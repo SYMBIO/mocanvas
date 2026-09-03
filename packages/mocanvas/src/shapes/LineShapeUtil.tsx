@@ -13,7 +13,7 @@ import {
 } from "@mocanvas/editor"
 import { getIndexBetween, sortByIndex, type IndexKey } from "@mocanvas/store"
 import type { ReactNode } from "react"
-import { getStrokeRgba } from "./shape-theme"
+import { getStrokeRgba, getDashId } from "./shape-theme"
 import { catmullRomToBezier } from "./spline-helpers"
 import { pathWordsToSvgD } from "./svg-path"
 
@@ -80,7 +80,7 @@ export class LineShapeUtil extends ShapeUtil<LineShape> {
       stroke: getStrokeRgba(color),
       strokeWidth: STROKE_SIZES[size] * scale,
       fill: 0,
-      dash: 0,
+      dash: getDashId(shape.props.dash),
       opacity: 1,
     }
   }

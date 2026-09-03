@@ -32,7 +32,16 @@ import {
   type TextShape,
 } from "./index"
 
-const editor = { getEditingShapeId: () => null } as unknown as Editor
+const editor = {
+  getEditingShapeId: () => null,
+  getBindingsFromShape: () => [],
+  getShapePageTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+  getCurrentPageShapesSorted: () => [],
+  getShapeParent: () => undefined,
+  options: { hitTestMargin: 8 },
+  getZoomLevel: () => 1,
+  inputs: { ctrlKey: false },
+} as unknown as Editor
 
 function makeShape<T extends UnknownShape>(type: T["type"], props: T["props"]): T {
   return {
@@ -383,11 +392,12 @@ describe("ArrowShapeUtil", () => {
     const shape = makeShape<ArrowShape>("arrow", base())
     const handles = util.getHandles(shape)
     expect(handles.map((h) => h.id)).toEqual(["start", "bend", "end"])
-    expect(util.onHandleDrag(shape, { handle: { ...handles[0]!, x: -5, y: 3 } })?.props?.start).toEqual({ x: -5, y: 3 })
-    expect(util.onHandleDrag(shape, { handle: { ...handles[2]!, x: 250, y: 9 } })?.props?.end).toEqual({ x: 250, y: 9 })
-    expect(util.onHandleDrag(shape, { handle: { ...handles[1]!, x: 100, y: 60 } })?.props?.bend).toBeCloseTo(60)
-    expect(util.onHandleDrag(shape, { handle: { ...handles[1]!, x: 100, y: 0.2 } })?.props?.bend).toBe(0)
-    expect(util.onHandleDrag(shape, { handle: { ...handles[1]!, id: "nope" } })).toBeUndefined()
+    const drag = (handle: (typeof handles)[number]) => util.onHandleDrag(shape, { handle, isPrecise: false })
+    expect(drag({ ...handles[0]!, x: -5, y: 3 })?.props?.start).toEqual({ x: -5, y: 3 })
+    expect(drag({ ...handles[2]!, x: 250, y: 9 })?.props?.end).toEqual({ x: 250, y: 9 })
+    expect(drag({ ...handles[1]!, x: 100, y: 60 })?.props?.bend).toBeCloseTo(60)
+    expect(drag({ ...handles[1]!, x: 100, y: 0.2 })?.props?.bend).toBe(0)
+    expect(drag({ ...handles[1]!, id: "nope" })).toBeUndefined()
   })
 
   it("label rect is added and excluded from path words", () => {
@@ -421,7 +431,7 @@ describe("TextShapeUtil", () => {
     expect(g1.bounds.h).toBeCloseTo(24 * 1.3)
     expect(g1.isFilled).toBe(true)
 
-    const wrapped = makeShape<TextShape>("text", { ...util.getDefaultProps(), w: 100, text: "a".repeat(30) })
+    const wrapped = makeShape<TextShape>("text", { ...util.getDefaultProps(), w: 100, autoSize: false, text: "a".repeat(30) })
     // 100 / (24 * 0.6) = 6 chars per line → 5 lines
     expect(util.getGeometry(wrapped).bounds.h).toBeCloseTo(5 * 24 * 1.3)
 

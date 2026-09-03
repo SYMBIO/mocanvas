@@ -59,3 +59,17 @@ export function getFontFamily(font: DefaultFontStyle): string {
       return 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace'
   }
 }
+
+/** Engine dash pattern id for a dash style (see `mocanvas-render::dash`). */
+export function getDashId(dash: string): number {
+  switch (dash) {
+    case "dashed":
+      return 1
+    case "dotted":
+      return 2
+    case "draw":
+      return 3
+    default:
+      return 0
+  }
+}

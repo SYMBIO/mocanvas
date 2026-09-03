@@ -35,6 +35,15 @@ import {
   type UnknownShape,
 } from "../records/base"
 import type { ShapeUtil, ShapeUtilConstructor } from "../shapes/ShapeUtil"
+import type { BindingUtil, BindingUtilConstructor } from "../bindings/BindingUtil"
+import {
+  BindingRecordType,
+  isBinding,
+  type BindingCreate,
+  type BindingId,
+  type BindingPartial,
+  type UnknownBinding,
+} from "../records/binding"
 import { createRootState } from "../tools/RootState"
 import type { StateNode, StateNodeConstructor } from "../tools/StateNode"
 import type { RenderBackend } from "../render/backend"
@@ -48,11 +57,14 @@ import {
   type WheelEventInfo,
 } from "./events"
 import { HandleTable } from "./HandleTable"
+import { getStylePropsOf, SharedStyleMap, type StyleProp } from "../records/styleProp"
 import { HistoryManager } from "./HistoryManager"
+import { SnapManager } from "./SnapManager"
 
 export interface EditorOptions {
   store: EditorStore
   shapeUtils: readonly ShapeUtilConstructor[]
+  bindingUtils?: readonly BindingUtilConstructor[]
   tools: readonly StateNodeConstructor[]
   engine: EngineBridge
   /** Id of the tool to start in. Defaults to the first tool. */
@@ -127,9 +139,11 @@ export class Editor extends EventEmitter<EditorEvents> {
   readonly history: HistoryManager<EditorRecord>
   readonly root: StateNode
   readonly shapeUtils: Readonly<Record<string, ShapeUtil>>
+  readonly bindingUtils: Readonly<Record<string, BindingUtil>>
   readonly options: EditorConfig
   readonly inputs: EditorInputs
   readonly handles = new HandleTable()
+  readonly snaps: SnapManager
   readonly getContainer: () => HTMLElement
   readonly sideEffects: EditorStore["sideEffects"]
 
@@ -148,6 +162,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.getContainer = opts.getContainer
     this.options = { ...DEFAULT_EDITOR_CONFIG, ...opts.options }
     this.sideEffects = this.store.sideEffects
+    this.snaps = new SnapManager(this)
 
     this._frameEpoch = atom("editor.frameEpoch", 0)
     this._overlayShapeIds = atom<readonly ShapeId[]>("editor.overlayShapeIds", [])
@@ -186,7 +201,15 @@ export class Editor extends EventEmitter<EditorEvents> {
     }
     this.shapeUtils = utils
 
+    const bindingUtils: Record<string, BindingUtil> = {}
+    for (const B of opts.bindingUtils ?? []) {
+      if (bindingUtils[B.type]) throw new Error(`Duplicate BindingUtil for type "${B.type}"`)
+      bindingUtils[B.type] = new B(this)
+    }
+    this.bindingUtils = bindingUtils
+
     this.ensureBaseRecords()
+    this.registerBindingSideEffects()
 
     this.history = new HistoryManager(this.store, () => this.emit("update"))
 
@@ -701,7 +724,13 @@ export class Editor extends EventEmitter<EditorEvents> {
           index = indexCache.has(parentId) ? getIndexAbove(prev) : prev
           indexCache.set(parentId, index)
         }
-        const props = { ...util.getDefaultProps(), ...(partial.props ?? {}) }
+        const props: Record<string, unknown> = { ...(util.getDefaultProps() as Record<string, unknown>) }
+        // Styles remembered for the next shape, unless the caller sets them explicitly.
+        const styles = this.getInstanceState().stylesForNextShape
+        for (const [key, style] of this.getStylePropsForType(partial.type)) {
+          if (style.id in styles) props[key] = styles[style.id]
+        }
+        Object.assign(props, partial.props ?? {})
         let shape = ShapeRecordType.create({
           id: partial.id ?? ShapeRecordType.createId(),
           type: partial.type,
@@ -712,7 +741,7 @@ export class Editor extends EventEmitter<EditorEvents> {
           parentId,
           isLocked: partial.isLocked ?? false,
           opacity: partial.opacity ?? 1,
-          props,
+          props: props as T["props"],
           meta: { ...(partial.meta ?? {}) },
         }) as T
         const next = util.onBeforeCreate?.(shape)
@@ -805,6 +834,477 @@ export class Editor extends EventEmitter<EditorEvents> {
       this.updateShapes(updates)
     })
     return this
+  }
+
+  // ---- bindings ----------------------------------------------------------
+
+  private readonly _allBindings: Computed<UnknownBinding[]> = computed("editor.allBindings", () =>
+    this.store.query.records("binding").get() as UnknownBinding[],
+  )
+
+  getBindingUtil<B extends UnknownBinding>(binding: B | B["type"]): BindingUtil<B> {
+    const type = typeof binding === "string" ? binding : binding.type
+    const util = this.bindingUtils[type]
+    if (!util) throw new Error(`No BindingUtil registered for type "${type}"`)
+    return util as BindingUtil<B>
+  }
+
+  hasBindingUtil(type: string): boolean {
+    return type in this.bindingUtils
+  }
+
+  getBinding<B extends UnknownBinding = UnknownBinding>(id: BindingId): B | undefined {
+    return this.store.get(id) as B | undefined
+  }
+
+  getBindingsFromShape<B extends UnknownBinding = UnknownBinding>(shape: UnknownShape | ShapeId, type?: B["type"]): B[] {
+    const id = typeof shape === "string" ? shape : shape.id
+    return this._allBindings.get().filter((b) => b.fromId === id && (!type || b.type === type)) as B[]
+  }
+
+  getBindingsToShape<B extends UnknownBinding = UnknownBinding>(shape: UnknownShape | ShapeId, type?: B["type"]): B[] {
+    const id = typeof shape === "string" ? shape : shape.id
+    return this._allBindings.get().filter((b) => b.toId === id && (!type || b.type === type)) as B[]
+  }
+
+  getBindingsInvolvingShape<B extends UnknownBinding = UnknownBinding>(shape: UnknownShape | ShapeId, type?: B["type"]): B[] {
+    const id = typeof shape === "string" ? shape : shape.id
+    return this._allBindings.get().filter((b) => (b.fromId === id || b.toId === id) && (!type || b.type === type)) as B[]
+  }
+
+  createBinding<B extends UnknownBinding>(partial: BindingCreate<B>): this {
+    return this.createBindings([partial])
+  }
+
+  createBindings<B extends UnknownBinding>(partials: readonly BindingCreate<B>[]): this {
+    if (partials.length === 0) return this
+    this.run(() => {
+      const records: UnknownBinding[] = []
+      for (const partial of partials) {
+        const util = this.getBindingUtil<B>(partial.type)
+        if (!this.getShape(partial.fromId) || !this.getShape(partial.toId)) continue
+        let binding = BindingRecordType.create({
+          id: partial.id ?? BindingRecordType.createId(),
+          type: partial.type,
+          fromId: partial.fromId,
+          toId: partial.toId,
+          props: { ...util.getDefaultProps(), ...(partial.props ?? {}) },
+          meta: { ...(partial.meta ?? {}) } as UnknownBinding["meta"],
+        }) as B
+        const next = util.onBeforeCreate?.({ binding })
+        if (next) binding = next
+        records.push(binding)
+      }
+      this.store.put(records)
+    })
+    return this
+  }
+
+  updateBinding<B extends UnknownBinding>(partial: BindingPartial<B>): this {
+    return this.updateBindings([partial])
+  }
+
+  updateBindings<B extends UnknownBinding>(partials: readonly BindingPartial<B>[]): this {
+    this.run(() => {
+      const records: UnknownBinding[] = []
+      for (const partial of partials) {
+        const prev = this.getBinding<B>(partial.id)
+        if (!prev) continue
+        let next: B = {
+          ...prev,
+          ...partial,
+          props: partial.props ? { ...prev.props, ...partial.props } : prev.props,
+          meta: partial.meta ? { ...prev.meta, ...partial.meta } : prev.meta,
+        } as B
+        const adjusted = this.getBindingUtil<B>(prev).onBeforeChange?.({ bindingBefore: prev, bindingAfter: next })
+        if (adjusted) next = adjusted
+        records.push(next)
+      }
+      if (records.length) this.store.put(records)
+    })
+    return this
+  }
+
+  deleteBinding(id: BindingId | UnknownBinding, opts: { isolateShapes?: boolean } = {}): this {
+    return this.deleteBindings([id], opts)
+  }
+
+  deleteBindings(ids: readonly (BindingId | UnknownBinding)[], opts: { isolateShapes?: boolean } = {}): this {
+    const bindingIds = ids.map((b) => (typeof b === "string" ? b : b.id))
+    if (bindingIds.length === 0) return this
+    this.run(() => {
+      if (opts.isolateShapes) {
+        for (const id of bindingIds) {
+          const binding = this.getBinding(id)
+          if (!binding) continue
+          const util = this.getBindingUtil(binding)
+          util.onBeforeIsolateFromShape?.({ binding })
+          util.onBeforeIsolateToShape?.({ binding })
+        }
+      }
+      this.store.remove(bindingIds.filter((id) => this.store.has(id)))
+    })
+    return this
+  }
+
+  /** Store side effects that keep bindings consistent with their shapes. */
+  private registerBindingSideEffects(): void {
+    const se = this.store.sideEffects
+    this.disposables.push(
+      se.registerAfterCreateHandler("binding", (record) => {
+        if (!isBinding(record) || !this.hasBindingUtil(record.type)) return
+        this.getBindingUtil(record).onAfterCreate?.({ binding: record })
+      }),
+      se.registerAfterChangeHandler("binding", (prev, next) => {
+        if (!isBinding(next) || !isBinding(prev) || !this.hasBindingUtil(next.type)) return
+        this.getBindingUtil(next).onAfterChange?.({ bindingBefore: prev, bindingAfter: next })
+      }),
+      se.registerBeforeDeleteHandler("binding", (record) => {
+        if (!isBinding(record) || !this.hasBindingUtil(record.type)) return
+        this.getBindingUtil(record).onBeforeDelete?.({ binding: record })
+      }),
+      se.registerAfterDeleteHandler("binding", (record) => {
+        if (!isBinding(record) || !this.hasBindingUtil(record.type)) return
+        this.getBindingUtil(record).onAfterDelete?.({ binding: record })
+      }),
+      se.registerAfterChangeHandler("shape", (prev, next) => {
+        if (prev.typeName !== "shape" || next.typeName !== "shape") return
+        if (this._allBindings.get().length === 0) return
+        for (const binding of this.getBindingsInvolvingShape(next.id)) {
+          if (!this.hasBindingUtil(binding.type)) continue
+          const util = this.getBindingUtil(binding)
+          if (binding.fromId === next.id) util.onAfterChangeFromShape?.({ binding, shapeBefore: prev, shapeAfter: next, reason: "self" })
+          if (binding.toId === next.id) util.onAfterChangeToShape?.({ binding, shapeBefore: prev, shapeAfter: next, reason: "self" })
+        }
+      }),
+      se.registerBeforeDeleteHandler("shape", (record) => {
+        if (record.typeName !== "shape") return
+        const bindings = this.getBindingsInvolvingShape(record.id)
+        if (bindings.length === 0) return
+        for (const binding of bindings) {
+          if (!this.hasBindingUtil(binding.type)) continue
+          const util = this.getBindingUtil(binding)
+          if (binding.fromId === record.id) util.onBeforeDeleteFromShape?.({ binding, shape: record })
+          if (binding.toId === record.id) util.onBeforeDeleteToShape?.({ binding, shape: record })
+        }
+        this.store.remove(bindings.map((b) => b.id).filter((id) => this.store.has(id)))
+      }),
+    )
+  }
+
+  /** Duplicate shapes (and their descendants) with new ids, offset by `offset` in page space. Returns the new top-level ids. */
+  duplicateShapes(ids: readonly ShapeId[] = this.getSelectedShapeIds(), offset: VecLike = { x: 20, y: 20 }): ShapeId[] {
+    if (ids.length === 0) return []
+    const idMap = new Map<ShapeId, ShapeId>()
+    const collect = (id: ShapeId): void => {
+      if (idMap.has(id)) return
+      idMap.set(id, ShapeRecordType.createId() as ShapeId)
+      for (const c of this.getSortedChildIdsForParent(id)) collect(c)
+    }
+    for (const id of ids) collect(id)
+    const topLevel = new Set(ids)
+    const creates: ShapeCreate[] = []
+    // Preserve draw order.
+    for (const shape of this.getCurrentPageShapesSorted()) {
+      const newId = idMap.get(shape.id)
+      if (!newId) continue
+      const parentId = isShapeId(shape.parentId) && idMap.has(shape.parentId) ? idMap.get(shape.parentId)! : shape.parentId
+      const isTop = topLevel.has(shape.id) || !idMap.has(shape.parentId as ShapeId)
+      creates.push({
+        ...shape,
+        id: newId,
+        parentId,
+        x: shape.x + (isTop ? offset.x : 0),
+        y: shape.y + (isTop ? offset.y : 0),
+        index: undefined as unknown as IndexKey,
+        props: { ...shape.props },
+        meta: { ...shape.meta },
+      })
+    }
+    this.run(() => {
+      this.createShapes(creates)
+      // Copy bindings between duplicated shapes.
+      const bindingCreates: BindingCreate[] = []
+      for (const b of this._allBindings.get()) {
+        const from = idMap.get(b.fromId)
+        const to = idMap.get(b.toId)
+        if (from && to) bindingCreates.push({ type: b.type, fromId: from, toId: to, props: { ...b.props }, meta: { ...b.meta } })
+      }
+      if (bindingCreates.length) this.createBindings(bindingCreates)
+    })
+    return ids.map((id) => idMap.get(id)!)
+  }
+
+  /** Serializable content for the clipboard: shapes (with descendants) and bindings between them. */
+  getContentFromCurrentPage(ids: readonly ShapeId[]): { shapes: UnknownShape[]; bindings: UnknownBinding[] } | undefined {
+    if (ids.length === 0) return undefined
+    const set = new Set<ShapeId>()
+    const collect = (id: ShapeId): void => {
+      if (set.has(id)) return
+      set.add(id)
+      for (const c of this.getSortedChildIdsForParent(id)) collect(c)
+    }
+    for (const id of ids) collect(id)
+    const shapes = this.getCurrentPageShapesSorted().filter((s) => set.has(s.id))
+    const bindings = this._allBindings.get().filter((b) => set.has(b.fromId) && set.has(b.toId))
+    return { shapes, bindings }
+  }
+
+  /** Insert clipboard content at a page point (centered), with fresh ids. Returns the new ids. */
+  putContentOntoCurrentPage(content: { shapes: UnknownShape[]; bindings?: UnknownBinding[] }, opts: { point?: VecLike; select?: boolean } = {}): ShapeId[] {
+    const { shapes } = content
+    if (shapes.length === 0) return []
+    const idMap = new Map<ShapeId, ShapeId>()
+    for (const s of shapes) idMap.set(s.id, ShapeRecordType.createId() as ShapeId)
+    const pageId = this.getCurrentPageId()
+    const tops = shapes.filter((s) => !idMap.has(s.parentId as ShapeId))
+    let offset = new Vec(0, 0)
+    if (opts.point) {
+      // Center the content's top-level bounds on the point.
+      const boxes = tops.map((s) => {
+        const util = this.shapeUtils[s.type]
+        const b = util ? util.getGeometry(s).bounds : new Box(0, 0, 0, 0)
+        return new Box(s.x + b.x, s.y + b.y, b.w, b.h)
+      })
+      const common = Box.Common(boxes)
+      offset = Vec.Sub(opts.point, common.center)
+    }
+    const creates: ShapeCreate[] = shapes.map((s) => {
+      const isTop = !idMap.has(s.parentId as ShapeId)
+      return {
+        ...s,
+        id: idMap.get(s.id)!,
+        parentId: isTop ? pageId : idMap.get(s.parentId as ShapeId)!,
+        x: s.x + (isTop ? offset.x : 0),
+        y: s.y + (isTop ? offset.y : 0),
+        index: undefined as unknown as IndexKey,
+        props: { ...s.props },
+        meta: { ...s.meta },
+      }
+    })
+    this.run(() => {
+      this.createShapes(creates.filter((c) => this.hasShapeUtil(c.type)))
+      const bindingCreates: BindingCreate[] = []
+      for (const b of content.bindings ?? []) {
+        const from = idMap.get(b.fromId)
+        const to = idMap.get(b.toId)
+        if (from && to && this.hasBindingUtil(b.type)) bindingCreates.push({ type: b.type, fromId: from, toId: to, props: { ...b.props }, meta: { ...b.meta } })
+      }
+      if (bindingCreates.length) this.createBindings(bindingCreates)
+      if (opts.select ?? true) this.setSelectedShapes(tops.map((s) => idMap.get(s.id)!))
+    })
+    return tops.map((s) => idMap.get(s.id)!)
+  }
+
+  // ---- styles ------------------------------------------------------------
+
+  private readonly stylePropCache = new Map<string, Map<string, StyleProp<unknown>>>()
+
+  /** Style props declared by the ShapeUtil for a type, keyed by prop name. */
+  getStylePropsForType(type: string): Map<string, StyleProp<unknown>> {
+    let m = this.stylePropCache.get(type)
+    if (!m) {
+      const ctor = this.shapeUtils[type]?.constructor as ShapeUtilConstructor | undefined
+      m = getStylePropsOf(ctor?.props)
+      this.stylePropCache.set(type, m)
+    }
+    return m
+  }
+
+  getStyleForNextShape<T>(style: StyleProp<T>): T {
+    const v = this.getInstanceState().stylesForNextShape[style.id]
+    return v === undefined ? style.defaultValue : (v as T)
+  }
+
+  setStyleForNextShapes<T>(style: StyleProp<T>, value: T): this {
+    const styles = this.getInstanceState().stylesForNextShape
+    if (styles[style.id] === value) return this
+    return this.updateInstanceState({ stylesForNextShape: { ...styles, [style.id]: value } })
+  }
+
+  /** Set a style on every selected shape that declares it. */
+  setStyleForSelectedShapes<T>(style: StyleProp<T>, value: T): this {
+    const updates: ShapePartial[] = []
+    for (const shape of this.getSelectedShapes()) {
+      for (const [key, sp] of this.getStylePropsForType(shape.type)) {
+        if (sp !== style) continue
+        if ((shape.props as Record<string, unknown>)[key] === value) continue
+        updates.push({ id: shape.id, type: shape.type, props: { [key]: value } })
+      }
+    }
+    if (updates.length) this.updateShapes(updates)
+    return this
+  }
+
+  /** Styles of the selection (or of the next shape when nothing is selected). */
+  getSharedStyles(): SharedStyleMap {
+    const map = new SharedStyleMap()
+    const selected = this.getSelectedShapes()
+    if (selected.length === 0) {
+      const styles = this.getInstanceState().stylesForNextShape
+      const seen = new Set<StyleProp<unknown>>()
+      for (const type of Object.keys(this.shapeUtils)) {
+        for (const sp of this.getStylePropsForType(type).values()) {
+          if (seen.has(sp)) continue
+          seen.add(sp)
+          map.applyValue(sp, styles[sp.id] ?? sp.defaultValue)
+        }
+      }
+      return map
+    }
+    for (const shape of selected) {
+      for (const [key, sp] of this.getStylePropsForType(shape.type)) {
+        map.applyValue(sp, (shape.props as Record<string, unknown>)[key])
+      }
+    }
+    return map
+  }
+
+  // ---- bulk transforms ---------------------------------------------------
+
+  /** Move shapes by a page-space offset. */
+  nudgeShapes(ids: readonly ShapeId[], offset: VecLike): this {
+    const updates: ShapePartial[] = []
+    for (const id of ids) {
+      const shape = this.getShape(id)
+      if (!shape || shape.isLocked) continue
+      const parent = this.getShapeParent(shape)
+      let d = new Vec(offset.x, offset.y)
+      if (parent) {
+        const m = this.getShapePageTransform(parent)
+        const det = m.a * m.d - m.b * m.c || 1
+        d = new Vec((m.d * d.x - m.c * d.y) / det, (-m.b * d.x + m.a * d.y) / det)
+      }
+      updates.push({ id, type: shape.type, x: shape.x + d.x, y: shape.y + d.y })
+    }
+    return this.updateShapes(updates)
+  }
+
+  /** Rotate shapes by `delta` radians around the center of their common page bounds. */
+  rotateShapesBy(ids: readonly ShapeId[], delta: number, center?: VecLike): this {
+    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
+    if (shapes.length === 0) return this
+    const boxes = shapes.map((s) => this.getShapePageBounds(s)).filter((b): b is Box => !!b)
+    const c = center ?? Box.Common(boxes).center
+    const updates: ShapePartial[] = []
+    for (const shape of shapes) {
+      const m = this.getShapePageTransform(shape)
+      const newPagePos = Vec.RotWith(new Vec(m.e, m.f), c, delta)
+      const parentPoint = this.getPointInParentSpace(shape, newPagePos)
+      updates.push({ id: shape.id, type: shape.type, x: parentPoint.x, y: parentPoint.y, rotation: shape.rotation + delta })
+    }
+    return this.updateShapes(updates)
+  }
+
+  /** Mirror shapes across the center of their common bounds. Positions flip; geometry is not mirrored. */
+  flipShapes(ids: readonly ShapeId[], operation: "horizontal" | "vertical"): this {
+    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
+    if (shapes.length < 1) return this
+    const boxes = shapes.map((s) => this.getShapePageBounds(s)!)
+    const common = Box.Common(boxes)
+    const updates: ShapePartial[] = []
+    shapes.forEach((shape, i) => {
+      const b = boxes[i]!
+      const nb =
+        operation === "horizontal"
+          ? new Box(common.maxX - (b.maxX - common.x), b.y, b.w, b.h)
+          : new Box(b.x, common.maxY - (b.maxY - common.y), b.w, b.h)
+      const d = new Vec(nb.x - b.x, nb.y - b.y)
+      const m = this.getShapePageTransform(shape)
+      const parentPoint = this.getPointInParentSpace(shape, new Vec(m.e + d.x, m.f + d.y))
+      updates.push({ id: shape.id, type: shape.type, x: parentPoint.x, y: parentPoint.y })
+    })
+    return this.updateShapes(updates)
+  }
+
+  /** Align shapes along an edge or center of their common bounds. */
+  alignShapes(ids: readonly ShapeId[], operation: "left" | "center-horizontal" | "right" | "top" | "center-vertical" | "bottom"): this {
+    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
+    if (shapes.length < 2) return this
+    const boxes = shapes.map((s) => this.getShapePageBounds(s)!)
+    const common = Box.Common(boxes)
+    const updates: ShapePartial[] = []
+    shapes.forEach((shape, i) => {
+      const b = boxes[i]!
+      let d = new Vec()
+      switch (operation) {
+        case "left":
+          d = new Vec(common.x - b.x, 0)
+          break
+        case "center-horizontal":
+          d = new Vec(common.center.x - b.center.x, 0)
+          break
+        case "right":
+          d = new Vec(common.maxX - b.maxX, 0)
+          break
+        case "top":
+          d = new Vec(0, common.y - b.y)
+          break
+        case "center-vertical":
+          d = new Vec(0, common.center.y - b.center.y)
+          break
+        case "bottom":
+          d = new Vec(0, common.maxY - b.maxY)
+          break
+      }
+      if (d.x === 0 && d.y === 0) return
+      const m = this.getShapePageTransform(shape)
+      const parentPoint = this.getPointInParentSpace(shape, new Vec(m.e + d.x, m.f + d.y))
+      updates.push({ id: shape.id, type: shape.type, x: parentPoint.x, y: parentPoint.y })
+    })
+    return this.updateShapes(updates)
+  }
+
+  /** Space shapes evenly between the first and last along an axis. */
+  distributeShapes(ids: readonly ShapeId[], operation: "horizontal" | "vertical"): this {
+    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
+    if (shapes.length < 3) return this
+    const items = shapes.map((s) => ({ shape: s, b: this.getShapePageBounds(s)! }))
+    const horizontal = operation === "horizontal"
+    items.sort((a, b) => (horizontal ? a.b.center.x - b.b.center.x : a.b.center.y - b.b.center.y))
+    const first = items[0]!
+    const last = items.at(-1)!
+    const span = horizontal ? last.b.x - (first.b.maxX) : last.b.y - first.b.maxY
+    const inner = items.slice(1, -1)
+    const totalInner = inner.reduce((acc, i) => acc + (horizontal ? i.b.w : i.b.h), 0)
+    const gap = (span - totalInner) / (inner.length + 1)
+    let cursor = horizontal ? first.b.maxX + gap : first.b.maxY + gap
+    const updates: ShapePartial[] = []
+    for (const it of inner) {
+      const d = horizontal ? new Vec(cursor - it.b.x, 0) : new Vec(0, cursor - it.b.y)
+      cursor += (horizontal ? it.b.w : it.b.h) + gap
+      const m = this.getShapePageTransform(it.shape)
+      const parentPoint = this.getPointInParentSpace(it.shape, new Vec(m.e + d.x, m.f + d.y))
+      updates.push({ id: it.shape.id, type: it.shape.type, x: parentPoint.x, y: parentPoint.y })
+    }
+    return this.updateShapes(updates)
+  }
+
+  /** Stack shapes edge to edge with a fixed gap along an axis (order by current position). */
+  stackShapes(ids: readonly ShapeId[], operation: "horizontal" | "vertical", gap = 16): this {
+    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
+    if (shapes.length < 2) return this
+    const items = shapes.map((s) => ({ shape: s, b: this.getShapePageBounds(s)! }))
+    const horizontal = operation === "horizontal"
+    items.sort((a, b) => (horizontal ? a.b.x - b.b.x : a.b.y - b.b.y))
+    let cursor = horizontal ? items[0]!.b.maxX + gap : items[0]!.b.maxY + gap
+    const updates: ShapePartial[] = []
+    for (const it of items.slice(1)) {
+      const d = horizontal ? new Vec(cursor - it.b.x, 0) : new Vec(0, cursor - it.b.y)
+      cursor += (horizontal ? it.b.w : it.b.h) + gap
+      const m = this.getShapePageTransform(it.shape)
+      const parentPoint = this.getPointInParentSpace(it.shape, new Vec(m.e + d.x, m.f + d.y))
+      updates.push({ id: it.shape.id, type: it.shape.type, x: parentPoint.x, y: parentPoint.y })
+    }
+    return this.updateShapes(updates)
+  }
+
+  /** Toggle the locked state of shapes. */
+  toggleLock(ids: readonly ShapeId[] = this.getSelectedShapeIds()): this {
+    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s)
+    if (shapes.length === 0) return this
+    const allLocked = shapes.every((s) => s.isLocked)
+    return this.updateShapes(shapes.map((s) => ({ id: s.id, type: s.type, isLocked: !allLocked })))
   }
 
   // ---- z-order -----------------------------------------------------------
@@ -1305,6 +1805,14 @@ export class Editor extends EventEmitter<EditorEvents> {
       return
     }
     let dirty = false
+    // Binding changes (e.g. undo of a binding alone) affect the geometry of their `from` shape.
+    const rebind = new Set<ShapeId>()
+    for (const rec of [...Object.values(changes.added), ...Object.values(changes.removed)]) {
+      if (isBinding(rec)) rebind.add(rec.fromId)
+    }
+    for (const [, next] of Object.values(changes.updated)) {
+      if (isBinding(next)) rebind.add(next.fromId)
+    }
     for (const rec of Object.values(changes.removed)) {
       if (rec.typeName !== "shape") continue
       const h = this.handles.release(rec.id)
@@ -1332,7 +1840,15 @@ export class Editor extends EventEmitter<EditorEvents> {
       }
       const geometryChanged = prev.props !== next.props || prev.type !== next.type || prev.opacity !== next.opacity
       this.writeShapeToEngine(next, geometryChanged || this.handles.peek(next.id) === undefined)
+      rebind.delete(next.id)
       dirty = true
+    }
+    for (const id of rebind) {
+      const shape = this.getShape(id)
+      if (shape && this.getAncestorPageId(shape) === pageId && !(id in changes.added)) {
+        this.writeShapeToEngine(shape, true)
+        dirty = true
+      }
     }
     if (dirty) {
       this.flushEngine()

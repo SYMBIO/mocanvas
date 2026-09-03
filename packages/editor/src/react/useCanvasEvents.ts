@@ -1,6 +1,8 @@
 import { useMemo } from "react"
 import type { Editor } from "../editor/Editor"
 import type { ClickEventInfo, PointerEventInfo, PointerTarget, WheelEventInfo } from "../editor/events"
+import { hitTestSelectionBounds, hitTestSelectionHandles, HANDLE_HIT_RADIUS } from "../editor/selectionHandles"
+import { Vec } from "../geometry"
 
 function modifiers(e: { shiftKey: boolean; altKey: boolean; ctrlKey: boolean; metaKey: boolean }) {
   const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform ?? "")
@@ -22,8 +24,40 @@ function localPoint(editor: Editor, e: { clientX: number; clientY: number }): { 
 /** Resolve what is under the pointer for the event target. */
 function resolveTarget(editor: Editor, point: { x: number; y: number }): PointerTarget {
   const page = editor.screenToPage(point)
-  const shape = editor.getShapeAtPoint(page, { hitInside: false })
-  return shape ? { target: "shape", shape } : { target: "canvas" }
+  if (editor.getCurrentToolId() === "select") {
+    const selHandle = hitTestSelectionHandles(editor, point)
+    if (selHandle) return { target: "selection", handle: selHandle }
+    // Shape handles (arrow ends, line points) of the only selected shape.
+    const only = editor.getOnlySelectedShape()
+    if (only) {
+      const handles = editor.getShapeUtil(only).getHandles?.(only)
+      if (handles?.length) {
+        const local = editor.getPointInShapeSpace(only, page)
+        const r = HANDLE_HIT_RADIUS / editor.getZoomLevel()
+        let best: (typeof handles)[number] | undefined
+        let bestD = r * r
+        for (const h of handles) {
+          const d = Vec.Dist2(h, local)
+          if (d <= bestD) {
+            bestD = d
+            best = h
+          }
+        }
+        if (best) return { target: "handle", shape: only, handle: best }
+      }
+    }
+  }
+  // Filled shapes hit on their interior, hollow ones only near their outline (engine decides per style).
+  const shape = editor.getShapeAtPoint(page, { hitInside: true })
+  if (shape) return { target: "shape", shape }
+  if (editor.getCurrentToolId() === "select" && hitTestSelectionBounds(editor, page)) {
+    const selected = editor.getSelectedShapes()
+    const inside = selected.find((s) => editor.getShapeGeometry(s).hitTestPoint(editor.getPointInShapeSpace(s, page), 0, true))
+    return inside ? { target: "shape", shape: inside } : { target: "selection" }
+  }
+  const filled = editor.getShapeAtPoint(page, { hitInside: true })
+  if (filled && editor.getSelectedShapeIds().includes(filled.id)) return { target: "shape", shape: filled }
+  return { target: "canvas" }
 }
 
 /** DOM handlers that translate browser events into editor events. */

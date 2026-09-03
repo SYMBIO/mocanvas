@@ -9,7 +9,7 @@ import {
   type UnknownShape,
 } from "@mocanvas/editor"
 import type { ReactNode } from "react"
-import { getFontFamily } from "./shape-theme"
+import { TextLabel } from "../text/TextEditor"
 
 export interface FrameShapeProps {
   w: number
@@ -22,6 +22,9 @@ export type FrameShape = BaseShape<"frame", FrameShapeProps>
 
 export const FRAME_FILL = "#ffffff"
 export const FRAME_STROKE = "#9fa8b2"
+const FRAME_NAME_COLOR = "#5c6470"
+const FRAME_NAME_FONT_SIZE = 12
+const FRAME_NAME_OFFSET = 24
 
 export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
   static override type = "frame" as const
@@ -44,27 +47,42 @@ export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
       <div
         style={{
           position: "absolute",
-          top: -24,
+          top: -FRAME_NAME_OFFSET,
           left: 0,
-          maxWidth: w,
-          height: 20,
-          lineHeight: "20px",
-          fontFamily: getFontFamily("sans"),
-          fontSize: 12,
-          color: "#5c6470",
-          whiteSpace: "nowrap",
+          width: w,
+          height: FRAME_NAME_OFFSET - 4,
           overflow: "hidden",
           textOverflow: "ellipsis",
           pointerEvents: "none",
         }}
       >
-        {name || "Frame"}
+        <TextLabel
+          shape={shape}
+          text={name}
+          isEditing={this.editor.getEditingShapeId() === shape.id}
+          font="sans"
+          fontSize={FRAME_NAME_FONT_SIZE}
+          color={FRAME_NAME_COLOR}
+          align="start"
+          verticalAlign="end"
+          wrap={false}
+          width={w}
+          height={FRAME_NAME_OFFSET - 4}
+          placeholder="Frame"
+          singleLine
+          onChange={(next) => this.editor.updateShape<FrameShape>({ id: shape.id, type: "frame", props: { name: next } })}
+        />
       </div>
     )
   }
 
   indicator(shape: FrameShape): ReactNode {
     return <rect width={shape.props.w} height={shape.props.h} />
+  }
+
+  /** The GPU draws the frame body while its name is edited. */
+  override needsOverlay(_shape: FrameShape): boolean {
+    return false
   }
 
   override hasOverlayLabel(_shape: FrameShape): boolean {
@@ -85,5 +103,10 @@ export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
 
   override getText(shape: FrameShape): string {
     return shape.props.name
+  }
+
+  override onEditEnd(shape: FrameShape): void {
+    const trimmed = shape.props.name.trim()
+    if (trimmed !== shape.props.name) this.editor.updateShape<FrameShape>({ id: shape.id, type: "frame", props: { name: trimmed } })
   }
 }

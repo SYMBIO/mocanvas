@@ -1,4 +1,4 @@
-import { track, useEditor, type Editor, type GeoShapeKind } from "@mocanvas/editor"
+import { GeoShapeGeoStyle, track, useEditor, type Editor, type GeoShapeKind } from "@mocanvas/editor"
 import type { CSSProperties } from "react"
 
 const panel: CSSProperties = {
@@ -46,6 +46,7 @@ const TOOLS: ToolButton[] = [
   { id: "geo", label: "◇", title: "Diamond", geo: "diamond" },
   { id: "geo", label: "☆", title: "Star", geo: "star" },
   { id: "note", label: "▤", title: "Note (N)" },
+  { id: "text", label: "T", title: "Text (T)" },
 ]
 
 /** Bottom toolbar. */
@@ -65,7 +66,7 @@ export const Toolbar = track(function Toolbar() {
             style={btn(active)}
             onClick={() => {
               if (t.geo) {
-                editor.updateInstanceState({ stylesForNextShape: { ...editor.getInstanceState().stylesForNextShape, geo: t.geo } })
+                editor.setStyleForNextShapes(GeoShapeGeoStyle, t.geo)
                 editor.setCurrentTool("geo", { geo: t.geo, force: true })
               } else editor.setCurrentTool(t.id)
             }}

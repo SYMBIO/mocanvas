@@ -15,7 +15,7 @@ import {
 } from "@mocanvas/editor"
 import type { ReactNode } from "react"
 import { smoothPoints } from "./draw-helpers"
-import { getFillRgba, getStrokeRgba } from "./shape-theme"
+import { getFillRgba, getStrokeRgba, getDashId } from "./shape-theme"
 
 export interface DrawPoint {
   x: number
@@ -83,7 +83,7 @@ export class DrawShapeUtil extends ShapeUtil<DrawShape> {
       stroke: getStrokeRgba(color),
       strokeWidth: STROKE_SIZES[size] * scale,
       fill: isClosed && fill !== "none" ? getFillRgba(color, fill) : 0,
-      dash: 0,
+      dash: getDashId(shape.props.dash),
       opacity: 1,
     }
   }

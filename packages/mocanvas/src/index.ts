@@ -1,6 +1,8 @@
 export * from "@mocanvas/editor"
 export * from "./shapes"
+export * from "./bindings"
 export * from "./tools"
+export * from "./text"
 export * from "./ui/DefaultUi"
 export { useKeyboardShortcuts } from "./ui/useKeyboardShortcuts"
 export * from "./file"

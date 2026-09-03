@@ -5,11 +5,29 @@ import {
   type ClickEventInfo,
   type KeyboardEventInfo,
   type PointerEventInfo,
+  type SelectionHandle,
+  type ShapeHandle,
   type ShapeId,
   type ShapePartial,
   type StateNodeConstructor,
   type UnknownShape,
 } from "@mocanvas/editor"
+
+const RESIZE_CURSORS: Partial<Record<SelectionHandle, string>> = {
+  top: "ns-resize",
+  bottom: "ns-resize",
+  left: "ew-resize",
+  right: "ew-resize",
+  top_left: "nwse-resize",
+  bottom_right: "nwse-resize",
+  top_right: "nesw-resize",
+  bottom_left: "nesw-resize",
+  rotate: "grab",
+}
+
+function setCursor(editor: { updateInstanceState(p: { cursor: { type: string; rotation: number } }): unknown }, type: string): void {
+  editor.updateInstanceState({ cursor: { type, rotation: 0 } })
+}
 
 class Idle extends StateNode {
   static override id = "idle"
@@ -21,6 +39,9 @@ class Idle extends StateNode {
   override onPointerMove(info: PointerEventInfo): void {
     const hovered = info.target === "shape" ? info.shape : undefined
     this.editor.setHoveredShape(hovered && !this.editor.isShapeOrAncestorLocked(hovered) ? hovered.id : null)
+    if (info.target === "selection" && info.handle) setCursor(this.editor, RESIZE_CURSORS[info.handle] ?? "default")
+    else if (info.target === "handle") setCursor(this.editor, "pointer")
+    else setCursor(this.editor, "default")
   }
 
   override onPointerDown(info: PointerEventInfo): void {
@@ -28,6 +49,16 @@ class Idle extends StateNode {
     switch (info.target) {
       case "canvas": {
         this.parent!.transition("pointing_canvas", info)
+        break
+      }
+      case "selection": {
+        if (info.handle === "rotate") this.parent!.transition("pointing_rotate_handle", info)
+        else if (info.handle) this.parent!.transition("pointing_resize_handle", info)
+        else this.parent!.transition("pointing_selection", info)
+        break
+      }
+      case "handle": {
+        this.parent!.transition("pointing_handle", info)
         break
       }
       case "shape": {
@@ -259,14 +290,35 @@ class Translating extends StateNode {
     if (info.key === "Shift" || info.key === "Alt") this.update()
   }
 
+  private initialBounds: Box | undefined
+
   private update(): void {
     const editor = this.editor
-    const { originPagePoint, currentPagePoint, shiftKey } = editor.inputs
+    const { originPagePoint, currentPagePoint, shiftKey, ctrlKey } = editor.inputs
     let delta = Vec.Sub(currentPagePoint, originPagePoint)
+    let lockX = false
+    let lockY = false
     if (shiftKey) {
       // lock to the dominant axis
-      if (Math.abs(delta.x) > Math.abs(delta.y)) delta = new Vec(delta.x, 0)
-      else delta = new Vec(0, delta.y)
+      if (Math.abs(delta.x) > Math.abs(delta.y)) {
+        delta = new Vec(delta.x, 0)
+        lockY = true
+      } else {
+        delta = new Vec(0, delta.y)
+        lockX = true
+      }
+    }
+    if (!ctrlKey && editor.inputs.isDragging) {
+      this.initialBounds ??= Box.Common(
+        [...this.initialShapes.values()].map((s) => editor.getShapePageBounds(s)).filter((b): b is Box => !!b),
+      )
+      if (this.initialBounds) {
+        const moving = new Box(this.initialBounds.x + delta.x, this.initialBounds.y + delta.y, this.initialBounds.w, this.initialBounds.h)
+        const { nudge } = editor.snaps.snapTranslate(moving, new Set(this.initialShapes.keys()), { lockX, lockY })
+        delta = Vec.Add(delta, nudge)
+      }
+    } else {
+      editor.snaps.clearLines()
     }
     const updates: ShapePartial[] = []
     for (const [id, initial] of this.initialShapes) {
@@ -296,11 +348,365 @@ class Translating extends StateNode {
     }
     this.parent!.transition("idle")
   }
+
+  override onExit(): void {
+    this.editor.snaps.clearLines()
+    this.initialBounds = undefined
+  }
 }
 
-/** Selection, brush select, and drag-to-move. Resize and rotate handles arrive in phase 2. */
+class PointingSelection extends StateNode {
+  static override id = "pointing_selection"
+  override onPointerMove(): void {
+    if (this.editor.inputs.isDragging) this.parent!.transition("translating")
+  }
+  override onPointerUp(): void {
+    this.parent!.transition("idle")
+  }
+  override onCancel(): void {
+    this.parent!.transition("idle")
+  }
+}
+
+class PointingResizeHandle extends StateNode {
+  static override id = "pointing_resize_handle"
+  private handle: SelectionHandle = "bottom_right"
+  override onEnter(info: Record<string, unknown>): void {
+    this.handle = (info as { handle?: SelectionHandle }).handle ?? "bottom_right"
+  }
+  override onPointerMove(): void {
+    if (this.editor.inputs.isDragging) this.parent!.transition("resizing", { handle: this.handle })
+  }
+  override onPointerUp(): void {
+    this.parent!.transition("idle")
+  }
+  override onCancel(): void {
+    this.parent!.transition("idle")
+  }
+}
+
+class PointingRotateHandle extends StateNode {
+  static override id = "pointing_rotate_handle"
+  override onPointerMove(): void {
+    if (this.editor.inputs.isDragging) this.parent!.transition("rotating")
+  }
+  override onPointerUp(): void {
+    this.parent!.transition("idle")
+  }
+  override onCancel(): void {
+    this.parent!.transition("idle")
+  }
+}
+
+class PointingHandle extends StateNode {
+  static override id = "pointing_handle"
+  private info: { shape: UnknownShape; handle: ShapeHandle } | null = null
+  override onEnter(info: Record<string, unknown>): void {
+    const i = info as { shape?: UnknownShape; handle?: ShapeHandle }
+    this.info = i.shape && i.handle ? { shape: i.shape, handle: i.handle } : null
+  }
+  override onPointerMove(): void {
+    if (this.editor.inputs.isDragging && this.info) this.parent!.transition("dragging_handle", this.info)
+  }
+  override onPointerUp(): void {
+    this.parent!.transition("idle")
+  }
+  override onCancel(): void {
+    this.parent!.transition("idle")
+  }
+}
+
+interface ResizeSnapshot {
+  shape: UnknownShape
+  /** Shape-local geometry bounds. */
+  bounds: Box
+  /** Page position of the shape origin. */
+  pagePos: Vec
+}
+
+class Resizing extends StateNode {
+  static override id = "resizing"
+  private handle: SelectionHandle = "bottom_right"
+  private markId = ""
+  private snapshots: ResizeSnapshot[] = []
+  private initialSelectionBounds = new Box()
+  private single: UnknownShape | undefined
+  private singleRotation = 0
+
+  override onEnter(info: Record<string, unknown>): void {
+    const editor = this.editor
+    this.handle = (info as { handle?: SelectionHandle }).handle ?? "bottom_right"
+    this.markId = editor.markHistoryStoppingPoint("resize")
+    const selected = editor.getSelectedShapes()
+    this.snapshots = selected.map((shape) => {
+      const m = editor.getShapePageTransform(shape)
+      return { shape, bounds: editor.getShapeGeometryBounds(shape)!.clone(), pagePos: new Vec(m.e, m.f) }
+    })
+    this.single = selected.length === 1 ? selected[0] : undefined
+    this.singleRotation = this.single ? editor.getSelectionRotation() : 0
+    this.initialSelectionBounds = this.single ? this.snapshots[0]!.bounds.clone() : editor.getSelectionPageBounds()!.clone()
+    for (const s of this.snapshots) editor.getShapeUtil(s.shape).onResizeStart?.(s.shape)
+    setCursor(editor, RESIZE_CURSORS[this.handle] ?? "default")
+    this.update()
+  }
+
+  override onPointerMove(): void {
+    this.update()
+  }
+  override onKeyDown(): void {
+    this.update()
+  }
+  override onKeyUp(): void {
+    this.update()
+  }
+  override onPointerUp(): void {
+    this.complete()
+  }
+  override onComplete(): void {
+    this.complete()
+  }
+  override onCancel(): void {
+    this.editor.bailToMark(this.markId)
+    this.parent!.transition("idle")
+  }
+
+  /** Pointer position in the resize frame (shape-local for a single shape, page for many). */
+  private framePoint(pagePoint: Vec): Vec {
+    if (!this.single) return pagePoint
+    const s = this.snapshots[0]!
+    // inverse of the initial page transform (rotation + translation only)
+    const d = Vec.Sub(pagePoint, s.pagePos)
+    return Vec.Rot(d, -this.singleRotation)
+  }
+
+  private update(): void {
+    const editor = this.editor
+    const { currentPagePoint, originPagePoint, shiftKey, altKey } = editor.inputs
+    const b0 = this.initialSelectionBounds
+    const p = this.framePoint(currentPagePoint)
+    const p0 = this.framePoint(originPagePoint)
+    const delta = Vec.Sub(p, p0)
+    const h = this.handle
+
+    // New frame bounds from the dragged handle.
+    let minX = b0.x
+    let minY = b0.y
+    let maxX = b0.maxX
+    let maxY = b0.maxY
+    if (h.includes("left")) minX += delta.x
+    if (h.includes("right")) maxX += delta.x
+    if (h.includes("top")) minY += delta.y
+    if (h.includes("bottom")) maxY += delta.y
+    if (altKey) {
+      // symmetric about the center
+      if (h.includes("left")) maxX -= delta.x
+      if (h.includes("right")) minX -= delta.x
+      if (h.includes("top")) maxY -= delta.y
+      if (h.includes("bottom")) minY -= delta.y
+    }
+    let scaleX = b0.w === 0 ? 1 : (maxX - minX) / b0.w
+    let scaleY = b0.h === 0 ? 1 : (maxY - minY) / b0.h
+    const lockAspect = shiftKey || (this.single ? editor.getShapeUtil(this.single).isAspectRatioLocked(this.single) : false)
+    if (lockAspect && h.includes("_")) {
+      const s = Math.max(Math.abs(scaleX), Math.abs(scaleY))
+      scaleX = Math.sign(scaleX || 1) * s
+      scaleY = Math.sign(scaleY || 1) * s
+      // recompute the moving edges from the anchored ones
+      if (h.includes("left")) minX = maxX - b0.w * scaleX
+      else maxX = minX + b0.w * scaleX
+      if (h.includes("top")) minY = maxY - b0.h * scaleY
+      else maxY = minY + b0.h * scaleY
+    }
+    // Flipping is not supported yet: clamp to a minimum size.
+    const MIN = 1
+    if (maxX - minX < MIN) {
+      if (h.includes("left")) minX = maxX - MIN
+      else maxX = minX + MIN
+      scaleX = MIN / (b0.w || MIN)
+    }
+    if (maxY - minY < MIN) {
+      if (h.includes("top")) minY = maxY - MIN
+      else maxY = minY + MIN
+      scaleY = MIN / (b0.h || MIN)
+    }
+    const anchorX = minX - b0.x * scaleX
+    const anchorY = minY - b0.y * scaleY
+
+    const updates: ShapePartial[] = []
+    for (const snap of this.snapshots) {
+      const { shape, bounds } = snap
+      const util = editor.getShapeUtil(shape)
+      if (!util.canResize(shape)) continue
+      let newOriginFrame: Vec
+      if (this.single) {
+        // frame == shape local space; local origin (0,0) maps to (anchorX, anchorY)
+        newOriginFrame = new Vec(anchorX, anchorY)
+      } else {
+        const rel = Vec.Sub(snap.pagePos, new Vec(b0.x, b0.y))
+        newOriginFrame = new Vec(minX + rel.x * scaleX, minY + rel.y * scaleY)
+      }
+      // frame → page → parent
+      const pagePoint = this.single ? Vec.Add(Vec.Rot(newOriginFrame, this.singleRotation), snap.pagePos) : newOriginFrame
+      const parentPoint = editor.getPointInParentSpace(shape, pagePoint)
+      const change = util.onResize?.(shape, {
+        newPoint: parentPoint,
+        handle: h,
+        mode: "scale_shape",
+        scaleX,
+        scaleY,
+        initialBounds: bounds.toJson(),
+        initialShape: shape,
+      })
+      updates.push({ id: shape.id, type: shape.type, x: parentPoint.x, y: parentPoint.y, ...(change ?? {}) })
+    }
+    editor.updateShapes(updates)
+  }
+
+  private complete(): void {
+    const editor = this.editor
+    for (const snap of this.snapshots) {
+      const current = editor.getShape(snap.shape.id)
+      if (current) editor.getShapeUtil(snap.shape).onResizeEnd?.(snap.shape, current)
+    }
+    this.parent!.transition("idle")
+  }
+}
+
+class Rotating extends StateNode {
+  static override id = "rotating"
+  private markId = ""
+  private center = new Vec()
+  private startAngle = 0
+  private initialShapes: { shape: UnknownShape; pagePos: Vec; pageRotation: number }[] = []
+
+  override onEnter(): void {
+    const editor = this.editor
+    this.markId = editor.markHistoryStoppingPoint("rotate")
+    this.center = editor.getSelectionPageBounds()!.center
+    this.startAngle = Vec.Angle(this.center, editor.inputs.originPagePoint)
+    this.initialShapes = editor.getSelectedShapes().map((shape) => {
+      const m = editor.getShapePageTransform(shape)
+      return { shape, pagePos: new Vec(m.e, m.f), pageRotation: Math.atan2(m.b, m.a) }
+    })
+    for (const i of this.initialShapes) editor.getShapeUtil(i.shape).onRotateStart?.(i.shape)
+    setCursor(editor, "grabbing")
+  }
+
+  override onPointerMove(): void {
+    this.update()
+  }
+  override onKeyDown(): void {
+    this.update()
+  }
+  override onKeyUp(): void {
+    this.update()
+  }
+  override onPointerUp(): void {
+    this.complete()
+  }
+  override onComplete(): void {
+    this.complete()
+  }
+  override onCancel(): void {
+    this.editor.bailToMark(this.markId)
+    this.parent!.transition("idle")
+  }
+
+  private update(): void {
+    const editor = this.editor
+    let delta = Vec.Angle(this.center, editor.inputs.currentPagePoint) - this.startAngle
+    if (editor.inputs.shiftKey) {
+      const step = Math.PI / 12
+      // snap the resulting page rotation of the first shape to 15° steps
+      const base = this.initialShapes[0]?.pageRotation ?? 0
+      delta = Math.round((base + delta) / step) * step - base
+    }
+    const updates: ShapePartial[] = []
+    for (const i of this.initialShapes) {
+      const newPagePos = Vec.RotWith(i.pagePos, this.center, delta)
+      const parentPoint = editor.getPointInParentSpace(i.shape, newPagePos)
+      const next = { ...i.shape, x: parentPoint.x, y: parentPoint.y, rotation: i.shape.rotation + delta }
+      const change = editor.getShapeUtil(i.shape).onRotate?.(i.shape, next)
+      updates.push({ id: i.shape.id, type: i.shape.type, x: next.x, y: next.y, rotation: next.rotation, ...(change ?? {}) })
+    }
+    editor.updateShapes(updates)
+  }
+
+  private complete(): void {
+    const editor = this.editor
+    for (const i of this.initialShapes) {
+      const current = editor.getShape(i.shape.id)
+      if (current) editor.getShapeUtil(i.shape).onRotateEnd?.(i.shape, current)
+    }
+    this.parent!.transition("idle")
+  }
+}
+
+class DraggingHandle extends StateNode {
+  static override id = "dragging_handle"
+  private markId = ""
+  private shape!: UnknownShape
+  private handle!: ShapeHandle
+  private startedAt = 0
+
+  override onEnter(info: Record<string, unknown>): void {
+    const i = info as { shape: UnknownShape; handle: ShapeHandle }
+    this.shape = this.editor.getShape(i.shape.id) ?? i.shape
+    this.handle = i.handle
+    this.startedAt = performance.now()
+    this.markId = this.editor.markHistoryStoppingPoint("drag handle")
+    setCursor(this.editor, "grabbing")
+    this.update()
+  }
+
+  override onPointerMove(): void {
+    this.update()
+  }
+  override onKeyDown(): void {
+    this.update()
+  }
+  override onKeyUp(): void {
+    this.update()
+  }
+  override onPointerUp(): void {
+    this.parent!.transition("idle")
+  }
+  override onComplete(): void {
+    this.parent!.transition("idle")
+  }
+  override onCancel(): void {
+    this.editor.bailToMark(this.markId)
+    this.parent!.transition("idle")
+  }
+
+  private update(): void {
+    const editor = this.editor
+    const current = editor.getShape(this.shape.id)
+    if (!current) return
+    const local = editor.getPointInShapeSpace(current, editor.inputs.currentPagePoint)
+    const handle: ShapeHandle = { ...this.handle, x: local.x, y: local.y }
+    const isPrecise = editor.inputs.altKey || performance.now() - this.startedAt > 1200
+    const change = editor.getShapeUtil(current).onHandleDrag?.(current, { handle, isPrecise, initial: this.shape })
+    if (change) editor.updateShape({ id: current.id, type: current.type, ...change })
+  }
+}
+
+/** Selection, brush select, drag-to-move, resize, rotate, and shape handle dragging. */
 export class SelectTool extends StateNode {
   static override id = "select"
   static override initial = "idle"
-  static override children = (): StateNodeConstructor[] => [Idle, PointingCanvas, Brushing, PointingShape, Translating]
+  static override children = (): StateNodeConstructor[] => [
+    Idle,
+    PointingCanvas,
+    Brushing,
+    PointingShape,
+    PointingSelection,
+    PointingResizeHandle,
+    PointingRotateHandle,
+    PointingHandle,
+    Translating,
+    Resizing,
+    Rotating,
+    DraggingHandle,
+  ]
 }

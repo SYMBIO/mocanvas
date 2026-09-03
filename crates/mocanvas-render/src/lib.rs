@@ -11,4 +11,4 @@ mod frame;
 mod tess;
 
 pub use frame::{FrameOutput, Renderer, VERTEX_FLOATS};
-pub use tess::{tessellate, MeshCache, MeshPart};
+pub use tess::{dash, dash_path, dash_pattern, tessellate, MeshCache, MeshPart};

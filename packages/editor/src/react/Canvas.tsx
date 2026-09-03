@@ -5,8 +5,10 @@ import type { Editor } from "../editor/Editor"
 import type { RenderBackend } from "../render/backend"
 import { createBackend } from "../render/webgl2"
 import type { UnknownShape } from "../records/base"
+import { Vec } from "../geometry"
 import { EditorProvider } from "./EditorContext"
 import { useCanvasEvents } from "./useCanvasEvents"
+import { getSelectionHandlePositions } from "../editor/selectionHandles"
 
 export interface CanvasProps {
   editor: Editor
@@ -129,6 +131,7 @@ export function Canvas({ editor, className, style, children, components }: Canva
     }
   }, [events])
 
+  const cursor = useValue("cursor", () => cssCursor(editor.getInstanceState().cursor.type), [editor])
   const Indicators = components?.Indicators ?? DefaultIndicators
   const Brush = components?.Brush ?? DefaultBrush
   const Background = components?.Background
@@ -138,7 +141,7 @@ export function Canvas({ editor, className, style, children, components }: Canva
       <div
         ref={containerRef}
         className={className ? `mocanvas ${className}` : "mocanvas"}
-        style={{ ...containerStyle, ...style }}
+        style={{ ...containerStyle, ...style, cursor }}
         tabIndex={0}
         onPointerDown={events.onPointerDown}
         onPointerMove={events.onPointerMove}
@@ -152,6 +155,7 @@ export function Canvas({ editor, className, style, children, components }: Canva
         <OverlayLayer editor={editor} />
         <svg style={{ ...layerStyle, pointerEvents: "none", overflow: "visible" }}>
           <Indicators editor={editor} />
+          <SnapLines editor={editor} />
           <Brush editor={editor} />
         </svg>
         {children}
@@ -210,6 +214,19 @@ const OverlayShape = track(function OverlayShape({ editor, shape, isEditing }: {
   )
 })
 
+const CURSORS: Record<string, string> = {
+  default: "default",
+  cross: "crosshair",
+  grab: "grab",
+  grabbing: "grabbing",
+  move: "move",
+  pointer: "pointer",
+  text: "text",
+}
+function cssCursor(type: string): string {
+  return CURSORS[type] ?? type
+}
+
 /** Selection bounds and hover indicator. */
 const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor: Editor }) {
   const bounds = editor.getSelectionPageBounds()
@@ -243,38 +260,67 @@ const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor:
     }
   }
   if (bounds && tool === "select") {
-    const rot = editor.getSelectionRotation()
-    if (selected.length === 1 && rot !== 0) {
+    const info = getSelectionHandlePositions(editor)
+    const stroke = "var(--mocanvas-selection, #3b82f6)"
+    if (selected.length === 1) {
       const shape = selected[0]!
+      const util = editor.getShapeUtil(shape)
       const b = editor.getShapeGeometryBounds(shape)!
       const m = editor.getShapePageTransform(shape)
-      items.push(
-        <g key="bounds-rot" transform={`matrix(${z} 0 0 ${z} ${cam.x * z} ${cam.y * z}) matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`}>
-          <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="none" stroke="var(--mocanvas-selection, #3b82f6)" strokeWidth={1.5 / z} />
-          {b.corners.map((c, i) => (
-            <rect key={i} x={c.x - 4 / z} y={c.y - 4 / z} width={8 / z} height={8 / z} fill="#fff" stroke="var(--mocanvas-selection, #3b82f6)" strokeWidth={1.5 / z} />
-          ))}
-        </g>,
-      )
+      if (!util.hideSelectionBoundsFg(shape)) {
+        items.push(
+          <g key="bounds" transform={`matrix(${z} 0 0 ${z} ${cam.x * z} ${cam.y * z}) matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`}>
+            <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="none" stroke={stroke} strokeWidth={1.5 / z} />
+          </g>,
+        )
+      }
+      const handles = util.getHandles?.(shape) ?? []
+      for (const hd of handles) {
+        const p = new Vec(m.a * hd.x + m.c * hd.y + m.e, m.b * hd.x + m.d * hd.y + m.f)
+        const sp = editor.pageToScreen(p)
+        items.push(
+          <circle key={`h-${hd.id}`} cx={sp.x} cy={sp.y} r={hd.type === "virtual" ? 4 : 6} fill={hd.type === "virtual" ? stroke : "#fff"} stroke={stroke} strokeWidth={1.5} opacity={hd.type === "virtual" ? 0.6 : 1} />,
+        )
+      }
     } else {
       const [x0, y0] = toScreen(bounds.x, bounds.y)
       const [x1, y1] = toScreen(bounds.maxX, bounds.maxY)
-      items.push(
-        <g key="bounds">
-          <rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} fill="none" stroke="var(--mocanvas-selection, #3b82f6)" strokeWidth={1.5} />
-          {[
-            [x0, y0],
-            [x1, y0],
-            [x1, y1],
-            [x0, y1],
-          ].map(([cx, cy], i) => (
-            <rect key={i} x={cx! - 4} y={cy! - 4} width={8} height={8} fill="#fff" stroke="var(--mocanvas-selection, #3b82f6)" strokeWidth={1.5} />
-          ))}
-        </g>,
-      )
+      items.push(<rect key="bounds" x={x0} y={y0} width={x1 - x0} height={y1 - y0} fill="none" stroke={stroke} strokeWidth={1.5} />)
+    }
+    if (info) {
+      for (const h of info.handles) {
+        if (h.handle === "rotate") {
+          items.push(<circle key="rotate" cx={h.point.x} cy={h.point.y} r={5} fill="#fff" stroke={stroke} strokeWidth={1.5} />)
+        } else if (h.handle.includes("_")) {
+          items.push(<rect key={h.handle} x={h.point.x - 4} y={h.point.y - 4} width={8} height={8} fill="#fff" stroke={stroke} strokeWidth={1.5} />)
+        }
+      }
     }
   }
   return <>{items}</>
+})
+
+const SnapLines = track(function SnapLines({ editor }: { editor: Editor }) {
+  const lines = editor.snaps.getLines()
+  if (lines.length === 0) return null
+  return (
+    <>
+      {lines.map((l) => {
+        const pts = l.points.map((p) => editor.pageToScreen(p))
+        return (
+          <g key={l.id}>
+            <polyline points={pts.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="var(--mocanvas-snap, #e879f9)" strokeWidth={1} />
+            {pts.map((p, i) => (
+              <line key={i} x1={p.x - 4} y1={p.y - 4} x2={p.x + 4} y2={p.y + 4} stroke="var(--mocanvas-snap, #e879f9)" strokeWidth={1} />
+            ))}
+            {pts.map((p, i) => (
+              <line key={`b${i}`} x1={p.x - 4} y1={p.y + 4} x2={p.x + 4} y2={p.y - 4} stroke="var(--mocanvas-snap, #e879f9)" strokeWidth={1} />
+            ))}
+          </g>
+        )
+      })}
+    </>
+  )
 })
 
 const DefaultBrush = track(function DefaultBrush({ editor }: { editor: Editor }) {

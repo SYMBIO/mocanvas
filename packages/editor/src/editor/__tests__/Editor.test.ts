@@ -221,3 +221,86 @@ describe("Editor", () => {
     expect(editor.getLastFrameStats().culled).toBe(1)
   })
 })
+
+describe("Editor clipboard and duplication", () => {
+  it("duplicates shapes with offset and keeps them selectable", () => {
+    const editor = makeEditor()
+    editor.createShapes<BoxShape>([{ type: "box", x: 10, y: 10 }, { type: "box", x: 200, y: 10 }])
+    const ids = editor.getCurrentPageShapes().map((s) => s.id)
+    const copies = editor.duplicateShapes(ids, { x: 30, y: 40 })
+    expect(copies).toHaveLength(2)
+    expect(editor.getCurrentPageShapes()).toHaveLength(4)
+    const c0 = editor.getShape(copies[0]!)!
+    expect(c0.x).toBe(40)
+    expect(c0.y).toBe(50)
+    expect(editor.engine.shapeCount).toBe(4)
+  })
+
+  it("round-trips content through getContent / putContent", () => {
+    const editor = makeEditor()
+    editor.createShapes<BoxShape>([{ type: "box", x: 0, y: 0 }, { type: "box", x: 100, y: 0, props: { w: 50, h: 50 } }])
+    const ids = editor.getCurrentPageShapes().map((s) => s.id)
+    const content = editor.getContentFromCurrentPage(ids)!
+    expect(content.shapes).toHaveLength(2)
+    const json = JSON.parse(JSON.stringify(content))
+    const created = editor.putContentOntoCurrentPage(json, { point: { x: 1000, y: 1000 } })
+    expect(created).toHaveLength(2)
+    expect(editor.getSelectedShapeIds()).toEqual(created)
+    const bounds = editor.getSelectionPageBounds()!
+    expect(bounds.center.x).toBeCloseTo(1000)
+    expect(bounds.center.y).toBeCloseTo(1000)
+  })
+
+  it("snaps a moving box to a neighbour edge", () => {
+    const editor = makeEditor()
+    editor.createShapes<BoxShape>([{ type: "box", x: 0, y: 0 }, { type: "box", x: 300, y: 300 }])
+    const [a, b] = editor.getCurrentPageShapes()
+    const moving = { x: 296, y: 500, w: 100, h: 100 }
+    const res = editor.snaps.snapTranslate(moving, new Set([a!.id]))
+    expect(res.nudge.x).toBeCloseTo(4)
+    expect(res.nudge.y).toBe(0)
+    expect(res.lines.length).toBeGreaterThan(0)
+    expect(editor.snaps.getLines().length).toBe(res.lines.length)
+    void b
+  })
+})
+
+describe("Editor bulk transforms", () => {
+  function three() {
+    const editor = makeEditor()
+    editor.createShapes<BoxShape>([
+      { type: "box", x: 0, y: 0, props: { w: 50, h: 50 } },
+      { type: "box", x: 100, y: 30, props: { w: 50, h: 50 } },
+      { type: "box", x: 300, y: 60, props: { w: 50, h: 50 } },
+    ])
+    return { editor, ids: editor.getCurrentPageShapes().map((s) => s.id) }
+  }
+
+  it("nudges and rotates", () => {
+    const { editor, ids } = three()
+    editor.nudgeShapes(ids, { x: 5, y: -5 })
+    expect(editor.getShape(ids[0]!)!.x).toBe(5)
+    expect(editor.getShape(ids[0]!)!.y).toBe(-5)
+    editor.rotateShapesBy([ids[0]!], Math.PI / 2)
+    const s = editor.getShape(ids[0]!)!
+    expect(s.rotation).toBeCloseTo(Math.PI / 2)
+    // bounds stay centered on the same point
+    const b = editor.getShapePageBounds(s)!
+    expect(b.center.x).toBeCloseTo(30)
+    expect(b.center.y).toBeCloseTo(20)
+  })
+
+  it("aligns, distributes, stacks and flips", () => {
+    const { editor, ids } = three()
+    editor.alignShapes(ids, "top")
+    expect(ids.map((id) => editor.getShape(id)!.y)).toEqual([0, 0, 0])
+    editor.distributeShapes(ids, "horizontal")
+    expect(editor.getShape(ids[1]!)!.x).toBe(150)
+    editor.stackShapes(ids, "horizontal", 10)
+    expect(ids.map((id) => editor.getShape(id)!.x)).toEqual([0, 60, 120])
+    editor.flipShapes(ids, "horizontal")
+    expect(ids.map((id) => editor.getShape(id)!.x)).toEqual([120, 60, 0])
+    editor.toggleLock(ids)
+    expect(editor.getShape(ids[0]!)!.isLocked).toBe(true)
+  })
+})

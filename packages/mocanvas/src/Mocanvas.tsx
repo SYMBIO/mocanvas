@@ -4,11 +4,13 @@ import {
   Editor,
   loadEngine,
   type CanvasProps,
+  type BindingUtilConstructor,
   type EditorStore,
   type ShapeUtilConstructor,
   type StateNodeConstructor,
 } from "@mocanvas/editor"
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import { defaultBindingUtils } from "./bindings"
 import { defaultShapeUtils } from "./shapes"
 import { defaultTools } from "./tools"
 import { DefaultUi } from "./ui/DefaultUi"
@@ -19,6 +21,8 @@ export interface MocanvasProps {
   store?: EditorStore
   /** Extra shape utils beyond the defaults. */
   shapeUtils?: readonly ShapeUtilConstructor[]
+  /** Extra binding utils beyond the defaults. */
+  bindingUtils?: readonly BindingUtilConstructor[]
   /** Extra tools beyond the defaults. */
   tools?: readonly StateNodeConstructor[]
   initialState?: string
@@ -36,7 +40,7 @@ export interface MocanvasProps {
 
 /** Batteries-included canvas: default shapes, tools, shortcuts and UI. */
 export function Mocanvas(props: MocanvasProps) {
-  const { store, shapeUtils, tools, initialState, onMount, hideUi, showStats, className, style, children, components, options } = props
+  const { store, shapeUtils, bindingUtils, tools, initialState, onMount, hideUi, showStats, className, style, children, components, options } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const [editor, setEditor] = useState<Editor | null>(null)
 
@@ -52,6 +56,7 @@ export function Mocanvas(props: MocanvasProps) {
       ed = new Editor({
         store: store ?? createStore(),
         shapeUtils: [...defaultShapeUtils, ...(shapeUtils ?? [])],
+        bindingUtils: [...defaultBindingUtils, ...(bindingUtils ?? [])],
         tools: [...defaultTools, ...(tools ?? [])],
         engine,
         ...(initialState ? { initialState } : {}),

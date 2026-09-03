@@ -135,9 +135,13 @@ engine.selection_bounds(ptr_handles, len) -> ptr to 4 f32
    overlay layer, which positions DOM shapes with `transform` and passes
    pointer events through except when editing.
 
-Zoom-independent stroke widths are handled at tessellation time using the
-camera zoom, with retessellation only when the zoom crosses a bucket boundary
-(√2 steps) to avoid per-frame retessellation while zooming.
+Stroke widths are in page units and scale with zoom, so meshes never need
+retessellation while zooming. Dash patterns (`dash` style word: 0 solid,
+1 dashed, 2 dotted, 3 draw) are applied in the tessellator by splitting the
+flattened outline into open dash subpaths before stroking.
+
+Shapes flagged `LABEL` are drawn on the GPU *and* reported in the overlay
+list, so a filled shape can carry a DOM text label.
 
 ## Hybrid overlay compositing
 

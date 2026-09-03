@@ -118,6 +118,8 @@ pub fn tessellate(path: &Path, style: &Style, geom_version: u32) -> MeshCache {
     }
 
     if style.has_stroke() {
+        let dashed = dash_pattern(style.dash, style.stroke_width).map(|(d, g)| to_lyon(&dash_path(path, d, g, TOLERANCE)));
+        let stroke_path = dashed.as_ref().unwrap_or(&lp);
         let mut buf: VertexBuffers<[f32; 2], u32> = VertexBuffers::new();
         let mut t = StrokeTessellator::new();
         let opts = StrokeOptions::tolerance(TOLERANCE)
@@ -125,7 +127,7 @@ pub fn tessellate(path: &Path, style: &Style, geom_version: u32) -> MeshCache {
             .with_line_join(LineJoin::Round)
             .with_line_cap(LineCap::Round);
         let ok = t.tessellate_path(
-            &lp,
+            stroke_path,
             &opts,
             &mut BuffersBuilder::new(&mut buf, |v: StrokeVertex| v.position().to_array()),
         );
@@ -164,5 +166,117 @@ mod tests {
         let m = tessellate(&p, &Style { fill: 0xff0000ff, ..Style::default() }, 1);
         assert!(m.fill.is_empty());
         assert!(!m.stroke.is_empty());
+    }
+}
+
+/// Dash pattern ids shared with the host.
+pub mod dash {
+    /// Continuous stroke.
+    pub const SOLID: u32 = 0;
+    /// Dashes roughly two stroke widths long with equal gaps.
+    pub const DASHED: u32 = 1;
+    /// Round dots spaced about two stroke widths apart.
+    pub const DOTTED: u32 = 2;
+    /// Hand-drawn look; rendered solid for now.
+    pub const DRAW: u32 = 3;
+}
+
+/// Dash/gap lengths in path units for a pattern and stroke width.
+pub fn dash_pattern(dash: u32, width: f32) -> Option<(f32, f32)> {
+    let w = width.max(0.5);
+    match dash {
+        dash::DASHED => Some((w * 2.0, w * 2.0)),
+        dash::DOTTED => Some((w * 0.05, w * 2.0)),
+        _ => None,
+    }
+}
+
+/// Split a path's flattened outline into dash segments, producing an open-subpath path.
+pub fn dash_path(path: &Path, dash_len: f32, gap_len: f32, tolerance: f32) -> Path {
+    use mocanvas_geo::Vec2;
+    let mut out = Path::new();
+    let mut sub: Vec<Vec2> = Vec::new();
+    let period = dash_len + gap_len;
+    if period <= 0.0 {
+        return path.clone();
+    }
+    let emit = |pts: &[Vec2], out: &mut Path| {
+        if pts.len() < 2 {
+            return;
+        }
+        // Walk the polyline, alternating on/off.
+        let mut dist = 0.0f32; // distance along the polyline
+        let mut on = true;
+        let mut next_switch = dash_len;
+        let mut drawing = false;
+        for w in pts.windows(2) {
+            let (a, b) = (w[0], w[1]);
+            let seg_len = a.dist(b);
+            if seg_len <= 0.0 {
+                continue;
+            }
+            let mut t0 = 0.0f32;
+            let seg_start = dist;
+            loop {
+                let remaining_to_switch = next_switch - (seg_start + t0 * seg_len);
+                let remaining_in_seg = seg_len * (1.0 - t0);
+                if on && !drawing {
+                    let p = a.lerp(b, t0);
+                    out.move_to(p);
+                    drawing = true;
+                }
+                if remaining_to_switch >= remaining_in_seg {
+                    if on {
+                        out.line_to(b);
+                    }
+                    break;
+                }
+                let t1 = t0 + remaining_to_switch / seg_len;
+                let p = a.lerp(b, t1);
+                if on {
+                    out.line_to(p);
+                    drawing = false;
+                }
+                on = !on;
+                next_switch += if on { dash_len } else { gap_len };
+                t0 = t1;
+            }
+            dist += seg_len;
+        }
+    };
+    path.flatten(tolerance, |p, new_sub| {
+        if new_sub && !sub.is_empty() {
+            emit(&sub, &mut out);
+            sub.clear();
+        }
+        sub.push(p);
+    });
+    if !sub.is_empty() {
+        emit(&sub, &mut out);
+    }
+    out
+}
+
+#[cfg(test)]
+mod dash_tests {
+    use super::*;
+    use mocanvas_geo::{Box2d, PathCmd};
+
+    #[test]
+    fn dashes_split_a_line_into_alternating_pieces() {
+        let line = Path::polyline(&[(0.0, 0.0).into(), (100.0, 0.0).into()]);
+        let d = dash_path(&line, 10.0, 10.0, 0.1);
+        let moves = d.cmds().iter().filter(|c| matches!(c, PathCmd::MoveTo(_))).count();
+        assert_eq!(moves, 5);
+        assert!(!d.is_closed());
+    }
+
+    #[test]
+    fn dashed_rect_stroke_tessellates() {
+        let p = Path::rect(&Box2d::from_xywh(0.0, 0.0, 100.0, 50.0));
+        let m = tessellate(&p, &Style { fill: 0, stroke: 0x000000ff, stroke_width: 4.0, dash: dash::DASHED, ..Style::default() }, 1);
+        assert!(!m.stroke.is_empty());
+        let solid = tessellate(&p, &Style { fill: 0, stroke: 0x000000ff, stroke_width: 4.0, dash: dash::SOLID, ..Style::default() }, 1);
+        assert!(m.stroke.indices.len() > solid.stroke.indices.len());
     }
 }

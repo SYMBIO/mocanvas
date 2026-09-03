@@ -1,5 +1,6 @@
 import {
   createShapeId,
+  GeoShapeGeoStyle,
   StateNode,
   type GeoShapeKind,
   type PointerEventInfo,
@@ -67,7 +68,7 @@ class Pointing extends StateNode {
       type: "geo",
       x: originPagePoint.x,
       y: originPagePoint.y,
-      props: { geo, w: 100, h: 100, ...(editor.getInstanceState().stylesForNextShape as object) },
+      props: { geo, w: 100, h: 100 },
     })
     editor.select(id)
     this.shapeId = id
@@ -117,9 +118,6 @@ export class GeoTool extends StateNode {
   override onEnter(info: Record<string, unknown>): void {
     const geo = info["geo"]
     if (typeof geo === "string") this.geo = geo as GeoShapeKind
-    else {
-      const styled = (this.editor.getInstanceState().stylesForNextShape as { geo?: GeoShapeKind }).geo
-      if (styled) this.geo = styled
-    }
+    else this.geo = this.editor.getStyleForNextShape(GeoShapeGeoStyle)
   }
 }

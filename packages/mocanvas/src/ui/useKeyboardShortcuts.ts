@@ -5,7 +5,9 @@ function isEditable(t: EventTarget | null): boolean {
   return t instanceof HTMLElement && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)
 }
 
-/** Default keyboard shortcuts: tool switching, undo/redo, select all, zoom. */
+let clipboardFallback = ""
+
+/** Default keyboard shortcuts: tool switching, undo/redo, select all, zoom, clipboard. */
 export function useKeyboardShortcuts(editor: Editor | null): void {
   useEffect(() => {
     if (!editor) return
@@ -30,6 +32,49 @@ export function useKeyboardShortcuts(editor: Editor | null): void {
             e.preventDefault()
             editor.selectAll()
             return
+          case "d": {
+            e.preventDefault()
+            const ids = editor.getSelectedShapeIds()
+            if (ids.length) {
+              editor.markHistoryStoppingPoint("duplicate")
+              const copies = editor.duplicateShapes(ids)
+              editor.setSelectedShapes(copies)
+            }
+            return
+          }
+          case "c":
+          case "x": {
+            const ids = editor.getSelectedShapeIds()
+            if (!ids.length) return
+            e.preventDefault()
+            const content = editor.getContentFromCurrentPage(ids)
+            if (content) {
+              const text = JSON.stringify({ type: "application/mocanvas", ...content })
+              navigator.clipboard?.writeText(text).catch(() => {})
+              clipboardFallback = text
+            }
+            if (key === "x") {
+              editor.markHistoryStoppingPoint("cut")
+              editor.deleteShapes(ids)
+            }
+            return
+          }
+          case "v": {
+            e.preventDefault()
+            const paste = (text: string) => {
+              try {
+                const data = JSON.parse(text) as { type?: string; shapes?: unknown[]; bindings?: unknown[] }
+                if (data.type !== "application/mocanvas" || !Array.isArray(data.shapes)) return
+                editor.markHistoryStoppingPoint("paste")
+                editor.putContentOntoCurrentPage(data as never, { point: editor.getViewportPageCenter() })
+              } catch {
+                // not our content
+              }
+            }
+            if (navigator.clipboard?.readText) navigator.clipboard.readText().then(paste, () => clipboardFallback && paste(clipboardFallback))
+            else if (clipboardFallback) paste(clipboardFallback)
+            return
+          }
           case "=":
           case "+":
             e.preventDefault()
@@ -89,6 +134,9 @@ export function useKeyboardShortcuts(editor: Editor | null): void {
           break
         case "n":
           editor.setCurrentTool("note")
+          break
+        case "t":
+          editor.setCurrentTool("text")
           break
         case "q":
           editor.updateInstanceState({ isToolLocked: !editor.getInstanceState().isToolLocked })

@@ -11,8 +11,9 @@ import {
   type StyleWords,
 } from "@mocanvas/editor"
 import type { ReactNode } from "react"
-import { getFontFamily, getTextCssColor } from "./shape-theme"
-import { estimateTextSize, LINE_HEIGHT } from "./text-helpers"
+import { TextLabel } from "../text/TextEditor"
+import { getTextShapeSize } from "../text/text-layout"
+import { getTextCssColor } from "./shape-theme"
 
 export interface TextShapeProps {
   color: DefaultColorStyle
@@ -27,12 +28,18 @@ export interface TextShapeProps {
 
 export type TextShape = BaseShape<"text", TextShapeProps>
 
-/** Estimated height of the text block at its current width. */
-export function getTextShapeHeight(shape: TextShape): number {
-  const { text, size, scale, w } = shape.props
-  const fontSize = FONT_SIZES[size] * scale
-  return estimateTextSize(text, fontSize, Math.max(1, w)).h
+/** Measured size of a text shape: intrinsic when `autoSize`, else wrapped at `w`. */
+export function getTextShapeSizeFor(shape: TextShape): { w: number; h: number; lineCount: number } {
+  const { text, size, scale, w, font, autoSize } = shape.props
+  return getTextShapeSize({ text, font, fontSize: FONT_SIZES[size] * scale, autoSize, w })
 }
+
+/** Height of the text block at its current width. */
+export function getTextShapeHeight(shape: TextShape): number {
+  return getTextShapeSizeFor(shape).h
+}
+
+const SIZE_KEYS: readonly (keyof TextShapeProps)[] = ["text", "font", "size", "scale", "autoSize"]
 
 export class TextShapeUtil extends ShapeUtil<TextShape> {
   static override type = "text" as const
@@ -42,7 +49,8 @@ export class TextShapeUtil extends ShapeUtil<TextShape> {
   }
 
   getGeometry(shape: TextShape): Geometry2d {
-    return new Rectangle2d({ width: Math.max(1, shape.props.w), height: getTextShapeHeight(shape), isFilled: true })
+    const { w, h } = getTextShapeSizeFor(shape)
+    return new Rectangle2d({ width: Math.max(1, shape.props.autoSize ? Math.max(w, shape.props.w) : shape.props.w), height: h, isFilled: true })
   }
 
   /** Text is drawn by the DOM overlay, not the GPU. */
@@ -51,31 +59,27 @@ export class TextShapeUtil extends ShapeUtil<TextShape> {
   }
 
   component(shape: TextShape): ReactNode {
-    const { text, font, size, scale, color, textAlign, w } = shape.props
+    const { text, font, size, scale, color, textAlign, w, autoSize } = shape.props
     return (
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: w,
-          fontFamily: getFontFamily(font),
-          fontSize: FONT_SIZES[size] * scale,
-          lineHeight: LINE_HEIGHT,
-          color: getTextCssColor(color),
-          textAlign: textAlign === "middle" ? "center" : textAlign,
-          whiteSpace: "pre-wrap",
-          overflowWrap: "break-word",
-          pointerEvents: "none",
-        }}
-      >
-        {text}
-      </div>
+      <TextLabel
+        shape={shape}
+        text={text}
+        isEditing={this.editor.getEditingShapeId() === shape.id}
+        font={font}
+        fontSize={FONT_SIZES[size] * scale}
+        color={getTextCssColor(color)}
+        align={textAlign}
+        verticalAlign="start"
+        wrap={!autoSize}
+        width={Math.max(1, w)}
+        onChange={(next) => this.editor.updateShape<TextShape>({ id: shape.id, type: "text", props: { text: next } })}
+      />
     )
   }
 
   indicator(shape: TextShape): ReactNode {
-    return <rect width={Math.max(1, shape.props.w)} height={getTextShapeHeight(shape)} />
+    const b = this.getGeometry(shape).bounds
+    return <rect width={b.w} height={b.h} />
   }
 
   override canEdit(_shape: TextShape): boolean {
@@ -88,6 +92,28 @@ export class TextShapeUtil extends ShapeUtil<TextShape> {
 
   override getText(shape: TextShape): string {
     return shape.props.text
+  }
+
+  /** Auto-sized text keeps `w` in sync with its measured width. */
+  override onBeforeCreate(next: TextShape): TextShape | void {
+    return this.fitWidth(next)
+  }
+
+  override onBeforeUpdate(prev: TextShape, next: TextShape): TextShape | void {
+    if (!next.props.autoSize) return
+    if (!SIZE_KEYS.some((k) => prev.props[k] !== next.props[k])) return
+    return this.fitWidth(next)
+  }
+
+  private fitWidth(shape: TextShape): TextShape | void {
+    if (!shape.props.autoSize) return
+    const { w } = getTextShapeSizeFor(shape)
+    if (w !== shape.props.w) return { ...shape, props: { ...shape.props, w } }
+  }
+
+  /** A text shape left empty after editing is removed. */
+  override onEditEnd(shape: TextShape): void {
+    if (shape.props.text.trim().length === 0) this.editor.deleteShapes([shape.id])
   }
 
   /** Resizing a text shape changes its wrap width and turns auto-size off. */

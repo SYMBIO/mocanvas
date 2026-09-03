@@ -51,10 +51,14 @@ keep the same string unions so `.tldr` files load without translation.
 | `getInstanceState` `updateInstanceState` `getCurrentPageState` `updateCurrentPageState` | same | |
 | `setEditingShape` `getEditingShapeId` `setHoveredShape` `getHoveredShapeId` `setErasingShapes` | same | |
 | `bringToFront` `sendToBack` `bringForward` `sendBackward` `reparentShapes` `groupShapes` `ungroupShapes` | same | groups in phase 2 |
-| `nudgeShapes` `rotateShapesBy` `resizeShape` `flipShapes` `alignShapes` `distributeShapes` `stackShapes` `stretchShapes` | phase 2 | |
+| `duplicateShapes` `getContentFromCurrentPage` `putContentOntoCurrentPage` | same | clipboard content is `{ shapes, bindings }` |
+| `createBindings` `updateBindings` `deleteBindings` `getBindingsFromShape` `getBindingsToShape` `getBindingsInvolvingShape` `getBindingUtil` | same | `BindingUtil` callbacks: `onAfterChangeToShape`, `onBeforeDeleteToShape`, `onBeforeIsolate*` |
+| `getStyleForNextShape` `setStyleForNextShapes` `setStyleForSelectedShapes` `getSharedStyles` | same | `StyleProp.define` / `defineEnum`; default styles use `mocanvas:` ids |
+| `snaps` | same shape | `SnapManager.snapTranslate` returns nudge + guide lines |
+| `nudgeShapes` `rotateShapesBy` `flipShapes` `alignShapes` `distributeShapes` `stackShapes` `toggleLock` | same | `flipShapes` mirrors positions, not geometry |
+| `resizeShape` `stretchShapes` | phase 3 | interactive resize lives in the select tool |
 | `getSvgString` `toImage` | phase 2 | |
 | `putExternalContent` `registerExternalContentHandler` | phase 2 | |
-| `getStyleForNextShape` `setStyleForNextShapes` `setStyleForSelectedShapes` | phase 2 | |
 | `inputs` `user` `menus` `textMeasure` | differs | `inputs` same shape; `textMeasure` is DOM-backed in phase 1 |
 | `sideEffects` | same | store side effects |
 | `store` | same | `Store` instance |

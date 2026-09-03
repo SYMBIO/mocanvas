@@ -46,7 +46,6 @@ class Drawing extends StateNode {
         isComplete: false,
         isClosed: false,
         isPen,
-        ...(editor.getInstanceState().stylesForNextShape as object),
       },
     })
     editor.selectNone()

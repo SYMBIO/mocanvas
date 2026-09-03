@@ -13,9 +13,9 @@ import {
   type StyleWords,
 } from "@mocanvas/editor"
 import type { ReactNode } from "react"
-import { horizontalAlignToFlex, horizontalAlignToTextAlign, verticalAlignToFlex } from "./GeoShapeUtil"
-import { getFontFamily, getNoteFillRgba, getNoteTextCssColor } from "./shape-theme"
-import { LINE_HEIGHT } from "./text-helpers"
+import { TextLabel } from "../text/TextEditor"
+import { computeGrowY, measureLabel, trimTrailingWhitespace } from "../text/text-layout"
+import { getNoteFillRgba, getNoteTextCssColor } from "./shape-theme"
 
 export interface NoteShapeProps {
   color: DefaultColorStyle
@@ -34,13 +34,24 @@ export interface NoteShapeProps {
 export type NoteShape = BaseShape<"note", NoteShapeProps>
 
 export const NOTE_SIZE = 200
-const NOTE_PADDING = 16
+export const NOTE_PADDING = 16
 
 /** Effective font size: an explicit adjustment (auto-shrunk text) wins over the size style. */
 export function getNoteFontSize(shape: NoteShape): number {
   const { size, scale, fontSizeAdjustment } = shape.props
   return (fontSizeAdjustment > 0 ? fontSizeAdjustment : FONT_SIZES[size]) * scale
 }
+
+/** `growY` a note needs so its (centered) text fits; the note keeps its square width. */
+export function getNoteGrowY(shape: NoteShape): number {
+  const { text, font, scale } = shape.props
+  if (!text) return 0
+  const side = NOTE_SIZE * scale
+  const m = measureLabel(text, { font, fontSize: getNoteFontSize(shape), maxWidth: side, padding: NOTE_PADDING * scale })
+  return computeGrowY(m.h, side)
+}
+
+const LABEL_KEYS: readonly (keyof NoteShapeProps)[] = ["text", "font", "size", "scale", "fontSizeAdjustment"]
 
 export class NoteShapeUtil extends ShapeUtil<NoteShape> {
   static override type = "note" as const
@@ -74,43 +85,32 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape> {
     const { text, font, color, labelColor, align, verticalAlign, scale, growY } = shape.props
     const textColor = labelColor === "black" ? getNoteTextCssColor(color) : LIGHT_THEME[labelColor].solid
     return (
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: NOTE_SIZE * scale,
-          height: NOTE_SIZE * scale + growY,
-          background: LIGHT_THEME[color].note.fill,
-          display: "flex",
-          justifyContent: horizontalAlignToFlex(align),
-          alignItems: verticalAlignToFlex(verticalAlign),
-          pointerEvents: "none",
-        }}
-      >
-        <div
-          style={{
-            fontFamily: getFontFamily(font),
-            fontSize: getNoteFontSize(shape),
-            lineHeight: LINE_HEIGHT,
-            color: textColor,
-            textAlign: horizontalAlignToTextAlign(align),
-            whiteSpace: "pre-wrap",
-            overflowWrap: "break-word",
-            padding: NOTE_PADDING * scale,
-            maxWidth: "100%",
-            boxSizing: "border-box",
-          }}
-        >
-          {text}
-        </div>
-      </div>
+      <TextLabel
+        shape={shape}
+        text={text}
+        isEditing={this.editor.getEditingShapeId() === shape.id}
+        font={font}
+        fontSize={getNoteFontSize(shape)}
+        color={textColor}
+        align={align}
+        verticalAlign={verticalAlign}
+        wrap
+        width={NOTE_SIZE * scale}
+        height={NOTE_SIZE * scale + growY}
+        padding={NOTE_PADDING * scale}
+        onChange={(next) => this.editor.updateShape<NoteShape>({ id: shape.id, type: "note", props: { text: next } })}
+      />
     )
   }
 
   indicator(shape: NoteShape): ReactNode {
     const { scale, growY } = shape.props
     return <rect width={NOTE_SIZE * scale} height={NOTE_SIZE * scale + growY} />
+  }
+
+  /** The GPU draws the sticky background even while editing. */
+  override needsOverlay(_shape: NoteShape): boolean {
+    return false
   }
 
   override hasOverlayLabel(_shape: NoteShape): boolean {
@@ -127,5 +127,21 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape> {
 
   override getText(shape: NoteShape): string {
     return shape.props.text
+  }
+
+  override onBeforeCreate(next: NoteShape): NoteShape | void {
+    const growY = getNoteGrowY(next)
+    if (growY !== next.props.growY) return { ...next, props: { ...next.props, growY } }
+  }
+
+  override onBeforeUpdate(prev: NoteShape, next: NoteShape): NoteShape | void {
+    if (!LABEL_KEYS.some((k) => prev.props[k] !== next.props[k])) return
+    const growY = getNoteGrowY(next)
+    if (growY !== next.props.growY) return { ...next, props: { ...next.props, growY } }
+  }
+
+  override onEditEnd(shape: NoteShape): void {
+    const trimmed = trimTrailingWhitespace(shape.props.text)
+    if (trimmed !== shape.props.text) this.editor.updateShape<NoteShape>({ id: shape.id, type: "note", props: { text: trimmed } })
   }
 }
