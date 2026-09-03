@@ -1,0 +1,14 @@
+{
+  "name": "@mocanvas/wasm",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "build": "wasm-pack build ../../crates/mocanvas-wasm --release --target web --out-dir ../../packages/wasm/pkg --out-name mocanvas",
+    "build:dev": "wasm-pack build ../../crates/mocanvas-wasm --dev --target web --out-dir ../../packages/wasm/pkg --out-name mocanvas",
+    "typecheck": "tsc --noEmit"
+  }
+}

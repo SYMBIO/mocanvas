@@ -1,0 +1,19 @@
+[package]
+name = "mocanvas-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "WebAssembly facade for the mocanvas engine"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+mocanvas-geo = { workspace = true }
+mocanvas-scene = { workspace = true }
+mocanvas-render = { workspace = true }
+wasm-bindgen = { workspace = true }
+js-sys = { workspace = true }
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O4", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]

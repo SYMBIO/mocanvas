@@ -1,0 +1,34 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/mocanvas-geo",
+  "crates/mocanvas-scene",
+  "crates/mocanvas-render",
+  "crates/mocanvas-wasm",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/symbio/mocanvas"
+
+[workspace.dependencies]
+mocanvas-geo = { path = "crates/mocanvas-geo" }
+mocanvas-scene = { path = "crates/mocanvas-scene" }
+mocanvas-render = { path = "crates/mocanvas-render" }
+lyon = "1.0"
+rstar = "0.12"
+slotmap = "1.0"
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = false
+
+[profile.dev.package."*"]
+opt-level = 2

@@ -1,0 +1,10 @@
+[package]
+name = "mocanvas-scene"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Scene mirror for mocanvas: struct-of-arrays shape storage, z-ordering, spatial index, queries"
+
+[dependencies]
+mocanvas-geo = { workspace = true }
+rstar = { workspace = true }

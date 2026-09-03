@@ -1,0 +1,11 @@
+[package]
+name = "mocanvas-render"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Tessellation, mesh cache and frame batching for mocanvas"
+
+[dependencies]
+mocanvas-geo = { workspace = true }
+mocanvas-scene = { workspace = true }
+lyon = { workspace = true }

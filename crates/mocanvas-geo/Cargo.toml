@@ -1,0 +1,10 @@
+[package]
+name = "mocanvas-geo"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "2D geometry primitives for mocanvas: vectors, transforms, boxes, paths, hit testing"
+
+[dependencies]
+
+[dev-dependencies]

@@ -1,0 +1,25 @@
+{
+  "name": "mocanvas-monorepo",
+  "private": true,
+  "license": "MIT",
+  "packageManager": "pnpm@10.27.0",
+  "scripts": {
+    "build:wasm": "pnpm --filter @mocanvas/wasm build",
+    "build:wasm:dev": "pnpm --filter @mocanvas/wasm build:dev",
+    "dev": "pnpm --filter playground dev",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:rust": "cargo test --workspace --exclude mocanvas-wasm",
+    "lint:rust": "cargo clippy --workspace --all-targets -- -D warnings"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
