@@ -188,8 +188,10 @@ apps/playground          Vite app
 1. Vertical slice: geo + scene + render crates, WASM facade, signals, store,
    Editor with camera/selection, select/hand/geo/draw tools, WebGL2 renderer,
    playground. `.tldr` load and save.
-2. Full built-in shape set, text via DOM overlay, arrows and bindings,
-   snapping, resize/rotate handles, export SVG/PNG, clipboard.
-3. Glyph atlas text rendering in WASM, image textures, frame clipping,
-   WebGPU backend.
-4. Compat adapter package, migration guide, collaboration hooks.
+2. (done) Text via DOM overlay, arrows and bindings, snapping, resize/rotate
+   handles, export SVG/PNG, clipboard, groups, style panel, dash patterns,
+   LOD quads, `@mocanvas/compat` aliases.
+3. Glyph atlas text rendering in WASM, image/video assets with textures,
+   frame clipping on the GPU, WebGPU backend, persistent per-shape GPU buffers.
+4. Migration guide, real `.tldr` schema migrations, collaboration hooks
+   (presence records, `mergeRemoteChanges` transport).
