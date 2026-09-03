@@ -33,6 +33,7 @@ import {
 } from "./index"
 
 const editor = {
+  getSortedChildIdsForParent: () => [],
   getEditingShapeId: () => null,
   getBindingsFromShape: () => [],
   getShapePageTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
@@ -98,11 +99,11 @@ function expectWellFormedStyle(style: { fill: number; stroke: number; strokeWidt
 }
 
 describe("defaultShapeUtils", () => {
-  it("registers seven distinct types with the required members", () => {
-    expect(defaultShapeUtils).toHaveLength(7)
+  it("registers eight distinct types with the required members", () => {
+    expect(defaultShapeUtils).toHaveLength(8)
     const types = defaultShapeUtils.map((U) => U.type)
-    expect(new Set(types).size).toBe(7)
-    expect(types).toEqual(["geo", "draw", "line", "arrow", "text", "note", "frame"])
+    expect(new Set(types).size).toBe(8)
+    expect(types).toEqual(["group", "geo", "draw", "line", "arrow", "text", "note", "frame"])
     for (const U of defaultShapeUtils) {
       const util = new U(editor)
       expect(util.type).toBe(U.type)

@@ -1,5 +1,6 @@
 import { GeoShapeGeoStyle, track, useEditor, type Editor, type GeoShapeKind } from "@mocanvas/editor"
 import type { CSSProperties } from "react"
+import { StylePanel } from "./StylePanel"
 
 const panel: CSSProperties = {
   position: "absolute",
@@ -127,6 +128,7 @@ export function DefaultUi({ editor, showStats = true }: { editor: Editor; showSt
     <>
       <Toolbar />
       <ZoomBar />
+      <StylePanel />
       {showStats ? <DebugStats editor={editor} /> : null}
     </>
   )

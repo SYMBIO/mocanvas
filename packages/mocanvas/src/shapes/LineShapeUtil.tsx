@@ -3,10 +3,10 @@ import {
   Polyline2d,
   ShapeUtil,
   STROKE_SIZES,
+  DefaultColorStyle,
+  DefaultDashStyle,
+  DefaultSizeStyle,
   type BaseShape,
-  type DefaultColorStyle,
-  type DefaultDashStyle,
-  type DefaultSizeStyle,
   type Geometry2d,
   type ShapeHandle,
   type StyleWords,
@@ -50,6 +50,7 @@ function midIndex(a: string, b: string): string {
 
 export class LineShapeUtil extends ShapeUtil<LineShape> {
   static override type = "line" as const
+  static override props = { color: DefaultColorStyle, dash: DefaultDashStyle, size: DefaultSizeStyle }
 
   getDefaultProps(): LineShapeProps {
     return {

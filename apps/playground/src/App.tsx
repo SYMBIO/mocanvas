@@ -1,4 +1,4 @@
-import { createShapeId, loadMocanvasFile, Mocanvas, serializeMocanvasFile, type Editor, type GeoShape, type GeoShapeKind, type ShapeCreate } from "mocanvas"
+import { createShapeId, downloadBlob, exportToBlob, loadMocanvasFile, Mocanvas, serializeMocanvasFile, type Editor, type GeoShape, type GeoShapeKind, type ShapeCreate } from "mocanvas"
 import { useRef, useState } from "react"
 
 const COLORS = ["black", "grey", "light-violet", "violet", "blue", "light-blue", "yellow", "orange", "green", "light-green", "light-red", "red"] as const
@@ -116,6 +116,25 @@ export function App() {
           <button type="button" onClick={() => fileRef.current?.click()}>
             open .tldr
           </button>
+          {(["svg", "png"] as const).map((format) => (
+            <button
+              key={format}
+              type="button"
+              onClick={async () => {
+                const ed = editorRef.current
+                if (!ed) return
+                try {
+                  const blob = await exportToBlob(ed, { format, background: true })
+                  downloadBlob(blob, `mocanvas.${format}`)
+                  setMsg(`exported ${format} (${(blob.size / 1024).toFixed(0)} kB)`)
+                } catch (err) {
+                  setMsg(`export failed: ${String(err)}`)
+                }
+              }}
+            >
+              export {format}
+            </button>
+          ))}
           <button
             type="button"
             onClick={async () => {

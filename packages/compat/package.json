@@ -1,0 +1,19 @@
+{
+  "name": "@mocanvas/compat",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "mocanvas": "workspace:*",
+    "@mocanvas/editor": "workspace:*",
+    "@mocanvas/store": "workspace:*",
+    "@mocanvas/state": "workspace:*"
+  },
+  "devDependencies": { "@types/react": "^19.1.0", "react": "^19.1.0" },
+  "peerDependencies": { "react": ">=18" }
+}

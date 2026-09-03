@@ -5,12 +5,13 @@ import {
   ShapeUtil,
   STROKE_SIZES,
   Vec,
+  DefaultColorStyle,
+  DefaultDashStyle,
+  DefaultFillStyle,
+  DefaultFontStyle,
+  DefaultLabelColorStyle,
+  DefaultSizeStyle,
   type BaseShape,
-  type DefaultColorStyle,
-  type DefaultDashStyle,
-  type DefaultFillStyle,
-  type DefaultFontStyle,
-  type DefaultSizeStyle,
   type Geometry2d,
   type ShapeHandle,
   type StyleWords,
@@ -39,7 +40,7 @@ import {
   shortenBody,
   type ArrowheadKind,
 } from "./arrow-helpers"
-import { getStrokeRgba, getTextCssColor } from "./shape-theme"
+import { getDashId, getStrokeRgba, getTextCssColor } from "./shape-theme"
 import { pathWordsToSvgD } from "./svg-path"
 
 export type { ArrowheadKind } from "./arrow-helpers"
@@ -70,6 +71,14 @@ const LABEL_PADDING = ARROW_LABEL_PADDING
 
 export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
   static override type = "arrow" as const
+  static override props = {
+    color: DefaultColorStyle,
+    labelColor: DefaultLabelColorStyle,
+    fill: DefaultFillStyle,
+    dash: DefaultDashStyle,
+    size: DefaultSizeStyle,
+    font: DefaultFontStyle,
+  }
 
   getDefaultProps(): ArrowShapeProps {
     return {
@@ -114,10 +123,10 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
   }
 
   override getRenderStyle(shape: ArrowShape): StyleWords {
-    const { color, size, scale } = shape.props
+    const { color, dash, size, scale } = shape.props
     const stroke = getStrokeRgba(color)
     // The body is open so it never fills; closed arrowheads fill with the stroke color.
-    return { stroke, strokeWidth: STROKE_SIZES[size] * scale, fill: stroke, dash: 0, opacity: 1 }
+    return { stroke, strokeWidth: STROKE_SIZES[size] * scale, fill: stroke, dash: getDashId(dash), opacity: 1 }
   }
 
   component(shape: ArrowShape): ReactNode {

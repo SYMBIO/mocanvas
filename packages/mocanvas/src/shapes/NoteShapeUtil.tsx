@@ -3,12 +3,13 @@ import {
   Rectangle2d,
   ShapeUtil,
   LIGHT_THEME,
+  DefaultColorStyle,
+  DefaultFontStyle,
+  DefaultHorizontalAlignStyle,
+  DefaultLabelColorStyle,
+  DefaultSizeStyle,
+  DefaultVerticalAlignStyle,
   type BaseShape,
-  type DefaultColorStyle,
-  type DefaultFontStyle,
-  type DefaultHorizontalAlignStyle,
-  type DefaultSizeStyle,
-  type DefaultVerticalAlignStyle,
   type Geometry2d,
   type StyleWords,
 } from "@mocanvas/editor"
@@ -55,6 +56,14 @@ const LABEL_KEYS: readonly (keyof NoteShapeProps)[] = ["text", "font", "size", "
 
 export class NoteShapeUtil extends ShapeUtil<NoteShape> {
   static override type = "note" as const
+  static override props = {
+    color: DefaultColorStyle,
+    labelColor: DefaultLabelColorStyle,
+    size: DefaultSizeStyle,
+    font: DefaultFontStyle,
+    align: DefaultHorizontalAlignStyle,
+    verticalAlign: DefaultVerticalAlignStyle,
+  }
 
   getDefaultProps(): NoteShapeProps {
     return {

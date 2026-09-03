@@ -66,7 +66,8 @@ class Idle extends StateNode {
           this.parent!.transition("pointing_canvas", info)
           return
         }
-        this.parent!.transition("pointing_shape", info)
+        const outer = this.editor.getOutermostSelectableShape(info.shape) ?? info.shape
+        this.parent!.transition("pointing_shape", { ...info, shape: outer })
         break
       }
       default:
@@ -76,6 +77,14 @@ class Idle extends StateNode {
 
   override onDoubleClick(info: ClickEventInfo): void {
     if (info.target !== "shape") return
+    const outer = this.editor.getOutermostSelectableShape(info.shape) ?? info.shape
+    if (outer.type === "group" && outer.id !== info.shape.id) {
+      // Focus into the group so its children become selectable.
+      this.editor.updateCurrentPageState({ focusedGroupId: outer.id })
+      const inner = this.editor.getOutermostSelectableShape(info.shape) ?? info.shape
+      this.editor.select(inner.id)
+      return
+    }
     const shape = info.shape
     const util = this.editor.getShapeUtil(shape)
     if (util.canEdit(shape) && !this.editor.isShapeOrAncestorLocked(shape)) {
@@ -121,7 +130,11 @@ class Idle extends StateNode {
       }
       case "Escape": {
         if (editor.getEditingShapeId()) editor.setEditingShape(null)
-        else editor.selectNone()
+        else if (editor.getCurrentPageState().focusedGroupId) {
+          const g = editor.getCurrentPageState().focusedGroupId!
+          editor.updateCurrentPageState({ focusedGroupId: null })
+          editor.select(g)
+        } else editor.selectNone()
         break
       }
       default:
@@ -141,6 +154,7 @@ class PointingCanvas extends StateNode {
   override onEnter(): void {
     if (!this.editor.inputs.shiftKey) {
       if (this.editor.getEditingShapeId()) this.editor.setEditingShape(null)
+      if (this.editor.getCurrentPageState().focusedGroupId) this.editor.updateCurrentPageState({ focusedGroupId: null })
       this.editor.selectNone()
     }
   }

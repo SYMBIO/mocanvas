@@ -32,6 +32,23 @@ export function useKeyboardShortcuts(editor: Editor | null): void {
             e.preventDefault()
             editor.selectAll()
             return
+          case "g": {
+            e.preventDefault()
+            const ids = editor.getSelectedShapeIds()
+            if (!ids.length) return
+            editor.markHistoryStoppingPoint(e.shiftKey ? "ungroup" : "group")
+            if (e.shiftKey) editor.ungroupShapes(ids)
+            else editor.groupShapes(ids)
+            return
+          }
+          case "l": {
+            e.preventDefault()
+            if (e.shiftKey) {
+              editor.markHistoryStoppingPoint("lock")
+              editor.toggleLock()
+            }
+            return
+          }
           case "d": {
             e.preventDefault()
             const ids = editor.getSelectedShapeIds()

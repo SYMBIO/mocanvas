@@ -1,0 +1,121 @@
+/**
+ * Migration aliases. Projects moving from a `TL`-prefixed API can switch their
+ * imports to `@mocanvas/compat` first and rename at their own pace.
+ *
+ * Every alias here is a pure re-export; there is no runtime code.
+ */
+export * from "mocanvas"
+
+import type {
+  ArrowBinding,
+  ArrowShape,
+  Camera,
+  CameraId,
+  ClickEventInfo,
+  Document,
+  DrawShape,
+  EditorRecord,
+  EditorStore,
+  EditorStoreSnapshot,
+  EventInfo,
+  FrameShape,
+  GeoShape,
+  GroupShape,
+  Instance,
+  InstancePageState,
+  KeyboardEventInfo,
+  LineShape,
+  NoteShape,
+  Page,
+  PageId,
+  ParentId,
+  PointerEventInfo,
+  Shape,
+  ShapeCreate,
+  ShapeHandle,
+  ShapeId,
+  ShapePartial,
+  ShapeUtilConstructor,
+  StateNodeConstructor,
+  TextShape,
+  UnknownBinding,
+  UnknownShape,
+  WheelEventInfo,
+  BindingId,
+  BindingUtilConstructor,
+  SelectionHandle,
+  ResizeInfo,
+  DefaultColorStyle as DefaultColorStyleValue,
+  DefaultDashStyle as DefaultDashStyleValue,
+  DefaultFillStyle as DefaultFillStyleValue,
+  DefaultFontStyle as DefaultFontStyleValue,
+  DefaultSizeStyle as DefaultSizeStyleValue,
+  DefaultHorizontalAlignStyle as DefaultHorizontalAlignStyleValue,
+  DefaultVerticalAlignStyle as DefaultVerticalAlignStyleValue,
+  GeoShapeKind,
+} from "mocanvas"
+import { Mocanvas, createSchema, createStore, Canvas, Editor } from "mocanvas"
+
+// ---- records ----------------------------------------------------------------
+export type TLRecord = EditorRecord
+export type TLStore = EditorStore
+export type TLStoreSnapshot = EditorStoreSnapshot
+export type TLShape = Shape
+export type TLUnknownShape = UnknownShape
+export type TLShapeId = ShapeId
+export type TLParentId = ParentId
+export type TLShapePartial<T extends UnknownShape = UnknownShape> = ShapePartial<T>
+export type TLShapeCreate<T extends UnknownShape = UnknownShape> = ShapeCreate<T>
+export type TLPage = Page
+export type TLPageId = PageId
+export type TLDocument = Document
+export type TLCamera = Camera
+export type TLCameraId = CameraId
+export type TLInstance = Instance
+export type TLInstancePageState = InstancePageState
+export type TLBinding = UnknownBinding
+export type TLBindingId = BindingId
+export type TLArrowBinding = ArrowBinding
+
+// ---- default shapes ---------------------------------------------------------
+export type TLGeoShape = GeoShape
+export type TLDrawShape = DrawShape
+export type TLLineShape = LineShape
+export type TLArrowShape = ArrowShape
+export type TLTextShape = TextShape
+export type TLNoteShape = NoteShape
+export type TLFrameShape = FrameShape
+export type TLGroupShape = GroupShape
+export type TLGeoShapeGeoStyle = GeoShapeKind
+
+// ---- styles (value types) ---------------------------------------------------
+export type TLDefaultColorStyle = DefaultColorStyleValue
+export type TLDefaultDashStyle = DefaultDashStyleValue
+export type TLDefaultFillStyle = DefaultFillStyleValue
+export type TLDefaultFontStyle = DefaultFontStyleValue
+export type TLDefaultSizeStyle = DefaultSizeStyleValue
+export type TLDefaultHorizontalAlignStyle = DefaultHorizontalAlignStyleValue
+export type TLDefaultVerticalAlignStyle = DefaultVerticalAlignStyleValue
+
+// ---- events / tools ---------------------------------------------------------
+export type TLEventInfo = EventInfo
+export type TLPointerEventInfo = PointerEventInfo
+export type TLClickEventInfo = ClickEventInfo
+export type TLKeyboardEventInfo = KeyboardEventInfo
+export type TLWheelEventInfo = WheelEventInfo
+export type TLHandle = ShapeHandle
+export type TLSelectionHandle = SelectionHandle
+export type TLResizeInfo<T extends UnknownShape> = ResizeInfo<T>
+export type TLShapeUtilConstructor<T extends UnknownShape = UnknownShape> = ShapeUtilConstructor<T>
+export type TLStateNodeConstructor = StateNodeConstructor
+export type TLBindingUtilConstructor = BindingUtilConstructor
+export type TLAnyShapeUtilConstructor = ShapeUtilConstructor
+
+// ---- values -----------------------------------------------------------------
+/** The batteries-included component. */
+export const Tldraw = Mocanvas
+/** The bare canvas (bring your own shapes, tools and UI). */
+export const TldrawEditor = Canvas
+export const createTLStore = createStore
+export const createTLSchema = createSchema
+export type TLEditor = Editor

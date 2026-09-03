@@ -3,11 +3,11 @@ import {
   Polyline2d,
   ShapeUtil,
   STROKE_SIZES,
+  DefaultColorStyle,
+  DefaultDashStyle,
+  DefaultFillStyle,
+  DefaultSizeStyle,
   type BaseShape,
-  type DefaultColorStyle,
-  type DefaultDashStyle,
-  type DefaultFillStyle,
-  type DefaultSizeStyle,
   type Geometry2d,
   type ResizeInfo,
   type StyleWords,
@@ -54,6 +54,7 @@ export function getDrawOutlinePoints(shape: DrawShape): VecLike[] {
 
 export class DrawShapeUtil extends ShapeUtil<DrawShape> {
   static override type = "draw" as const
+  static override props = { color: DefaultColorStyle, fill: DefaultFillStyle, dash: DefaultDashStyle, size: DefaultSizeStyle }
 
   getDefaultProps(): DrawShapeProps {
     return {

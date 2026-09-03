@@ -1307,6 +1307,57 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this.updateShapes(shapes.map((s) => ({ id: s.id, type: s.type, isLocked: !allLocked })))
   }
 
+  // ---- groups ------------------------------------------------------------
+
+  /** Wrap shapes in a new `group` shape (requires a registered "group" ShapeUtil). Returns the group id. */
+  groupShapes(ids: readonly ShapeId[] = this.getSelectedShapeIds(), groupId: ShapeId = ShapeRecordType.createId() as ShapeId): ShapeId | undefined {
+    if (!this.hasShapeUtil("group")) throw new Error("No ShapeUtil registered for type \"group\"")
+    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
+    if (shapes.length < 2) return undefined
+    const parentId = shapes[0]!.parentId
+    if (!shapes.every((s) => s.parentId === parentId)) return undefined
+    const sorted = sortByIndex(shapes)
+    const bounds = Box.Common(sorted.map((s) => this.getShapePageBounds(s)!))
+    this.run(() => {
+      this.createShape({ id: groupId, type: "group", parentId, x: bounds.x, y: bounds.y, index: getIndexAbove(sorted.at(-1)!.index) })
+      this.reparentShapes(sorted.map((s) => s.id), groupId)
+      this.setSelectedShapes([groupId])
+    })
+    return groupId
+  }
+
+  /** Dissolve groups, re-parenting their children to the group's parent. */
+  ungroupShapes(ids: readonly ShapeId[] = this.getSelectedShapeIds()): this {
+    const groups = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && s.type === "group")
+    if (groups.length === 0) return this
+    this.run(() => {
+      const released: ShapeId[] = []
+      for (const g of groups) {
+        const children = this.getSortedChildIdsForParent(g.id)
+        this.reparentShapes(children, g.parentId, getIndexAbove(g.index))
+        released.push(...children)
+        this.store.remove([g.id])
+      }
+      this.setSelectedShapes(released)
+    })
+    return this
+  }
+
+  /** The outermost group containing a shape, or undefined. */
+  getOutermostSelectableShape(shape: UnknownShape | ShapeId): UnknownShape | undefined {
+    let cur = typeof shape === "string" ? this.getShape(shape) : shape
+    if (!cur) return undefined
+    let result = cur
+    const focused = this.getCurrentPageState().focusedGroupId
+    while (cur && isShapeId(cur.parentId)) {
+      const parent: UnknownShape | undefined = this.getShape(cur.parentId)
+      if (!parent || parent.id === focused) break
+      if (parent.type === "group") result = parent
+      cur = parent
+    }
+    return result
+  }
+
   // ---- z-order -----------------------------------------------------------
 
   bringToFront(ids: readonly ShapeId[] = this.getSelectedShapeIds()): this {
@@ -1842,6 +1893,16 @@ export class Editor extends EventEmitter<EditorEvents> {
       this.writeShapeToEngine(next, geometryChanged || this.handles.peek(next.id) === undefined)
       rebind.delete(next.id)
       dirty = true
+    }
+    // Groups derive their geometry from their children.
+    const touched = [...Object.values(changes.added), ...Object.values(changes.removed), ...Object.values(changes.updated).map(([, n]) => n)]
+    for (const rec of touched) {
+      if (rec.typeName !== "shape") continue
+      let parent: UnknownShape | undefined = isShapeId(rec.parentId) ? this.getShape(rec.parentId) : undefined
+      while (parent && parent.type === "group") {
+        rebind.add(parent.id)
+        parent = isShapeId(parent.parentId) ? this.getShape(parent.parentId) : undefined
+      }
     }
     for (const id of rebind) {
       const shape = this.getShape(id)

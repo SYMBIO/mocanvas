@@ -63,8 +63,9 @@ impl Renderer {
         self.meshes.clear();
     }
 
-    /// Build the frame for a page-space viewport.
-    pub fn frame(&mut self, scene: &mut Scene, viewport: &Box2d) -> &FrameOutput {
+    /// Build the frame for a page-space viewport at a camera zoom (screen px per page unit).
+    pub fn frame(&mut self, scene: &mut Scene, viewport: &Box2d, zoom: f32) -> &FrameOutput {
+        let zoom = zoom.max(1e-6);
         self.out.clear();
         scene.visible_slots(viewport, &mut self.visible);
         self.out.culled = (scene.len() as u32).saturating_sub(self.visible.len() as u32);
@@ -86,6 +87,21 @@ impl Renderer {
                 if sh.flags & FLAG_OVERLAY != 0 {
                     continue;
                 }
+            }
+            // Level of detail: shapes smaller than a few pixels on screen are drawn as a
+            // single quad in their dominant color instead of a full mesh.
+            let pb = sh.page_bounds;
+            let screen_size = pb.width().max(pb.height()) * zoom;
+            if screen_size < LOD_QUAD_PX {
+                if screen_size >= LOD_MIN_PX {
+                    let color = if sh.style.has_fill() { sh.style.fill } else { sh.style.stroke };
+                    let rgba = unpack_rgba(color, sh.style.opacity);
+                    append_quad(&mut self.out, pb, rgba);
+                    self.out.drawn += 1;
+                } else {
+                    self.out.culled += 1;
+                }
+                continue;
             }
             let i = slot as usize;
             let needs = match &self.meshes[i] {
@@ -114,6 +130,20 @@ impl Renderer {
         let _ = batch_start;
         &self.out
     }
+}
+
+/// Below this screen size (px) a shape is drawn as a quad.
+pub const LOD_QUAD_PX: f32 = 4.0;
+/// Below this screen size (px) a shape is not drawn at all.
+pub const LOD_MIN_PX: f32 = 0.75;
+
+#[inline]
+fn append_quad(out: &mut FrameOutput, b: &Box2d, rgba: [f32; 4]) {
+    let base = (out.vertices.len() / VERTEX_FLOATS) as u32;
+    for c in b.corners() {
+        out.vertices.extend_from_slice(&[c.x, c.y, rgba[0], rgba[1], rgba[2], rgba[3]]);
+    }
+    out.indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
 }
 
 fn scene_capacity(scene: &Scene) -> usize {
@@ -148,15 +178,35 @@ mod tests {
             sc.set_style(h, Style { fill: 0xff0000ff, stroke: 0, ..Style::default() });
         }
         let mut r = Renderer::new();
-        let out = r.frame(&mut sc, &Box2d::from_xywh(900.0, -10.0, 2200.0, 200.0));
+        let out = r.frame(&mut sc, &Box2d::from_xywh(900.0, -10.0, 2200.0, 200.0), 1.0);
         assert_eq!(out.drawn, 3);
         assert_eq!(out.culled, 7);
         assert_eq!(out.indices.len(), 18);
         assert_eq!(out.vertices.len(), 12 * VERTEX_FLOATS);
         assert_eq!(out.batches, vec![0, 18, 0]);
         // second frame reuses meshes (no panic, same output)
-        let out2 = r.frame(&mut sc, &Box2d::from_xywh(900.0, -10.0, 2200.0, 200.0));
+        let out2 = r.frame(&mut sc, &Box2d::from_xywh(900.0, -10.0, 2200.0, 200.0), 1.0);
         assert_eq!(out2.indices.len(), 18);
+    }
+
+    #[test]
+    fn tiny_shapes_become_quads_or_vanish() {
+        let mut sc = Scene::new();
+        sc.upsert(1, 1, 0, ZKey(1), 0, 0.0, 0.0, 0.0, 100.0, 100.0);
+        sc.set_geometry(1, Path::ellipse(&Box2d::from_xywh(0.0, 0.0, 100.0, 100.0)));
+        sc.set_style(1, Style { fill: 0xff0000ff, stroke: 0x000000ff, stroke_width: 2.0, ..Style::default() });
+        let mut r = Renderer::new();
+        let vp = Box2d::from_xywh(-1000.0, -1000.0, 3000.0, 3000.0);
+        let full = r.frame(&mut sc, &vp, 1.0).indices.len();
+        assert!(full > 6);
+        // 100 page units * 0.02 zoom = 2 px → quad
+        let quad = r.frame(&mut sc, &vp, 0.02);
+        assert_eq!(quad.indices.len(), 6);
+        assert_eq!(quad.drawn, 1);
+        // 0.005 zoom = 0.5 px → dropped
+        let gone = r.frame(&mut sc, &vp, 0.005);
+        assert_eq!(gone.indices.len(), 0);
+        assert_eq!(gone.culled, 1);
     }
 
     #[test]
@@ -164,7 +214,7 @@ mod tests {
         let mut sc = Scene::new();
         sc.upsert(1, 1, 0, ZKey(1), FLAG_OVERLAY, 10.0, 20.0, 0.0, 100.0, 50.0);
         let mut r = Renderer::new();
-        let out = r.frame(&mut sc, &Box2d::from_xywh(0.0, 0.0, 500.0, 500.0));
+        let out = r.frame(&mut sc, &Box2d::from_xywh(0.0, 0.0, 500.0, 500.0), 1.0);
         assert_eq!(out.drawn, 0);
         assert_eq!(out.overlay.len(), 6);
         assert_eq!(out.overlay[0], 1);

@@ -1,11 +1,26 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/state" },
-    { "path": "packages/store" },
-    { "path": "packages/wasm" },
-    { "path": "packages/editor" },
-    { "path": "packages/mocanvas" },
-    { "path": "apps/playground" }
+    {
+      "path": "packages/state"
+    },
+    {
+      "path": "packages/store"
+    },
+    {
+      "path": "packages/wasm"
+    },
+    {
+      "path": "packages/editor"
+    },
+    {
+      "path": "packages/mocanvas"
+    },
+    {
+      "path": "packages/compat"
+    },
+    {
+      "path": "apps/playground"
+    }
   ]
 }

@@ -304,3 +304,52 @@ describe("Editor bulk transforms", () => {
     expect(editor.getShape(ids[0]!)!.isLocked).toBe(true)
   })
 })
+
+describe("Editor groups", () => {
+  class GroupUtil extends BaseBoxShapeUtil<BaseShape<"group", { w: number; h: number; color: number }>> {
+    static override type = "group" as const
+    getDefaultProps() {
+      return { w: 1, h: 1, color: 0 }
+    }
+    getGeometry(shape: BaseShape<"group", { w: number; h: number; color: number }>) {
+      const kids = this.editor.getSortedChildIdsForParent(shape.id).map((id) => this.editor.getShape(id)!)
+      const maxX = Math.max(1, ...kids.map((k) => k.x + (k.props as { w: number }).w))
+      const maxY = Math.max(1, ...kids.map((k) => k.y + (k.props as { h: number }).h))
+      return new Rectangle2d({ width: maxX, height: maxY, isFilled: false })
+    }
+    component() {
+      return null
+    }
+    indicator() {
+      return null
+    }
+  }
+
+  it("groups and ungroups shapes, keeping page positions", () => {
+    const engine = loadEngineSync(readFileSync(wasmPath))
+    const editor = new Editor({
+      store: createStore(),
+      shapeUtils: [BoxUtil, GroupUtil],
+      tools: [TestTool],
+      engine,
+      getContainer: () => ({}) as HTMLElement,
+    })
+    editor.createShapes<BoxShape>([{ type: "box", x: 100, y: 100 }, { type: "box", x: 300, y: 150, props: { w: 50, h: 50 } }])
+    const ids = editor.getCurrentPageShapes().map((s) => s.id)
+    const groupId = editor.groupShapes(ids)!
+    const group = editor.getShape(groupId)!
+    expect(group.type).toBe("group")
+    expect(editor.getShape(ids[0]!)!.parentId).toBe(groupId)
+    expect(editor.getShapePageBounds(ids[1]!)!.x).toBe(300)
+    expect(editor.getSelectedShapeIds()).toEqual([groupId])
+    expect(editor.getOutermostSelectableShape(ids[0]!)!.id).toBe(groupId)
+    // moving the group moves the children on the page
+    editor.nudgeShapes([groupId], { x: 10, y: 0 })
+    expect(editor.getShapePageBounds(ids[1]!)!.x).toBe(310)
+    editor.ungroupShapes([groupId])
+    expect(editor.getShape(groupId)).toBeUndefined()
+    expect(editor.getShape(ids[1]!)!.parentId).toBe(editor.getCurrentPageId())
+    expect(editor.getShape(ids[1]!)!.x).toBe(310)
+    expect(editor.getSelectedShapeIds().sort()).toEqual([...ids].sort())
+  })
+})

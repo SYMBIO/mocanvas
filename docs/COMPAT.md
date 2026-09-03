@@ -14,6 +14,7 @@ about; **later** — planned, not in v1.
 | `@tldraw/state`     | `@mocanvas/state`  | `atom`, `computed`, `react`, `transact`       |
 | `@tldraw/state-react` | `@mocanvas/state/react` | `useValue`, `track`, `useAtom`          |
 | `@tldraw/tlschema`  | `@mocanvas/editor` (records) | record and prop types live with the editor |
+| any of the above    | `@mocanvas/compat` | re-exports everything from `mocanvas` plus `TL*` type aliases, `Tldraw`, `TldrawEditor`, `createTLStore`, `createTLSchema` |
 
 ## Records
 
@@ -50,7 +51,7 @@ keep the same string unions so `.tldr` files load without translation.
 | `run` `batch` | same | |
 | `getInstanceState` `updateInstanceState` `getCurrentPageState` `updateCurrentPageState` | same | |
 | `setEditingShape` `getEditingShapeId` `setHoveredShape` `getHoveredShapeId` `setErasingShapes` | same | |
-| `bringToFront` `sendToBack` `bringForward` `sendBackward` `reparentShapes` `groupShapes` `ungroupShapes` | same | groups in phase 2 |
+| `bringToFront` `sendToBack` `bringForward` `sendBackward` `reparentShapes` `groupShapes` `ungroupShapes` `getOutermostSelectableShape` | same | `group` shape util is in `mocanvas` |
 | `duplicateShapes` `getContentFromCurrentPage` `putContentOntoCurrentPage` | same | clipboard content is `{ shapes, bindings }` |
 | `createBindings` `updateBindings` `deleteBindings` `getBindingsFromShape` `getBindingsToShape` `getBindingsInvolvingShape` `getBindingUtil` | same | `BindingUtil` callbacks: `onAfterChangeToShape`, `onBeforeDeleteToShape`, `onBeforeIsolate*` |
 | `getStyleForNextShape` `setStyleForNextShapes` `setStyleForSelectedShapes` `getSharedStyles` | same | `StyleProp.define` / `defineEnum`; default styles use `mocanvas:` ids |

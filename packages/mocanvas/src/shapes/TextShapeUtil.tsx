@@ -2,10 +2,11 @@ import {
   FONT_SIZES,
   Rectangle2d,
   ShapeUtil,
+  DefaultColorStyle,
+  DefaultFontStyle,
+  DefaultHorizontalAlignStyle,
+  DefaultSizeStyle,
   type BaseShape,
-  type DefaultColorStyle,
-  type DefaultFontStyle,
-  type DefaultSizeStyle,
   type Geometry2d,
   type ResizeInfo,
   type StyleWords,
@@ -43,6 +44,7 @@ const SIZE_KEYS: readonly (keyof TextShapeProps)[] = ["text", "font", "size", "s
 
 export class TextShapeUtil extends ShapeUtil<TextShape> {
   static override type = "text" as const
+  static override props = { color: DefaultColorStyle, size: DefaultSizeStyle, font: DefaultFontStyle, textAlign: DefaultHorizontalAlignStyle }
 
   getDefaultProps(): TextShapeProps {
     return { color: "black", size: "m", font: "draw", textAlign: "start", w: 100, text: "", scale: 1, autoSize: true }

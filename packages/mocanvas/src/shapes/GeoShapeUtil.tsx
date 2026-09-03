@@ -4,14 +4,16 @@ import {
   Group2d,
   Rectangle2d,
   STROKE_SIZES,
+  DefaultColorStyle,
+  DefaultDashStyle,
+  DefaultFillStyle,
+  DefaultFontStyle,
+  DefaultHorizontalAlignStyle,
+  DefaultLabelColorStyle,
+  DefaultSizeStyle,
+  DefaultVerticalAlignStyle,
+  GeoShapeGeoStyle,
   type BaseShape,
-  type DefaultColorStyle,
-  type DefaultDashStyle,
-  type DefaultFillStyle,
-  type DefaultFontStyle,
-  type DefaultHorizontalAlignStyle,
-  type DefaultSizeStyle,
-  type DefaultVerticalAlignStyle,
   type GeoShapeKind,
   type Geometry2d,
   type StyleWords,
@@ -20,7 +22,7 @@ import type { CSSProperties, ReactNode } from "react"
 import { alignToJustify, alignToTextAlign, TextLabel, verticalAlignToAlignItems } from "../text/TextEditor"
 import { computeGrowY, measureLabel, trimTrailingWhitespace } from "../text/text-layout"
 import { getGeoGeometry } from "./geo-helpers"
-import { getFillRgba, getStrokeRgba, getTextCssColor } from "./shape-theme"
+import { getDashId, getFillRgba, getStrokeRgba, getTextCssColor } from "./shape-theme"
 import { pathWordsToSvgD } from "./svg-path"
 
 export interface GeoShapeProps {
@@ -74,6 +76,17 @@ const LABEL_KEYS: readonly (keyof GeoShapeProps)[] = ["text", "font", "size", "s
 
 export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
   static override type = "geo" as const
+  static override props = {
+    geo: GeoShapeGeoStyle,
+    color: DefaultColorStyle,
+    labelColor: DefaultLabelColorStyle,
+    fill: DefaultFillStyle,
+    dash: DefaultDashStyle,
+    size: DefaultSizeStyle,
+    font: DefaultFontStyle,
+    align: DefaultHorizontalAlignStyle,
+    verticalAlign: DefaultVerticalAlignStyle,
+  }
 
   getDefaultProps(): GeoShapeProps {
     return {
@@ -116,12 +129,12 @@ export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
   }
 
   override getRenderStyle(shape: GeoShape): StyleWords {
-    const { color, fill, size, scale } = shape.props
+    const { color, fill, dash, size, scale } = shape.props
     return {
       stroke: getStrokeRgba(color),
       strokeWidth: STROKE_SIZES[size] * scale,
       fill: getFillRgba(color, fill),
-      dash: 0,
+      dash: getDashId(dash),
       opacity: 1,
     }
   }

@@ -23,7 +23,11 @@ export * from "./text-helpers"
 export { pathWordsToSvgD } from "./svg-path"
 
 /** The built-in shape utils, in the order they are registered. */
+export { GroupShapeUtil, type GroupShape } from "./GroupShapeUtil"
+import { GroupShapeUtil } from "./GroupShapeUtil"
+
 export const defaultShapeUtils: ShapeUtilConstructor[] = [
+  GroupShapeUtil,
   GeoShapeUtil,
   DrawShapeUtil,
   LineShapeUtil,

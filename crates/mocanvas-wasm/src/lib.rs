@@ -189,7 +189,7 @@ impl Engine {
         let min = Vec2::new(-cam_x, -cam_y);
         let max = Vec2::new(vp_w / z - cam_x, vp_h / z - cam_y);
         let vp = Box2d::new(min, max).expand(1.0 / z);
-        self.renderer.frame(&mut self.scene, &vp);
+        self.renderer.frame(&mut self.scene, &vp, z);
     }
 
     /// Pointer to interleaved `x y r g b a` f32 vertices.

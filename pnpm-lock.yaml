@@ -52,6 +52,28 @@ importers:
         specifier: ^7.1.0
         version: 7.3.6(@types/node@24.13.3)
 
+  packages/compat:
+    dependencies:
+      '@mocanvas/editor':
+        specifier: workspace:*
+        version: link:../editor
+      '@mocanvas/state':
+        specifier: workspace:*
+        version: link:../state
+      '@mocanvas/store':
+        specifier: workspace:*
+        version: link:../store
+      mocanvas:
+        specifier: workspace:*
+        version: link:../mocanvas
+    devDependencies:
+      '@types/react':
+        specifier: ^19.1.0
+        version: 19.2.18
+      react:
+        specifier: ^19.1.0
+        version: 19.2.8
+
   packages/editor:
     dependencies:
       '@mocanvas/state':
