@@ -1,46 +1,86 @@
 /*
- * Default UI theme. Everything is driven by custom properties declared on the
- * editor container (`.mocanvas`), so an app can restyle the whole UI by
- * overriding a handful of variables. Colours meet WCAG AA (>= 4.5:1) for text
- * in both the light and dark palettes.
+ * Default UI theme.
+ *
+ * Everything is driven by custom properties declared on the editor container
+ * (`.mocanvas`), so an app can restyle the whole UI — chrome drawn on the
+ * canvas included — by overriding a handful of variables. See `docs/UI.md`.
+ *
+ * Every text/background pair below is at or above 4.5:1 in both palettes, and
+ * every icon or canvas-chrome stroke is at or above 3:1 against the surface it
+ * sits on.
  */
 
 .mocanvas,
-.mocanvas-panel {
+.mocanvas-panel,
+.mocanvas-layer {
+  /* surfaces */
   --mocanvas-ui-panel: #ffffff;
-  --mocanvas-ui-panel-border: #e3e5ea;
+  --mocanvas-ui-panel-border: #d6d9e0;
+  --mocanvas-ui-control: rgba(16, 24, 40, 0.06);
   --mocanvas-ui-text: #16181d;
-  --mocanvas-ui-muted: #616570;
+  --mocanvas-ui-muted: #5c6070;
   --mocanvas-ui-accent: #2563eb;
   --mocanvas-ui-accent-fg: #ffffff;
   --mocanvas-ui-accent-soft: rgba(37, 99, 235, 0.12);
   --mocanvas-ui-hover: rgba(16, 24, 40, 0.06);
+  --mocanvas-ui-active: rgba(16, 24, 40, 0.13);
   --mocanvas-ui-shadow: 0 8px 24px rgba(15, 18, 25, 0.1), 0 1px 3px rgba(15, 18, 25, 0.08);
-  --mocanvas-ui-radius: 12px;
-  --mocanvas-ui-radius-sm: 8px;
   --mocanvas-ui-tip-bg: #16181d;
   --mocanvas-ui-tip-fg: #f6f7f9;
   --mocanvas-ui-tip-muted: #a9aeb9;
+
+  /* metrics */
+  --mocanvas-ui-radius: 12px;
+  --mocanvas-ui-radius-sm: 8px;
   --mocanvas-ui-btn: 40px;
+  --mocanvas-ui-icon: 20px;
+  --mocanvas-ui-gap: 2px;
+  --mocanvas-ui-pad: 4px;
+  --mocanvas-ui-pad-lg: 10px;
+  --mocanvas-ui-inset: 12px;
+  /*
+   * Width the bottom-left and bottom-right docks (zoom bar, stats chip) reserve
+   * on either side of the centred toolbar. The toolbar wraps rather than grow
+   * into that reservation, so the three can never collide.
+   */
+  --mocanvas-ui-dock: 300px;
+  /* Height the bottom edge occupies; the style panel stops above it. */
+  --mocanvas-ui-bottom-dock: 62px;
   --mocanvas-ui-font: system-ui, -apple-system, "Segoe UI", sans-serif;
   --mocanvas-ui-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /*
+   * Canvas chrome, read by the editor's indicator layer. These are deliberately
+   * NOT redefined for the dark UI: the canvas keeps its own background, which
+   * does not follow `prefers-color-scheme`. The values clear 3:1 against both a
+   * light (#f9fafb: 4.45 and 3.69) and a dark (#1b1d22: 3.63 and 4.37) canvas,
+   * so an app that darkens the canvas only needs to swap `-selection-fg`, the
+   * fill behind a solid handle.
+   */
+  --mocanvas-selection: #2f6fe4;
+  --mocanvas-selection-fg: #ffffff;
+  --mocanvas-brush-fill: rgba(47, 111, 228, 0.12);
+  --mocanvas-snap: #cf3fe0;
 }
 
 @media (prefers-color-scheme: dark) {
   .mocanvas,
-  .mocanvas-panel {
+  .mocanvas-panel,
+  .mocanvas-layer {
     --mocanvas-ui-panel: #1b1d22;
-    --mocanvas-ui-panel-border: #34373f;
+    --mocanvas-ui-panel-border: #3c404a;
+    --mocanvas-ui-control: rgba(255, 255, 255, 0.08);
     --mocanvas-ui-text: #eceef3;
     --mocanvas-ui-muted: #a4a9b4;
     --mocanvas-ui-accent: #6ea8fe;
     --mocanvas-ui-accent-fg: #0e1116;
     --mocanvas-ui-accent-soft: rgba(110, 168, 254, 0.18);
     --mocanvas-ui-hover: rgba(255, 255, 255, 0.09);
+    --mocanvas-ui-active: rgba(255, 255, 255, 0.18);
     --mocanvas-ui-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.6);
     --mocanvas-ui-tip-bg: #2b2f37;
     --mocanvas-ui-tip-fg: #f2f4f8;
-    --mocanvas-ui-tip-muted: #a4a9b4;
+    --mocanvas-ui-tip-muted: #b9bec9;
   }
 }
 
@@ -51,9 +91,9 @@
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--mocanvas-ui-gap);
   box-sizing: border-box;
-  padding: 4px;
+  padding: var(--mocanvas-ui-pad);
   background: var(--mocanvas-ui-panel);
   border: 1px solid var(--mocanvas-ui-panel-border);
   border-radius: var(--mocanvas-ui-radius);
@@ -66,36 +106,63 @@
   -webkit-user-select: none;
 }
 
+/*
+ * `left: 50%` alone caps an absolutely positioned box at half the container
+ * width (shrink-to-fit uses `container - left`), which made the toolbar wrap on
+ * any viewport narrower than twice its own width. Anchoring both edges and
+ * letting the margins centre a `max-content` box has no such cap.
+ */
 .mocanvas-toolbar {
-  left: 50%;
-  bottom: 12px;
-  transform: translateX(-50%);
-  max-width: calc(100% - 24px);
+  left: var(--mocanvas-ui-inset);
+  right: var(--mocanvas-ui-inset);
+  bottom: var(--mocanvas-ui-inset);
+  width: max-content;
+  max-width: calc(100% - 2 * (var(--mocanvas-ui-inset) + var(--mocanvas-ui-dock)));
+  margin-inline: auto;
   flex-wrap: wrap;
   justify-content: center;
 }
 
 .mocanvas-zoombar {
-  left: 12px;
-  bottom: 12px;
+  left: var(--mocanvas-ui-inset);
+  bottom: var(--mocanvas-ui-inset);
 }
 
 .mocanvas-stylepanel {
-  right: 12px;
-  top: 12px;
-  width: 232px;
-  max-height: calc(100% - 84px);
+  right: var(--mocanvas-ui-inset);
+  top: var(--mocanvas-ui-inset);
+  /*
+   * Sized so the content column still holds two 3-button groups side by side
+   * (2 × 124 + 4) with a classic 17px scrollbar taking its share of the width.
+   */
+  width: 292px;
+  max-height: calc(100% - 2 * var(--mocanvas-ui-inset) - var(--mocanvas-ui-bottom-dock));
   overflow-y: auto;
+  scrollbar-width: thin;
   overscroll-behavior: contain;
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
-  padding: 10px;
+  gap: var(--mocanvas-ui-pad-lg);
+  padding: var(--mocanvas-ui-pad-lg);
+  /*
+   * Scroll affordance: two fixed gradients painted against the panel and two
+   * scrolling shadows behind them. The shadow only shows while content is
+   * clipped in that direction, so a short panel looks flat.
+   */
+  background-image:
+    linear-gradient(var(--mocanvas-ui-panel) 30%, rgba(0, 0, 0, 0)),
+    linear-gradient(rgba(0, 0, 0, 0), var(--mocanvas-ui-panel) 70%),
+    radial-gradient(farthest-side at 50% 0, rgba(15, 18, 25, 0.22), rgba(0, 0, 0, 0)),
+    radial-gradient(farthest-side at 50% 100%, rgba(15, 18, 25, 0.22), rgba(0, 0, 0, 0));
+  background-position: 0 0, 0 100%, 0 0, 0 100%;
+  background-size: 100% 26px, 100% 26px, 100% 9px, 100% 9px;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
 }
 
 .mocanvas-stats {
-  right: 12px;
-  bottom: 12px;
+  right: var(--mocanvas-ui-inset);
+  bottom: var(--mocanvas-ui-inset);
   flex-direction: column;
   align-items: flex-start;
   gap: 1px;
@@ -118,6 +185,47 @@
   width: 1px;
   margin: 4px 3px;
   background: var(--mocanvas-ui-panel-border);
+}
+
+/*
+ * Narrow layouts. The bottom edge holds three panels — zoom bar, toolbar,
+ * stats — whose natural widths add up to about 1290px. Below that the toolbar
+ * takes a row of its own and stops reserving the docks; below 560px the stats
+ * chip moves out of the bottom edge altogether.
+ */
+@media (max-width: 1290px) {
+  .mocanvas,
+  .mocanvas-panel {
+    /* the toolbar now has a row of its own above the zoom bar */
+    --mocanvas-ui-bottom-dock: 124px;
+  }
+
+  .mocanvas-toolbar {
+    --mocanvas-ui-dock: 0px;
+    bottom: calc(2 * var(--mocanvas-ui-inset) + 50px);
+  }
+}
+
+/*
+ * Phone-width: the bottom edge cannot hold the zoom bar and the stats chip side
+ * by side, so each takes a row of its own and the style panel keeps the top,
+ * spanning the width and capped at a share of the height.
+ */
+@media (max-width: 560px) {
+  .mocanvas-stats {
+    bottom: calc(2 * var(--mocanvas-ui-inset) + 50px);
+  }
+
+  .mocanvas-toolbar {
+    bottom: calc(3 * var(--mocanvas-ui-inset) + 112px);
+  }
+
+  .mocanvas-stylepanel {
+    left: var(--mocanvas-ui-inset);
+    right: var(--mocanvas-ui-inset);
+    width: auto;
+    max-height: 42%;
+  }
 }
 
 /* --- buttons ------------------------------------------------------------ */
@@ -158,6 +266,7 @@
 }
 
 .mocanvas-btn:active:not(:disabled) {
+  background: var(--mocanvas-ui-active);
   transform: scale(0.94);
 }
 
@@ -167,7 +276,19 @@
   color: var(--mocanvas-ui-accent-fg);
 }
 
-.mocanvas-btn[aria-expanded="true"] {
+.mocanvas-btn[aria-pressed="true"]:hover,
+.mocanvas-btn[aria-checked="true"]:hover,
+.mocanvas-btn[aria-pressed="true"]:active,
+.mocanvas-btn[aria-checked="true"]:active {
+  background: var(--mocanvas-ui-accent);
+  /* The accent already reads as "on"; darkening it would break its contrast
+     with the label, so pressed buttons signal hover with the ring instead. */
+  box-shadow: inset 0 0 0 2px var(--mocanvas-ui-panel), inset 0 0 0 3px var(--mocanvas-ui-accent);
+}
+
+/* The tint carries the "open" signal on its own; tinting the icon as well
+   would drop it to 4.37:1 against that tint in the light palette. */
+.mocanvas-btn[aria-expanded="true"]:not([aria-pressed="true"]):not([aria-checked="true"]) {
   background: var(--mocanvas-ui-accent-soft);
 }
 
@@ -176,35 +297,59 @@
   cursor: default;
 }
 
-.mocanvas-btn:focus {
+.mocanvas-btn:focus,
+.mocanvas-swatch:focus {
   outline: none;
 }
 
+/* The 2px offset keeps a ring of panel colour between an accent-filled button
+   and its accent ring, so focus stays visible on a pressed control. */
 .mocanvas-btn:focus-visible,
 .mocanvas-swatch:focus-visible,
 .mocanvas-slider:focus-visible {
   outline: 2px solid var(--mocanvas-ui-accent);
   outline-offset: 2px;
+  z-index: 1;
 }
 
-/* --- segmented controls ------------------------------------------------- */
+/* Buttons take their icon size from the token; icons used as inline marks
+   (the "mixed" badge, the picker chevron) keep the size they ask for. */
+.mocanvas-btn > .mocanvas-icon {
+  width: var(--mocanvas-ui-icon);
+  height: var(--mocanvas-ui-icon);
+}
+
+/* --- style panel groups ------------------------------------------------- */
+
+.mocanvas-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mocanvas-group + .mocanvas-group {
+  padding-top: var(--mocanvas-ui-pad-lg);
+  border-top: 1px solid var(--mocanvas-ui-panel-border);
+}
 
 .mocanvas-seg {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px;
-}
-
-.mocanvas-seg--dense {
-  --mocanvas-ui-btn: 34px;
+  gap: var(--mocanvas-ui-gap);
 }
 
 .mocanvas-seg .mocanvas-btn:not([aria-checked="true"]):not([aria-pressed="true"]) {
-  background: var(--mocanvas-ui-hover);
+  background: var(--mocanvas-ui-control);
 }
 
 .mocanvas-seg .mocanvas-btn:hover:not([aria-checked="true"]):not([aria-pressed="true"]) {
   background: var(--mocanvas-ui-accent-soft);
+}
+
+.mocanvas-seg--split {
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  gap: 4px;
 }
 
 .mocanvas-row-label {
@@ -212,7 +357,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   color: var(--mocanvas-ui-muted);
   font-size: 10px;
   font-weight: 600;
@@ -231,88 +376,150 @@
   text-transform: none;
 }
 
+/* --- the shape picker --------------------------------------------------- */
+
+.mocanvas-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--mocanvas-ui-btn);
+  padding: 0 8px 0 10px;
+  border: none;
+  border-radius: var(--mocanvas-ui-radius-sm);
+  background: var(--mocanvas-ui-control);
+  color: var(--mocanvas-ui-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.mocanvas-picker:hover {
+  background: var(--mocanvas-ui-accent-soft);
+}
+
+.mocanvas-picker:active {
+  background: var(--mocanvas-ui-active);
+}
+
+.mocanvas-picker:focus {
+  outline: none;
+}
+
+.mocanvas-picker:focus-visible {
+  outline: 2px solid var(--mocanvas-ui-accent);
+  outline-offset: 2px;
+}
+
+.mocanvas-picker > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mocanvas-picker .mocanvas-icon:last-child {
+  color: var(--mocanvas-ui-muted);
+}
+
 /* --- swatches ----------------------------------------------------------- */
 
+/* The button is a full 40×40 target; the disc inside it is the visual mark. */
 .mocanvas-swatch {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: 26px;
-  height: 26px;
+  width: var(--mocanvas-ui-btn);
+  height: var(--mocanvas-ui-btn);
   padding: 0;
   border: none;
-  border-radius: 50%;
+  border-radius: var(--mocanvas-ui-radius-sm);
   background: transparent;
   cursor: pointer;
-  transition: box-shadow 0.12s ease, transform 0.08s ease;
+  transition: background-color 0.12s ease, transform 0.08s ease;
 }
 
 .mocanvas-swatch > span {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--mocanvas-swatch-color, currentColor);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  transition: box-shadow 0.12s ease;
 }
 
 .mocanvas-swatch:hover {
-  box-shadow: 0 0 0 2px var(--mocanvas-ui-hover);
-}
-
-.mocanvas-swatch[aria-checked="true"] {
-  box-shadow: 0 0 0 2px var(--mocanvas-ui-accent);
+  background: var(--mocanvas-ui-hover);
 }
 
 .mocanvas-swatch:active {
   transform: scale(0.92);
+  background: var(--mocanvas-ui-active);
+}
+
+.mocanvas-swatch[aria-checked="true"] > span {
+  box-shadow: 0 0 0 2px var(--mocanvas-ui-panel), 0 0 0 4px var(--mocanvas-ui-accent), inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.mocanvas-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(var(--mocanvas-ui-btn), 1fr));
+  gap: var(--mocanvas-ui-gap);
 }
 
 /* --- slider ------------------------------------------------------------- */
 
 .mocanvas-slider {
   width: 100%;
-  height: 20px;
+  height: 24px;
   margin: 0;
   accent-color: var(--mocanvas-ui-accent);
   cursor: pointer;
 }
 
-/* --- popover ------------------------------------------------------------ */
+/* --- popovers ----------------------------------------------------------- */
 
+/*
+ * Fixed, not absolute: a popover anchored inside `.mocanvas-stylepanel` would
+ * otherwise be clipped by that panel's own scroll container. Placement is
+ * computed against the viewport in `overlays.tsx`.
+ */
 .mocanvas-popover {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 10px);
-  transform: translateX(-50%);
-  z-index: 20;
+  position: fixed;
+  z-index: 30;
   display: grid;
-  grid-template-columns: repeat(5, auto);
-  gap: 2px;
+  grid-template-columns: repeat(var(--mocanvas-popover-cols, 5), var(--mocanvas-ui-btn));
+  gap: var(--mocanvas-ui-gap);
   padding: 6px;
   background: var(--mocanvas-ui-panel);
   border: 1px solid var(--mocanvas-ui-panel-border);
   border-radius: var(--mocanvas-ui-radius);
   box-shadow: var(--mocanvas-ui-shadow);
+  color: var(--mocanvas-ui-text);
+  font-family: var(--mocanvas-ui-font);
+  pointer-events: auto;
 }
 
 /* --- tooltip ------------------------------------------------------------ */
 
 /*
- * Pure CSS: the label comes from `data-tooltip`, the optional shortcut from
- * `data-shortcut`. The two halves meet at the button's centre line so together
- * they read as a single pill.
+ * One shared, viewport-clamped tooltip. A CSS-only `::after` version cannot
+ * avoid the viewport edge, and is clipped outright inside a scrolling panel.
  */
-[data-tooltip]::after,
-[data-shortcut]::before {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  z-index: 30;
-  height: 22px;
+.mocanvas-tooltip {
+  position: fixed;
+  z-index: 40;
   display: flex;
   align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  gap: 6px;
+  border-radius: 6px;
   background: var(--mocanvas-ui-tip-bg);
+  color: var(--mocanvas-ui-tip-fg);
   font-family: var(--mocanvas-ui-font);
   font-size: 11px;
   font-weight: 500;
@@ -320,67 +527,18 @@
   line-height: 22px;
   white-space: nowrap;
   pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.12s ease, visibility 0.12s ease;
 }
 
-[data-tooltip]::after {
-  content: attr(data-tooltip);
-  right: 50%;
-  padding: 0 4px 0 9px;
-  border-radius: 6px 0 0 6px;
-  color: var(--mocanvas-ui-tip-fg);
-}
-
-[data-shortcut]::before {
-  content: attr(data-shortcut);
-  left: 50%;
-  padding: 0 9px 0 4px;
-  border-radius: 0 6px 6px 0;
+.mocanvas-tooltip kbd {
   color: var(--mocanvas-ui-tip-muted);
-}
-
-/* Without a shortcut the single pill centres on the button. */
-[data-tooltip]:not([data-shortcut])::after {
-  right: auto;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0 9px;
-  border-radius: 6px;
-}
-
-[data-tooltip]:hover::after,
-[data-tooltip]:hover[data-shortcut]::before {
-  opacity: 1;
-  visibility: visible;
-  transition-delay: 0.5s;
-}
-
-[data-tooltip]:focus-visible::after,
-[data-tooltip]:focus-visible[data-shortcut]::before {
-  opacity: 1;
-  visibility: visible;
-}
-
-[data-tooltip]:disabled:hover::after,
-[data-tooltip]:disabled:hover[data-shortcut]::before {
-  opacity: 0;
-  visibility: hidden;
-}
-
-/* Panels anchored to the top edge flip their tooltips downwards. */
-.mocanvas-stylepanel [data-tooltip]::after,
-.mocanvas-stylepanel [data-shortcut]::before {
-  bottom: auto;
-  top: calc(100% + 8px);
+  font: inherit;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .mocanvas-btn,
   .mocanvas-swatch,
-  [data-tooltip]::after,
-  [data-shortcut]::before {
+  .mocanvas-swatch > span,
+  .mocanvas-picker {
     transition: none;
   }
 }

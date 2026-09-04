@@ -1,6 +1,7 @@
 import { GeoShapeGeoStyle, GEO_SHAPE_KINDS, track, useEditor, useValue, type Editor, type GeoShapeKind } from "@mocanvas/editor"
-import { Fragment, useEffect, useRef, useState } from "react"
+import { Fragment, useEffect, useRef, useState, type Ref } from "react"
 import { Icon, type IconName } from "./icons"
+import { Popover, UiTooltip } from "./overlays"
 import { StylePanel } from "./StylePanel"
 import { debugStatsOpen } from "./useKeyboardShortcuts"
 import "./ui.css"
@@ -84,12 +85,14 @@ interface UiButtonProps {
   expanded?: boolean
   disabled?: boolean
   className?: string
+  ref?: Ref<HTMLButtonElement>
   onClick: () => void
 }
 
-function UiButton({ icon, label, shortcut, pressed, expanded, disabled, className, onClick }: UiButtonProps) {
+function UiButton({ icon, label, shortcut, pressed, expanded, disabled, className, ref, onClick }: UiButtonProps) {
   return (
     <button
+      ref={ref}
       type="button"
       className={className ? `mocanvas-btn ${className}` : "mocanvas-btn"}
       aria-label={label}
@@ -113,23 +116,7 @@ function UiButton({ icon, label, shortcut, pressed, expanded, disabled, classNam
 export const Toolbar = track(function Toolbar() {
   const editor = useEditor()
   const [moreOpen, setMoreOpen] = useState(false)
-  const moreRef = useRef<HTMLSpanElement>(null)
-
-  useEffect(() => {
-    if (!moreOpen) return
-    const onDown = (e: PointerEvent) => {
-      if (!moreRef.current?.contains(e.target as Node)) setMoreOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMoreOpen(false)
-    }
-    document.addEventListener("pointerdown", onDown, true)
-    document.addEventListener("keydown", onKey, true)
-    return () => {
-      document.removeEventListener("pointerdown", onDown, true)
-      document.removeEventListener("keydown", onKey, true)
-    }
-  }, [moreOpen])
+  const moreRef = useRef<HTMLButtonElement>(null)
 
   const available = registeredTools(editor)
   const toolId = editor.getCurrentToolId()
@@ -160,35 +147,34 @@ export const Toolbar = track(function Toolbar() {
             />
           ))}
           {hasGeo && group.some((item) => item.geo) ? (
-            <span className="mocanvas-more" ref={moreRef}>
+            <span className="mocanvas-more">
               <UiButton
+                ref={moreRef}
                 icon="chevron-down"
                 label="More shapes"
                 pressed={moreActive}
                 expanded={moreOpen}
                 onClick={() => setMoreOpen((v) => !v)}
               />
-              {moreOpen ? (
-                <div className="mocanvas-popover" role="menu" aria-label="More shapes">
-                  {MORE_GEO_KINDS.map((kind) => (
-                    <button
-                      key={kind}
-                      type="button"
-                      role="menuitemradio"
-                      className="mocanvas-btn"
-                      aria-label={titleCase(kind)}
-                      aria-checked={geo === kind}
-                      data-tooltip={titleCase(kind)}
-                      onClick={() => {
-                        pickGeo(kind)
-                        setMoreOpen(false)
-                      }}
-                    >
-                      <Icon name={`geo-${kind}`} />
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              <Popover anchorRef={moreRef} open={moreOpen} onClose={() => setMoreOpen(false)} label="More shapes" prefer="above">
+                {MORE_GEO_KINDS.map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    role="menuitemradio"
+                    className="mocanvas-btn"
+                    aria-label={titleCase(kind)}
+                    aria-checked={geo === kind}
+                    data-tooltip={titleCase(kind)}
+                    onClick={() => {
+                      pickGeo(kind)
+                      setMoreOpen(false)
+                    }}
+                  >
+                    <Icon name={`geo-${kind}`} />
+                  </button>
+                ))}
+              </Popover>
             </span>
           ) : null}
         </Fragment>
@@ -261,6 +247,7 @@ export function DefaultUi({ editor, showStats = true }: { editor: Editor; showSt
       <ZoomBar />
       <StylePanel />
       {statsOpen ? <DebugStats editor={editor} /> : null}
+      <UiTooltip />
     </>
   )
 }

@@ -46,6 +46,22 @@ const layerStyle: CSSProperties = {
   height: "100%",
 }
 
+/*
+ * Canvas chrome. Every colour comes from a custom property so an app can retheme
+ * the indicators along with the rest of the UI; the literals here are only the
+ * fallback for an editor mounted without `ui.css`, and are picked to clear 3:1
+ * against both a light and a dark canvas.
+ */
+const SELECTION = "var(--mocanvas-selection, #2f6fe4)"
+/** Fill of a solid handle: the surface the selection stroke is drawn against. */
+const HANDLE_FILL = "var(--mocanvas-selection-fg, #ffffff)"
+const BRUSH_FILL = "var(--mocanvas-brush-fill, rgba(47, 111, 228, 0.12))"
+const SNAP = "var(--mocanvas-snap, #cf3fe0)"
+/** Screen-space stroke width for indicator outlines. */
+const INDICATOR_STROKE = 1.5
+/** Screen-space radii/sides of the selection handles, in CSS px. */
+const HANDLE = { corner: 9, rotate: 5.5, shape: 6, virtual: 4 } as const
+
 /**
  * The canvas: a WebGL2 surface driven by the engine, a DOM overlay for shapes
  * that render through `ShapeUtil.component`, and an SVG layer for indicators.
@@ -283,24 +299,24 @@ const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor:
     const m = editor.getShapePageTransform(shape)
     return (
       <g key={key} transform={`matrix(${z} 0 0 ${z} ${cam.x * z} ${cam.y * z}) matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`}>
-        <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="none" stroke={stroke} strokeWidth={1.5 / z} />
+        <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="none" stroke={stroke} strokeWidth={INDICATOR_STROKE / z} />
       </g>
     )
   }
 
   if (hovered && tool === "select" && !selected.some((s) => s.id === hovered.id)) {
-    const ind = indicatorFor(hovered, "hover", "var(--mocanvas-selection, #3b82f6)")
+    const ind = indicatorFor(hovered, "hover", SELECTION)
     if (ind) items.push(ind)
   }
   if (selected.length > 1) {
     for (const s of selected) {
-      const ind = indicatorFor(s, `sel-${s.id}`, "var(--mocanvas-selection, #3b82f6)")
+      const ind = indicatorFor(s, `sel-${s.id}`, SELECTION)
       if (ind) items.push(ind)
     }
   }
   if (bounds && tool === "select") {
     const info = getSelectionHandlePositions(editor)
-    const stroke = "var(--mocanvas-selection, #3b82f6)"
+    const stroke = SELECTION
     if (selected.length === 1) {
       const shape = selected[0]!
       const util = editor.getShapeUtil(shape)
@@ -309,7 +325,7 @@ const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor:
       if (!util.hideSelectionBoundsFg(shape)) {
         items.push(
           <g key="bounds" transform={`matrix(${z} 0 0 ${z} ${cam.x * z} ${cam.y * z}) matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`}>
-            <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="none" stroke={stroke} strokeWidth={1.5 / z} />
+            <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="none" stroke={stroke} strokeWidth={INDICATOR_STROKE / z} />
           </g>,
         )
       }
@@ -318,20 +334,41 @@ const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor:
         const p = new Vec(m.a * hd.x + m.c * hd.y + m.e, m.b * hd.x + m.d * hd.y + m.f)
         const sp = editor.pageToScreen(p)
         items.push(
-          <circle key={`h-${hd.id}`} cx={sp.x} cy={sp.y} r={hd.type === "virtual" ? 4 : 6} fill={hd.type === "virtual" ? stroke : "#fff"} stroke={stroke} strokeWidth={1.5} opacity={hd.type === "virtual" ? 0.6 : 1} />,
+          <circle
+            key={`h-${hd.id}`}
+            cx={sp.x}
+            cy={sp.y}
+            r={hd.type === "virtual" ? HANDLE.virtual : HANDLE.shape}
+            fill={hd.type === "virtual" ? stroke : HANDLE_FILL}
+            stroke={stroke}
+            strokeWidth={INDICATOR_STROKE}
+            opacity={hd.type === "virtual" ? 0.6 : 1}
+          />,
         )
       }
     } else {
       const [x0, y0] = toScreen(bounds.x, bounds.y)
       const [x1, y1] = toScreen(bounds.maxX, bounds.maxY)
-      items.push(<rect key="bounds" x={x0} y={y0} width={x1 - x0} height={y1 - y0} fill="none" stroke={stroke} strokeWidth={1.5} />)
+      items.push(<rect key="bounds" x={x0} y={y0} width={x1 - x0} height={y1 - y0} fill="none" stroke={stroke} strokeWidth={INDICATOR_STROKE} />)
     }
     if (info) {
       for (const h of info.handles) {
         if (h.handle === "rotate") {
-          items.push(<circle key="rotate" cx={h.point.x} cy={h.point.y} r={5} fill="#fff" stroke={stroke} strokeWidth={1.5} />)
+          items.push(<circle key="rotate" cx={h.point.x} cy={h.point.y} r={HANDLE.rotate} fill={HANDLE_FILL} stroke={stroke} strokeWidth={INDICATOR_STROKE} />)
         } else if (h.handle.includes("_")) {
-          items.push(<rect key={h.handle} x={h.point.x - 4} y={h.point.y - 4} width={8} height={8} fill="#fff" stroke={stroke} strokeWidth={1.5} />)
+          items.push(
+            <rect
+              key={h.handle}
+              x={h.point.x - HANDLE.corner / 2}
+              y={h.point.y - HANDLE.corner / 2}
+              width={HANDLE.corner}
+              height={HANDLE.corner}
+              rx={2}
+              fill={HANDLE_FILL}
+              stroke={stroke}
+              strokeWidth={INDICATOR_STROKE}
+            />,
+          )
         }
       }
     }
@@ -348,12 +385,12 @@ const SnapLines = track(function SnapLines({ editor }: { editor: Editor }) {
         const pts = l.points.map((p) => editor.pageToScreen(p))
         return (
           <g key={l.id}>
-            <polyline points={pts.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="var(--mocanvas-snap, #e879f9)" strokeWidth={1} />
+            <polyline points={pts.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke={SNAP} strokeWidth={INDICATOR_STROKE} />
             {pts.map((p, i) => (
-              <line key={i} x1={p.x - 4} y1={p.y - 4} x2={p.x + 4} y2={p.y + 4} stroke="var(--mocanvas-snap, #e879f9)" strokeWidth={1} />
+              <line key={i} x1={p.x - 4} y1={p.y - 4} x2={p.x + 4} y2={p.y + 4} stroke={SNAP} strokeWidth={INDICATOR_STROKE} />
             ))}
             {pts.map((p, i) => (
-              <line key={`b${i}`} x1={p.x - 4} y1={p.y + 4} x2={p.x + 4} y2={p.y - 4} stroke="var(--mocanvas-snap, #e879f9)" strokeWidth={1} />
+              <line key={`b${i}`} x1={p.x - 4} y1={p.y + 4} x2={p.x + 4} y2={p.y - 4} stroke={SNAP} strokeWidth={INDICATOR_STROKE} />
             ))}
           </g>
         )
@@ -374,9 +411,9 @@ const DefaultBrush = track(function DefaultBrush({ editor }: { editor: Editor })
       y={y}
       width={brush.w * cam.z}
       height={brush.h * cam.z}
-      fill="var(--mocanvas-brush-fill, rgba(59,130,246,0.1))"
-      stroke="var(--mocanvas-selection, #3b82f6)"
-      strokeWidth={1}
+      fill={BRUSH_FILL}
+      stroke={SELECTION}
+      strokeWidth={INDICATOR_STROKE}
     />
   )
 })

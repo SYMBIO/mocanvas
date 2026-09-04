@@ -18,6 +18,7 @@ import {
   StateNode,
   type ShapeId,
 } from "@mocanvas/editor"
+import { getStylePanelSections, hasAnyStyleSection } from "./StylePanel"
 import {
   ArrowShapeUtil,
   DrawShapeUtil,
@@ -32,6 +33,7 @@ import {
   type GeoShapeUtil as GeoUtil,
 } from "../shapes"
 import { defaultBindingUtils } from "../bindings"
+import { defaultTools } from "../tools"
 
 const wasmPath = fileURLToPath(new URL("../../../wasm/pkg/mocanvas_bg.wasm", import.meta.url))
 
@@ -207,5 +209,119 @@ describe("editor styles", () => {
     editor.createShape({ type: "arrow", x: 0, y: 0, props: { dash: "dotted" } })
     const arrow = editor.getShape(lastShapeId(editor))!
     expect(editor.getShapeUtil(arrow).getRenderStyle(arrow)?.dash).toBe(getDashId("dotted"))
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Style panel
+// ---------------------------------------------------------------------------
+
+/** An editor with the real tool set, so the "creating" fallback can be driven. */
+function makeToolEditor(): Editor {
+  const engine = loadEngineSync(readFileSync(wasmPath))
+  const editor = new Editor({
+    store: createStore(),
+    shapeUtils: defaultShapeUtils,
+    bindingUtils: defaultBindingUtils,
+    tools: defaultTools,
+    engine,
+    getContainer: () => ({}) as HTMLElement,
+  })
+  editor.updateViewportScreenBounds({ x: 0, y: 0, w: 1000, h: 800 })
+  return editor
+}
+
+describe("style panel sections", () => {
+  let editor: Editor
+
+  beforeEach(() => {
+    editor = makeToolEditor()
+  })
+
+  const select = (type: string, props: Record<string, unknown> = {}): void => {
+    editor.createShape({ type, x: 0, y: 0, props })
+    editor.setSelectedShapes([lastShapeId(editor)])
+  }
+
+  it("shows every row a geo shape can carry", () => {
+    select("geo", { geo: "rectangle", w: 10, h: 10 })
+    const s = getStylePanelSections(editor)
+    expect(s.shape).toBe(true)
+    expect(s.color).toBe(true)
+    expect(s.fill).toBe(true)
+    expect(s.font).toBe(true)
+    expect(s.align).toBe(true)
+    expect(s.verticalAlign).toBe(true)
+    expect(s.opacity).toBe(true)
+  })
+
+  it("omits the text rows for a selection that carries no text style", () => {
+    select("line")
+    const s = getStylePanelSections(editor)
+    expect(s.color).toBe(true)
+    expect(s.dash).toBe(true)
+    expect(s.size).toBe(true)
+    // A line has no label, so Font, Align and Vertical align must not appear.
+    expect(s.font).toBe(false)
+    expect(s.align).toBe(false)
+    expect(s.verticalAlign).toBe(false)
+    expect(s.shape).toBe(false)
+    expect(s.fill).toBe(false)
+  })
+
+  it("omits Shape, Fill and Vertical align for a text shape", () => {
+    select("text", { text: "hi" })
+    const s = getStylePanelSections(editor)
+    expect(s.font).toBe(true)
+    expect(s.align).toBe(true)
+    expect(s.verticalAlign).toBe(false)
+    expect(s.shape).toBe(false)
+    expect(s.fill).toBe(false)
+    expect(s.dash).toBe(false)
+  })
+
+  it("shows a row a mixed selection partly carries, and drops one it never carries", () => {
+    // Shared styles are the union over the selection: a row shows when at least
+    // one selected shape declares it, and setting it skips the shapes that do
+    // not. Two lines carry no Font at all, so that row disappears.
+    editor.createShape({ type: "line", x: 0, y: 0, props: {} })
+    const line = lastShapeId(editor)
+    editor.createShape({ type: "geo", x: 0, y: 0, props: { geo: "rectangle", w: 10, h: 10 } })
+    editor.setSelectedShapes([line, lastShapeId(editor)])
+    expect(getStylePanelSections(editor).font).toBe(true)
+
+    editor.createShape({ type: "line", x: 0, y: 0, props: {} })
+    editor.setSelectedShapes([line, lastShapeId(editor)])
+    const s = getStylePanelSections(editor)
+    expect(s.color).toBe(true)
+    expect(s.font).toBe(false)
+    expect(s.shape).toBe(false)
+    expect(s.fill).toBe(false)
+  })
+
+  it("shows nothing with an empty selection and a non-creating tool", () => {
+    editor.selectNone()
+    editor.setCurrentTool("select")
+    expect(hasAnyStyleSection(getStylePanelSections(editor))).toBe(false)
+  })
+
+  it("falls back to the active drawing tool when nothing is selected", () => {
+    editor.selectNone()
+    editor.setCurrentTool("geo")
+    const s = getStylePanelSections(editor)
+    expect(s.shape).toBe(true)
+    expect(s.color).toBe(true)
+    // Opacity edits the selection, so it stays out with nothing selected.
+    expect(s.opacity).toBe(false)
+  })
+
+  it("offers a line tool only the styles a line carries", () => {
+    editor.selectNone()
+    editor.setCurrentTool("line")
+    const s = getStylePanelSections(editor)
+    expect(s.color).toBe(true)
+    expect(s.dash).toBe(true)
+    expect(s.font).toBe(false)
+    expect(s.shape).toBe(false)
   })
 })

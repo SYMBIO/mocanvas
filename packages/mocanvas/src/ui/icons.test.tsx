@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { GEO_SHAPE_KINDS } from "@mocanvas/editor"
-import { Icon, ICONS, ICON_NAMES, type IconName } from "./icons"
+import { GEO_BOX, getGeoIconBox, Icon, ICONS, ICON_NAMES, type IconName } from "./icons"
 import { MORE_GEO_KINDS, PRIMARY_GEO_KINDS, TOOLBAR_GROUPS } from "./DefaultUi"
 import { defaultTools } from "../tools"
 
@@ -29,6 +29,33 @@ describe("icon set", () => {
       expect(ICON_NAMES).toContain(name)
       const html = renderToStaticMarkup(<Icon name={name} />)
       expect(html, kind).toMatch(/<path d="M/)
+    }
+  })
+
+  it("draws no two icons the same", () => {
+    // A duplicate silhouette is a naming bug: "oval" drew the same circle as
+    // "ellipse", and the handwriting font drew the same A as the sans one.
+    const seen = new Map<string, IconName>()
+    for (const name of ICON_NAMES) {
+      const art = renderToStaticMarkup(<Icon name={name} />).replace(/^.*?>(?=<)/, "")
+      const twin = seen.get(art)
+      expect(twin, `${name} is drawn identically to ${twin}`).toBeUndefined()
+      seen.set(art, name)
+    }
+  })
+
+  it("fits every geo outline in a box no larger than the shared one", () => {
+    for (const kind of GEO_SHAPE_KINDS) {
+      const [w, h] = getGeoIconBox(kind)
+      expect(Math.max(w, h), kind).toBe(GEO_BOX)
+      expect(Math.min(w, h), kind).toBeGreaterThan(GEO_BOX / 2)
+    }
+  })
+
+  it("gives the kinds whose name implies a proportion a non-square box", () => {
+    for (const kind of ["rectangle", "oval"] as const) {
+      const [w, h] = getGeoIconBox(kind)
+      expect(w, kind).not.toBe(h)
     }
   })
 

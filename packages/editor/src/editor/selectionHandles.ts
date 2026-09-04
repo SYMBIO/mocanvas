@@ -2,8 +2,30 @@ import type { Editor } from "./Editor"
 import type { SelectionHandle } from "./events"
 import { Box, Vec, type VecLike } from "../geometry"
 
-export const HANDLE_HIT_RADIUS = 8
+/**
+ * Half the size of a selection handle's pointer target, in screen pixels.
+ * 12 gives a 24x24 target, the smallest that stays comfortable on a trackpad
+ * and on touch. It shrinks on small selections — see `getHandleHitRadius`.
+ */
+export const HANDLE_HIT_RADIUS = 12
 export const ROTATE_HANDLE_OFFSET = 20
+
+/**
+ * An edge handle is only worth showing when the edge is long enough that the
+ * handle does not simply cover the two corners next to it.
+ */
+const MIN_EDGE_LENGTH_FOR_EDGE_HANDLE = 4 * HANDLE_HIT_RADIUS
+
+/**
+ * The effective hit radius for the current selection. On a selection smaller
+ * than a few handles across, full-size targets would cover the whole shape and
+ * leave nothing to drag, so the radius shrinks to keep an interior free.
+ */
+export function getHandleHitRadius(screenW: number, screenH: number): number {
+  const smallest = Math.min(screenW, screenH)
+  if (smallest >= 6 * HANDLE_HIT_RADIUS) return HANDLE_HIT_RADIUS
+  return Math.max(4, Math.min(HANDLE_HIT_RADIUS, smallest / 6))
+}
 
 export interface SelectionHandleHit {
   handle: SelectionHandle
@@ -15,7 +37,9 @@ export interface SelectionHandleHit {
  * Screen-space positions of the selection handles for the current selection,
  * or null if nothing is selected / handles are hidden.
  */
-export function getSelectionHandlePositions(editor: Editor): { bounds: Box; rotation: number; handles: SelectionHandleHit[] } | null {
+export function getSelectionHandlePositions(
+  editor: Editor,
+): { bounds: Box; rotation: number; handles: SelectionHandleHit[]; screenW: number; screenH: number } | null {
   const selected = editor.getSelectedShapes()
   if (selected.length === 0) return null
   if (selected.length === 1) {
@@ -42,17 +66,36 @@ export function getSelectionHandlePositions(editor: Editor): { bounds: Box; rota
   const handles: SelectionHandleHit[] = []
   const hideResize = single ? editor.getShapeUtil(single).hideResizeHandles(single) : false
   const hideRotate = single ? editor.getShapeUtil(single).hideRotateHandle(single) : false
+
+  const topLeft = toScreen({ x, y })
+  const topRight = toScreen({ x: x + w, y })
+  const bottomRight = toScreen({ x: x + w, y: y + h })
+  const bottomLeft = toScreen({ x, y: y + h })
+  // Screen-space edge lengths: the selection may be rotated, so measure the
+  // transformed corners rather than the page-space width and height.
+  const screenW = Vec.Dist(topLeft, topRight)
+  const screenH = Vec.Dist(topLeft, bottomLeft)
+
   if (!hideResize) {
     handles.push(
-      { handle: "top_left", point: toScreen({ x, y }) },
-      { handle: "top_right", point: toScreen({ x: x + w, y }) },
-      { handle: "bottom_right", point: toScreen({ x: x + w, y: y + h }) },
-      { handle: "bottom_left", point: toScreen({ x, y: y + h }) },
-      { handle: "top", point: toScreen({ x: cx, y }) },
-      { handle: "right", point: toScreen({ x: x + w, y: cy }) },
-      { handle: "bottom", point: toScreen({ x: cx, y: y + h }) },
-      { handle: "left", point: toScreen({ x, y: cy }) },
+      { handle: "top_left", point: topLeft },
+      { handle: "top_right", point: topRight },
+      { handle: "bottom_right", point: bottomRight },
+      { handle: "bottom_left", point: bottomLeft },
     )
+    // Edge handles only once the edge is long enough to hold one.
+    if (screenW >= MIN_EDGE_LENGTH_FOR_EDGE_HANDLE) {
+      handles.push(
+        { handle: "top", point: toScreen({ x: cx, y }) },
+        { handle: "bottom", point: toScreen({ x: cx, y: y + h }) },
+      )
+    }
+    if (screenH >= MIN_EDGE_LENGTH_FOR_EDGE_HANDLE) {
+      handles.push(
+        { handle: "right", point: toScreen({ x: x + w, y: cy }) },
+        { handle: "left", point: toScreen({ x, y: cy }) },
+      )
+    }
   }
   if (!hideRotate) {
     // rotate handle above the top edge, in screen pixels
@@ -62,15 +105,16 @@ export function getSelectionHandlePositions(editor: Editor): { bounds: Box; rota
     const off = Vec.Len(Vec.Sub(top, center)) === 0 ? new Vec(0, -1) : dir
     handles.push({ handle: "rotate", point: Vec.Add(top, Vec.Mul(off, ROTATE_HANDLE_OFFSET)) })
   }
-  return { bounds, rotation, handles }
+  return { bounds, rotation, handles, screenW, screenH }
 }
 
 /** The selection handle under a screen point, if any. */
-export function hitTestSelectionHandles(editor: Editor, screenPoint: VecLike, radius = HANDLE_HIT_RADIUS): SelectionHandle | undefined {
+export function hitTestSelectionHandles(editor: Editor, screenPoint: VecLike, radius?: number): SelectionHandle | undefined {
   const info = getSelectionHandlePositions(editor)
   if (!info) return undefined
+  const r = radius ?? getHandleHitRadius(info.screenW, info.screenH)
   let best: SelectionHandle | undefined
-  let bestD = radius * radius
+  let bestD = r * r
   for (const h of info.handles) {
     const d = Vec.Dist2(h.point, screenPoint)
     if (d <= bestD) {

@@ -25,8 +25,9 @@ import {
   type SharedStyle,
   type StyleProp,
 } from "@mocanvas/editor"
-import type { ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { Icon, type IconName } from "./icons"
+import { Popover } from "./overlays"
 
 /** Tools whose id doubles as the type of the shape they create. */
 const CREATING_TOOLS = new Set(["geo", "draw", "note", "text", "arrow", "line"])
@@ -49,6 +50,84 @@ function titleCase(s: string): string {
   return s.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+// ---------------------------------------------------------------------------
+// Which rows the panel shows
+// ---------------------------------------------------------------------------
+
+/**
+ * The style rows the panel renders, in order, grouped as the panel groups them.
+ *
+ * With a selection this is exactly what the selected shapes declare, so a line
+ * (colour, dash, size) never offers Font or Align; with nothing selected it is
+ * what the active drawing tool is about to create. Exported so the rule can be
+ * tested without a DOM.
+ */
+export interface StylePanelSections {
+  /** The geo picker. */
+  shape: boolean
+  /** Colour swatch grids. */
+  color: boolean
+  labelColor: boolean
+  /** Stroke and fill. */
+  fill: boolean
+  dash: boolean
+  size: boolean
+  /** Text. */
+  font: boolean
+  align: boolean
+  verticalAlign: boolean
+  /** Shape-level, not a style: only with a selection. */
+  opacity: boolean
+}
+
+const NOTHING: StylePanelSections = {
+  shape: false,
+  color: false,
+  labelColor: false,
+  fill: false,
+  dash: false,
+  size: false,
+  font: false,
+  align: false,
+  verticalAlign: false,
+  opacity: false,
+}
+
+/** Decide which rows the style panel shows for the editor's current state. */
+export function getStylePanelSections(editor: Editor): StylePanelSections {
+  const hasSelection = editor.getSelectedShapeIds().length > 0
+  const toolId = editor.getCurrentToolId()
+  // With a selection the selection decides, full stop: falling back to the
+  // active tool's styles would offer rows the selected shapes cannot carry.
+  const visible: Set<StyleProp<unknown>> = hasSelection
+    ? new Set(editor.getSharedStyles().keys())
+    : CREATING_TOOLS.has(toolId)
+      ? new Set(editor.getStylePropsForType(toolId).values())
+      : new Set()
+  if (visible.size === 0 && !hasSelection) return NOTHING
+  return {
+    shape: visible.has(GeoShapeGeoStyle),
+    color: visible.has(DefaultColorStyle),
+    labelColor: visible.has(DefaultLabelColorStyle),
+    fill: visible.has(DefaultFillStyle),
+    dash: visible.has(DefaultDashStyle),
+    size: visible.has(DefaultSizeStyle),
+    font: visible.has(DefaultFontStyle),
+    align: visible.has(DefaultHorizontalAlignStyle),
+    verticalAlign: visible.has(DefaultVerticalAlignStyle),
+    opacity: hasSelection,
+  }
+}
+
+/** Whether any row at all is on. */
+export function hasAnyStyleSection(s: StylePanelSections): boolean {
+  return Object.values(s).some(Boolean)
+}
+
+// ---------------------------------------------------------------------------
+// Pieces
+// ---------------------------------------------------------------------------
+
 /** The dashed ring shown beside a row whose selection has differing values. */
 function MixedRing() {
   return (
@@ -59,18 +138,23 @@ function MixedRing() {
   )
 }
 
-function Row({ label, mixed, dense, children }: { label: string; mixed: boolean; dense?: boolean; children: ReactNode }) {
+function Row({ label, mixed, children }: { label: string; mixed: boolean; children: ReactNode }) {
   return (
     <div>
       <div className="mocanvas-row-label">
         <span>{label}</span>
         {mixed ? <MixedRing /> : null}
       </div>
-      <div className={dense ? "mocanvas-seg mocanvas-seg--dense" : "mocanvas-seg"} role="radiogroup" aria-label={label}>
+      <div className="mocanvas-seg" role="radiogroup" aria-label={label}>
         {children}
       </div>
     </div>
   )
+}
+
+/** A titled band of related rows, separated from its neighbours by a hairline. */
+function Group({ children }: { children: ReactNode }) {
+  return <div className="mocanvas-group">{children}</div>
 }
 
 interface ChoiceProps<T> {
@@ -92,25 +176,81 @@ function Choice<T>({ value, current, label, onPick, children }: ChoiceProps<T>) 
 
 function ColorRow({ label, current, onPick }: { label: string; current: SharedStyle<ColorValue> | undefined; onPick: (c: ColorValue) => void }) {
   return (
-    <Row label={label} mixed={current?.type === "mixed"}>
-      {SWATCH_COLORS.map((c) => {
-        const active = current?.type === "shared" && current.value === c
-        return (
+    <div>
+      <div className="mocanvas-row-label">
+        <span>{label}</span>
+        {current?.type === "mixed" ? <MixedRing /> : null}
+      </div>
+      <div className="mocanvas-swatches" role="radiogroup" aria-label={label}>
+        {SWATCH_COLORS.map((c) => (
           <button
             key={c}
             type="button"
             role="radio"
             className="mocanvas-swatch"
             aria-label={titleCase(c)}
-            aria-checked={active}
+            aria-checked={current?.type === "shared" && current.value === c}
             data-tooltip={titleCase(c)}
             onClick={() => onPick(c)}
           >
             <span style={{ ["--mocanvas-swatch-color" as string]: LIGHT_THEME[c].solid }} />
           </button>
-        )
-      })}
-    </Row>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The geo kind, as one button that opens a grid. Twenty always-visible cells
+ * cost more vertical space than the rest of the panel put together, and the
+ * kind rarely changes once a shape exists.
+ */
+function ShapePicker({ current, onPick }: { current: SharedStyle<GeoShapeKind> | undefined; onPick: (geo: GeoShapeKind) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLButtonElement>(null)
+  const value = current?.type === "shared" ? current.value : null
+  return (
+    <div>
+      <div className="mocanvas-row-label">
+        <span>Shape</span>
+        {current?.type === "mixed" ? <MixedRing /> : null}
+      </div>
+      <button
+        ref={ref}
+        type="button"
+        className="mocanvas-picker"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={value ? `Shape: ${titleCase(value)}` : "Shape"}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span>
+          {value ? <Icon name={`geo-${value}`} /> : <Icon name="mixed" />}
+          {value ? titleCase(value) : "Mixed"}
+        </span>
+        <Icon name={open ? "chevron-up" : "chevron-down"} size={16} />
+      </button>
+      <Popover anchorRef={ref} open={open} onClose={() => setOpen(false)} label="Shape" prefer="below">
+        {GEO_SHAPE_KINDS.map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            role="menuitemradio"
+            className="mocanvas-btn"
+            aria-label={titleCase(kind)}
+            aria-checked={value === kind}
+            data-tooltip={titleCase(kind)}
+            onClick={() => {
+              onPick(kind)
+              setOpen(false)
+            }}
+          >
+            <Icon name={`geo-${kind}`} />
+          </button>
+        ))}
+      </Popover>
+    </div>
   )
 }
 
@@ -144,23 +284,23 @@ function OpacityRow({ editor }: { editor: Editor }) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Panel
+// ---------------------------------------------------------------------------
+
 /**
  * Style controls for the selection (or, with nothing selected, for the next
  * shape the active drawing tool creates). Sits in the top-right corner.
+ *
+ * Rows are grouped — shape, colour, stroke and fill, text, opacity — and every
+ * group is omitted when the selection cannot carry it.
  */
 export const StylePanel = track(function StylePanel() {
   const editor = useEditor()
-  const toolId = editor.getCurrentToolId()
-  const hasSelection = editor.getSelectedShapeIds().length > 0
-  const creating = CREATING_TOOLS.has(toolId)
+  const sections = getStylePanelSections(editor)
   const styles = editor.getSharedStyles()
+  if (!hasAnyStyleSection(sections)) return null
 
-  // With a selection, show what the selected shapes declare; otherwise only the
-  // styles of the shape type the active tool will create.
-  const visible: Set<StyleProp<unknown>> = hasSelection && styles.size > 0 ? new Set(styles.keys()) : creating ? new Set(editor.getStylePropsForType(toolId).values()) : new Set()
-  if (visible.size === 0) return null
-
-  const has = (sp: StyleProp<unknown>) => visible.has(sp)
   const setStyle = <T,>(style: StyleProp<T>, value: T) => {
     editor.markHistoryStoppingPoint("style")
     editor.setStyleForSelectedShapes(style, value)
@@ -169,77 +309,108 @@ export const StylePanel = track(function StylePanel() {
   const pickGeo = (geo: GeoShapeKind) => {
     setStyle(GeoShapeGeoStyle, geo)
     // The geo tool reads its kind on enter; re-enter so the change takes effect immediately.
-    if (toolId === "geo") editor.setCurrentTool("geo", { geo, force: true })
+    if (editor.getCurrentToolId() === "geo") editor.setCurrentTool("geo", { geo, force: true })
   }
 
+  const strokeGroup = sections.fill || sections.dash || sections.size
+  const textGroup = sections.font || sections.align || sections.verticalAlign
+
   return (
-    <div className="mocanvas-panel mocanvas-stylepanel" onPointerDown={(e) => e.stopPropagation()}>
-      {has(GeoShapeGeoStyle) ? (
-        <Row label="Shape" mixed={styles.get(GeoShapeGeoStyle)?.type === "mixed"} dense>
-          {GEO_SHAPE_KINDS.map((kind) => (
-            <Choice key={kind} value={kind} current={styles.get(GeoShapeGeoStyle)} label={titleCase(kind)} onPick={pickGeo}>
-              <Icon name={`geo-${kind}`} size={18} />
-            </Choice>
-          ))}
-        </Row>
+    <div className="mocanvas-panel mocanvas-stylepanel" aria-label="Style" onPointerDown={(e) => e.stopPropagation()}>
+      {sections.shape ? (
+        <Group>
+          <ShapePicker current={styles.get(GeoShapeGeoStyle)} onPick={pickGeo} />
+        </Group>
       ) : null}
-      {has(DefaultColorStyle) ? <ColorRow label="Color" current={styles.get(DefaultColorStyle)} onPick={(c) => setStyle(DefaultColorStyle, c)} /> : null}
-      {has(DefaultLabelColorStyle) ? <ColorRow label="Label" current={styles.get(DefaultLabelColorStyle)} onPick={(c) => setStyle(DefaultLabelColorStyle, c)} /> : null}
-      {has(DefaultFillStyle) ? (
-        <Row label="Fill" mixed={styles.get(DefaultFillStyle)?.type === "mixed"}>
-          {FILLS.map((f) => (
-            <Choice key={f} value={f} current={styles.get(DefaultFillStyle)} label={`${titleCase(f)} fill`} onPick={(v) => setStyle(DefaultFillStyle, v)}>
-              <Icon name={FILL_ICON[f]!} />
-            </Choice>
-          ))}
-        </Row>
+
+      {sections.color || sections.labelColor ? (
+        <Group>
+          {sections.color ? <ColorRow label="Color" current={styles.get(DefaultColorStyle)} onPick={(c) => setStyle(DefaultColorStyle, c)} /> : null}
+          {sections.labelColor ? <ColorRow label="Label" current={styles.get(DefaultLabelColorStyle)} onPick={(c) => setStyle(DefaultLabelColorStyle, c)} /> : null}
+        </Group>
       ) : null}
-      {has(DefaultDashStyle) ? (
-        <Row label="Dash" mixed={styles.get(DefaultDashStyle)?.type === "mixed"}>
-          {DASHES.map((d) => (
-            <Choice key={d} value={d} current={styles.get(DefaultDashStyle)} label={`${titleCase(d)} line`} onPick={(v) => setStyle(DefaultDashStyle, v)}>
-              <Icon name={`dash-${d}`} />
-            </Choice>
-          ))}
-        </Row>
+
+      {strokeGroup ? (
+        <Group>
+          {sections.fill ? (
+            <Row label="Fill" mixed={styles.get(DefaultFillStyle)?.type === "mixed"}>
+              {FILLS.map((f) => (
+                <Choice key={f} value={f} current={styles.get(DefaultFillStyle)} label={`${titleCase(f)} fill`} onPick={(v) => setStyle(DefaultFillStyle, v)}>
+                  <Icon name={FILL_ICON[f]!} />
+                </Choice>
+              ))}
+            </Row>
+          ) : null}
+          {sections.dash ? (
+            <Row label="Dash" mixed={styles.get(DefaultDashStyle)?.type === "mixed"}>
+              {DASHES.map((d) => (
+                <Choice key={d} value={d} current={styles.get(DefaultDashStyle)} label={`${titleCase(d)} line`} onPick={(v) => setStyle(DefaultDashStyle, v)}>
+                  <Icon name={`dash-${d}`} />
+                </Choice>
+              ))}
+            </Row>
+          ) : null}
+          {sections.size ? (
+            <Row label="Size" mixed={styles.get(DefaultSizeStyle)?.type === "mixed"}>
+              {SIZES.map((s) => (
+                <Choice key={s} value={s} current={styles.get(DefaultSizeStyle)} label={`Size ${s.toUpperCase()}`} onPick={(v) => setStyle(DefaultSizeStyle, v)}>
+                  <Icon name={`size-${s}`} />
+                </Choice>
+              ))}
+            </Row>
+          ) : null}
+        </Group>
       ) : null}
-      {has(DefaultSizeStyle) ? (
-        <Row label="Size" mixed={styles.get(DefaultSizeStyle)?.type === "mixed"}>
-          {SIZES.map((s) => (
-            <Choice key={s} value={s} current={styles.get(DefaultSizeStyle)} label={`Size ${s.toUpperCase()}`} onPick={(v) => setStyle(DefaultSizeStyle, v)}>
-              <Icon name={`size-${s}`} />
-            </Choice>
-          ))}
-        </Row>
+
+      {textGroup ? (
+        <Group>
+          {sections.font ? (
+            <Row label="Font" mixed={styles.get(DefaultFontStyle)?.type === "mixed"}>
+              {FONTS.map((f) => (
+                <Choice key={f} value={f} current={styles.get(DefaultFontStyle)} label={`${titleCase(f)} font`} onPick={(v) => setStyle(DefaultFontStyle, v)}>
+                  <Icon name={`font-${f}`} />
+                </Choice>
+              ))}
+            </Row>
+          ) : null}
+          {/* The two alignments are one idea and three buttons each, so they
+              share a row rather than costing two labels' worth of height. */}
+          {sections.align || sections.verticalAlign ? (
+            <div>
+              <div className="mocanvas-row-label">
+                <span>Align</span>
+                {styles.get(DefaultHorizontalAlignStyle)?.type === "mixed" || styles.get(DefaultVerticalAlignStyle)?.type === "mixed" ? <MixedRing /> : null}
+              </div>
+              <div className="mocanvas-seg mocanvas-seg--split">
+                {sections.align ? (
+                  <div className="mocanvas-seg" role="radiogroup" aria-label="Horizontal align">
+                    {H_ALIGNS.map((a) => (
+                      <Choice key={a} value={a} current={styles.get(DefaultHorizontalAlignStyle)} label={H_ALIGN_LABEL[a]!} onPick={(v) => setStyle(DefaultHorizontalAlignStyle, v)}>
+                        <Icon name={H_ALIGN_ICON[a]!} />
+                      </Choice>
+                    ))}
+                  </div>
+                ) : null}
+                {sections.verticalAlign ? (
+                  <div className="mocanvas-seg" role="radiogroup" aria-label="Vertical align">
+                    {V_ALIGNS.map((a) => (
+                      <Choice key={a} value={a} current={styles.get(DefaultVerticalAlignStyle)} label={V_ALIGN_LABEL[a]!} onPick={(v) => setStyle(DefaultVerticalAlignStyle, v)}>
+                        <Icon name={V_ALIGN_ICON[a]!} />
+                      </Choice>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </Group>
       ) : null}
-      {has(DefaultFontStyle) ? (
-        <Row label="Font" mixed={styles.get(DefaultFontStyle)?.type === "mixed"}>
-          {FONTS.map((f) => (
-            <Choice key={f} value={f} current={styles.get(DefaultFontStyle)} label={`${titleCase(f)} font`} onPick={(v) => setStyle(DefaultFontStyle, v)}>
-              <Icon name={`font-${f}`} />
-            </Choice>
-          ))}
-        </Row>
+
+      {sections.opacity ? (
+        <Group>
+          <OpacityRow editor={editor} />
+        </Group>
       ) : null}
-      {has(DefaultHorizontalAlignStyle) ? (
-        <Row label="Align" mixed={styles.get(DefaultHorizontalAlignStyle)?.type === "mixed"}>
-          {H_ALIGNS.map((a) => (
-            <Choice key={a} value={a} current={styles.get(DefaultHorizontalAlignStyle)} label={H_ALIGN_LABEL[a]!} onPick={(v) => setStyle(DefaultHorizontalAlignStyle, v)}>
-              <Icon name={H_ALIGN_ICON[a]!} />
-            </Choice>
-          ))}
-        </Row>
-      ) : null}
-      {has(DefaultVerticalAlignStyle) ? (
-        <Row label="Vertical align" mixed={styles.get(DefaultVerticalAlignStyle)?.type === "mixed"}>
-          {V_ALIGNS.map((a) => (
-            <Choice key={a} value={a} current={styles.get(DefaultVerticalAlignStyle)} label={V_ALIGN_LABEL[a]!} onPick={(v) => setStyle(DefaultVerticalAlignStyle, v)}>
-              <Icon name={V_ALIGN_ICON[a]!} />
-            </Choice>
-          ))}
-        </Row>
-      ) : null}
-      {hasSelection ? <OpacityRow editor={editor} /> : null}
     </div>
   )
 })

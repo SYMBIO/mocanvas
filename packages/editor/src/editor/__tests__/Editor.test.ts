@@ -435,3 +435,38 @@ describe("Editor shape error isolation", () => {
     expect(warn).toHaveBeenCalledTimes(1)
   })
 })
+
+describe("selection handles", () => {
+  it("gives a 24px target, drops crowded edge handles and shrinks on tiny selections", async () => {
+    const { getHandleHitRadius, getSelectionHandlePositions, hitTestSelectionHandles, HANDLE_HIT_RADIUS } = await import(
+      "../selectionHandles"
+    )
+    expect(HANDLE_HIT_RADIUS).toBe(12)
+    // Comfortable selections keep the full target; tiny ones shrink so the
+    // shape's interior stays draggable.
+    expect(getHandleHitRadius(200, 200)).toBe(HANDLE_HIT_RADIUS)
+    expect(getHandleHitRadius(30, 200)).toBeCloseTo(5)
+    expect(getHandleHitRadius(6, 6)).toBe(4)
+
+    const editor = makeEditor()
+    editor.createShape<BoxShape>({ type: "box", x: 0, y: 0, props: { w: 300, h: 300, color: 0 } })
+    const big = editor.getCurrentPageShapes()[0]!
+    editor.select(big.id)
+    const info = getSelectionHandlePositions(editor)!
+    expect(info.handles.map((h) => h.handle).sort()).toEqual(
+      ["bottom", "bottom_left", "bottom_right", "left", "right", "rotate", "top", "top_left", "top_right"].sort(),
+    )
+    // The corner sits at screen (0,0); a point 10px away is still on target.
+    expect(hitTestSelectionHandles(editor, { x: 10, y: 6 })).toBe("top_left")
+    expect(hitTestSelectionHandles(editor, { x: 150, y: 150 })).toBeUndefined()
+
+    // A selection narrower than four handles loses its top/bottom handles.
+    editor.updateShape<BoxShape>({ id: big.id, type: "box", props: { w: 20, h: 300 } })
+    const narrow = getSelectionHandlePositions(editor)!
+    const names = narrow.handles.map((h) => h.handle)
+    expect(names).not.toContain("top")
+    expect(names).not.toContain("bottom")
+    expect(names).toContain("left")
+    expect(names).toContain("top_left")
+  })
+})

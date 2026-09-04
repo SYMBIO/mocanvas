@@ -1,6 +1,6 @@
 # Benchmark: mocanvas vs tldraw
 
-_Generated 2026-09-04 08:30:07 UTC by `apps/bench/scripts/bench.mjs`. Re-run with `pnpm --filter bench bench`._
+_Generated 2026-09-04 09:26:29 UTC by `apps/bench/scripts/bench.mjs`. Re-run with `pnpm --filter bench bench`._
 
 Both libraries are driven through an identical `window.bench` API (`apps/bench/src/bench-api.ts`)
 with byte-identical workloads: same grid, same shape sizes, colours and fills, the same scripted
@@ -11,7 +11,7 @@ deltas recorded while a camera animation runs (zoom to fit → zoom in 4× → h
 
 | | |
 | :--- | :--- |
-| Date | 2026-09-04 08:30:07 UTC |
+| Date | 2026-09-04 09:26:29 UTC |
 | Machine | Apple M3 Pro, 11 cores, 36 GB |
 | OS | Darwin 25.5.0 (arm64) |
 | Node | v25.9.0 |
@@ -21,7 +21,7 @@ deltas recorded while a camera animation runs (zoom to fit → zoom in 4× → h
 | WebGL2 renderer | ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver) |
 | Rasterisation | **software (SwiftShader)** — no hardware GPU in this environment |
 | tldraw | 5.4.0 |
-| mocanvas | 0.0.1 (this repo, 32ac776-dirty (uncommitted work in packages/ during the run)) |
+| mocanvas | 0.0.1 (this repo, 15b670a-dirty) |
 | Builds | production (`vite build`, minified, `NODE_ENV=production`) for both |
 | Viewport | 1200×800 CSS px, device scale 1 |
 | Matrix | N ∈ {1000, 5000, 20000} × kind ∈ {geo, mixed}, 3 repeats, medians reported |
@@ -36,23 +36,23 @@ Wall time of the single `createShapes` call, inside one transaction with history
 
 | N | kind | mocanvas | tldraw | ratio |
 | ---: | :--- | ---: | ---: | :--- |
-| 1,000 | geo | 13 ms | 39 ms | 2.97× faster |
-| 5,000 | geo | 39 ms | 142 ms | 3.61× faster |
-| 20,000 | geo | 138 ms | 499 ms | 3.61× faster |
-| 1,000 | mixed | 21 ms | 63 ms | 2.95× faster |
-| 5,000 | mixed | 59 ms | 210 ms | 3.59× faster |
-| 20,000 | mixed | 217 ms | 604 ms | 2.78× faster |
+| 1,000 | geo | 15 ms | 38 ms | 2.50× faster |
+| 5,000 | geo | 40 ms | 120 ms | 2.99× faster |
+| 20,000 | geo | 134 ms | 433 ms | 3.23× faster |
+| 1,000 | mixed | 26 ms | 76 ms | 2.96× faster |
+| 5,000 | mixed | 68 ms | 242 ms | 3.56× faster |
+| 20,000 | mixed | 249 ms | 754 ms | 3.02× faster |
 
 Time from the start of that call until the second animation frame afterwards (creation + first paint):
 
 | N | kind | mocanvas | tldraw | ratio |
 | ---: | :--- | ---: | ---: | :--- |
-| 1,000 | geo | 104 ms | 133 ms | 1.27× faster |
-| 5,000 | geo | 216 ms | 540 ms | 2.50× faster |
-| 20,000 | geo | 501 ms | 2482 ms | 4.96× faster |
-| 1,000 | mixed | 110 ms | 163 ms | 1.48× faster |
-| 5,000 | mixed | 273 ms | 683 ms | 2.50× faster |
-| 20,000 | mixed | 737 ms | 2478 ms | 3.36× faster |
+| 1,000 | geo | 95 ms | 126 ms | 1.33× faster |
+| 5,000 | geo | 122 ms | 470 ms | 3.87× faster |
+| 20,000 | geo | 213 ms | 2226 ms | 10.45× faster |
+| 1,000 | mixed | 130 ms | 196 ms | 1.51× faster |
+| 5,000 | mixed | 174 ms | 727 ms | 4.18× faster |
+| 20,000 | mixed | 406 ms | 2923 ms | 7.20× faster |
 
 ### Pan / zoom frame time (`panZoomRun(120)`)
 
@@ -60,45 +60,45 @@ Time from the start of that call until the second animation frame afterwards (cr
 
 | N | kind | mocanvas | tldraw | ratio |
 | ---: | :--- | ---: | ---: | :--- |
-| 1,000 | geo | 16.70 ms | 8.30 ms | 2.01× slower |
-| 5,000 | geo | 25.10 ms | 8.80 ms | 2.85× slower |
-| 20,000 | geo | 41.60 ms | 133.40 ms | 3.21× faster |
-| 1,000 | mixed | 16.70 ms | 8.30 ms | 2.01× slower |
-| 5,000 | mixed | 33.20 ms | 16.60 ms | 2.00× slower |
-| 20,000 | mixed | 50.10 ms | 124.90 ms | 2.49× faster |
+| 1,000 | geo | 9.10 ms | 8.30 ms | 1.10× slower |
+| 5,000 | geo | 25.00 ms | 8.40 ms | 2.98× slower |
+| 20,000 | geo | 33.30 ms | 124.20 ms | 3.73× faster |
+| 1,000 | mixed | 24.90 ms | 8.30 ms | 3.00× slower |
+| 5,000 | mixed | 41.60 ms | 16.70 ms | 2.49× slower |
+| 20,000 | mixed | 50.00 ms | 157.90 ms | 3.16× faster |
 
 95th-percentile frame (the stutter you actually feel):
 
 | N | kind | mocanvas | tldraw | ratio |
 | ---: | :--- | ---: | ---: | :--- |
-| 1,000 | geo | 41.60 ms | 9.00 ms | 4.62× slower |
-| 5,000 | geo | 84.20 ms | 33.30 ms | 2.53× slower |
-| 20,000 | geo | 193.10 ms | 291.20 ms | 1.51× faster |
-| 1,000 | mixed | 33.30 ms | 9.20 ms | 3.62× slower |
-| 5,000 | mixed | 107.60 ms | 33.40 ms | 3.22× slower |
-| 20,000 | mixed | 266.10 ms | 283.30 ms | 1.06× faster |
+| 1,000 | geo | 24.50 ms | 9.10 ms | 2.69× slower |
+| 5,000 | geo | 66.60 ms | 25.00 ms | 2.66× slower |
+| 20,000 | geo | 116.70 ms | 258.80 ms | 2.22× faster |
+| 1,000 | mixed | 42.30 ms | 9.00 ms | 4.70× slower |
+| 5,000 | mixed | 108.30 ms | 41.60 ms | 2.60× slower |
+| 20,000 | mixed | 208.30 ms | 350.10 ms | 1.68× faster |
 
 Worst single frame:
 
 | N | kind | mocanvas | tldraw | ratio |
 | ---: | :--- | ---: | ---: | :--- |
-| 1,000 | geo | 75.20 ms | 9.30 ms | 8.09× slower |
-| 5,000 | geo | 241.70 ms | 42.50 ms | 5.69× slower |
-| 20,000 | geo | 250.10 ms | 358.40 ms | 1.43× faster |
-| 1,000 | mixed | 41.90 ms | 9.30 ms | 4.51× slower |
-| 5,000 | mixed | 116.70 ms | 50.20 ms | 2.32× slower |
-| 20,000 | mixed | 424.90 ms | 358.20 ms | 1.19× slower |
+| 1,000 | geo | 25.80 ms | 9.40 ms | 2.74× slower |
+| 5,000 | geo | 83.30 ms | 33.40 ms | 2.49× slower |
+| 20,000 | geo | 166.70 ms | 308.40 ms | 1.85× faster |
+| 1,000 | mixed | 58.60 ms | 9.30 ms | 6.30× slower |
+| 5,000 | mixed | 133.30 ms | 57.80 ms | 2.31× slower |
+| 20,000 | mixed | 300.40 ms | 429.20 ms | 1.43× faster |
 
 Average frames per second over the run (higher is better):
 
 | N | kind | mocanvas | tldraw | ratio |
 | ---: | :--- | ---: | ---: | :--- |
-| 1,000 | geo | 50.5 | 120.0 | 2.37× slower |
-| 5,000 | geo | 24.6 | 66.7 | 2.71× slower |
-| 20,000 | geo | 15.4 | 6.7 | 2.30× faster |
-| 1,000 | mixed | 57.1 | 120.0 | 2.10× slower |
-| 5,000 | mixed | 23.0 | 60.3 | 2.62× slower |
-| 20,000 | mixed | 11.7 | 7.2 | 1.62× faster |
+| 1,000 | geo | 77.4 | 120.0 | 1.55× slower |
+| 5,000 | geo | 34.7 | 80.4 | 2.32× slower |
+| 20,000 | geo | 24.0 | 7.4 | 3.24× faster |
+| 1,000 | mixed | 37.3 | 120.0 | 3.22× slower |
+| 5,000 | mixed | 21.0 | 52.4 | 2.50× slower |
+| 20,000 | mixed | 14.2 | 5.7 | 2.49× faster |
 
 ### Select-all + drag frame time (`selectAllDragRun(60)`)
 
@@ -107,23 +107,23 @@ the write path (store update → geometry invalidation → re-render), not just 
 
 | N | kind | mocanvas | tldraw | ratio |
 | ---: | :--- | ---: | ---: | :--- |
-| 1,000 | geo | 33.30 ms | 33.40 ms | 1.00× faster |
-| 5,000 | geo | 125.10 ms | 191.40 ms | 1.53× faster |
-| 20,000 | geo | 441.60 ms | 983.20 ms | 2.23× faster |
-| 1,000 | mixed | 41.60 ms | 33.40 ms | 1.25× slower |
-| 5,000 | mixed | 158.40 ms | 200.00 ms | 1.26× faster |
-| 20,000 | mixed | 750.30 ms | 816.70 ms | 1.09× faster |
+| 1,000 | geo | 33.00 ms | 25.10 ms | 1.31× slower |
+| 5,000 | geo | 116.60 ms | 150.00 ms | 1.29× faster |
+| 20,000 | geo | 400.00 ms | 858.40 ms | 2.15× faster |
+| 1,000 | mixed | 50.00 ms | 41.70 ms | 1.20× slower |
+| 5,000 | mixed | 183.50 ms | 225.90 ms | 1.23× faster |
+| 20,000 | mixed | 841.60 ms | 1124.90 ms | 1.34× faster |
 
 95th-percentile frame:
 
 | N | kind | mocanvas | tldraw | ratio |
 | ---: | :--- | ---: | ---: | :--- |
-| 1,000 | geo | 41.70 ms | 41.80 ms | 1.00× faster |
-| 5,000 | geo | 174.50 ms | 216.80 ms | 1.24× faster |
-| 20,000 | geo | 532.50 ms | 1225.00 ms | 2.30× faster |
-| 1,000 | mixed | 49.90 ms | 42.00 ms | 1.19× slower |
-| 5,000 | mixed | 183.10 ms | 217.20 ms | 1.19× faster |
-| 20,000 | mixed | 900.20 ms | 966.70 ms | 1.07× faster |
+| 1,000 | geo | 34.20 ms | 33.90 ms | 1.01× slower |
+| 5,000 | geo | 140.70 ms | 166.70 ms | 1.18× faster |
+| 20,000 | geo | 441.60 ms | 1058.20 ms | 2.40× faster |
+| 1,000 | mixed | 66.80 ms | 50.20 ms | 1.33× slower |
+| 5,000 | mixed | 250.00 ms | 258.40 ms | 1.03× faster |
+| 20,000 | mixed | 925.00 ms | 1375.00 ms | 1.49× faster |
 
 ### Hit testing (`hitTestRun(500)`)
 
@@ -131,12 +131,12 @@ the write path (store update → geometry invalidation → re-render), not just 
 
 | N | kind | mocanvas | tldraw | ratio |
 | ---: | :--- | ---: | ---: | :--- |
-| 1,000 | geo | 2.6 µs | 34.8 µs | 13.38× faster |
-| 5,000 | geo | 3.4 µs | 128.6 µs | 37.82× faster |
-| 20,000 | geo | 6.6 µs | 544.4 µs | 82.48× faster |
-| 1,000 | mixed | 2.2 µs | 51.8 µs | 23.55× faster |
-| 5,000 | mixed | 4.0 µs | 169.4 µs | 42.35× faster |
-| 20,000 | mixed | 5.4 µs | 506.0 µs | 93.70× faster |
+| 1,000 | geo | 2.0 µs | 32.0 µs | 16.00× faster |
+| 5,000 | geo | 3.0 µs | 111.8 µs | 37.27× faster |
+| 20,000 | geo | 5.4 µs | 524.6 µs | 97.15× faster |
+| 1,000 | mixed | 2.4 µs | 46.8 µs | 19.50× faster |
+| 5,000 | mixed | 4.0 µs | 184.0 µs | 46.00× faster |
+| 20,000 | mixed | 5.2 µs | 656.0 µs | 126.15× faster |
 
 ### JS heap after the run (`memoryMB()`)
 
@@ -147,7 +147,7 @@ understates both, differently. Treat it as a rough signal, not a memory benchmar
 | N | kind | mocanvas | tldraw | ratio |
 | ---: | :--- | ---: | ---: | :--- |
 | 1,000 | geo | 9.5 MB | 51.0 MB | 5.35× less |
-| 5,000 | geo | 9.5 MB | 214.6 MB | 22.50× less |
+| 5,000 | geo | 9.5 MB | 202.2 MB | 21.20× less |
 | 20,000 | geo | 20.7 MB | 803.0 MB | 38.80× less |
 | 1,000 | mixed | 9.5 MB | 51.0 MB | 5.35× less |
 | 5,000 | mixed | 12.1 MB | 214.6 MB | 17.72× less |
@@ -167,17 +167,17 @@ with two children. Both pages load that same file, zoom to fit at 1200×800 and 
 
 | | |
 | :--- | ---: |
-| Differing pixels | **11.84%** (113,685 of 960,000) |
+| Differing pixels | **12.14%** (116,538 of 960,000) |
 | Tolerance | any channel differing by more than 24/255 |
-| Painted (non-white) pixels, mocanvas | 0 |
+| Painted (non-white) pixels, mocanvas | 163,726 |
 | Painted (non-white) pixels, tldraw | 114,470 |
-| Painted-pixel overlap (IoU) | 0.0% |
+| Painted-pixel overlap (IoU) | 56.4% |
 
 ### Load result
 
 | | mocanvas | tldraw |
 | :--- | :--- | :--- |
-| Loaded without error | no — TypeError: Cannot read properties of undefined (reading 'trim') | yes |
+| Loaded without error | yes | yes |
 | Shapes on the page after load | 14 | 14 |
 
 ### Second pass: with the two known format gaps shimmed
@@ -193,10 +193,10 @@ into mocanvas. tldraw still renders the untouched original. This shim lives in t
 
 | | raw file | down-converted |
 | :--- | ---: | ---: |
-| mocanvas loaded without error | no | yes |
-| Differing pixels vs tldraw | 11.84% | **12.10%** |
-| Painted pixels, mocanvas | 0 | 163,726 |
-| Painted-pixel overlap (IoU) | 0.0% | 56.4% |
+| mocanvas loaded without error | yes | yes |
+| Differing pixels vs tldraw | 12.14% | **12.14%** |
+| Painted pixels, mocanvas | 163,726 | 163,726 |
+| Painted-pixel overlap (IoU) | 56.4% | 56.4% |
 
 **Read the overlap row, not the differing-pixels row.** "Differing pixels" is a poor headline here and can
 move the wrong way: tldraw only paints about 12% of this canvas, so a *blank* mocanvas render already scores

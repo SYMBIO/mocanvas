@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import type { Editor } from "../editor/Editor"
 import type { ClickEventInfo, PointerEventInfo, PointerTarget, WheelEventInfo } from "../editor/events"
 import { hitTestSelectionBounds, hitTestSelectionHandles, HANDLE_HIT_RADIUS } from "../editor/selectionHandles"
+
 import { Vec } from "../geometry"
 
 function modifiers(e: { shiftKey: boolean; altKey: boolean; ctrlKey: boolean; metaKey: boolean }) {

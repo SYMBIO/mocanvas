@@ -30,6 +30,21 @@ const LATEST_JSON = resolve(RESULTS_DIR, "latest.json")
 const DOC = resolve(REPO_ROOT, "docs/BENCHMARK.md")
 const FIXTURE = resolve(ROOT, "public/compare.tldr")
 
+/**
+ * The previously published run, kept only so the report can show a trend.
+ * Hand-copied from the `docs/BENCHMARK.md` generated at 2026-09-04 08:30:07 UTC
+ * (git 32ac776-dirty), before the `.tldr` load fix and the renderer's frame
+ * reuse / tessellation budget / LOD hysteresis landed. Update it — or delete it
+ * together with the "What changed" section — once it is no longer the
+ * interesting comparison.
+ */
+const PREVIOUS = {
+  date: "2026-09-04 08:30:07 UTC",
+  git: "32ac776-dirty",
+  panP95: { "1000:geo": 41.6, "5000:geo": 84.2, "20000:geo": 193.1, "1000:mixed": 33.3, "5000:mixed": 107.6, "20000:mixed": 266.1 },
+  compare: { loaded: false, diffPercent: 11.84, inkPixelsMocanvas: 0, inkOverlapPercent: 0 },
+}
+
 // ---------------------------------------------------------------------------
 // args
 // ---------------------------------------------------------------------------
@@ -133,25 +148,15 @@ async function compareRendering(browser, url) {
   }
   const diff = await pixelDiff(shots.mocanvas, shots.tldraw, 24, "compare-diff")
 
-  // Pass B — mocanvas gets a bench-side down-converted copy (richText → text,
-  // encoded draw path → point array) so we can also report how close the
-  // rendering gets once those two known format gaps are shimmed.
-  let shimmed = null
-  try {
-    const { page: tp } = await openBenchPage(browser, url, "tldraw")
-    const downconverted = await withTimeout(tp, 120_000, (doc) => window.bench.downconvert(doc), fixture)
-    await tp.close()
-    const { load, file } = await shoot("mocanvas", downconverted, "compare-mocanvas-shimmed")
-    shimmed = {
-      load,
-      file,
-      diff: await pixelDiff(file, shots.tldraw, 24, "compare-diff-shimmed"),
-    }
-  } catch (e) {
-    shimmed = { error: String(e.message ?? e) }
-  }
+  // There used to be a pass B here: mocanvas got a bench-side down-converted
+  // copy of the document (richText → text, packed draw path → point array)
+  // because it could not read either form itself, and the shimmed screenshot
+  // was the only one that showed anything. `normalizeLoadedRecords` does both
+  // conversions now, so pass A is the honest number and the shim is gone. The
+  // `window.bench.downconvert` helper is still there if a future format gap
+  // ever needs the same treatment.
 
-  return { ok: true, shots, loads, diff, shimmed, fixtureRecords: fixture.records.length }
+  return { ok: true, shots, loads, diff, fixtureRecords: fixture.records.length }
 }
 
 /**
@@ -249,6 +254,20 @@ function machineInfo() {
   }
 }
 
+/**
+ * The GL cost probe recorded by the pan/zoom A/B run, if it is still on disk.
+ * It is what lets the report say how much of a frame here is MSAA resolve
+ * rather than scene work; without it that caveat is simply not made.
+ */
+function glCostProbe() {
+  try {
+    const probe = JSON.parse(readFileSync(resolve(RESULTS_DIR, "panzoom-after.json"), "utf8")).glCostProbe
+    return probe && Number.isFinite(probe.clearAndDrawMs) && Number.isFinite(probe.clearAndDrawMs_antialiasOff) ? probe : null
+  } catch {
+    return null
+  }
+}
+
 function pkgVersion(name) {
   try {
     return JSON.parse(readFileSync(resolve(ROOT, `node_modules/${name}/package.json`), "utf8")).version
@@ -269,6 +288,59 @@ function renderDoc(data) {
   md.push("camera path, and the same hit-test sample points. Frame times are frame-to-frame `requestAnimationFrame`")
   md.push("deltas recorded while a camera animation runs (zoom to fit → zoom in 4× → horizontal pan sweep → zoom back out).")
   md.push("")
+
+  if (matrix?.mocanvas) {
+    md.push("## What changed since the previous run")
+    md.push("")
+    md.push(`Two changes landed between the previous published numbers (${PREVIOUS.date}, git \`${PREVIOUS.git}\`) and this run:`)
+    md.push("")
+    md.push("- **`.tldr` loading was fixed.** `normalizeLoadedRecords` (`packages/editor/src/records/normalize.ts`)")
+    md.push("  now maps `props.richText` onto `props.text` and decodes packed freehand `segments[].path` into")
+    md.push("  `segments[].points` while records are loaded. The previous run could not open the tldraw-authored")
+    md.push("  fixture at all — it threw and left a blank canvas — so the rendering comparison below was measured")
+    md.push("  against nothing. mocanvas now loads and draws the unmodified file.")
+    md.push("- **Renderer.** A per-frame tessellation budget (256 shapes), frame reuse keyed on scene epoch + zoom")
+    md.push("  bucket + viewport containment, and LOD hysteresis. All three target the same thing: the long frames")
+    md.push("  where the camera moves but the scene did not.")
+    md.push("")
+    md.push("95th-percentile pan/zoom frame, mocanvas only (the metric those renderer changes target):")
+    md.push("")
+    md.push("| N | kind | before | after | change |")
+    md.push("| ---: | :--- | ---: | ---: | ---: |")
+    for (const kind of kinds) {
+      for (const n of ns) {
+        const key = `${n}:${kind}`
+        const after = matrix.mocanvas[key]?.panP95
+        const before = PREVIOUS.panP95[key]
+        const delta = before != null && Number.isFinite(after) && before > 0
+          ? `${after < before ? "" : "+"}${(((after - before) / before) * 100).toFixed(0)}%`
+          : "—"
+        md.push(`| ${int(n)} | ${kind} | ${before == null ? "—" : `${fmt(before, 2)} ms`} | ${fmt(after, 2)} ms | ${delta} |`)
+      }
+    }
+    md.push("")
+    md.push("Both columns are whole-matrix runs in the same environment (three repeats, median), not an isolated")
+    md.push("A/B, so read the direction and not the last digit — single-digit percentage moves here are noise.")
+    md.push("An interleaved A/B of just those renderer changes, in one browser session with the old behaviour")
+    md.push("toggled off and on, is in `apps/bench/results/panzoom-after.json`; it put the p95 improvement at")
+    md.push("16–31% between 5,000 and 20,000 shapes, which is the same story this table tells.")
+    md.push("")
+    if (compare?.ok && !compare.diff?.error) {
+      const before = PREVIOUS.compare
+      md.push("Rendering comparison against the same `.tldr` fixture:")
+      md.push("")
+      md.push("| | before | after |")
+      md.push("| :--- | :--- | :--- |")
+      md.push(`| mocanvas loaded the file | ${before.loaded ? "yes" : "no — threw on `props.richText`"} | ${compare.loads.mocanvas.ok ? "yes" : `no — ${compare.loads.mocanvas.error}`} |`)
+      md.push(`| Painted pixels, mocanvas | ${int(before.inkPixelsMocanvas)} | ${int(compare.diff.inkPixelsMocanvas)} |`)
+      md.push(`| Painted-pixel overlap (IoU) | ${fmt(before.inkOverlapPercent, 1)}% | **${fmt(compare.diff.inkOverlapPercent, 1)}%** |`)
+      md.push(`| Differing pixels | ${fmt(before.diffPercent, 2)}% | ${fmt(compare.diff.diffPercent, 2)}% |`)
+      md.push("")
+      md.push("The differing-pixel row is the one that reads backwards, and it is worth understanding before")
+      md.push("quoting either number — see [the note under the comparison](#rendering-comparison).")
+      md.push("")
+    }
+  }
 
   md.push("## Environment")
   md.push("")
@@ -396,7 +468,16 @@ function renderDoc(data) {
       md.push(`| Tolerance | any channel differing by more than ${compare.diff.tolerance}/255 |`)
       md.push(`| Painted (non-white) pixels, mocanvas | ${int(compare.diff.inkPixelsMocanvas)} |`)
       md.push(`| Painted (non-white) pixels, tldraw | ${int(compare.diff.inkPixelsTldraw)} |`)
-      md.push(`| Painted-pixel overlap (IoU) | ${compare.diff.inkOverlapPercent.toFixed(1)}% |`)
+      md.push(`| Painted-pixel overlap (IoU) | **${compare.diff.inkOverlapPercent.toFixed(1)}%** |`)
+      md.push("")
+      md.push("**Read the overlap row, not the differing-pixels row.** \"Differing pixels\" is a poor headline for this")
+      md.push("comparison and moves in misleading ways: tldraw inks only about 12% of the canvas, so a render that draws")
+      md.push("too little scores well on it. The previous run is the proof — mocanvas painted *nothing* there and still")
+      md.push(`scored 11.84% differing pixels, against ${compare.diff.diffPercent.toFixed(2)}% for the real render below it, because a blank canvas`)
+      md.push("disagrees only where tldraw drew something. mocanvas now paints in nearly the same places but with a")
+      md.push("different stroke, fill and font, so the union of disagreeing pixels stays about as large while the picture")
+      md.push("is enormously closer. The painted-pixel overlap (intersection over union) is the metric that reflects")
+      md.push(`that: of every pixel either side inked, ${compare.diff.inkOverlapPercent.toFixed(1)}% were inked by both.`)
       md.push("")
     }
     md.push("### Load result")
@@ -406,38 +487,11 @@ function renderDoc(data) {
     md.push(`| Loaded without error | ${compare.loads.mocanvas.ok ? "yes" : `no — ${compare.loads.mocanvas.error}`} | ${compare.loads.tldraw.ok ? "yes" : `no — ${compare.loads.tldraw.error}`} |`)
     md.push(`| Shapes on the page after load | ${compare.loads.mocanvas.shapes} | ${compare.loads.tldraw.shapes} |`)
     md.push("")
-    if (compare.shimmed && !compare.shimmed.error) {
-      md.push("### Second pass: with the two known format gaps shimmed")
-      md.push("")
-      md.push("The raw comparison above is dominated by two `.tldr` format features mocanvas does not yet read")
-      md.push("(see the warnings below). To also show how close the *rendering* gets, the bench down-converts the same")
-      md.push("document — `props.richText` → `props.text`, encoded draw `segments[].path` → `segments[].points` — using")
-      md.push("tldraw's own public helpers (`renderPlaintextFromRichText`, `getPointsFromDrawSegment`), and loads that")
-      md.push("into mocanvas. tldraw still renders the untouched original. This shim lives in the bench app only; it is")
-      md.push("**not** part of mocanvas, and the number below is what mocanvas *could* look like, not what it does today.")
-      md.push("")
-      md.push(`- \`apps/bench/results/compare-mocanvas-shimmed.png\`, diff \`compare-diff-shimmed.png\``)
-      md.push("")
-      md.push("| | raw file | down-converted |")
-      md.push("| :--- | ---: | ---: |")
-      md.push(`| mocanvas loaded without error | ${compare.loads.mocanvas.ok ? "yes" : "no"} | ${compare.shimmed.load.ok ? "yes" : "no"} |`)
-      md.push(`| Differing pixels vs tldraw | ${compare.diff.error ? "—" : `${compare.diff.diffPercent.toFixed(2)}%`} | ${compare.shimmed.diff.error ? "—" : `**${compare.shimmed.diff.diffPercent.toFixed(2)}%**`} |`)
-      md.push(`| Painted pixels, mocanvas | ${compare.diff.error ? "—" : int(compare.diff.inkPixelsMocanvas)} | ${compare.shimmed.diff.error ? "—" : int(compare.shimmed.diff.inkPixelsMocanvas)} |`)
-      md.push(`| Painted-pixel overlap (IoU) | ${compare.diff.error ? "—" : `${compare.diff.inkOverlapPercent.toFixed(1)}%`} | ${compare.shimmed.diff.error ? "—" : `${compare.shimmed.diff.inkOverlapPercent.toFixed(1)}%`} |`)
-      md.push("")
-      md.push("**Read the overlap row, not the differing-pixels row.** \"Differing pixels\" is a poor headline here and can")
-      md.push("move the wrong way: tldraw only paints about 12% of this canvas, so a *blank* mocanvas render already scores")
-      md.push("a deceptively low differing-pixel percentage — it disagrees only where tldraw drew something. Once mocanvas")
-      md.push("actually draws, it paints in nearly the same places but with different stroke, fill and font, so the union of")
-      md.push("disagreeing pixels can get slightly *larger* even though the picture is enormously closer. The painted-pixel")
-      md.push("overlap (intersection over union) is the metric that reflects that: it goes from 0% (nothing drawn) to")
-      md.push(`${compare.shimmed.diff.error ? "—" : `${compare.shimmed.diff.inkOverlapPercent.toFixed(1)}%`} (shapes in the right places, drawn differently).`)
-      md.push("")
-    } else if (compare.shimmed?.error) {
-      md.push(`_Down-converted second pass failed: ${compare.shimmed.error}_`)
-      md.push("")
-    }
-
+    md.push("_An earlier revision of this bench ran a second pass in which the fixture was down-converted for")
+    md.push("mocanvas (`richText` → `text`, packed draw `path` → `points`) using tldraw's own public helpers, because")
+    md.push("mocanvas could not read either form and its raw-file screenshot was blank. mocanvas does both conversions")
+    md.push("itself now, so that shim and its screenshots are gone and the numbers above are the unassisted ones._")
+    md.push("")
     const warn = compare.loads.mocanvas.warnings ?? []
     md.push("### mocanvas load warnings")
     md.push("")
@@ -506,6 +560,17 @@ function renderDoc(data) {
   md.push("- **Headless, software-rasterised GPU.** " + (browser.software
     ? "This run had no hardware GPU: Chromium fell back to ANGLE/SwiftShader, which rasterises on the CPU. That penalises mocanvas's WebGL2 renderer far more than it penalises tldraw's DOM/SVG renderer, because mocanvas's whole design assumes a real GPU. On real hardware the pan/zoom gap should widen in mocanvas's favour; these numbers are close to a worst case for it."
     : "Hardware acceleration was available, but a headless Chromium GPU stack is still not a user's browser."))
+  const probe = glCostProbe()
+  if (probe && browser.software) {
+    md.push("- **4× MSAA dominates a software-rasterised frame, so these frame times mostly measure SwiftShader, not")
+    md.push("  the engine.** A probe in this same environment (`glCostProbe` in `apps/bench/results/panzoom-after.json`)")
+    md.push(`  draws ${int(probe.triangles)} triangles (${fmt(probe.bufferMB, 2)} MB of vertex data) into a context configured exactly like the`)
+    md.push("  WebGL2 backend's, and reads one pixel back so the GPU process has to finish before the clock stops.")
+    md.push(`  Uploading the buffers costs ${fmt(probe.uploadOnlyMs, 2)} ms and clearing costs ${fmt(probe.clearOnlyMs, 2)} ms, but clear-plus-draw costs`)
+    md.push(`  **${fmt(probe.clearAndDrawMs, 1)} ms with \`antialias: true\` against ${fmt(probe.clearAndDrawMs_antialiasOff, 1)} ms with it off** — roughly`)
+    md.push(`  ${fmt(((probe.clearAndDrawMs - probe.clearAndDrawMs_antialiasOff) / probe.clearAndDrawMs) * 100, 0)}% of the frame is multisample resolve on the CPU. On a real GPU MSAA is close to free, so the`)
+    md.push("  absolute mocanvas frame times below are largely a property of this rasteriser rather than of the scene.")
+  }
   md.push("- **Default settings on both sides.** No tuning, no custom shape utils, no culling or LOD flags flipped, no")
   md.push("  tldraw performance options enabled. Both libraries are used the way the docs show. Either could likely be")
   md.push("  made faster by someone who knows its knobs; that is a different benchmark.")
