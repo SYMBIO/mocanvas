@@ -1,11 +1,16 @@
 # Benchmark: mocanvas vs tldraw
 
-_Generated 2026-09-04 09:26:29 UTC by `apps/bench/scripts/bench.mjs`. Re-run with `pnpm --filter bench bench`._
+_Generated 2026-09-04 09:47:15 UTC by `apps/bench/scripts/bench.mjs`. Re-run with `pnpm --filter bench bench`._
 
 Both libraries are driven through an identical `window.bench` API (`apps/bench/src/bench-api.ts`)
 with byte-identical workloads: same grid, same shape sizes, colours and fills, the same scripted
 camera path, and the same hit-test sample points. Frame times are frame-to-frame `requestAnimationFrame`
 deltas recorded while a camera animation runs (zoom to fit → zoom in 4× → horizontal pan sweep → zoom back out).
+
+> **The two halves of this report were measured at different times.** The rendering comparison was re-measured after the fill-ramp fix; the performance tables were **not** re-run — they are unchanged from the earlier run listed under Environment, and nothing below claims they were.
+>
+> Rendering comparison: measured 2026-09-04 09:47:15 UTC, git `ef4d079`.
+> Performance tables: measured 2026-09-04 09:26:29 UTC, git `15b670a-dirty`.
 
 ## What changed since the previous run
 
@@ -14,7 +19,7 @@ Two changes landed between the previous published numbers (2026-09-04 08:30:07 U
 - **`.tldr` loading was fixed.** `normalizeLoadedRecords` (`packages/editor/src/records/normalize.ts`)
   now maps `props.richText` onto `props.text` and decodes packed freehand `segments[].path` into
   `segments[].points` while records are loaded. The previous run could not open the tldraw-authored
-  fixture at all — it threw and left a blank canvas — so the rendering comparison below was measured
+  fixture at all — it threw and left a blank canvas — so *that run’s* rendering comparison was measured
   against nothing. mocanvas now loads and draws the unmodified file.
 - **Renderer.** A per-frame tessellation budget (256 shapes), frame reuse keyed on scene epoch + zoom
   bucket + viewport containment, and LOD hysteresis. All three target the same thing: the long frames
@@ -45,23 +50,38 @@ The clean measurement of those renderer changes is not this table but the interl
 `apps/bench/results/panzoom-after.json`, which toggles frame reuse and the tessellation budget off and on
 within a single browser session: it puts the p95 improvement at 16–31% between 5,000 and 20,000 shapes.
 
-Rendering comparison against the same `.tldr` fixture:
+Rendering comparison against the same `.tldr` fixture. It has three points now, and only the last
+column was measured by the run at the top of this file — see the note above about the two halves of
+this report:
 
-| | before | after |
-| :--- | :--- | :--- |
-| mocanvas loaded the file | no — threw on `props.richText` | yes |
-| Painted pixels, mocanvas | 0 | 163,726 |
-| Painted-pixel overlap (IoU) | 0.0% | **56.4%** |
-| Differing pixels | 11.84% | 12.14% |
+| | `32ac776-dirty` (before the .tldr fix) | `15b670a-dirty` (before the fill fix) | `ef4d079` (now) |
+| :--- | :--- | :--- | :--- |
+| mocanvas loaded the file | no — threw on `props.richText` | yes | yes |
+| Painted pixels, mocanvas | 0 | 163,726 | 110,289 |
+| Painted-pixel overlap (IoU) | 0.0% | 56.4% | **79.1%** |
+| Differing pixels | 11.84% | 12.14% | **3.79%** |
 
-The differing-pixel row is the one that reads backwards, and it is worth understanding before
-quoting either number — see [the note under the comparison](#rendering-comparison).
+**The fill fix helped, and by a lot.** `getFillRgba` (`packages/mocanvas/src/shapes/shape-theme.ts`)
+was mapping `fill: "solid"` onto the palette hue itself and `fill: "semi"` onto a tint of it — one step
+stronger than tldraw at both levels. It now maps `semi` to the paper colour, `solid` to the hue's pale
+tint, and `fill` to the hue. Measured over the eroded interior of each filled shape, the two renders
+are now identical pixel for pixel: the red ellipse is `#f4dadb` on both sides, the violet hexagon
+`#ecdcf2`, and the blue rectangle, the star and both of the frame's children `#fcfffe`.
+
+The painted-pixel count falling (163,726 → 110,289, against tldraw's 114,470) is that fix working, not a
+regression: a `semi` fill is *supposed* to leave the paper alone, so those pixels correctly stop
+counting as ink. mocanvas now inks slightly less than tldraw rather than substantially more.
+
+The differing-pixel row is still the one that reads backwards, and it is worth understanding before
+quoting either number — see [the note under the comparison](#rendering-comparison). Note in particular
+that it barely moved between the first two columns (11.84% → 12.14%) across the change that took
+mocanvas from drawing nothing at all to drawing the whole document.
 
 ## Environment
 
 | | |
 | :--- | :--- |
-| Date | 2026-09-04 09:26:29 UTC |
+| Date | 2026-09-04 09:47:15 UTC (rendering comparison; performance tables measured 2026-09-04 09:26:29 UTC) |
 | Machine | Apple M3 Pro, 11 cores, 36 GB |
 | OS | Darwin 25.5.0 (arm64) |
 | Node | v25.9.0 |
@@ -71,12 +91,12 @@ quoting either number — see [the note under the comparison](#rendering-compari
 | WebGL2 renderer | ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver) |
 | Rasterisation | **software (SwiftShader)** — no hardware GPU in this environment |
 | tldraw | 5.4.0 |
-| mocanvas | 0.0.1 (this repo, 15b670a-dirty) |
+| mocanvas | 0.0.1 (this repo, ef4d079; performance tables measured at 15b670a-dirty) |
 | Builds | production (`vite build`, minified, `NODE_ENV=production`) for both |
 | Viewport | 1200×800 CSS px, device scale 1 |
 | Matrix | N ∈ {1000, 5000, 20000} × kind ∈ {geo, mixed}, 3 repeats, medians reported |
 
-_The tree was checked clean at `15b670a` immediately before this run started, and the bundle is built once, before the first measurement — so a clean `15b670a` is what was measured. The `-dirty` marker comes from edits made after that build: to this report generator, and to UI code (selection handles, style panel, icons) committed by a concurrent session. Neither is in the bundle these numbers come from._
+_Why the performance tables' revision is marked dirty: the tree was checked clean at `15b670a` immediately before that run started, and the bundle is built once, before the first measurement — so a clean `15b670a` is what was measured. The `-dirty` marker comes from edits made after that build: to this report generator, and to UI code (selection handles, style panel, icons) committed by a concurrent session. Neither is in the bundle those numbers come from._
 
 ## Results
 
@@ -219,20 +239,25 @@ with two children. Both pages load that same file, zoom to fit at 1200×800 and 
 
 | | |
 | :--- | ---: |
-| Differing pixels | **12.14%** (116,538 of 960,000) |
+| Differing pixels | **3.79%** (36,368 of 960,000) |
 | Tolerance | any channel differing by more than 24/255 |
-| Painted (non-white) pixels, mocanvas | 163,726 |
+| Painted (non-white) pixels, mocanvas | 110,289 |
 | Painted (non-white) pixels, tldraw | 114,470 |
-| Painted-pixel overlap (IoU) | **56.4%** |
+| Painted-pixel overlap (IoU) | **79.1%** |
 
-**Read the overlap row, not the differing-pixels row.** "Differing pixels" is a poor headline for this
-comparison and moves in misleading ways: tldraw inks only about 12% of the canvas, so a render that draws
-too little scores well on it. The previous run is the proof — mocanvas painted *nothing* there and still
-scored 11.84% differing pixels, against 12.14% for the render that now draws the whole document — because a blank canvas
-disagrees only where tldraw drew something. mocanvas now paints in nearly the same places but with a
-different stroke, fill and font, so the union of disagreeing pixels stays about as large while the picture
-is enormously closer. The painted-pixel overlap (intersection over union) is the metric that reflects
-that: of every pixel either side inked, 56.4% were inked by both.
+**Read the overlap row, not the differing-pixels row.** "Differing pixels" is still a poor headline for
+this comparison, even now that it has fallen: tldraw inks only about 12% of the canvas, so a render that
+draws too little scores well on it. The two earlier runs are the proof — mocanvas painted *nothing* in the
+first and scored 11.84% differing pixels, then drew the whole document with the wrong fills and scored
+12.14%. Two renders that could hardly be less alike landed within 0.3 points of each other, because a
+blank canvas disagrees only where tldraw drew something. The painted-pixel overlap (intersection over
+union) separated them properly at the time (0.0% against 56.4%) and is still the metric to read here:
+of every pixel either side inked, 79.1% were inked by both.
+
+This run is the first where both rows agree: 3.79% differing at 79.1% overlap. The fill ramp was
+corrected between the two runs, which removed the large flat areas of disagreement inside every filled
+shape; what is left is mostly outline geometry, where mocanvas paints in nearly the same places as tldraw
+but with a different stroke and font. See the visible-differences list below for the breakdown.
 
 ### Load result
 
@@ -258,7 +283,7 @@ present on one side but not the other):
 - `binding arrow: unknown prop "snap"`
 - `draw: unknown prop "scaleX"`
 - `draw: unknown prop "scaleY"`
-- `draw: segment has no "points" array (encoded "path" is not decoded)`
+- `draw: segment uses the packed "path" form (decoded to "points" on load)`
 - `geo: unknown prop "flipX" (x7)`
 - `geo: unknown prop "flipY" (x7)`
 - `geo: unknown prop "richText" (x7)`
@@ -286,11 +311,12 @@ failed to read. Two of these entries are worth spelling out, because in the prev
    lacks. `normalizeLoadedRecords` (`packages/editor/src/records/normalize.ts`) now flattens `richText`
    into `text` while the records load. Before it did, this file threw
    `TypeError: Cannot read properties of undefined (reading 'trim')` and the page rendered nothing.
-2. **`draw: segment has no "points" array (encoded "path" is not decoded)`.** tldraw stores freehand
+2. **`draw: segment uses the packed "path" form (decoded to "points" on load)`.** tldraw stores freehand
    strokes as `segments[].path`, a base64-packed point buffer, rather than the older `segments[].points`
-   array. The same normalisation pass decodes it, which is why the freehand wave renders above — the
-   parenthetical in that message describes the old behaviour and is simply wrong now. The check has been
-   reworded in the bench page since this run; the line above is the wording that was recorded during it.
+   array. The same normalisation pass decodes it, which is why the freehand wave renders above. In the
+   run before the `.tldr` load fix this check read `segment has no "points" array (encoded "path" is
+   not decoded)`, and that was literally true then: the stroke was dropped. It is now a note about the
+   file's format, not a gap in mocanvas.
 
 The remaining warnings are benign: extra props mocanvas does not model
 (`flipX`/`flipY`, `scaleX`/`scaleY`, `kind`, `elbowMidPoint`, `textLastEditedBy`, `frame.color`,
@@ -301,88 +327,98 @@ The remaining warnings are benign: extra props mocanvas does not model
 _Written by hand from looking at the two screenshots, and kept in
 `apps/bench/results/visible-differences.md` so that re-running the bench does not overwrite it._
 
-Comparing `compare-tldraw.png` with `compare-mocanvas.png`. Both are now the same unmodified
-fixture rendered by each library — the previous version of this list was written against a
-down-converted ("shimmed") mocanvas render, next to a raw-file screenshot that was blank, and
-several of its entries no longer describe anything real.
+Comparing `compare-tldraw.png` with `compare-mocanvas.png`. Both are the same unmodified fixture
+rendered by each library. This list was re-measured on `ef4d079`, after the fill-ramp fix; the
+entry that used to head it — "fill strength", ~85% of the diff — is gone, and the list below is
+re-ordered accordingly.
 
 The percentages are measured, not guessed: differing pixels inside a box drawn around each shape,
 at the same tolerance as the headline number (any channel differing by more than 24/255), as a
-share of all differing pixels in the image. The boxes overlap where the shapes do — the bent arrow
-crosses both the rectangle and the ellipse — so the shares add up to slightly more than 100%.
+share of all differing pixels in the image (36,368). The boxes overlap where the shapes do — the
+bent arrow crosses both the rectangle and the ellipse — so the shares add up to slightly more than
+100%. They are shares of a diff that is now a third of its previous size, so a share that went *up*
+does not mean that difference got worse: every remaining cause grew as a fraction of a much smaller
+whole.
 
-1. **Fill strength — the five filled shapes hold about 85% of all differing pixels, and this is why.**
-   (Their boxes also contain those shapes' outlines and the arrow crossing them, so treat 85% as the
-   ceiling for this one cause rather than an exact share.) mocanvas's
-   fill ramp is about one step stronger than tldraw's at both fill levels, so the *interiors* of
-   filled shapes disagree over large areas while their outlines agree exactly.
-   - `fill: "solid"`: the red ellipse is `#e03131` in mocanvas against `#f4dadb` in tldraw; the
-     violet hexagon `#ae3ec9` against `#ecdcf2`. tldraw's "solid" is a pale tint of the colour;
-     mocanvas's is the colour itself.
-   - `fill: "semi"`: the blue rectangle is `#dce1f8` against `#fcfffe` — tldraw's semi fill is
-     indistinguishable from the white page. Same for the star (`#f9f0e6` vs `#fcfffe`) and both of
-     the frame's children.
-   - Share of the diff: rectangle 24.3%, frame (its two filled children) 23.5%, ellipse 20.0%,
-     hexagon 16.3%, star 3.2%.
-   - The stroke colours match exactly — scanning across the ellipse, both libraries put the same
-     `#e03131` ring in the same place. The previous list claimed mocanvas draws filled shapes with
-     no contrasting outline; that was wrong. The outline is drawn, it just vanishes into a fill of
-     its own colour, which is a consequence of this difference rather than a separate one.
+1. **Hand-drawn outline geometry — now the largest cause, roughly half the diff.** tldraw's default
+   `dash: "draw"` wobbles the outline, overshoots at corners, varies the stroke width, and rounds
+   every corner generously. mocanvas draws the exact polygon with a uniform stroke and sharp
+   vertices. Now that the fills agree, this is *all* that is left inside most of the filled shapes:
+   two rings of stroke that do not sit on the same pixels, around interiors that match exactly.
+   - Share of the diff: hexagon 15.8%, rectangle 11.6%, star 10.3%, ellipse 5.8%,
+     triangle 4.8%, line 3.0%, straight arrow 2.4%.
+   - The hexagon is the clearest case and the single largest region in the diff. The star is the
+     most extreme in relative terms: its box scores a region IoU of only 20.0%, because a `semi`
+     star is nothing but outline and tldraw rounds every one of its ten points.
+   - The rectangle's 11.6% is not all outline — about 3.5 points of it is the "Hello box" label
+     (see 5) and the bent arrow crosses the box (see 4). Its outline band alone is about 2.9%.
+   - Stroke *colours* match exactly: scanning across the ellipse, both libraries put the same
+     `#e03131` ring in the same place; the star's is `#f1ac4b` on both sides.
 
-2. **Hand-drawn outline geometry.** tldraw's default `dash: "draw"` wobbles the outline, overshoots
-   at corners, varies the stroke width, and rounds every corner generously — the hexagon is the
-   clearest case, and the rectangle and the star's points are rounded too. mocanvas draws the exact
-   polygon with a uniform stroke and sharp vertices. Because the rounding also cuts the silhouette
-   back at each vertex, this shows up in `compare-diff.png` as isolated wedges at the corners of
-   otherwise-agreeing shapes. Where there is no fill underneath it is cheap: triangle 1.5%, line
-   0.9%, straight arrow 0.7%.
+2. **Frame chrome. 14.6% of the diff, region IoU 47.8%.** tldraw's frame border is `#717171`;
+   mocanvas's is a lighter, bluer `#9fa8b2`, one pixel lower (the top edge lands on y=475 against
+   tldraw's y=474). The "Frame A" label is lighter in mocanvas and sits 2 px right and 3 px down of
+   tldraw's. The frame's two children contribute about 6.0% between them, and that is outline
+   geometry (cause 1), not fill: both children's interiors are `#fcfffe` in both renders.
 
-3. **Font weight.** Size, baseline and position now agree — "Hello box", "Sticky note", "Plain text
-   shape" and the frame label all sit where tldraw puts them, at the same size. What differs is the
-   face: tldraw's is heavier and slightly wider, so "Plain text shape" ends about 25 px earlier in
-   mocanvas. Text shape region: 2.2% of the diff, region IoU 25.5% (low because a glyph either
-   lands on a pixel or does not).
+3. **Note chrome. 11.1% of the diff at a region IoU of 95.9%**, on the largest single shape in the
+   fixture — the high IoU says the note is in the right place at the right size, and the 11.1% is
+   almost entirely colour. What is missing in mocanvas is the trim: tldraw draws a soft drop shadow
+   below the note (about 3.7% of the diff on its own; the strip below the body fades to `#e6e7e9`)
+   and a subtle top-to-bottom gradient on the body (`#f7dc99` at the top → `#fce19c` at the
+   bottom). mocanvas's body is a flat `#fce19c` — matching tldraw's *bottom* — with nothing beneath
+   it. The "Sticky note" label matches in position and size, and is marginally lighter.
 
-4. **The bound arrow terminates differently.** tldraw stops the bent arrow short of the rectangle it
-   is bound to, leaving a visible gap; mocanvas runs it to the shape's edge, so its arrowhead
-   overlaps the border. The arrowhead is also slightly larger and at a slightly different angle.
-   The bent-arrow box scores 8.2%, but it overlaps the rectangle and the ellipse, so most of that
-   number is really their fills.
+4. **The bound arrow terminates differently. 9.0%, region IoU 48.1%.** tldraw stops the bent arrow
+   short of the rectangle it is bound to, leaving a visible gap; mocanvas runs it to the shape's
+   edge, so its arrowhead overlaps the border. The arrowhead is also slightly larger and at a
+   slightly different angle. The bent-arrow box overlaps the rectangle and the ellipse, so part of
+   that 9.0% is their outlines.
 
-5. **Freehand stroke taper.** Both draw the same wave along the same curve (1.4% of the diff, region
-   IoU 48.8%). tldraw's stroke varies in width and tapers to a point at both ends (pressure
+5. **Font weight. Text shape region: 6.9% of the diff, region IoU 25.5%** (low because a glyph
+   either lands on a pixel or does not). Size, baseline and position agree — "Hello box", "Sticky
+   note", "Plain text shape" and the frame label all sit where tldraw puts them, at the same size.
+   What differs is the face: tldraw's is heavier and slightly wider, so "Plain text shape" ends at
+   x=523 in mocanvas against x=548 in tldraw — about 25 px earlier — and inks 1,237 dark pixels
+   against tldraw's 1,683.
+
+6. **Freehand stroke taper. 4.3% of the diff, region IoU 48.8%.** Both draw the same wave along the
+   same curve. tldraw's stroke varies in width and tapers to a point at both ends (pressure
    simulation); mocanvas's is uniform width, blunt at both ends, and marginally thinner overall.
 
-6. **Note chrome.** The note body colour and its label now match closely — 3.4% of the diff at a
-   region IoU of 95.9%, on the largest single shape in the fixture. What is missing in mocanvas is
-   the trim: tldraw draws a soft drop shadow below the note (fading `#c0c4c5` → `#f4f5f6` over about
-   12 px) and a subtle top-to-bottom gradient on the body (`#f7dc99` → `#fce19c`). mocanvas's body
-   is a flat `#fce19c` with nothing beneath it.
+7. **tldraw watermark. 1.9%, region IoU 0.0%.** tldraw paints a "Get a license for production" badge
+   in the bottom-right corner; mocanvas has nothing there. Not a rendering difference at all — and
+   it is a larger share of the diff than it used to be only because the diff shrank around it.
 
-7. **Frame chrome.** tldraw's frame border is `#717171`; mocanvas's is a lighter, bluer `#9fa8b2`,
-   one pixel lower. The "Frame A" label is lighter in mocanvas and sits a couple of pixels down and
-   to the right.
+8. **Framing.** Zoom-to-fit lands slightly differently: ignoring the watermark, mocanvas's ink
+   bounding box is 1136×708 px starting at (32, 46), against tldraw's 1142×712 starting at (29, 43)
+   — 3 px right, 3 px down, and 0.5% smaller. Every shape carries that offset, which widens every
+   edge in the diff a little. Part of the size difference is tldraw's hand-drawn overshoot spilling
+   past the true geometry.
 
-8. **tldraw watermark.** tldraw paints a "Get a license for production" badge in the bottom-right
-   corner; mocanvas has nothing there. 0.6% of the diff, and not a rendering difference at all.
+**Retired from this list** — these were real in earlier runs and are not differences any more:
 
-9. **Framing.** Zoom-to-fit lands slightly differently: mocanvas's ink bounding box starts 3 px
-   right and 3 px down of tldraw's and is 0.5% smaller. Every shape carries that offset, which
-   widens every edge in the diff a little. Part of the size difference is tldraw's hand-drawn
-   overshoot spilling past the true geometry.
-
-**Retired from this list** — these were real in the previous run and are not differences any more:
-
-- mocanvas rendered *nothing* from the unmodified file (it threw on `props.richText`). It now loads
-  and draws all 14 shapes.
+- **Fill strength (was #1, ~85% of the diff).** `getFillRgba`
+  (`packages/mocanvas/src/shapes/shape-theme.ts`, commit `ef4d079`) now maps `semi` to the paper
+  colour, `solid` to the hue's pale tint, and `fill` to the hue itself. Measured over the eroded
+  interior of each filled shape — well inside the outline, so no stroke pixels are counted — the
+  two renders are now byte-identical: the red ellipse is `#f4dadb` on both sides (9,374 px, 0.0%
+  differing), the violet hexagon `#ecdcf2` on both (7,448 px, 0.0%), the blue rectangle `#fcfffe`
+  on both (7,503 px, 0.0%), the star `#fcfffe` on both (1,672 px, 0.6% — that residue is the
+  hand-drawn outline of a point intruding into the sample box, not fill), and both of the frame's
+  children `#fcfffe` on both (0.0%). The ellipse's box, which the old list put at 20.0% of the
+  diff on a fill disagreement, is down to 5.8% at a region IoU of 96.7%. This single change took
+  the whole-image diff from 12.14% to 3.79% and the painted-pixel IoU from 56.4% to 79.1%.
+- mocanvas rendered *nothing* from the unmodified file (it threw on `props.richText`). It loads and
+  draws all 14 shapes.
 - The sticky note's "Sticky note" label was missing. It renders, at the right size and position.
-- The text shape's and the freehand stroke's content were only present in the shimmed render. Both
+- The text shape's and the freehand stroke's content were only present in a shimmed render. Both
   come from the raw file now.
 
 Everything else lines up: the page background (`#f9fafb` on both, exactly), the note body colour,
-every stroke colour, shape positions and sizes, the geo shape set, the bent arrow's binding to the
-rectangle, the straight arrow, the line's spline, the frame and both of its children, and the text
-shape's position.
+every fill colour, every stroke colour, shape positions and sizes, the geo shape set, the bent
+arrow's binding to the rectangle, the straight arrow, the line's spline, the frame and both of its
+children, and the text shape's position.
 
 ## Methodology
 

@@ -39,11 +39,11 @@ const FIXTURE = resolve(ROOT, "public/compare.tldr")
  * interesting comparison.
  */
 /**
- * Why the revision below is marked dirty. Hand-written per run, like PREVIOUS —
+ * Why a measured revision is marked dirty. Hand-written per run, like PREVIOUS —
  * check it still says something true before publishing a new report, and drop
- * it if the run was made from a clean tree.
+ * it if every run behind the report was made from a clean tree.
  */
-const RUN_NOTE = "The tree was checked clean at `15b670a` immediately before this run started, and the bundle is built once, before the first measurement — so a clean `15b670a` is what was measured. The `-dirty` marker comes from edits made after that build: to this report generator, and to UI code (selection handles, style panel, icons) committed by a concurrent session. Neither is in the bundle these numbers come from."
+const RUN_NOTE = "Why the performance tables' revision is marked dirty: the tree was checked clean at `15b670a` immediately before that run started, and the bundle is built once, before the first measurement — so a clean `15b670a` is what was measured. The `-dirty` marker comes from edits made after that build: to this report generator, and to UI code (selection handles, style panel, icons) committed by a concurrent session. Neither is in the bundle those numbers come from."
 
 const PREVIOUS = {
   date: "2026-09-04 08:30:07 UTC",
@@ -52,6 +52,31 @@ const PREVIOUS = {
   tldrawPanP95: { "1000:geo": 9.0, "5000:geo": 33.3, "20000:geo": 291.2, "1000:mixed": 9.2, "5000:mixed": 33.4, "20000:mixed": 283.3 },
   compare: { loaded: false, diffPercent: 11.84, inkPixelsMocanvas: 0, inkOverlapPercent: 0 },
 }
+
+/**
+ * The rendering comparison as it stood at `15b670a` — after the `.tldr` load fix
+ * (so mocanvas drew the whole document) but before the fill-ramp fix in
+ * `ef4d079`. Kept so the comparison table can show all three points: nothing
+ * drawn → drawn with the wrong fills → drawn with the right ones. Hand-copied
+ * from the `docs/BENCHMARK.md` generated at 2026-09-04 09:26:29 UTC (git `15b670a-dirty`).
+ */
+const PREVIOUS_COMPARE = {
+  git: "15b670a-dirty",
+  loaded: true,
+  diffPercent: 12.14,
+  inkPixelsMocanvas: 163726,
+  inkOverlapPercent: 56.4,
+}
+
+/**
+ * Where the performance matrix in `latest.json` came from, for the case where
+ * this report is a mix: the rendering comparison re-measured on a later commit,
+ * the performance matrix carried over from an earlier run (`--skip-perf`, then
+ * the previous `matrix` merged back in). Set `mixedRun: true` in `latest.json`
+ * to turn the provenance note on; drop both once a full run supersedes it.
+ */
+const PERF_RUN = { date: "2026-09-04 09:26:29 UTC", git: "15b670a-dirty" }
+const MIXED_RUN_NOTE = "**The two halves of this report were measured at different times.** The rendering comparison was re-measured after the fill-ramp fix; the performance tables were **not** re-run — they are unchanged from the earlier run listed under Environment, and nothing below claims they were."
 
 // ---------------------------------------------------------------------------
 // args
@@ -296,6 +321,13 @@ function renderDoc(data) {
   md.push("camera path, and the same hit-test sample points. Frame times are frame-to-frame `requestAnimationFrame`")
   md.push("deltas recorded while a camera animation runs (zoom to fit → zoom in 4× → horizontal pan sweep → zoom back out).")
   md.push("")
+  if (data.mixedRun) {
+    md.push(`> ${MIXED_RUN_NOTE}`)
+    md.push(">")
+    md.push(`> Rendering comparison: measured ${date}, git \`${versions.git}\`.`)
+    md.push(`> Performance tables: measured ${PERF_RUN.date}, git \`${PERF_RUN.git}\`.`)
+    md.push("")
+  }
 
   if (matrix?.mocanvas) {
     md.push("## What changed since the previous run")
@@ -305,7 +337,7 @@ function renderDoc(data) {
     md.push("- **`.tldr` loading was fixed.** `normalizeLoadedRecords` (`packages/editor/src/records/normalize.ts`)")
     md.push("  now maps `props.richText` onto `props.text` and decodes packed freehand `segments[].path` into")
     md.push("  `segments[].points` while records are loaded. The previous run could not open the tldraw-authored")
-    md.push("  fixture at all — it threw and left a blank canvas — so the rendering comparison below was measured")
+    md.push("  fixture at all — it threw and left a blank canvas — so *that run\u2019s* rendering comparison was measured")
     md.push("  against nothing. mocanvas now loads and draws the unmodified file.")
     md.push("- **Renderer.** A per-frame tessellation budget (256 shapes), frame reuse keyed on scene epoch + zoom")
     md.push("  bucket + viewport containment, and LOD hysteresis. All three target the same thing: the long frames")
@@ -344,18 +376,34 @@ function renderDoc(data) {
     md.push("within a single browser session: it puts the p95 improvement at 16–31% between 5,000 and 20,000 shapes.")
     md.push("")
     if (compare?.ok && !compare.diff?.error) {
-      const before = PREVIOUS.compare
-      md.push("Rendering comparison against the same `.tldr` fixture:")
+      const first = PREVIOUS.compare
+      const mid = PREVIOUS_COMPARE
+      md.push("Rendering comparison against the same `.tldr` fixture. It has three points now, and only the last")
+      md.push("column was measured by the run at the top of this file — see the note above about the two halves of")
+      md.push("this report:")
       md.push("")
-      md.push("| | before | after |")
-      md.push("| :--- | :--- | :--- |")
-      md.push(`| mocanvas loaded the file | ${before.loaded ? "yes" : "no — threw on `props.richText`"} | ${compare.loads.mocanvas.ok ? "yes" : `no — ${compare.loads.mocanvas.error}`} |`)
-      md.push(`| Painted pixels, mocanvas | ${int(before.inkPixelsMocanvas)} | ${int(compare.diff.inkPixelsMocanvas)} |`)
-      md.push(`| Painted-pixel overlap (IoU) | ${fmt(before.inkOverlapPercent, 1)}% | **${fmt(compare.diff.inkOverlapPercent, 1)}%** |`)
-      md.push(`| Differing pixels | ${fmt(before.diffPercent, 2)}% | ${fmt(compare.diff.diffPercent, 2)}% |`)
+      md.push(`| | \`${PREVIOUS.git}\` (before the .tldr fix) | \`${mid.git}\` (before the fill fix) | \`${versions.git}\` (now) |`)
+      md.push("| :--- | :--- | :--- | :--- |")
+      md.push(`| mocanvas loaded the file | ${first.loaded ? "yes" : "no — threw on `props.richText`"} | ${mid.loaded ? "yes" : "no"} | ${compare.loads.mocanvas.ok ? "yes" : `no — ${compare.loads.mocanvas.error}`} |`)
+      md.push(`| Painted pixels, mocanvas | ${int(first.inkPixelsMocanvas)} | ${int(mid.inkPixelsMocanvas)} | ${int(compare.diff.inkPixelsMocanvas)} |`)
+      md.push(`| Painted-pixel overlap (IoU) | ${fmt(first.inkOverlapPercent, 1)}% | ${fmt(mid.inkOverlapPercent, 1)}% | **${fmt(compare.diff.inkOverlapPercent, 1)}%** |`)
+      md.push(`| Differing pixels | ${fmt(first.diffPercent, 2)}% | ${fmt(mid.diffPercent, 2)}% | **${fmt(compare.diff.diffPercent, 2)}%** |`)
       md.push("")
-      md.push("The differing-pixel row is the one that reads backwards, and it is worth understanding before")
-      md.push("quoting either number — see [the note under the comparison](#rendering-comparison).")
+      md.push("**The fill fix helped, and by a lot.** `getFillRgba` (`packages/mocanvas/src/shapes/shape-theme.ts`)")
+      md.push("was mapping `fill: \"solid\"` onto the palette hue itself and `fill: \"semi\"` onto a tint of it — one step")
+      md.push("stronger than tldraw at both levels. It now maps `semi` to the paper colour, `solid` to the hue's pale")
+      md.push("tint, and `fill` to the hue. Measured over the eroded interior of each filled shape, the two renders")
+      md.push("are now identical pixel for pixel: the red ellipse is `#f4dadb` on both sides, the violet hexagon")
+      md.push("`#ecdcf2`, and the blue rectangle, the star and both of the frame's children `#fcfffe`.")
+      md.push("")
+      md.push(`The painted-pixel count falling (${int(mid.inkPixelsMocanvas)} → ${int(compare.diff.inkPixelsMocanvas)}, against tldraw's ${int(compare.diff.inkPixelsTldraw)}) is that fix working, not a`)
+      md.push("regression: a `semi` fill is *supposed* to leave the paper alone, so those pixels correctly stop")
+      md.push("counting as ink. mocanvas now inks slightly less than tldraw rather than substantially more.")
+      md.push("")
+      md.push("The differing-pixel row is still the one that reads backwards, and it is worth understanding before")
+      md.push("quoting either number — see [the note under the comparison](#rendering-comparison). Note in particular")
+      md.push(`that it barely moved between the first two columns (${fmt(first.diffPercent, 2)}% → ${fmt(mid.diffPercent, 2)}%) across the change that took`)
+      md.push("mocanvas from drawing nothing at all to drawing the whole document.")
       md.push("")
     }
   }
@@ -364,7 +412,7 @@ function renderDoc(data) {
   md.push("")
   md.push("| | |")
   md.push("| :--- | :--- |")
-  md.push(`| Date | ${date} |`)
+  md.push(`| Date | ${date}${data.mixedRun ? " (rendering comparison; performance tables measured " + PERF_RUN.date + ")" : ""} |`)
   md.push(`| Machine | ${machine.cpu}, ${machine.cores} cores, ${machine.memoryGB} GB |`)
   md.push(`| OS | ${machine.os} |`)
   md.push(`| Node | ${machine.node} |`)
@@ -374,12 +422,12 @@ function renderDoc(data) {
   md.push(`| WebGL2 renderer | ${browser.gpu.renderer} |`)
   md.push(`| Rasterisation | ${browser.software ? "**software (SwiftShader)** — no hardware GPU in this environment" : "hardware"} |`)
   md.push(`| tldraw | ${versions.tldraw} |`)
-  md.push(`| mocanvas | ${versions.mocanvas} (this repo, ${versions.git}) |`)
+  md.push(`| mocanvas | ${versions.mocanvas} (this repo, ${versions.git}${data.mixedRun ? "; performance tables measured at " + PERF_RUN.git : ""}) |`)
   md.push(`| Builds | production (\`vite build\`, minified, \`NODE_ENV=production\`) for both |`)
   md.push(`| Viewport | ${VIEWPORT.width}×${VIEWPORT.height} CSS px, device scale 1 |`)
   md.push(`| Matrix | N ∈ {${ns.join(", ")}} × kind ∈ {${kinds.join(", ")}}, ${repeats} repeats, medians reported |`)
   md.push("")
-  if (String(versions.git).endsWith("-dirty") && RUN_NOTE) {
+  if ((String(versions.git).endsWith("-dirty") || (data.mixedRun && String(PERF_RUN.git).endsWith("-dirty"))) && RUN_NOTE) {
     md.push(`_${RUN_NOTE}_`)
     md.push("")
   }
@@ -492,14 +540,19 @@ function renderDoc(data) {
       md.push(`| Painted (non-white) pixels, tldraw | ${int(compare.diff.inkPixelsTldraw)} |`)
       md.push(`| Painted-pixel overlap (IoU) | **${compare.diff.inkOverlapPercent.toFixed(1)}%** |`)
       md.push("")
-      md.push("**Read the overlap row, not the differing-pixels row.** \"Differing pixels\" is a poor headline for this")
-      md.push("comparison and moves in misleading ways: tldraw inks only about 12% of the canvas, so a render that draws")
-      md.push("too little scores well on it. The previous run is the proof — mocanvas painted *nothing* there and still")
-      md.push(`scored 11.84% differing pixels, against ${compare.diff.diffPercent.toFixed(2)}% for the render that now draws the whole document — because a blank canvas`)
-      md.push("disagrees only where tldraw drew something. mocanvas now paints in nearly the same places but with a")
-      md.push("different stroke, fill and font, so the union of disagreeing pixels stays about as large while the picture")
-      md.push("is enormously closer. The painted-pixel overlap (intersection over union) is the metric that reflects")
-      md.push(`that: of every pixel either side inked, ${compare.diff.inkOverlapPercent.toFixed(1)}% were inked by both.`)
+      md.push("**Read the overlap row, not the differing-pixels row.** \"Differing pixels\" is still a poor headline for")
+      md.push("this comparison, even now that it has fallen: tldraw inks only about 12% of the canvas, so a render that")
+      md.push("draws too little scores well on it. The two earlier runs are the proof — mocanvas painted *nothing* in the")
+      md.push("first and scored 11.84% differing pixels, then drew the whole document with the wrong fills and scored")
+      md.push("12.14%. Two renders that could hardly be less alike landed within 0.3 points of each other, because a")
+      md.push("blank canvas disagrees only where tldraw drew something. The painted-pixel overlap (intersection over")
+      md.push("union) separated them properly at the time (0.0% against 56.4%) and is still the metric to read here:")
+      md.push(`of every pixel either side inked, ${compare.diff.inkOverlapPercent.toFixed(1)}% were inked by both.`)
+      md.push("")
+      md.push(`This run is the first where both rows agree: ${compare.diff.diffPercent.toFixed(2)}% differing at ${compare.diff.inkOverlapPercent.toFixed(1)}% overlap. The fill ramp was`)
+      md.push("corrected between the two runs, which removed the large flat areas of disagreement inside every filled")
+      md.push("shape; what is left is mostly outline geometry, where mocanvas paints in nearly the same places as tldraw")
+      md.push("but with a different stroke and font. See the visible-differences list below for the breakdown.")
       md.push("")
     }
     md.push("### Load result")
@@ -545,11 +598,12 @@ function renderDoc(data) {
       md.push("   lacks. `normalizeLoadedRecords` (`packages/editor/src/records/normalize.ts`) now flattens `richText`")
       md.push("   into `text` while the records load. Before it did, this file threw")
       md.push("   `TypeError: Cannot read properties of undefined (reading 'trim')` and the page rendered nothing.")
-      md.push("2. **`draw: segment has no \"points\" array (encoded \"path\" is not decoded)`.** tldraw stores freehand")
+      md.push("2. **`draw: segment uses the packed \"path\" form (decoded to \"points\" on load)`.** tldraw stores freehand")
       md.push("   strokes as `segments[].path`, a base64-packed point buffer, rather than the older `segments[].points`")
-      md.push("   array. The same normalisation pass decodes it, which is why the freehand wave renders above — the")
-      md.push("   parenthetical in that message describes the old behaviour and is simply wrong now. The check has been")
-      md.push("   reworded in the bench page since this run; the line above is the wording that was recorded during it.")
+      md.push("   array. The same normalisation pass decodes it, which is why the freehand wave renders above. In the")
+      md.push("   run before the `.tldr` load fix this check read `segment has no \"points\" array (encoded \"path\" is")
+      md.push("   not decoded)`, and that was literally true then: the stroke was dropped. It is now a note about the")
+      md.push("   file's format, not a gap in mocanvas.")
       md.push("")
       md.push("The remaining warnings are benign: extra props mocanvas does not model")
       md.push("(`flipX`/`flipY`, `scaleX`/`scaleY`, `kind`, `elbowMidPoint`, `textLastEditedBy`, `frame.color`,")
