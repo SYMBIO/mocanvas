@@ -98,7 +98,13 @@ export function Canvas({ editor, className, style, children, components }: Canva
       raf = 0
       if (!dirty) return
       dirty = false
-      editor.renderFrame(backend)
+      // Shapes that entered the viewport may still be waiting on the engine's
+      // per-frame tessellation budget, drawn as flat quads until their turn comes.
+      // Keep the loop alive until that backlog clears.
+      if (editor.renderFrame(backend).pending) {
+        dirty = true
+        raf = requestAnimationFrame(draw)
+      }
     }
     const stop = reactSignal(
       "canvas.frame",

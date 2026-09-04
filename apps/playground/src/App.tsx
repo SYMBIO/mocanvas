@@ -1,5 +1,6 @@
 import { createShapeId, downloadBlob, exportToBlob, loadMocanvasFile, Mocanvas, serializeMocanvasFile, type Editor, type GeoShape, type GeoShapeKind, type ShapeCreate } from "mocanvas"
-import { useRef, useState } from "react"
+import { CollaboratorCursors, createBroadcastChannelTransport, useSync } from "@mocanvas/sync"
+import { useCallback, useRef, useState } from "react"
 
 const COLORS = ["black", "grey", "light-violet", "violet", "blue", "light-blue", "yellow", "orange", "green", "light-green", "light-red", "red"] as const
 const GEOS: GeoShapeKind[] = ["rectangle", "ellipse", "triangle", "diamond", "hexagon", "star"]
@@ -34,16 +35,23 @@ function stress(editor: Editor, n: number) {
   return t1 - t0
 }
 
+const ROOM_ID = new URLSearchParams(location.search).get("room") ?? "playground"
+
 export function App() {
   const editorRef = useRef<Editor | null>(null)
+  const [editor, setEditor] = useState<Editor | null>(null)
   const [msg, setMsg] = useState("")
   const fileRef = useRef<HTMLInputElement>(null)
+  // Same-origin tabs share a room over a BroadcastChannel; open a second tab to try it.
+  const transport = useCallback(() => createBroadcastChannelTransport(ROOM_ID), [])
+  const { status } = useSync(editor, { roomId: ROOM_ID, transport })
 
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       <Mocanvas
         onMount={(editor) => {
           editorRef.current = editor
+          setEditor(editor)
           ;(window as unknown as { editor: Editor }).editor = editor
           if (editor.getCurrentPageShapeIds().size === 0) {
             editor.createShapes([
@@ -162,7 +170,14 @@ export function App() {
             }}
           />
           <span style={{ color: "#6b7280" }}>{msg}</span>
+          <span
+            title={`Collaboration room "${ROOM_ID}" — open this page in a second tab to see the other cursor`}
+            style={{ color: status === "online" ? "#059669" : "#9ca3af" }}
+          >
+            ● {status}
+          </span>
         </div>
+        {editor ? <CollaboratorCursors editor={editor} /> : null}
       </Mocanvas>
     </div>
   )

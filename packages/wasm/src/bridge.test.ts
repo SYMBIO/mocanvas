@@ -23,6 +23,9 @@ describe("EngineBridge", () => {
     expect(bridge.cmd.flush()).toBe(300)
     expect(bridge.shapeCount).toBe(100)
 
+    // The engine builds for a slightly padded viewport so small camera moves can
+    // reuse the buffers; at this scale the pad (125 page units) still stops short of
+    // shape 6 at x = 1200.
     const f = bridge.frame({ x: 0, y: 0, z: 1 }, 1000, 500)
     expect(f.drawn).toBe(5)
     expect(f.culled).toBe(95)
@@ -136,5 +139,73 @@ describe("EngineBridge", () => {
       { firstIndex: 24, indexCount: 6, texture: 0, clip: [300, 100, 500, 300] },
     ])
     expect(EngineBridge.readOverlay(f.overlay)).toEqual([{ handle: 6, x: 210, y: 10, w: 20, h: 20, rotation: 0, clip: frameClip }])
+  })
+
+  it("reports the frame buffers unchanged when only the camera moved", () => {
+    // Pad the build the way a hardware-GPU host would, so a small pan can reuse it.
+    bridge.setViewportPad(0.25)
+    bridge.cmd.clear()
+    for (let h = 1; h <= 20; h++) {
+      bridge.cmd.upsert(h, 1, 0, h, 0, 0, h * 200, 0, 0, 100, 100)
+      bridge.cmd.setGeometry(h, rectPath(100, 100))
+      bridge.cmd.setStyle(h, solid)
+    }
+    bridge.cmd.flush()
+
+    const first = bridge.frame({ x: 0, y: 0, z: 1 }, 1000, 500, 0)
+    expect(first.dirty).toBe(true)
+    expect(first.pending).toBe(false)
+    const version = first.version
+    const indices = Array.from(first.indices)
+
+    // Same camera: nothing to rebuild, and the same object (views included) comes back.
+    const again = bridge.frame({ x: 0, y: 0, z: 1 }, 1000, 500, 0)
+    expect(again.dirty).toBe(false)
+    expect(again.version).toBe(version)
+    expect(again).toBe(first)
+
+    // A pan inside the padded box still reuses the build.
+    const nudged = bridge.frame({ x: -60, y: 0, z: 1 }, 1000, 500, 0)
+    expect(nudged.dirty).toBe(false)
+    expect(nudged.version).toBe(version)
+    expect(Array.from(nudged.indices)).toEqual(indices)
+
+    // A pan past it rebuilds, and so does any scene change.
+    const panned = bridge.frame({ x: -900, y: 0, z: 1 }, 1000, 500, 0)
+    expect(panned.dirty).toBe(true)
+    expect(panned.version).toBeGreaterThan(version)
+
+    bridge.cmd.setStyle(1, { ...solid, fill: 0x00ff00ff })
+    bridge.cmd.flush()
+    const restyled = bridge.frame({ x: -900, y: 0, z: 1 }, 1000, 500, 0)
+    expect(restyled.dirty).toBe(true)
+    expect(restyled.version).toBeGreaterThan(panned.version)
+    bridge.setViewportPad(0)
+  })
+
+  it("defers shapes over the tessellation budget to later frames", () => {
+    bridge.cmd.clear()
+    for (let h = 1; h <= 4; h++) {
+      bridge.cmd.upsert(h, 1, 0, h, 0, 0, h * 200, 0, 0, 100, 100)
+      bridge.cmd.setGeometry(h, rectPath(100, 100))
+      bridge.cmd.setStyle(h, solid)
+    }
+    bridge.cmd.flush()
+
+    const first = bridge.frame({ x: 0, y: 0, z: 1 }, 1000, 500, 1)
+    expect(first.pending).toBe(true)
+    // Deferred shapes are still drawn — as flat quads, not as gaps.
+    expect(first.drawn).toBe(4)
+
+    let frames = 1
+    let f = first
+    while (f.pending && frames < 16) {
+      f = bridge.frame({ x: 0, y: 0, z: 1 }, 1000, 500, 1)
+      frames++
+    }
+    expect(f.pending).toBe(false)
+    expect(frames).toBe(4)
+    // Backlog cleared: the frame is cacheable again.
+    expect(bridge.frame({ x: 0, y: 0, z: 1 }, 1000, 500, 1).dirty).toBe(false)
   })
 })

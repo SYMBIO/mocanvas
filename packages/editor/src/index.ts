@@ -19,6 +19,7 @@ export * from "./geometry"
 export * from "./records/base"
 export * from "./records/binding"
 export * from "./records/asset"
+export * from "./records/presence"
 export * from "./records/normalize"
 export * from "./bindings/BindingUtil"
 export {

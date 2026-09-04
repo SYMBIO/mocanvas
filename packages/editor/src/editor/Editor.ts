@@ -71,6 +71,7 @@ import {
 } from "./events"
 import { HandleTable } from "./HandleTable"
 import { bucketTextureResolution, TextureManager } from "./TextureManager"
+import { createUserPreferences, type InstancePresence, type UserPreferences } from "../records/presence"
 import { getStylePropsOf, SharedStyleMap, type StyleProp } from "../records/styleProp"
 import { HistoryManager } from "./HistoryManager"
 import { SnapManager } from "./SnapManager"
@@ -2232,6 +2233,29 @@ export class Editor extends EventEmitter<EditorEvents> {
     const handler = this.externalAssetHandlers.get(info.type)
     if (!handler) return undefined
     return await handler(info)
+  }
+
+  // ---- presence ----------------------------------------------------------
+  // Everything below is about other people in the same document. It is kept in
+  // one block so the collaboration layer (`@mocanvas/sync`) has a single seam.
+
+  /**
+   * The local person's identity: a random id for this session plus a name and
+   * a colour that can be changed at any time. Session-only, never persisted.
+   */
+  readonly user: UserPreferences = createUserPreferences()
+
+  /** Presence records of everyone else in the room, in arrival order. */
+  getCollaborators(): InstancePresence[] {
+    const me = this.user.getId()
+    const records = this.store.query.records("instance_presence").get()
+    return records.filter((p) => p.userId !== me)
+  }
+
+  /** The subset of `getCollaborators()` looking at the page we are on. */
+  getCollaboratorsOnCurrentPage(): InstancePresence[] {
+    const pageId = this.getCurrentPageId()
+    return this.getCollaborators().filter((p) => p.currentPageId === pageId)
   }
 }
 

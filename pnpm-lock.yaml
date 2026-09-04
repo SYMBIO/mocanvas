@@ -66,6 +66,9 @@ importers:
       '@mocanvas/store':
         specifier: workspace:*
         version: link:../../packages/store
+      '@mocanvas/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
       mocanvas:
         specifier: workspace:*
         version: link:../../packages/mocanvas
@@ -187,6 +190,31 @@ importers:
       nanoid:
         specifier: ^5.1.0
         version: 5.1.16
+
+  packages/sync:
+    dependencies:
+      '@mocanvas/editor':
+        specifier: workspace:*
+        version: link:../editor
+      '@mocanvas/state':
+        specifier: workspace:*
+        version: link:../state
+      '@mocanvas/store':
+        specifier: workspace:*
+        version: link:../store
+    devDependencies:
+      '@types/react':
+        specifier: ^19.1.0
+        version: 19.2.18
+      '@types/ws':
+        specifier: ^8.5.0
+        version: 8.18.1
+      react:
+        specifier: ^19.1.0
+        version: 19.2.8
+      ws:
+        specifier: ^8.18.0
+        version: 8.21.3
 
   packages/wasm: {}
 
@@ -1549,6 +1577,9 @@ packages:
 
   '@types/use-sync-external-store@0.0.6':
     resolution: {integrity: sha512-zFDAD+tlpf2r4asuHEj0XH6pY6i0g5NeAHPn+15wk3BV6JA69eERFXC1gyGThDkVa1zCyKr5jox1+2LbV/AMLg==}
+
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
   '@vitejs/plugin-react@5.2.0':
     resolution: {integrity: sha512-YmKkfhOAi3wsB1PhJq5Scj3GXMn3WvtQ/JC0xoopuHoXSdmtdStOpFrYaT1kie2YgFBcIe64ROzMYRjCrYOdYw==}
@@ -3599,6 +3630,10 @@ snapshots:
       csstype: 3.2.3
 
   '@types/use-sync-external-store@0.0.6': {}
+
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 24.13.3
 
   '@vitejs/plugin-react@5.2.0(vite@7.3.6(@types/node@24.13.3))':
     dependencies:

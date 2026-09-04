@@ -73,6 +73,13 @@ export class WebGL2Backend implements RenderBackend {
   private readonly textures = new Map<number, WebGLTexture>()
   private vboBytes = 0
   private iboBytes = 0
+  /**
+   * `FrameBuffers.version` currently sitting in the VBO/IBO, or -1 when they hold
+   * nothing usable. The engine's vertex data is page-space, so panning and zooming
+   * change only the camera uniform: while the version is unchanged this skips the
+   * (multi-megabyte, at scale) `bufferSubData` and just re-issues the draw calls.
+   */
+  private uploadedVersion = -1
   private width = 1
   private height = 1
   private pixelWidth = 1
@@ -215,21 +222,24 @@ export class WebGL2Backend implements RenderBackend {
     gl.uniform2f(this.uVp, this.width, this.height)
     gl.bindVertexArray(this.vao)
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo)
-    const vBytes = frame.vertices.byteLength
-    if (vBytes > this.vboBytes) {
-      this.vboBytes = Math.max(vBytes, this.vboBytes * 2)
-      gl.bufferData(gl.ARRAY_BUFFER, this.vboBytes, gl.DYNAMIC_DRAW)
-    }
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, frame.vertices)
+    if (frame.version !== this.uploadedVersion) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo)
+      const vBytes = frame.vertices.byteLength
+      if (vBytes > this.vboBytes) {
+        this.vboBytes = Math.max(vBytes, this.vboBytes * 2)
+        gl.bufferData(gl.ARRAY_BUFFER, this.vboBytes, gl.DYNAMIC_DRAW)
+      }
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, frame.vertices)
 
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibo)
-    const iBytes = frame.indices.byteLength
-    if (iBytes > this.iboBytes) {
-      this.iboBytes = Math.max(iBytes, this.iboBytes * 2)
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.iboBytes, gl.DYNAMIC_DRAW)
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibo)
+      const iBytes = frame.indices.byteLength
+      if (iBytes > this.iboBytes) {
+        this.iboBytes = Math.max(iBytes, this.iboBytes * 2)
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.iboBytes, gl.DYNAMIC_DRAW)
+      }
+      gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, frame.indices)
+      this.uploadedVersion = frame.version
     }
-    gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, frame.indices)
 
     // Scissor rects arrive top-down in device px; GL scissor is bottom-left based.
     const ph = this.pixelHeight

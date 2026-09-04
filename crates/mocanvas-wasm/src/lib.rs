@@ -194,13 +194,61 @@ impl Engine {
 
     /// Build the frame for a camera (`cx, cy` page offset, `zoom`) and viewport size in
     /// screen pixels. Afterwards read the buffers through the `*_ptr`/`*_len` getters.
-    pub fn frame(&mut self, cam_x: f32, cam_y: f32, zoom: f32, vp_w: f32, vp_h: f32) {
+    ///
+    /// The buffers are page-space, so they do not depend on the camera: when the scene
+    /// is unchanged and the camera has only moved a little, this reuses the previous
+    /// build, leaves the buffers alone and reports [`Engine::frame_dirty`] `false` — the
+    /// host can then skip re-uploading them and just redraw with the new camera uniform.
+    ///
+    /// `tess_budget` caps how many shapes may be tessellated in this call (0 = no cap);
+    /// the rest are drawn as level-of-detail quads until a later frame catches up, with
+    /// [`Engine::frame_pending`] set meanwhile.
+    pub fn frame(&mut self, cam_x: f32, cam_y: f32, zoom: f32, vp_w: f32, vp_h: f32, tess_budget: usize) {
         let z = zoom.max(1e-6);
         // screen = (page + cam) * zoom  →  page = screen / zoom - cam
         let min = Vec2::new(-cam_x, -cam_y);
         let max = Vec2::new(vp_w / z - cam_x, vp_h / z - cam_y);
         let vp = Box2d::new(min, max).expand(1.0 / z);
-        self.renderer.frame(&mut self.scene, &vp, z);
+        let budget = if tess_budget == 0 { usize::MAX } else { tess_budget };
+        self.renderer.frame(&mut self.scene, &vp, z, budget);
+    }
+
+    /// Whether the last [`Engine::frame`] rebuilt the buffers. When false the pointers,
+    /// lengths and contents are exactly what the previous frame produced.
+    pub fn frame_dirty(&self) -> bool {
+        self.renderer.frame_dirty()
+    }
+
+    /// Counter bumped on every rebuild. A host that has uploaded version `v` can skip
+    /// the upload for as long as this still reads `v`.
+    pub fn frame_version(&self) -> f64 {
+        self.renderer.frame_version() as f64
+    }
+
+    /// Whether shapes are still waiting on the tessellation budget and are meanwhile
+    /// drawn as quads. The host should keep scheduling frames while this is true.
+    pub fn frame_pending(&self) -> bool {
+        self.renderer.tessellation_pending()
+    }
+
+    /// The default per-frame tessellation budget.
+    pub fn default_tess_budget() -> usize {
+        mocanvas_render::DEFAULT_TESS_BUDGET
+    }
+
+    /// Grow the box each frame is built for by `pad` (a fraction of the viewport size)
+    /// on every side, so a camera panning inside that margin reuses the build instead
+    /// of re-tessellating and re-uploading. Defaults to
+    /// `mocanvas_render::DEFAULT_VIEWPORT_PAD` — see `Renderer::set_viewport_pad` for
+    /// the trade-off, which depends on how expensive the host's rasteriser makes
+    /// geometry relative to uploads.
+    pub fn set_viewport_pad(&mut self, pad: f32) {
+        self.renderer.set_viewport_pad(pad);
+    }
+
+    /// The current viewport pad.
+    pub fn viewport_pad(&self) -> f32 {
+        self.renderer.viewport_pad()
     }
 
     /// Pointer to interleaved `x y u v r g b a` f32 vertices (8 per vertex).

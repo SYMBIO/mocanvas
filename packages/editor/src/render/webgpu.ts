@@ -106,6 +106,8 @@ export class WebGPUBackend implements RenderBackend {
   private ibo: GPUBuffer | null = null
   private vboBytes = 0
   private iboBytes = 0
+  /** `FrameBuffers.version` already written into the vertex/index buffers, or -1. */
+  private uploadedVersion = -1
   private width = 1
   private height = 1
   private pixelWidth = 1
@@ -267,12 +269,19 @@ export class WebGPUBackend implements RenderBackend {
       u[4] = this.width
       u[5] = this.height
       device.queue.writeBuffer(this.uniforms, 0, u)
+      const before = [this.vbo, this.ibo]
       ;[this.vbo, this.vboBytes] = this.ensureBuffer(this.vbo, this.vboBytes, frame.vertices.byteLength, GPUBufferUsage.VERTEX, "mocanvas vertices")
       ;[this.ibo, this.iboBytes] = this.ensureBuffer(this.ibo, this.iboBytes, frame.indices.byteLength, GPUBufferUsage.INDEX, "mocanvas indices")
-      // Views over WASM memory: pass the backing buffer with explicit offsets so the
-      // typed-array's `ArrayBufferLike` generic does not fight the WebGPU types.
-      device.queue.writeBuffer(this.vbo, 0, frame.vertices.buffer as ArrayBuffer, frame.vertices.byteOffset, frame.vertices.byteLength)
-      device.queue.writeBuffer(this.ibo, 0, frame.indices.buffer as ArrayBuffer, frame.indices.byteOffset, frame.indices.byteLength)
+      // The vertex data is page-space and the camera lives in the uniform buffer, so
+      // a frame the engine did not rebuild is already on the GPU: only the uniform
+      // above has to change. Reallocated buffers always need re-filling.
+      if (frame.version !== this.uploadedVersion || this.vbo !== before[0] || this.ibo !== before[1]) {
+        // Views over WASM memory: pass the backing buffer with explicit offsets so the
+        // typed-array's `ArrayBufferLike` generic does not fight the WebGPU types.
+        device.queue.writeBuffer(this.vbo, 0, frame.vertices.buffer as ArrayBuffer, frame.vertices.byteOffset, frame.vertices.byteLength)
+        device.queue.writeBuffer(this.ibo, 0, frame.indices.buffer as ArrayBuffer, frame.indices.byteOffset, frame.indices.byteLength)
+        this.uploadedVersion = frame.version
+      }
 
       pass.setPipeline(this.pipeline)
       pass.setVertexBuffer(0, this.vbo)

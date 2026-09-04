@@ -85,6 +85,20 @@ export interface FrameBuffers {
   overlay: Uint32Array
   drawn: number
   culled: number
+  /**
+   * Build counter, bumped only when the buffers are rebuilt. The vertex data is
+   * page-space and the camera is a shader uniform, so a moving camera alone does
+   * not change it: a backend that has already uploaded version `v` can skip the
+   * upload for as long as this reads `v`.
+   */
+  version: number
+  /** Whether the call that produced this frame rebuilt the buffers. */
+  dirty: boolean
+  /**
+   * Shapes were deferred by the per-frame tessellation budget and are drawn as
+   * flat placeholder quads meanwhile. Keep scheduling frames until this is false.
+   */
+  pending: boolean
 }
 
 export interface Batch {
@@ -275,12 +289,21 @@ export class CommandWriter {
 /** High-level wrapper: owns the engine, the command writer, and typed views. */
 export class EngineBridge {
   readonly cmd: CommandWriter
+  /**
+   * Shapes the engine may tessellate in one `frame()` call; the rest are drawn as
+   * level-of-detail quads and picked up by later frames, which keeps a viewport
+   * full of never-seen shapes from stalling on one frame. Read from the engine so
+   * `mocanvas_render::DEFAULT_TESS_BUDGET` stays the single source of truth.
+   */
+  tessBudget: number
+  private lastFrame: FrameBuffers | null = null
 
   constructor(
     readonly engine: Engine,
     readonly memory: WebAssembly.Memory,
   ) {
     this.cmd = new CommandWriter(engine, memory)
+    this.tessBudget = Engine.default_tess_budget()
   }
 
   get shapeCount(): number {
@@ -291,18 +314,41 @@ export class EngineBridge {
     return this.engine.epoch()
   }
 
-  frame(cam: CameraState, viewportW: number, viewportH: number): FrameBuffers {
+  /**
+   * Build (or reuse) the frame for a camera. `tessBudget` overrides
+   * {@link EngineBridge.tessBudget} for this call; pass `0` for no cap, which is
+   * what tests want when they need one deterministic frame.
+   *
+   * When the engine reports the buffers unchanged the previous `FrameBuffers`
+   * object is returned as-is, views included, so `frame.version` is a stable
+   * identity a backend can compare against what it last uploaded.
+   */
+  frame(cam: CameraState, viewportW: number, viewportH: number, tessBudget: number = this.tessBudget): FrameBuffers {
     const e = this.engine
-    e.frame(cam.x, cam.y, cam.z, viewportW, viewportH)
+    e.frame(cam.x, cam.y, cam.z, viewportW, viewportH, tessBudget)
     const buf = this.memory.buffer
-    return {
+    const version = e.frame_version()
+    const last = this.lastFrame
+    // Reuse the views when nothing was rebuilt — unless WASM memory grew, which
+    // detaches every existing view over it.
+    if (last && !e.frame_dirty() && last.version === version && last.vertices.buffer === buf) {
+      last.dirty = false
+      last.pending = e.frame_pending()
+      return last
+    }
+    const frame: FrameBuffers = {
       vertices: new Float32Array(buf, e.vertices_ptr(), e.vertices_len()),
       indices: new Uint32Array(buf, e.indices_ptr(), e.indices_len()),
       batches: new Uint32Array(buf, e.batches_ptr(), e.batches_len()),
       overlay: new Uint32Array(buf, e.overlay_ptr(), e.overlay_len()),
       drawn: e.drawn_count(),
       culled: e.culled_count(),
+      version,
+      dirty: e.frame_dirty(),
+      pending: e.frame_pending(),
     }
+    this.lastFrame = frame
+    return frame
   }
 
   /** Decode the overlay buffer of a frame. */
@@ -337,6 +383,25 @@ export class EngineBridge {
     const out: Batch[] = []
     for (let i = 0; i + BATCH_WORDS <= batches.length; i += BATCH_WORDS) out.push(EngineBridge.readBatch(batches, i))
     return out
+  }
+
+  /**
+   * Grow the box each frame is built for by `pad` (a fraction of the viewport size)
+   * on every side, so a camera panning inside that margin reuses the buffers instead
+   * of rebuilding and re-uploading them.
+   *
+   * Zero by default: the pad submits `(1 + 2 * pad)²` more geometry on every frame in
+   * exchange for skipping the upload on some of them, which only pays when the host's
+   * upload is expensive relative to its per-triangle cost. It is on a hardware GPU;
+   * it is emphatically not under software rasterisation.
+   */
+  setViewportPad(pad: number): void {
+    this.engine.set_viewport_pad(pad)
+  }
+
+  /** The current viewport pad. */
+  get viewportPad(): number {
+    return this.engine.viewport_pad()
   }
 
   hitTest(pageX: number, pageY: number, tolerance: number, filter = 0): Handle {

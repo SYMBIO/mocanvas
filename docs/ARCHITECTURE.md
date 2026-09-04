@@ -113,7 +113,10 @@ host and uploaded through `RenderBackend.uploadTexture(id, source)`.
 ### Frame (WASM → TS)
 
 ```
-engine.frame(cam_x, cam_y, cam_z, vp_w, vp_h) -> FrameInfo
+engine.frame(cam_x, cam_y, cam_z, vp_w, vp_h, tess_budget) -> FrameInfo
+engine.frame_version() -> f64   // bumped only when the buffers are rebuilt
+engine.frame_dirty() -> bool    // did this call rebuild them?
+engine.frame_pending() -> bool  // shapes still queued behind the budget
 ```
 
 `FrameInfo` exposes pointers and lengths into WASM memory for:
@@ -134,8 +137,25 @@ Shapes whose page bounds fall entirely outside their clip rect are culled and
 never reach either buffer. Level-of-detail quads and textured quads carry the
 clip like any other geometry.
 
+The vertex data is page space and the camera is a shader uniform, so the buffers
+do not depend on the camera. `frame()` therefore reuses the previous build while
+the scene epoch is unchanged, the viewport is still inside the box that build
+covered, and the zoom is in the same √2 bucket; it then leaves the buffers alone
+and reports `frame_dirty() == false`, and the host skips re-uploading them.
+`engine.set_viewport_pad(p)` grows the built box by a fraction of the viewport so
+that panning can reuse it too — off by default, because the pad submits
+`(1 + 2p)²` more geometry on every frame in exchange for skipping uploads on some
+of them, which only pays when uploads are expensive relative to per-triangle cost.
+
+`tess_budget` caps how many shapes one call may tessellate (0 = no cap, default
+`DEFAULT_TESS_BUDGET`). Shapes past the cap are drawn as level-of-detail quads and
+picked up by a later frame; `frame_pending()` stays true until the backlog clears,
+and the host keeps scheduling frames while it does. This trades a brief flat-quad
+stand-in for the multi-hundred-millisecond stall a viewport full of never-seen
+shapes used to cause.
+
 TS wraps these in typed-array views (no copy) and issues one
-`bufferSubData` + one `drawElements` per batch. The WebGL2 backend binds the
+`bufferSubData` (only when `frame_version()` moved) + one `drawElements` per batch. The WebGL2 backend binds the
 batch's texture (a 1×1 white texture for `0`, sampled in the fragment shader)
 and, for clipped batches only, enables `SCISSOR_TEST` with the clip rect
 mapped page → device pixels (`(p + cam) * zoom * dpr`, y flipped).
@@ -152,12 +172,16 @@ engine.selection_bounds(ptr_handles, len) -> ptr to 4 f32
 ## Render pipeline (per frame)
 
 1. TS: signals mark `camera` or `scene` dirty → `requestAnimationFrame`.
-2. WASM `frame()`: viewport box → BVH query → visible handles sorted by zkey.
-3. For each visible shape whose `mesh_version != shape_version`: tessellate
-   fill and stroke with lyon into a per-shape mesh cache (local space).
+2. WASM `frame()`: if the scene, viewport and zoom bucket still match the last
+   build, stop here and report the buffers unchanged. Otherwise: viewport box →
+   BVH query → visible handles sorted by zkey.
+3. For each visible shape whose `mesh_version != shape_version`, up to the
+   frame's tessellation budget: tessellate fill and stroke with lyon into a
+   per-shape mesh cache (local space). Shapes past the budget are drawn as
+   level-of-detail quads until a later frame reaches them.
 4. Append transformed vertices into the frame vertex buffer, batching by
    texture. Shapes flagged `OVERLAY` skip the mesh and go into the overlay list.
-5. TS uploads buffers and draws. Overlay list is diffed against the React
+5. TS uploads the buffers (unless the engine reports them unchanged) and draws. Overlay list is diffed against the React
    overlay layer, which positions DOM shapes with `transform` and passes
    pointer events through except when editing.
 

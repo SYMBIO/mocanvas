@@ -15,8 +15,18 @@ import {
 } from "../records/base"
 import { BindingRecordType, type UnknownBinding } from "../records/binding"
 import { AssetRecordType, type Asset } from "../records/asset"
+import { InstancePresenceRecordType, type InstancePresence } from "../records/presence"
 
-export type EditorRecord = Document | Page | UnknownShape | UnknownBinding | Asset | Camera | Instance | InstancePageState
+export type EditorRecord =
+  | Document
+  | Page
+  | UnknownShape
+  | UnknownBinding
+  | Asset
+  | Camera
+  | Instance
+  | InstancePageState
+  | InstancePresence
 export type EditorStore = Store<EditorRecord, EditorStoreProps>
 export type EditorStoreSnapshot = StoreSnapshot<EditorRecord>
 
@@ -43,6 +53,7 @@ export function createSchema(migrations: MigrationSequence[] = []): StoreSchema<
       camera: CameraRecordType,
       instance: InstanceRecordType,
       instance_page_state: InstancePageStateRecordType,
+      instance_presence: InstancePresenceRecordType,
     },
     { migrations },
   )

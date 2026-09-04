@@ -1,0 +1,117 @@
+{
+  "note": "Pan/zoom subset only (window.bench.panZoomRun(120)), mocanvas only. Interleaved A/B in one browser session: A = engine with frame reuse and the tessellation budget disabled (pre-change behaviour), B = after. Median of 5 rounds each. Same headless Chromium / SwiftShader environment as docs/BENCHMARK.md; does not replace it.",
+  "generated": "2026-09-04T09:06:04+00:00",
+  "viewport": {
+    "width": 1200,
+    "height": 800,
+    "deviceScaleFactor": 1
+  },
+  "rasterisation": "software (ANGLE/SwiftShader)",
+  "glCostProbe": {
+    "note": "Same context settings as the WebGL2 backend (antialias: true), synchronised with a 1px readPixels so the GPU process is included.",
+    "triangles": 50000,
+    "bufferMB": 5.15,
+    "uploadOnlyMs": 0.39,
+    "clearOnlyMs": 3.59,
+    "clearAndDrawMs": 35.88,
+    "clearAndDrawMs_antialiasOff": 10.78
+  },
+  "results": [
+    {
+      "n": 1000,
+      "kind": "geo",
+      "a": {
+        "p50": 16.59999999999991,
+        "p95": 25.199999999999932,
+        "max": 75.5,
+        "avg": 16.2975
+      },
+      "b": {
+        "p50": 16.699999999999818,
+        "p95": 25.199999999999818,
+        "max": 58.30000000000018,
+        "avg": 16.32
+      }
+    },
+    {
+      "n": 1000,
+      "kind": "mixed",
+      "a": {
+        "p50": 16.600000000000136,
+        "p95": 33.19999999999993,
+        "max": 34.100000000000364,
+        "avg": 17.082499999999996
+      },
+      "b": {
+        "p50": 16.699999999999932,
+        "p95": 33.29999999999973,
+        "max": 34,
+        "avg": 17.149166666666666
+      }
+    },
+    {
+      "n": 5000,
+      "kind": "geo",
+      "a": {
+        "p50": 25,
+        "p95": 83.10000000000036,
+        "max": 134.0999999999999,
+        "avg": 34.92999999999999
+      },
+      "b": {
+        "p50": 25,
+        "p95": 58.90000000000009,
+        "max": 91.59999999999991,
+        "avg": 30.138333333333332
+      }
+    },
+    {
+      "n": 5000,
+      "kind": "mixed",
+      "a": {
+        "p50": 25.699999999999818,
+        "p95": 100,
+        "max": 125,
+        "avg": 41.041666666666664
+      },
+      "b": {
+        "p50": 33.19999999999982,
+        "p95": 83.80000000000018,
+        "max": 124.90000000000055,
+        "avg": 40.207499999999996
+      }
+    },
+    {
+      "n": 20000,
+      "kind": "geo",
+      "a": {
+        "p50": 33.399999999999636,
+        "p95": 166.69999999999982,
+        "max": 208.40000000000055,
+        "avg": 56.66583333333333
+      },
+      "b": {
+        "p50": 33.299999999999955,
+        "p95": 116.60000000000036,
+        "max": 166.69999999999982,
+        "avg": 42.707499999999996
+      }
+    },
+    {
+      "n": 20000,
+      "kind": "mixed",
+      "a": {
+        "p50": 49.70000000000073,
+        "p95": 241.60000000000036,
+        "max": 308.3000000000011,
+        "avg": 78.33333333333333
+      },
+      "b": {
+        "p50": 41.69999999999982,
+        "p95": 167.39999999999964,
+        "max": 258.3000000000002,
+        "avg": 58.88916666666667
+      }
+    }
+  ]
+}

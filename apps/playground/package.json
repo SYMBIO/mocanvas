@@ -3,14 +3,19 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build", "typecheck": "tsc --noEmit" },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "mocanvas": "workspace:*",
     "@mocanvas/editor": "workspace:*",
     "@mocanvas/store": "workspace:*",
     "@mocanvas/state": "workspace:*",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "@mocanvas/sync": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.1.0",
