@@ -283,7 +283,15 @@ apps/playground          Vite app
 2. (done) Text via DOM overlay, arrows and bindings, snapping, resize/rotate
    handles, export SVG/PNG, clipboard, groups, style panel, dash patterns,
    LOD quads, `@mocanvas/compat` aliases.
-3. Glyph atlas text rendering in WASM, image/video assets with textures,
-   frame clipping on the GPU, WebGPU backend, persistent per-shape GPU buffers.
-4. Migration guide, real `.tldr` schema migrations, collaboration hooks
-   (presence records, `mergeRemoteChanges` transport).
+3. (done) Image assets with GPU textures, text rasterised to textures, frame
+   clipping on the GPU, WebGPU backend, arrow/line/frame tools, the icon set,
+   and the `.tldr` compatibility layer for documents written by current
+   releases (`richText`, encoded draw segments).
+4. (done) Collaboration (`@mocanvas/sync`: presence, transports, a relay),
+   frame reuse and a tessellation budget, the migration guide, and the
+   benchmark against the reference implementation.
+
+Open: a CRDT in place of last-writer-wins for concurrent edits, elbow arrows,
+bookmark/embed/video shapes, freehand pressure taper, and routing the default
+indicators layer through `ShapeUtil.indicator` instead of drawing geometry
+bounds.

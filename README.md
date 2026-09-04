@@ -60,5 +60,12 @@ render as React components go to a DOM overlay positioned in page space.
 
 ## Status
 
-Phase 1 (vertical slice). See the phases list at the end of the architecture
-document.
+Phases 1-4 are done: the Rust/WASM engine with textures, clipping and level of
+detail; the document model with `.tldr` load and save; the editor with tools,
+bindings, styles, snapping, groups and history; GPU-textured images and text;
+WebGL2 and WebGPU backends; SVG and PNG export; collaboration; and the default
+shapes, tools and UI.
+
+`docs/BENCHMARK.md` measures mocanvas against the library it is shaped after on
+the same workloads and renders the same document in both for comparison. The
+open items are listed at the end of `docs/ARCHITECTURE.md`.
