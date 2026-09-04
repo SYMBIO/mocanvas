@@ -475,12 +475,22 @@ export class EngineBridge {
 let initPromise: Promise<WebAssembly.Memory> | null = null
 
 /**
- * Load the WASM module (once) and create an engine. In Vite/browsers the module
- * URL is resolved relative to this package; pass `input` to override.
+ * Load the WASM module (once) and create an engine.
+ *
+ * With no argument the module is resolved as
+ * `new URL("../pkg/mocanvas_bg.wasm", import.meta.url)`, which Vite, webpack 5
+ * and Rollup all recognise: they emit the `.wasm` file as an asset and rewrite
+ * the URL to point at it. The same relative path is correct from `src/` during
+ * development and from `dist/` in the published package.
+ *
+ * Bundlers that do not understand `new URL(..., import.meta.url)` need the
+ * location passed in: `loadEngine("/assets/mocanvas_bg.wasm")`, a `URL`, a
+ * `Response`, or the compiled bytes. See the package README.
  */
 export async function loadEngine(input?: InitInput): Promise<EngineBridge> {
   if (!initPromise) {
-    initPromise = init(input === undefined ? undefined : { module_or_path: input }).then((o) => o.memory)
+    const module_or_path = input ?? new URL("../pkg/mocanvas_bg.wasm", import.meta.url)
+    initPromise = init({ module_or_path }).then((o) => o.memory)
   }
   const memory = await initPromise
   return new EngineBridge(new Engine(), memory)

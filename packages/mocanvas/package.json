@@ -1,14 +1,82 @@
 {
   "name": "mocanvas",
   "version": "0.0.1",
+  "description": "An infinite-canvas SDK for the web: React component, default shapes, tools and UI, on a Rust/WebAssembly engine.",
   "license": "MIT",
+  "author": "Symbio Digital",
+  "homepage": "https://github.com/SYMBIO/mocanvas/tree/main/packages/mocanvas#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SYMBIO/mocanvas.git",
+    "directory": "packages/mocanvas"
+  },
+  "bugs": {
+    "url": "https://github.com/SYMBIO/mocanvas/issues"
+  },
+  "keywords": [
+    "canvas",
+    "infinite-canvas",
+    "whiteboard",
+    "webgl",
+    "webassembly",
+    "wasm",
+    "rust",
+    "editor",
+    "tldraw",
+    "react",
+    "sdk",
+    "drawing",
+    "diagram"
+  ],
   "type": "module",
-  "sideEffects": ["*.css"],
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
-  "dependencies": {"@mocanvas/state":"workspace:*","@mocanvas/store":"workspace:*","@mocanvas/editor":"workspace:*"},
-  "devDependencies": {"@types/react":"^19.1.0","@types/react-dom":"^19.1.0","react":"^19.1.0","react-dom":"^19.1.0"},
-  "peerDependencies": {"react":">=18","react-dom":">=18"}
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": {
+    "@mocanvas/editor": "workspace:*",
+    "@mocanvas/state": "workspace:*",
+    "@mocanvas/store": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  }
 }

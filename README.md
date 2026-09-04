@@ -12,6 +12,28 @@ An infinite-canvas SDK for the web with a familiar `Editor` / `ShapeUtil` /
   [docs/COMPAT.md](docs/COMPAT.md).
 - **Clean-room, MIT.** Written from scratch. See [docs/CLEAN_ROOM.md](docs/CLEAN_ROOM.md).
 
+## Install
+
+```bash
+npm install mocanvas react react-dom
+```
+
+```tsx
+import { Mocanvas } from "mocanvas"
+
+export const App = () => (
+  <div style={{ position: "absolute", inset: 0 }}>
+    <Mocanvas />
+  </div>
+)
+```
+
+Every package is **ESM only** — there is no CommonJS build. The engine locates
+its `.wasm` asset with `import.meta.url`, which has no CommonJS equivalent;
+Vite, webpack 5, Next, Astro, Remix and Rollup all consume the packages as-is.
+See [packages/wasm/README.md](packages/wasm/README.md) for what to do in a
+bundler that does not understand `new URL(..., import.meta.url)`.
+
 ## Packages
 
 | Package            | What                                                        |
@@ -21,6 +43,8 @@ An infinite-canvas SDK for the web with a familiar `Editor` / `ShapeUtil` /
 | `@mocanvas/store`  | records, `Store`, schema, migrations, `.tldr` IO             |
 | `@mocanvas/state`  | signals                                                      |
 | `@mocanvas/wasm`   | engine bindings                                              |
+| `@mocanvas/sync`   | multiplayer: record diffs, presence, cursors                 |
+| `@mocanvas/compat` | `TL`-prefixed aliases for a tldraw migration                  |
 
 Rust crates live in `crates/`: `mocanvas-geo`, `mocanvas-scene`,
 `mocanvas-render`, `mocanvas-wasm`.
@@ -35,6 +59,10 @@ pnpm install
 pnpm build:wasm:dev   # or build:wasm for the optimized build
 pnpm dev              # playground on http://localhost:5180
 ```
+
+Apps and tests in this repository resolve the packages from `src`; `pnpm build`
+compiles the wasm and then every package to `dist` in dependency order, which
+is what is published.
 
 Tests:
 

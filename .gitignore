@@ -1,5 +1,6 @@
 node_modules
 dist
+.tsbuild
 target
 packages/wasm/pkg
 *.log
@@ -9,3 +10,4 @@ coverage
 
 # benchmark artifacts (regenerate with: pnpm --filter bench bench)
 apps/bench/results/*.png
+*.tgz

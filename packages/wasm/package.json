@@ -1,14 +1,61 @@
 {
   "name": "@mocanvas/wasm",
   "version": "0.0.1",
+  "description": "Typed loader and zero-copy bridge over the mocanvas Rust/WebAssembly engine.",
   "license": "MIT",
+  "author": "Symbio Digital",
+  "homepage": "https://github.com/SYMBIO/mocanvas/tree/main/packages/wasm#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SYMBIO/mocanvas.git",
+    "directory": "packages/wasm"
+  },
+  "bugs": {
+    "url": "https://github.com/SYMBIO/mocanvas/issues"
+  },
+  "keywords": [
+    "webassembly",
+    "wasm",
+    "rust",
+    "tessellation",
+    "geometry",
+    "hit-testing",
+    "mocanvas"
+  ],
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "pkg",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
   "scripts": {
-    "build": "wasm-pack build ../../crates/mocanvas-wasm --release --target web --out-dir ../../packages/wasm/pkg --out-name mocanvas",
-    "build:dev": "wasm-pack build ../../crates/mocanvas-wasm --dev --target web --out-dir ../../packages/wasm/pkg --out-name mocanvas",
-    "typecheck": "tsc --noEmit"
+    "build": "pnpm run build:wasm && node scripts/prepare-pkg.mjs && tsup",
+    "build:wasm": "wasm-pack build ../../crates/mocanvas-wasm --release --target web --out-dir ../../packages/wasm/pkg --out-name mocanvas",
+    "build:dev": "wasm-pack build ../../crates/mocanvas-wasm --dev --target web --out-dir ../../packages/wasm/pkg --out-name mocanvas && node scripts/prepare-pkg.mjs",
+    "typecheck": "tsc --noEmit",
+    "prepack": "pnpm run build"
   }
 }

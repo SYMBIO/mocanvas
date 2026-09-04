@@ -1,19 +1,69 @@
 {
   "name": "@mocanvas/compat",
   "version": "0.0.1",
+  "description": "TL-prefixed aliases over the mocanvas API, for projects migrating an existing tldraw app.",
   "license": "MIT",
+  "author": "Symbio Digital",
+  "homepage": "https://github.com/SYMBIO/mocanvas/tree/main/packages/compat#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SYMBIO/mocanvas.git",
+    "directory": "packages/compat"
+  },
+  "bugs": {
+    "url": "https://github.com/SYMBIO/mocanvas/issues"
+  },
+  "keywords": [
+    "tldraw",
+    "compat",
+    "migration",
+    "aliases",
+    "mocanvas"
+  ],
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "sideEffects": false,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "typecheck": "tsc --noEmit" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "prepack": "pnpm run build"
+  },
   "dependencies": {
     "mocanvas": "workspace:*",
     "@mocanvas/editor": "workspace:*",
-    "@mocanvas/store": "workspace:*",
-    "@mocanvas/state": "workspace:*"
+    "@mocanvas/state": "workspace:*",
+    "@mocanvas/store": "workspace:*"
   },
-  "devDependencies": { "@types/react": "^19.1.0", "react": "^19.1.0" },
-  "peerDependencies": { "react": ">=18" }
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "react": "^19.1.0"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
 }

@@ -3,6 +3,19 @@
 Multiplayer for a mocanvas store: document changes travel as record diffs,
 cursors and selections travel as presence records.
 
+Part of [mocanvas](https://github.com/SYMBIO/mocanvas).
+
+## Install
+
+```bash
+npm install @mocanvas/sync react
+```
+
+`react` (>= 18) is a peer dependency, used by `useSync` and
+`<CollaboratorCursors />`.
+
+## Quick start
+
 ```ts
 import { createSyncClient, createBroadcastChannelTransport } from "@mocanvas/sync"
 
@@ -114,11 +127,16 @@ PORT=9000 pnpm --filter @mocanvas/sync relay
 createWebSocketTransport(`ws://localhost:5858/${roomId}`, { reconnect: true })
 ```
 
-`ws` is a devDependency of this package only: the relay is a development tool,
-not part of the shipped client.
+The relay script ships in the package but `ws` does not — it is a
+devDependency here, because the relay is a development tool and not part of
+the client. Install `ws` yourself to run it outside this repository.
 
 ## Tests
 
 ```sh
 pnpm --filter @mocanvas/sync test
 ```
+
+## License
+
+MIT

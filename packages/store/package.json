@@ -1,14 +1,64 @@
 {
   "name": "@mocanvas/store",
   "version": "0.0.1",
+  "description": "The mocanvas document model: reactive records, schema, migrations and .tldr file IO.",
   "license": "MIT",
+  "author": "Symbio Digital",
+  "homepage": "https://github.com/SYMBIO/mocanvas/tree/main/packages/store#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SYMBIO/mocanvas.git",
+    "directory": "packages/store"
+  },
+  "bugs": {
+    "url": "https://github.com/SYMBIO/mocanvas/issues"
+  },
+  "keywords": [
+    "store",
+    "records",
+    "crdt",
+    "schema",
+    "migrations",
+    "tldr",
+    "mocanvas"
+  ],
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "sideEffects": false,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
-  "dependencies": {"@mocanvas/state":"workspace:*","fractional-indexing":"^3.2.0","nanoid":"^5.1.0"},
-  "devDependencies": {},
-  "peerDependencies": {}
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": {
+    "@mocanvas/state": "workspace:*",
+    "fractional-indexing": "^3.2.0",
+    "nanoid": "^5.1.0"
+  }
 }
