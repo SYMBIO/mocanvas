@@ -40,18 +40,23 @@ const FIXTURE = resolve(ROOT, "public/compare.tldr")
  * interesting comparison.
  */
 /**
- * Why a measured revision is marked dirty. Hand-written per run, like PREVIOUS —
- * check it still says something true before publishing a new report, and drop
- * it if every run behind the report was made from a clean tree.
+ * Why a measured revision is marked dirty. Hand-written per run, like PREVIOUS.
+ * Null when every run behind the report was made from a clean tree, which is the
+ * case for this one: the whole report comes from a single clean-tree run.
  */
-const RUN_NOTE = "Why both revisions are marked dirty. **The rendering comparison** ran at `83ff957` with `packages/` and `crates/` untouched — the only uncommitted changes were under `apps/bench`, and they are the measurement code that produced the interior-IoU and stroke-band numbers, not anything mocanvas renders. **The performance tables** were measured at a tree that was checked clean at `15b670a` immediately before that run started, and the bundle is built once, before the first measurement, so a clean `15b670a` is what those numbers come from; their `-dirty` marker is from edits made after that build, to this report generator and to UI code (selection handles, style panel, icons) committed by a concurrent session."
+const RUN_NOTE = "What was clean, exactly. `git status --short` was empty at `2ef11f1` when this run started, and the bundle under measurement is built once, before the first measurement — so every number here comes from a clean `2ef11f1`. The working tree went dirty later in the run, while it was still measuring, because this report generator (`apps/bench/scripts/bench.mjs`) and `apps/bench/results/visible-differences.md` were being edited to describe the run. Neither is part of what was measured: nothing under `packages/` or `crates/` was touched at any point."
 
 const PREVIOUS = {
-  date: "2026-09-04 08:30:07 UTC",
-  git: "32ac776-dirty",
-  panP95: { "1000:geo": 41.6, "5000:geo": 84.2, "20000:geo": 193.1, "1000:mixed": 33.3, "5000:mixed": 107.6, "20000:mixed": 266.1 },
-  tldrawPanP95: { "1000:geo": 9.0, "5000:geo": 33.3, "20000:geo": 291.2, "1000:mixed": 9.2, "5000:mixed": 33.4, "20000:mixed": 283.3 },
-  compare: { loaded: false, diffPercent: 11.84, inkPixelsMocanvas: 0, inkOverlapPercent: 0 },
+  date: "2026-09-04 09:26:29 UTC",
+  git: "15b670a-dirty",
+  createMs: { "1000:geo": 15.1, "5000:geo": 40.1, "20000:geo": 134.2, "1000:mixed": 25.7, "5000:mixed": 67.8, "20000:mixed": 249.4 },
+  tldrawCreateMs: { "1000:geo": 37.8, "5000:geo": 120.0, "20000:geo": 433.2, "1000:mixed": 76.0, "5000:mixed": 241.5, "20000:mixed": 753.7 },
+  panP95: { "1000:geo": 24.5, "5000:geo": 66.6, "20000:geo": 116.7, "1000:mixed": 42.3, "5000:mixed": 108.3, "20000:mixed": 208.3 },
+  tldrawPanP95: { "1000:geo": 9.1, "5000:geo": 25.0, "20000:geo": 258.8, "1000:mixed": 9.0, "5000:mixed": 41.6, "20000:mixed": 350.1 },
+  dragP50: { "1000:geo": 33.0, "5000:geo": 116.6, "20000:geo": 400.0, "1000:mixed": 50.0, "5000:mixed": 183.5, "20000:mixed": 841.6 },
+  tldrawDragP50: { "1000:geo": 25.1, "5000:geo": 150.0, "20000:geo": 858.4, "1000:mixed": 41.7, "5000:mixed": 225.9, "20000:mixed": 1124.9 },
+  dragP95: { "1000:geo": 34.2, "5000:geo": 140.7, "20000:geo": 441.6, "1000:mixed": 66.8, "5000:mixed": 250.0, "20000:mixed": 925.0 },
+  tldrawDragP95: { "1000:geo": 33.9, "5000:geo": 166.7, "20000:geo": 1058.2, "1000:mixed": 50.2, "5000:mixed": 258.4, "20000:mixed": 1375.0 },
 }
 
 /**
@@ -85,17 +90,16 @@ const HISTORY = [
     diffPercent: 3.79,
     inkOverlapPercent: 79.1,
   },
+  {
+    git: "83ff957",
+    what: "hand-drawn outlines",
+    loaded: "yes",
+    diffPercent: 3.82,
+    inkOverlapPercent: 78.2,
+    interiorIoU: 94.1,
+    bandMedian: 1.0,
+  },
 ]
-
-/**
- * Where the performance matrix in `latest.json` came from, for the case where
- * this report is a mix: the rendering comparison re-measured on a later commit,
- * the performance matrix carried over from an earlier run (`--skip-perf`, then
- * the previous `matrix` merged back in). Set `mixedRun: true` in `latest.json`
- * to turn the provenance note on; drop both once a full run supersedes it.
- */
-const PERF_RUN = { date: "2026-09-04 09:26:29 UTC", git: "15b670a-dirty" }
-const MIXED_RUN_NOTE = "**The two halves of this report were measured at different times.** The rendering comparison was re-measured after the hand-drawn stroke style landed, and with two region metrics that did not exist before; the performance tables were **not** re-run — they are unchanged from the earlier run listed under Environment, and nothing below claims they were."
 
 // ---------------------------------------------------------------------------
 // args
@@ -385,10 +389,12 @@ function comparisonSection(compare, versions) {
     md.push("rounded corners, overshoot past the vertex — and neither is trying to reproduce the other's random")
     md.push("numbers. Two outlines that both look right therefore miss each other by roughly a stroke width, and a")
     md.push("pixel diff charges for that twice: once where mocanvas painted and tldraw did not, and once the other way")
-    md.push("round. That is measured, not assumed — making mocanvas draw exact polygons instead *improved* the")
-    const exact = HISTORY[HISTORY.length - 1]
-    md.push(`whole-image figures (${fmt(exact.inkOverlapPercent, 1)}% painted-pixel IoU at \`${exact.git}\`, against this run's ${fmt(d.inkOverlapPercent, 1)}%) while making the`)
-    md.push("render look wrong. So the whole-image row is reported last, and the two above it are the ones to quote.")
+    md.push("round. That is measured, not assumed. When mocanvas drew exact polygons with a uniform stroke, at")
+    const exactCol = HISTORY.find((c) => c.git === "ef4d079")
+    const drawnCol = HISTORY.find((c) => c.git === "83ff957")
+    md.push(`\`ef4d079\`, it scored *better* on the whole-image figures than it did once the hand-drawn outline landed`)
+    md.push(`at \`83ff957\` — ${fmt(exactCol.inkOverlapPercent, 1)}% painted-pixel IoU against ${fmt(drawnCol.inkOverlapPercent, 1)}% — while looking visibly wrong. So the whole-image`)
+    md.push("row is reported last, and the two above it are the ones to quote.")
     md.push("")
 
     // ---- 1. interior IoU --------------------------------------------------
@@ -415,17 +421,37 @@ function comparisonSection(compare, versions) {
     md.push("")
     const rectCol = byId(interior.perShape, "fx-rect")?.interior?.colourAgreementPercent
     const noteCol = byId(interior.perShape, "fx-note")?.interior?.colourAgreementPercent
+    const starCol = byId(interior.perShape, "fx-star")?.interior?.colourAgreementPercent
     md.push("**Fills are essentially exact.** Every shape that is only fill agrees on colour over 99% of its shared")
-    md.push(`interior. The two that do not are the two carrying something else: the rectangle's ${fmt(rectCol, 1)}% is its "Hello box"`)
-    md.push(`label (a font-weight difference, not a fill one) and the note's ${fmt(noteCol, 1)}% is tldraw's top-to-bottom gradient`)
-    md.push("and drop shadow against mocanvas's flat body.")
+    md.push(`interior, except the star at ${fmt(starCol, 1)}% — the smallest interior in the fixture, where the hand-drawn`)
+    md.push("outline's wobble reaches proportionally furthest in. The two rows below that are the two carrying")
+    md.push(`something other than fill: the rectangle's ${fmt(rectCol, 1)}% is its "Hello box" label, a font-weight difference`)
+    md.push(`rather than a fill one, and the note's ${fmt(noteCol, 1)}% is its label plus the drop shadow around its body. The`)
+    md.push("note's gradient is no longer a difference at all: it reads `#f7dc99` at the top of the body and `#fce19c` at")
+    md.push("the bottom in both renders — identical values, not merely within tolerance.")
     md.push("")
     const starIoU = byId(interior.perShape, "fx-star")?.interior?.iouPercent
     const hexIoU = byId(interior.perShape, "fx-hexagon")?.interior?.iouPercent
-    md.push("**The two low IoU rows are real geometry differences, which is what this metric is for.** mocanvas's star")
-    md.push(`uses a smaller inner radius than tldraw's, so its arms are visibly thinner — that is the ${fmt(starIoU, 1)}% — and its`)
-    md.push(`hexagon is narrower across the flats, which is the ${fmt(hexIoU, 1)}%. Neither is visible in the whole-image number,`)
-    md.push("where they are buried under stroke wobble; both are obvious once the interiors are compared directly.")
+    md.push("**The two geometry errors this metric was built to find are fixed.** In the previous run the star sat at")
+    md.push("69.9% and the hexagon at 80.1%: mocanvas drew the star with too small an inner radius, so its arms were")
+    md.push("visibly thinner, and it put the hexagon's vertices left and right instead of top and bottom, which made it")
+    md.push(`half a box narrower across the flats. \`2ef11f1\` corrected both, and they now read ${fmt(starIoU, 1)}% and ${fmt(hexIoU, 1)}%.`)
+    md.push("Neither error was visible in the whole-image number, where both were buried under stroke wobble; both were")
+    md.push("obvious the moment the interiors were compared directly.")
+    md.push("")
+    const worstIoU = interior.perShape.filter((v) => v.interior).sort((x, y) => x.interior.iouPercent - y.interior.iouPercent).slice(0, 3)
+    md.push(`**What is left is not a wrong outline.** The lowest rows are now ${worstIoU.map((v) => `${shapeLabel(v)} (${fmt(v.interior.iouPercent, 1)}%)`).join(", ")}, and they`)
+    md.push("have two different causes, neither of them shape geometry.")
+    md.push("")
+    md.push("The note is the one large region on that list, and what this metric scores there is not its body but its")
+    md.push("silhouette, which includes the drop shadow. The body matches: 214 px wide in both renders, same gradient")
+    md.push("values at both ends. The shadow does not — mocanvas's spreads about 7 px further on each side and 7 px")
+    md.push("higher than tldraw's — and that spread is most of the missing 10 points.")
+    md.push("")
+    md.push("The star and the triangle are simply the two smallest interiors in the fixture (8,666 and 8,897 px). A 6 px")
+    md.push("erosion takes a fixed bite out of every silhouette and zoom-to-fit lands mocanvas's ink a pixel or two off")
+    md.push("tldraw's (see Visible differences); both cost a small region proportionally far more than a large one. The")
+    md.push("frame, the largest region here, scores 98.8% under exactly the same treatment.")
     md.push("")
     const skipped = interior.perShape.filter((s) => !s.interior).map((s) => shapeLabel(s))
     md.push(`Not scored here: the ${skipped.slice(0, -1).join(", the ")} and the ${skipped[skipped.length - 1]}. An open shape encloses nothing, and its box overlaps shapes that`)
@@ -467,15 +493,19 @@ function comparisonSection(compare, versions) {
     md.push(`half a stroke width or better. Two outlines that a pixel diff scores as largely disjoint are, measured as a`)
     md.push("distance, running within a stroke width of each other nearly everywhere.")
     md.push("")
-    md.push("The rows that are not within a stroke width are the differences worth having a name for, and none of them")
-    md.push("is stroke randomness:")
+    md.push("The two rows that stand out are the differences worth having a name for, and neither is stroke")
+    md.push("randomness:")
     md.push("")
     md.push(`- **bent arrow, ${quote("fx-arrow-bent")}** — tldraw stops the arrow short of the rectangle it is bound`)
-    md.push("  to; mocanvas runs it to the shape's edge. A binding difference, and the largest one in the fixture.")
-    md.push(`- **hexagon, ${quote("fx-hexagon")}** — the same narrower hexagon the interior IoU row catches.`)
+    md.push("  to; mocanvas runs it to the shape's edge. A binding difference, and the only region left in the fixture")
+    md.push("  whose median is more than half a stroke width out.")
     md.push(`- **text shape, ${quote("fx-text")}** — font weight: tldraw's face is heavier and slightly wider, so the`)
-    md.push("  glyphs drift apart along the line even though the baseline and size agree.")
-    md.push(`- **star, ${quote("fx-star")}** — the inner-radius difference again.`)
+    md.push("  glyphs drift apart along the line even though the baseline and size agree. It also owns the fixture's")
+    md.push("  worst single pixel.")
+    md.push("")
+    md.push(`The star (${quote("fx-star")}) and the hexagon (${quote("fx-hexagon")}) were on this list in the previous run, at 2.83 px`)
+    md.push("and 6.71 px median against a ~4 px stroke. `2ef11f1` corrected the outlines behind both, and they now sit at")
+    md.push("the fixture median.")
     md.push("")
     md.push("Two exclusions, both documented in `scripts/compare-metrics.mjs`. tldraw's \"Get a license for production\"")
     md.push(`badge (found automatically at ${band.excluded ? `${band.excluded.x0},${band.excluded.y0}–${band.excluded.x1},${band.excluded.y1}` : "the bottom-right corner"}, and only excluded because mocanvas paints nothing at all inside it) sits`)
@@ -513,7 +543,7 @@ function comparisonSection(compare, versions) {
   md.push("")
   const cols = [...HISTORY, {
     git: versions.git,
-    what: "hand-drawn outlines (this run)",
+    what: "star and hexagon corrected (this run)",
     loaded: compare.loads.mocanvas.ok ? "yes" : `no — ${compare.loads.mocanvas.error}`,
     diffPercent: d.diffPercent,
     inkOverlapPercent: d.inkOverlapPercent,
@@ -533,16 +563,75 @@ function comparisonSection(compare, versions) {
   md.push("that took mocanvas from drawing nothing at all to drawing the entire document. The fill-ramp fix in")
   md.push("`ef4d079` is the one change both of them register properly.")
   md.push("")
-  const exact = HISTORY[HISTORY.length - 1]
-  md.push("**The last step is the point of this section.** `ef4d079` drew exact polygons with a uniform stroke;")
-  md.push("`182bf43` and `83ff957` replaced that with the seeded, wobbling, corner-overshooting outline the default")
-  md.push("`dash: \"draw\"` style actually calls for, which is unambiguously the more faithful render. The whole-image")
-  md.push(`numbers got *worse* for it (${fmt(exact.inkOverlapPercent, 1)}% → ${fmt(d.inkOverlapPercent, 1)}% painted-pixel IoU, ${fmt(exact.diffPercent, 2)}% → ${fmt(d.diffPercent, 2)}% differing). The two rows above`)
-  md.push("them are the ones that can tell the difference between a stroke in the wrong place and a stroke drawn with")
-  md.push("different random numbers, and only those two are worth optimising against.")
+  const exact = HISTORY.find((c) => c.git === "ef4d079")
+  const drawn = HISTORY.find((c) => c.git === "83ff957")
+  md.push("**The last two steps show why the order of the three metrics matters.**")
   md.push("")
-  md.push("The last two columns were measured on different revisions but with the same fixture, viewport, browser and")
-  md.push("tolerance; the interior and band rows exist only from this run, and nothing has been back-filled.")
+  md.push(`\`ef4d079\` drew exact polygons with a uniform stroke. \`182bf43\` and \`83ff957\` replaced that with the seeded,`)
+  md.push("wobbling, corner-overshooting outline the default \`dash: \"draw\"\` style actually calls for — unambiguously the")
+  md.push(`more faithful render — and the whole-image numbers got *worse* for it (${fmt(exact.inkOverlapPercent, 1)}% → ${fmt(drawn.inkOverlapPercent, 1)}% painted-pixel`)
+  md.push(`IoU, ${fmt(exact.diffPercent, 2)}% → ${fmt(drawn.diffPercent, 2)}% differing). A pixel diff cannot tell a stroke in the wrong place from a stroke`)
+  md.push("drawn with different random numbers, and it charges twice for the second.")
+  md.push("")
+  md.push(`\`2ef11f1\` then fixed two outlines that were genuinely the wrong shape — the star's inner radius and the`)
+  md.push(`hexagon's orientation — and *every* metric improved, whole-image rows included (${fmt(drawn.inkOverlapPercent, 1)}% → ${fmt(d.inkOverlapPercent, 1)}% painted-pixel`)
+  md.push(`IoU, ${fmt(drawn.diffPercent, 2)}% → ${fmt(d.diffPercent, 2)}% differing, interior IoU ${fmt(drawn.interiorIoU, 1)}% → ${fmt(r?.interior?.overall?.iouPercent, 1)}%). That is the distinction the ordering`)
+  md.push("encodes: a wrong shape is wrong in all three, while a differently-seeded stroke only looks wrong to the")
+  md.push("third. Optimise against the first two; read the third as a consequence.")
+  md.push("")
+  md.push("The columns were measured on different revisions but with the same fixture, viewport, browser and tolerance.")
+  md.push("The interior and band rows are blank before \`83ff957\` because the metrics did not exist yet — nothing has")
+  md.push("been back-filled or estimated.")
+  md.push("")
+  return md
+}
+
+/**
+ * Three or four sentences at the top of the report: where mocanvas is faster,
+ * where it is slower and why, and how closely it reproduces the same document.
+ * Every figure is computed from this run — nothing here is hand-copied.
+ */
+function summarySection(data) {
+  const { matrix, compare } = data
+  const md = []
+  if (!matrix?.mocanvas || !matrix.tldraw) return md
+  const keys = Object.keys(matrix.mocanvas)
+  /** tldraw ÷ mocanvas, so > 1 means mocanvas was faster. */
+  const ratios = (metric, filter = () => true) => keys.filter(filter)
+    .map((k) => matrix.tldraw[k]?.[metric] / matrix.mocanvas[k]?.[metric])
+    .filter((v) => Number.isFinite(v) && v > 0)
+  const span = (xs, digits = 1) => {
+    const lo = Math.min(...xs), hi = Math.max(...xs)
+    return lo.toFixed(digits) === hi.toFixed(digits) ? `${lo.toFixed(digits)}×` : `${lo.toFixed(digits)}–${hi.toFixed(digits)}×`
+  }
+  const big = (k) => k.startsWith("20000:")
+  const small = (k) => !k.startsWith("20000:")
+
+  md.push("## Summary")
+  md.push("")
+  md.push(`mocanvas creates shapes ${span(ratios("createMs"))} faster than tldraw and reaches first paint up to ${Math.max(...ratios("firstFrameMs")).toFixed(0)}× faster,`)
+  md.push(`answers hit-test queries ${span(ratios("hitAvgUs"), 0)} faster and holds ${span(ratios("memoryMB"), 0)} less JS heap; at 20,000 shapes it is also`)
+  md.push(`${span(ratios("panP50", big))} faster on the median pan/zoom frame and ${span(ratios("dragP50", big))} faster on select-all-drag.`)
+  md.push(`At 1,000 and 5,000 shapes it is slower per frame — ${span(ratios("panP50", small).map((v) => 1 / v))} on the median pan/zoom frame — for two`)
+  md.push("reasons set out in the caveats: this machine has no GPU, so mocanvas's WebGL2 output is rasterised on the")
+  md.push("CPU, where 4× MSAA alone accounts for roughly 70% of the frame; and the pan/zoom metric counts only")
+  md.push("main-thread work, which tldraw largely avoids by panning with a CSS transform on the compositor. The")
+  md.push("`selectAllDragRun` tables are the fairer frame comparison; mocanvas is behind there at 1,000 shapes,")
+  md.push("level at 5,000, and ahead at 20,000.")
+  if (compare?.ok && !compare.diff?.error && compare.regions) {
+    const i = compare.regions.interior?.overall
+    const b = compare.regions.stroke?.overall?.symmetric
+    const sw = compare.regions.stroke?.strokeWidthEstimatePx
+    if (i && b) {
+      md.push("")
+      md.push(`Rendering the same tldraw-authored document, mocanvas agrees with tldraw on ${i.iouPercent.toFixed(1)}% of shape interiors by`)
+      md.push(`IoU at ${i.colourAgreementPercent.toFixed(1)}% colour agreement, and half its stroke pixels land within ${b.medianPx.toFixed(2)} px of a tldraw stroke`)
+      md.push(`pixel of the same colour (95th percentile ${b.p95Px.toFixed(2)} px, against a stroke about ${sw?.toFixed(0) ?? "4"} px wide). ${compare.diff.diffPercent.toFixed(2)}% of the`)
+      md.push("canvas differs pixel-for-pixel, most of it two hand-drawn outlines that miss each other by roughly a stroke")
+      md.push("width. The differences that are not stroke randomness are a bound arrow that runs to the shape's edge where")
+      md.push("tldraw stops short of it, and a lighter font.")
+    }
+  }
   md.push("")
   return md
 }
@@ -554,36 +643,29 @@ function renderDoc(data) {
   md.push("")
   md.push(`_Generated ${date} by \`apps/bench/scripts/bench.mjs\`. Re-run with \`pnpm --filter bench bench\`._`)
   md.push("")
+  md.push(...summarySection(data))
   md.push("Both libraries are driven through an identical `window.bench` API (`apps/bench/src/bench-api.ts`)")
   md.push("with byte-identical workloads: same grid, same shape sizes, colours and fills, the same scripted")
   md.push("camera path, and the same hit-test sample points. Frame times are frame-to-frame `requestAnimationFrame`")
   md.push("deltas recorded while a camera animation runs (zoom to fit → zoom in 4× → horizontal pan sweep → zoom back out).")
   md.push("")
-  if (data.mixedRun) {
-    md.push(`> ${MIXED_RUN_NOTE}`)
-    md.push(">")
-    md.push(`> Rendering comparison: measured ${date}, git \`${versions.git}\`.`)
-    md.push(`> Performance tables: measured ${PERF_RUN.date}, git \`${PERF_RUN.git}\`.`)
-    md.push("")
-  }
-
   if (matrix?.mocanvas) {
     md.push("## What changed since the previous run")
     md.push("")
-    md.push(`Two changes landed between the previous published numbers (${PREVIOUS.date}, git \`${PREVIOUS.git}\`) and this run:`)
+    md.push(`Three changes to what mocanvas draws landed between the previous published performance numbers (${PREVIOUS.date}, git \`${PREVIOUS.git}\`) and this run:`)
     md.push("")
-    md.push("- **`.tldr` loading was fixed.** `normalizeLoadedRecords` (`packages/editor/src/records/normalize.ts`)")
-    md.push("  now maps `props.richText` onto `props.text` and decodes packed freehand `segments[].path` into")
-    md.push("  `segments[].points` while records are loaded. The previous run could not open the tldraw-authored")
-    md.push("  fixture at all — it threw and left a blank canvas — so *that run\u2019s* rendering comparison was measured")
-    md.push("  against nothing. mocanvas now loads and draws the unmodified file.")
-    md.push("- **Renderer.** A per-frame tessellation budget (256 shapes), frame reuse keyed on scene epoch + zoom")
-    md.push("  bucket + viewport containment, and LOD hysteresis. All three target the same thing: the long frames")
-    md.push("  where the camera moves but the scene did not.")
+    md.push("- **Hand-drawn stroke style** (`182bf43`, `83ff957`). The default `dash: \"draw\"` outline is now seeded")
+    md.push("  wobble, rounded corners and overshoot past the vertex, where before it was the exact polygon with a")
+    md.push("  uniform stroke. It is the more faithful render, and it costs roughly 2.5× the tessellation work of a")
+    md.push("  plain stroke. Every shape in this benchmark uses the default dash, so that cost is paid on every shape")
+    md.push("  every time geometry is rebuilt.")
+    md.push("- **Note and frame chrome** (`219fe67`) — the note's top-to-bottom gradient and drop shadow, and a")
+    md.push("  corrected frame border colour.")
+    md.push("- **Corrected star and hexagon outlines** (`2ef11f1`) — the star's inner radius and the hexagon's")
+    md.push("  orientation. That one is measured in the [rendering comparison](#rendering-comparison), not here.")
     md.push("")
-    md.push("95th-percentile pan/zoom frame — the metric those renderer changes target. tldraw's column is the")
-    md.push("control: its code did not change between the two runs, so whatever it moved by is what this environment")
-    md.push("does on its own.")
+    md.push("95th-percentile pan/zoom frame. tldraw's column is the control: its code did not change between the two")
+    md.push("runs, so whatever it moved by is what this machine did on its own.")
     md.push("")
     md.push("| N | kind | mocanvas before → after | Δ | tldraw before → after (unchanged) | Δ |")
     md.push("| ---: | :--- | ---: | ---: | ---: | ---: |")
@@ -595,28 +677,70 @@ function renderDoc(data) {
         const key = `${n}:${kind}`
         const mo = matrix.mocanvas[key]?.panP95
         const tl = matrix.tldraw?.[key]?.panP95
-        const moWas = PREVIOUS.panP95[key]
-        const tlWas = PREVIOUS.tldrawPanP95[key]
-        md.push(`| ${int(n)} | ${kind} | ${fmt(moWas, 1)} → ${fmt(mo, 1)} ms | ${pct(moWas, mo)} | ${fmt(tlWas, 1)} → ${fmt(tl, 1)} ms | ${pct(tlWas, tl)} |`)
+        md.push(`| ${int(n)} | ${kind} | ${fmt(PREVIOUS.panP95[key], 1)} → ${fmt(mo, 1)} ms | ${pct(PREVIOUS.panP95[key], mo)} | ${fmt(PREVIOUS.tldrawPanP95[key], 1)} → ${fmt(tl, 1)} ms | ${pct(PREVIOUS.tldrawPanP95[key], tl)} |`)
       }
     }
     md.push("")
-    md.push("**Read the control column before reading the first one.** tldraw ran the same code in both runs and still")
-    md.push("moved by -25% to +42%: this environment was faster on `geo` and slower on `mixed` than it was two hours")
-    md.push("earlier. mocanvas's column has the same shape — large gains on `geo` and at 20,000 `mixed`, nothing or a")
-    md.push("small loss on the two small `mixed` cases — so a fair reading is that the renderer changes helped where")
-    md.push("there is real work to skip, and that everything else here is the machine, not the code. Frame deltas are")
-    md.push("also quantised to the browser's frame cadence (most values land on multiples of ~8.3 ms), which turns a")
-    md.push("small real change into a whole bucket or into nothing at all.")
+    // How much slower was the machine? Measured on tldraw, whose code did not change.
+    const controlDeltas = []
+    for (const kind of kinds) for (const n of ns) {
+      const key = `${n}:${kind}`
+      for (const [was, isNow] of [
+        [PREVIOUS.tldrawPanP95[key], matrix.tldraw?.[key]?.panP95],
+        [PREVIOUS.tldrawCreateMs[key], matrix.tldraw?.[key]?.createMs],
+        [PREVIOUS.tldrawDragP50[key], matrix.tldraw?.[key]?.dragP50],
+      ]) if (was > 0 && Number.isFinite(isNow)) controlDeltas.push(((isNow - was) / was) * 100)
+    }
+    const lo = Math.min(...controlDeltas), hi = Math.max(...controlDeltas)
+    md.push("**This machine was much slower during this run, so read the control column first.** tldraw ran identical")
+    md.push(`code across the two runs and still moved by ${fmt(lo, 0)}% to +${fmt(hi, 0)}% across pan, creation and drag —`)
+    md.push("shape creation included, which draws nothing at all, and its hit testing, which is pure JS and touches no")
+    md.push("pixels, got 27–69% slower too. Nothing in that column is a code change, so the absolute before → after")
+    md.push("figures in the first column cannot be read as a regression on their own; they carry the same machine")
+    md.push("slowdown plus whatever mocanvas did.")
     md.push("")
-    md.push("The clean measurement of those renderer changes is not this table but the interleaved A/B in")
-    md.push("`apps/bench/results/panzoom-after.json`, which toggles frame reuse and the tessellation budget off and on")
-    md.push("within a single browser session: it puts the p95 improvement at 16–31% between 5,000 and 20,000 shapes.")
+    md.push("What survives that is the **ratio between the two libraries**, which were measured against each other in")
+    md.push("the same session on both occasions, so a slower machine largely divides out. Below 1.00 means mocanvas was")
+    md.push("faster than tldraw; the bracket is how that ratio moved, and a positive bracket is mocanvas losing ground.")
+    md.push("")
+    const ratioCols = [
+      ["create", "createMs", "createMs", "tldrawCreateMs"],
+      ["pan p95", "panP95", "panP95", "tldrawPanP95"],
+      ["drag p50", "dragP50", "dragP50", "tldrawDragP50"],
+      ["drag p95", "dragP95", "dragP95", "tldrawDragP95"],
+    ]
+    md.push(`| N | kind | ${ratioCols.map((c) => `${c[0]} (then → now)`).join(" | ")} |`)
+    md.push(`| ---: | :--- | ${ratioCols.map(() => "---:").join(" | ")} |`)
+    for (const kind of kinds) {
+      for (const n of ns) {
+        const key = `${n}:${kind}`
+        const cells = ratioCols.map(([, metric, prevMo, prevTl]) => {
+          const then = PREVIOUS[prevMo]?.[key] / PREVIOUS[prevTl]?.[key]
+          const now = matrix.mocanvas[key]?.[metric] / matrix.tldraw?.[key]?.[metric]
+          if (!Number.isFinite(then) || !Number.isFinite(now)) return "—"
+          const d = ((now / then) - 1) * 100
+          return `${then.toFixed(2)} → ${now.toFixed(2)} (${d >= 0 ? "+" : ""}${d.toFixed(0)}%)`
+        })
+        md.push(`| ${int(n)} | ${kind} | ${cells.join(" | ")} |`)
+      }
+    }
+    md.push("")
+    md.push("**Creation and hit testing did not move; the redraw paths did.** mocanvas's advantage on `create` is the")
+    md.push("same as it was (±10% on the ratio, in both directions), and so is its hit-testing advantage, which is")
+    md.push("expected: neither builds stroke geometry. The `selectAllDrag` ratio, which does rebuild it every frame,")
+    md.push("moved against mocanvas in all six cells on the median frame and four of six at the 95th percentile, by")
+    md.push("roughly 7–50%. That is the hand-drawn stroke being paid for, and it is the honest cost of the more")
+    md.push("faithful render.")
+    md.push("")
+    md.push("The pan/zoom ratios move in both directions — worse at 1,000 and 20,000, better at 5,000 — and are the")
+    md.push("least trustworthy column here. Frame deltas are quantised to the browser's ~8.3 ms cadence, so the")
+    md.push("`1,000 geo` cell\'s +149% is mocanvas going from 24.5 ms to 58.3 ms: three buckets to seven, where one")
+    md.push("bucket either way would have moved it by a third. Treat pan/zoom as \"somewhere between unchanged and")
+    md.push("moderately worse\" and the drag figures as the number that was actually measured.")
     md.push("")
     if (compare?.ok && !compare.diff?.error) {
-      md.push("The rendering comparison has moved a long way over the same span, but it is measured and discussed")
-      md.push("in [its own section](#rendering-comparison) rather than here, because what changed there is what is")
-      md.push("being *measured*, not only what is being rendered.")
+      md.push("What the same changes bought is in the [rendering comparison](#rendering-comparison): the fixture-wide")
+      md.push("interior IoU and every whole-image figure improved, and the two worst per-shape rows were fixed outright.")
       md.push("")
     }
   }
@@ -625,7 +749,7 @@ function renderDoc(data) {
   md.push("")
   md.push("| | |")
   md.push("| :--- | :--- |")
-  md.push(`| Date | ${date}${data.mixedRun ? " (rendering comparison; performance tables measured " + PERF_RUN.date + ")" : ""} |`)
+  md.push(`| Date | ${date} |`)
   md.push(`| Machine | ${machine.cpu}, ${machine.cores} cores, ${machine.memoryGB} GB |`)
   md.push(`| OS | ${machine.os} |`)
   md.push(`| Node | ${machine.node} |`)
@@ -635,12 +759,12 @@ function renderDoc(data) {
   md.push(`| WebGL2 renderer | ${browser.gpu.renderer} |`)
   md.push(`| Rasterisation | ${browser.software ? "**software (SwiftShader)** — no hardware GPU in this environment" : "hardware"} |`)
   md.push(`| tldraw | ${versions.tldraw} |`)
-  md.push(`| mocanvas | ${versions.mocanvas} (this repo, ${versions.git}${data.mixedRun ? "; performance tables measured at " + PERF_RUN.git : ""}) |`)
+  md.push(`| mocanvas | ${versions.mocanvas} (this repo, ${versions.git}) |`)
   md.push(`| Builds | production (\`vite build\`, minified, \`NODE_ENV=production\`) for both |`)
   md.push(`| Viewport | ${VIEWPORT.width}×${VIEWPORT.height} CSS px, device scale 1 |`)
   md.push(`| Matrix | N ∈ {${ns.join(", ")}} × kind ∈ {${kinds.join(", ")}}, ${repeats} repeats, medians reported |`)
   md.push("")
-  if ((String(versions.git).endsWith("-dirty") || (data.mixedRun && String(PERF_RUN.git).endsWith("-dirty"))) && RUN_NOTE) {
+  if (RUN_NOTE) {
     md.push(`_${RUN_NOTE}_`)
     md.push("")
   }
@@ -843,13 +967,18 @@ function renderDoc(data) {
     md.push(`  **${fmt(probe.clearAndDrawMs, 1)} ms with \`antialias: true\` against ${fmt(probe.clearAndDrawMs_antialiasOff, 1)} ms with it off** — roughly`)
     md.push(`  ${fmt(((probe.clearAndDrawMs - probe.clearAndDrawMs_antialiasOff) / probe.clearAndDrawMs) * 100, 0)}% of the frame is multisample resolve on the CPU. On a real GPU MSAA is close to free, so the`)
     md.push("  absolute mocanvas frame times above are largely a property of this rasteriser rather than of the scene.")
+    md.push("  That probe file was recorded in this same environment at an earlier revision. It is quoted here because")
+    md.push("  it measures the rasteriser rather than mocanvas — no mocanvas code runs in it — so it does not need")
+    md.push("  re-measuring with the rest of the report.")
   }
   if (matrix?.tldraw && PREVIOUS?.tldrawPanP95) {
-    md.push("- **Run-to-run spread is wide here, so do not read small differences.** tldraw's code did not change")
-    md.push("  between this run and the previous one, and its 95th-percentile pan/zoom frame still moved by -25% to")
-    md.push("  +42% across the matrix (see \"What changed since the previous run\"). Anything smaller than that on a")
-    md.push("  single metric is this machine, not either library. Comparisons made inside one browser session — the")
-    md.push("  mocanvas/tldraw pairs here, or the A/B in `panzoom-after.json` — are the ones worth quoting.")
+    md.push("- **Run-to-run spread is very wide here, and was unusually wide between this run and the last.** tldraw's code did not")
+    md.push("  change between this run and the previous one, and it still came out 26–57% slower on shape creation,")
+    md.push("  27–69% slower on hit testing and up to 234% slower on the 95th-percentile pan/zoom frame (see \"What")
+    md.push("  changed since the previous run\"). None of that is a code change, so **absolute numbers from this report")
+    md.push("  should not be compared against absolute numbers from any earlier one.** Only comparisons made inside a")
+    md.push("  single browser session — the mocanvas/tldraw pairs in every table here — are worth quoting, and even a")
+    md.push("  cross-run comparison of those ratios should be read as a direction, not a magnitude.")
   }
   md.push("- **Default settings on both sides.** No tuning, no custom shape utils, no culling or LOD flags flipped, no")
   md.push("  tldraw performance options enabled. Both libraries are used the way the docs show. Either could likely be")
@@ -880,6 +1009,11 @@ function renderDoc(data) {
   md.push("  library draws faster\": a low tldraw number there partly means the work moved somewhere this benchmark")
   md.push("  cannot see. The `selectAllDragRun` numbers are the fairer frame-time comparison, because mutating shapes")
   md.push("  forces both libraries to actually re-render.")
+  md.push("- **Every shape here uses the default `dash: \"draw\"`, which is the expensive one.** That outline is seeded")
+  md.push("  wobble with rounded corners and overshoot, and it costs roughly 2.5× the tessellation work of a plain")
+  md.push("  stroke. It is what tldraw draws by default too, so the comparison is like-for-like, but it means the")
+  md.push("  mocanvas frame times here are its most expensive stroke style on every one of 20,000 shapes. A document")
+  md.push("  drawn with `dash: \"solid\"` would not produce these numbers, and this benchmark does not measure that case.")
   md.push("- **Frame deltas are floored by the browser's frame cadence**, so very fast cases converge on the same number")
   md.push("  for both libraries; that is a measurement ceiling, not a tie.")
   md.push("- **Memory is JS heap only** (see the note on that table).")

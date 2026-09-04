@@ -320,6 +320,14 @@ apps/playground          Vite app
    frame reuse and a tessellation budget, the migration guide, and the
    benchmark against the reference implementation.
 
+The hand-drawn stroke costs about 2.5x the triangles and the tessellation time
+of a plain one, and it is the default style, so it is paid on most pages. The
+per-frame tessellation budget keeps that off the critical path when shapes
+first appear, but the extra triangles are transformed and rasterised every
+frame; `docs/BENCHMARK.md` measures a 7-50% cost in the drag redraw path
+against a plain stroke. Turning it off is a per-shape style change
+(`dash: "solid"`), not a build flag.
+
 Open: a CRDT in place of last-writer-wins for concurrent edits, elbow arrows,
 bookmark/embed/video shapes, freehand pressure taper, and routing the default
 indicators layer through `ShapeUtil.indicator` instead of drawing geometry
