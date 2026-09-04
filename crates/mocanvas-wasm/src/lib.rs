@@ -341,6 +341,25 @@ impl Engine {
         !b.is_empty()
     }
 
+    /// Geometry-only page bounds of a shape → `f32_ptr()` holds `minx miny maxx maxy`.
+    /// Same box as `bounds` without the half-stroke pad. Returns false if missing.
+    pub fn geometry_bounds(&mut self, handle: Handle) -> bool {
+        match self.scene.geometry_bounds(handle) {
+            Some(b) => {
+                self.f32_out[..4].copy_from_slice(&b.to_array());
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Union of all geometry bounds → `f32_ptr()`. Returns false if the scene is empty.
+    pub fn all_geometry_bounds(&mut self) -> bool {
+        let b = self.scene.all_geometry_bounds();
+        self.f32_out[..4].copy_from_slice(&b.to_array());
+        !b.is_empty()
+    }
+
     /// Page transform of a shape → `f32_ptr()` holds `a b c d e f`. Returns false if missing.
     pub fn page_transform(&mut self, handle: Handle) -> bool {
         match self.scene.get(handle) {

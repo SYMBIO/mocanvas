@@ -427,9 +427,19 @@ export class EngineBridge {
     return [f[0]!, f[1]!, f[2]!, f[3]!]
   }
 
-  /** Page bounds `[minX, minY, maxX, maxY]` or null. */
+  /**
+   * Ink page bounds `[minX, minY, maxX, maxY]` or null: the shape's outline
+   * expanded by half its stroke width. This is what the spatial index, the
+   * viewport cull and clipping run on. For a user-facing measurement of where
+   * the shape *is*, use {@link geometryBounds}.
+   */
   bounds(handle: Handle): [number, number, number, number] | null {
     return this.engine.bounds(handle) ? this.readBox() : null
+  }
+
+  /** Geometry page bounds `[minX, minY, maxX, maxY]` or null: `bounds` without the stroke pad. */
+  geometryBounds(handle: Handle): [number, number, number, number] | null {
+    return this.engine.geometry_bounds(handle) ? this.readBox() : null
   }
 
   unionBounds(handles: ArrayLike<number>): [number, number, number, number] | null {
@@ -440,8 +450,14 @@ export class EngineBridge {
     return this.engine.union_bounds(n) ? this.readBox() : null
   }
 
+  /** Union of every shape's ink bounds, or null when the scene is empty. */
   allBounds(): [number, number, number, number] | null {
     return this.engine.all_bounds() ? this.readBox() : null
+  }
+
+  /** Union of every shape's geometry bounds, or null when the scene is empty. */
+  allGeometryBounds(): [number, number, number, number] | null {
+    return this.engine.all_geometry_bounds() ? this.readBox() : null
   }
 
   /** Page transform `[a b c d e f]` or null. */

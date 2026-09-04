@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { loadEngineSync, type StyleWords } from "@mocanvas/wasm"
 import { Editor } from "../Editor"
 import { createStore } from "../createStore"
-import { Rectangle2d } from "../../geometry"
+import { Box, Rectangle2d } from "../../geometry"
 import { createShapeId, type BaseShape, type ShapeId } from "../../records/base"
 import { BaseBoxShapeUtil } from "../../shapes/ShapeUtil"
 import { StateNode, type StateNodeConstructor } from "../../tools/StateNode"
@@ -468,5 +468,33 @@ describe("selection handles", () => {
     expect(names).not.toContain("bottom")
     expect(names).toContain("left")
     expect(names).toContain("top_left")
+  })
+})
+
+describe("page bounds", () => {
+  it("reports geometry, not the ink the culler needs", () => {
+    const editor = makeEditor()
+    // A stroked shape's page bounds carry half the stroke width for culling.
+    // Page bounds, and so zoom-to-fit, must not inherit that pad: the pad is
+    // per-shape, so a thick shape above a thin one would skew the union's
+    // centre and land the whole scene off by a fraction of a pixel.
+    editor.createShapes<BoxShape>([
+      { type: "box", x: 100, y: 100, props: { w: 200, h: 120, color: 0xff0000ff } },
+      { type: "box", x: 400, y: 300, props: { w: 100, h: 100, color: 0xff0000ff } },
+    ])
+    const shapes = editor.getCurrentPageShapes()
+    const union = Box.Common(shapes.map((s) => editor.getShapePageBounds(s)!))
+    const page = editor.getCurrentPageBounds()!
+    expect(page.toJson()).toEqual(union.toJson())
+    expect(page.toJson()).toEqual({ x: 100, y: 100, w: 400, h: 300 })
+
+    // Rotating a shape still agrees with the per-shape geometry bounds.
+    editor.updateShape<BoxShape>({ id: shapes[1]!.id, type: "box", rotation: Math.PI / 4 })
+    const rotated = Box.Common(editor.getCurrentPageShapes().map((s) => editor.getShapePageBounds(s)!))
+    const pageRotated = editor.getCurrentPageBounds()!
+    expect(pageRotated.x).toBeCloseTo(rotated.x, 3)
+    expect(pageRotated.y).toBeCloseTo(rotated.y, 3)
+    expect(pageRotated.w).toBeCloseTo(rotated.w, 3)
+    expect(pageRotated.h).toBeCloseTo(rotated.h, 3)
   })
 })

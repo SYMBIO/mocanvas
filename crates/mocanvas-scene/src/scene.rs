@@ -49,8 +49,12 @@ pub struct ShapeRef<'a> {
     pub h: f32,
     /// Page-space transform.
     pub page_transform: &'a Mat2d,
-    /// Page-space axis-aligned bounds.
+    /// Page-space axis-aligned *ink* bounds: the outline expanded by half the
+    /// stroke width. What the spatial index, culling and clipping run on.
     pub page_bounds: &'a Box2d,
+    /// Page-space axis-aligned *geometry* bounds: the same outline without the
+    /// stroke pad. What user-facing measurements (fit, align, report) want.
+    pub geom_bounds: &'a Box2d,
     /// Local-space bounds of the outline (empty if no geometry was uploaded).
     pub local_bounds: &'a Box2d,
     /// Page-space clip rectangle inherited from the nearest `FLAG_CLIP` ancestor
@@ -93,6 +97,7 @@ pub struct Scene {
     local_bounds: Vec<Box2d>,
     page_xf: Vec<Mat2d>,
     page_bounds: Vec<Box2d>,
+    geom_bounds: Vec<Box2d>,
     clip_of: Vec<Option<Box2d>>,
     z_rank: Vec<u32>,
     alive: Vec<bool>,
@@ -175,6 +180,7 @@ impl Scene {
             h: self.h[s],
             page_transform: &self.page_xf[s],
             page_bounds: &self.page_bounds[s],
+            geom_bounds: &self.geom_bounds[s],
             local_bounds: &self.local_bounds[s],
             clip: self.clip_of[s],
             path: &self.path[s],
@@ -346,6 +352,24 @@ impl Scene {
         b
     }
 
+    /// Page-space geometry bounds of one shape: the outline transformed into
+    /// page space, *without* the half-stroke pad that `page_bounds` carries.
+    pub fn geometry_bounds(&self, handle: Handle) -> Option<Box2d> {
+        self.slot(handle).map(|s| self.geom_bounds[s as usize])
+    }
+
+    /// Union of geometry bounds of every shape. The box a viewport fit or any
+    /// other user-facing measurement of the page should use.
+    pub fn all_geometry_bounds(&self) -> Box2d {
+        let mut b = Box2d::EMPTY;
+        for (s, alive) in self.alive.iter().enumerate() {
+            if *alive {
+                b = b.union(&self.geom_bounds[s]);
+            }
+        }
+        b
+    }
+
     /// Iterate live slots (unordered).
     pub fn slots(&self) -> impl Iterator<Item = Slot> + '_ {
         self.alive.iter().enumerate().filter(|(_, a)| **a).map(|(i, _)| i as Slot)
@@ -385,6 +409,7 @@ impl Scene {
             self.local_bounds[i] = Box2d::EMPTY;
             self.page_xf[i] = Mat2d::IDENTITY;
             self.page_bounds[i] = Box2d::EMPTY;
+            self.geom_bounds[i] = Box2d::EMPTY;
             self.clip_of[i] = None;
             self.z_rank[i] = 0;
             self.alive[i] = true;
@@ -409,6 +434,7 @@ impl Scene {
             self.local_bounds.push(Box2d::EMPTY);
             self.page_xf.push(Mat2d::IDENTITY);
             self.page_bounds.push(Box2d::EMPTY);
+            self.geom_bounds.push(Box2d::EMPTY);
             self.clip_of.push(None);
             self.z_rank.push(0);
             self.alive.push(true);
@@ -481,10 +507,7 @@ impl Scene {
     /// Page-space rectangle a `FLAG_CLIP` shape clips its descendants to: its
     /// geometry bounds (nominal size if no geometry yet), without stroke padding.
     fn clip_rect(&self, slot: Slot) -> Box2d {
-        let i = slot as usize;
-        let lb = self.local_bounds[i];
-        let lb = if lb.is_empty() { Box2d::from_xywh(0.0, 0.0, self.w[i], self.h[i]) } else { lb };
-        lb.transformed(&self.page_xf[i])
+        self.geom_bounds[slot as usize]
     }
 
     /// Clip inherited by `slot` from its parent chain: the nearest clipping
@@ -506,17 +529,28 @@ impl Scene {
         })
     }
 
+    /// Recompute both page-space boxes of a slot from the one page transform:
+    /// the geometry box (outline only) and the ink box (outline + half stroke).
+    /// The spatial index tracks the ink box.
     fn update_page_bounds(&mut self, slot: Slot) {
         let i = slot as usize;
         let lb = self.local_bounds[i];
-        let pb = if lb.is_empty() {
-            // No geometry yet: fall back to nominal size so culling still works.
-            Box2d::from_xywh(0.0, 0.0, self.w[i], self.h[i]).transformed(&self.page_xf[i])
+        // No geometry yet: fall back to nominal size so culling still works.
+        let lb = if lb.is_empty() { Box2d::from_xywh(0.0, 0.0, self.w[i], self.h[i]) } else { lb };
+        let xf = self.page_xf[i];
+        let gb = lb.transformed(&xf);
+        // The stroke pad is applied in local space (it is a local-space outline
+        // offset), so the ink box is a second transform of the padded outline
+        // rather than a page-space inflation of `gb`.
+        let half = if self.local_bounds[i].is_empty() {
+            0.0
+        } else if self.style[i].has_stroke() {
+            self.style[i].stroke_width * 0.5
         } else {
-            let half = if self.style[i].has_stroke() { self.style[i].stroke_width * 0.5 } else { 0.0 };
-            lb.expand(half).transformed(&self.page_xf[i])
+            0.0
         };
-        self.page_bounds[i] = pb;
+        self.geom_bounds[i] = gb;
+        self.page_bounds[i] = if half == 0.0 { gb } else { lb.expand(half).transformed(&xf) };
         self.reindex(slot);
     }
 
@@ -680,6 +714,55 @@ mod tests {
         assert_eq!(sc.get(1).unwrap().style.texture, 7);
         assert!(sc.get(1).unwrap().style.has_texture());
         assert!(!sc.set_texture(99, 7));
+    }
+
+    #[test]
+    fn geometry_bounds_ignore_the_stroke_that_page_bounds_include() {
+        let mut sc = Scene::new();
+        // 200x120 at (100,100) with a 3.5 unit stroke → 1.75 of pad on every side.
+        sc.upsert(1, 1, 0, ZKey(1), 0, 100.0, 100.0, 0.0, 200.0, 120.0);
+        sc.set_style(1, Style { stroke_width: 3.5, ..Style::default() });
+        sc.set_geometry(1, Path::rect(&Box2d::from_xywh(0.0, 0.0, 200.0, 120.0)));
+
+        let gb = sc.geometry_bounds(1).unwrap();
+        assert_eq!(gb.to_array(), [100.0, 100.0, 300.0, 220.0]);
+        let pb = *sc.get(1).unwrap().page_bounds;
+        assert_eq!(pb.to_array(), [98.25, 98.25, 301.75, 221.75]);
+        assert_eq!(sc.get(1).unwrap().geom_bounds.to_array(), gb.to_array());
+        // One shape: the page-wide unions are the per-shape boxes.
+        assert_eq!(sc.all_geometry_bounds().to_array(), gb.to_array());
+        assert_eq!(sc.all_bounds().to_array(), pb.to_array());
+
+        // A hairline second shape below shows the asymmetry the ink union has
+        // and the geometry union does not.
+        sc.upsert(2, 1, 0, ZKey(2), 0, 100.0, 300.0, 0.0, 200.0, 120.0);
+        sc.set_style(2, Style { stroke_width: 1.0, ..Style::default() });
+        sc.set_geometry(2, Path::rect(&Box2d::from_xywh(0.0, 0.0, 200.0, 120.0)));
+        assert_eq!(sc.all_geometry_bounds().to_array(), [100.0, 100.0, 300.0, 420.0]);
+        assert_eq!(sc.all_bounds().to_array(), [98.25, 98.25, 301.75, 420.5]);
+
+        // A shape with no stroke has identical boxes.
+        sc.set_style(2, Style { stroke: 0, ..Style::default() });
+        assert_eq!(sc.geometry_bounds(2).unwrap().to_array(), [100.0, 300.0, 300.0, 420.0]);
+        assert_eq!(sc.get(2).unwrap().page_bounds.to_array(), [100.0, 300.0, 300.0, 420.0]);
+
+        assert!(sc.geometry_bounds(99).is_none());
+    }
+
+    #[test]
+    fn geometry_bounds_of_a_rotated_shape_exclude_the_stroke() {
+        let mut sc = Scene::new();
+        sc.upsert(1, 1, 0, ZKey(1), 0, 0.0, 0.0, core::f32::consts::FRAC_PI_4, 100.0, 100.0);
+        sc.set_style(1, Style { stroke_width: 4.0, ..Style::default() });
+        sc.set_geometry(1, Path::rect(&Box2d::from_xywh(0.0, 0.0, 100.0, 100.0)));
+        let gb = sc.geometry_bounds(1).unwrap();
+        let pb = *sc.get(1).unwrap().page_bounds;
+        // 100x100 at 45° spans 100*sqrt(2); the 2-unit pad rotates with it,
+        // widening the box by 2*2*sqrt(2) with no shift of the centre.
+        assert!((gb.width() - 141.42).abs() < 0.01);
+        assert!((pb.width() - (141.42 + 5.657)).abs() < 0.01);
+        assert!((gb.center().x - pb.center().x).abs() < 1e-4);
+        assert!((gb.center().y - pb.center().y).abs() < 1e-4);
     }
 
     #[test]

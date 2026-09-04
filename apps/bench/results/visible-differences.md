@@ -37,11 +37,42 @@ Every figure in this file was measured off the two PNGs; none is carried over fr
    and inks 1,170 dark pixels against tldraw's 1,590. This is also what the rectangle's 94.8%
    interior colour agreement is (its "Hello box" label), and part of the note's 95.9%.
 
-4. **Framing.** Zoom-to-fit still lands slightly differently. Ignoring the watermark, mocanvas's ink
-   bounding box is 1146×710 px starting at (24, 44), against tldraw's 1143×712 starting at (28, 43).
-   The 4 px on the left edge is the note's wider shadow (see 2); the rest is a 1 px vertical offset
-   carried by every shape, which costs each interior-IoU row a point or two and costs the small
-   shapes more than the large ones.
+4. **Framing: mocanvas fits *ink* bounds where tldraw fits *geometry* bounds.** Ignoring the
+   watermark, mocanvas's ink bounding box is 1146×710 px starting at (24, 44), against tldraw's
+   1143×712 starting at (28, 43). The 4 px on the left edge is the note's wider shadow (see 2). The
+   rest is not the constant 1 px offset it was described as: it is a 0.33% scale difference plus a
+   0.67 px downward shift, which reads as +1.8 px at the top of the content and −0.5 px at the
+   bottom. Both harness pages compute the camera with the *same* helper (`fitCameraFor`, a fixed
+   64 px inset) at the same 1200×800 viewport, so the only free input is each library's own
+   `getCurrentPageBounds()`. tldraw returns the geometric union, `(100, 100, 1060, 660)`; mocanvas
+   returns the engine's culling bounds — `Scene::page_bounds`, each shape's geometry expanded by
+   half its stroke width — which is `(98.25, 98.25, 1063.5, 662.25)`: 1.75 px of pad around the
+   `size: "m"` (3.5 px) strokes at the top, left and right, and only 0.5 px under the frame's 1 px
+   hairline at the bottom. Feeding those two boxes to the shared formula reproduces both recorded
+   cameras exactly, to the last digit — tldraw `z = 1.071698113208`, mocanvas `z = 1.068171133051`
+   (the ratio 1060/1063.5), with the fitted centre 0.625 page px above the geometric centre because
+   the pad is thicker at the top than at the bottom. That accounts for the whole framing difference;
+   nothing is left over for a renderer offset. It costs each interior-IoU row a point or two and
+   costs the small shapes more than the large ones.
+
+   The renderer itself is not implicated and was checked directly: with the WebGL2 clip mapping from
+   `packages/editor/src/render/webgl2.ts` (`screen = (pos + cam) * zoom`, `clip = screen / vp * 2 −
+   1`, y flipped), a quad spanning page y 100–101 at `cam = (0, 0, 1)` fills device row 100 exactly
+   at dpr 1 and rows 200–201 at dpr 2, and page y 100.5–101.5 fills rows 201–202 — i.e. a page
+   coordinate of N lands on a pixel *boundary* at N × dpr, the same convention a DOM or SVG renderer
+   uses. No half pixel is introduced by the transform, by the `round(cssSize × dpr)` backing store,
+   or by `updateViewportScreenBounds` taking a viewport-relative rect.
+
+   No code was changed for this. The fix belongs in `Editor.getCurrentPageBounds()` (or in what the
+   engine reports), not in the camera: `getShapePageBounds()` returns geometry while
+   `getCurrentPageBounds()` returns ink, and the two silently disagree. Fitting to ink is defensible
+   on its own — it keeps a fat stroke from being clipped at the viewport edge — but it should not be
+   *asymmetric*: because the pad is per-shape, a thick stroke at the top and a hairline at the
+   bottom pull the fitted centre off the content's actual centre. Two 200×120 rectangles at the same
+   x, one `size: "xl"` and one `size: "s"`, make it visible with nothing else on the page: geometric
+   union `(100, 100, 200, 420)`, `getCurrentPageBounds()` `(95, 95, 210, 426)` — 5 px of pad above,
+   1 px below, so the fitted centre sits 2 px high. `Editor.zoomToFit()` inherits the same skew.
+   Nudging the camera to make this fixture line up would be the wrong repair.
 
 5. **tldraw watermark. 2.1% of the diff.** tldraw paints a "Get a license for production" badge in
    the bottom-right corner; mocanvas has nothing there. Not a rendering difference. Both region

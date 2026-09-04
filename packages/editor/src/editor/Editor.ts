@@ -723,9 +723,18 @@ export class Editor extends EventEmitter<EditorEvents> {
     return out
   }
 
+  /**
+   * Union of every shape's page bounds on the current page, or undefined when
+   * the page is empty.
+   *
+   * Geometry, not ink: this is the union of `getShapePageBounds()` and excludes
+   * the half-stroke pad the engine keeps for culling. The pad is per-shape, so
+   * including it would both inflate the box and shift its centre whenever the
+   * outermost shapes carry different stroke widths.
+   */
   getCurrentPageBounds(): Box | undefined {
     this.flushEngine()
-    const b = this.engine.allBounds()
+    const b = this.engine.allGeometryBounds()
     return b ? Box.FromMinMax(b[0], b[1], b[2], b[3]) : undefined
   }
 
