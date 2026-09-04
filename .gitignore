@@ -11,3 +11,6 @@ coverage
 # benchmark artifacts (regenerate with: pnpm --filter bench bench)
 apps/bench/results/*.png
 *.tgz
+
+# TypeScript incremental build state
+*.tsbuildinfo

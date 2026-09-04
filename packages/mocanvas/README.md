@@ -61,33 +61,41 @@ does not work.
 
 ## The WebAssembly engine
 
-The engine lives in `@mocanvas/wasm` and is loaded on mount. By default it
-resolves as `new URL("../pkg/mocanvas_bg.wasm", import.meta.url)`, which
-bundlers recognise: they emit the file as an asset and rewrite the URL.
+The engine lives in `@mocanvas/wasm` and is loaded on mount. **No bundler
+configuration is required.** It resolves as
+`new URL("../pkg/mocanvas_bg.wasm", import.meta.url)`, which bundlers
+recognise — they emit the file as an asset and rewrite the URL — then fetches
+it and verifies it really is WebAssembly. The file is ~256 KB and is fetched
+separately; it is deliberately not inlined into the JavaScript bundle.
 
-Two notes:
+When that URL does not answer with WebAssembly (a dev server's HTML fallback, a
+404 page), the loader uses a base64 copy that ships in the package instead of
+failing, logs one warning, and the canvas renders. The copy is behind a dynamic
+`import()`, so it is its own chunk and is never downloaded otherwise.
 
-- **Vite** pre-bundles dependencies with esbuild, which does not rewrite that
-  URL. Exclude the package from the optimizer:
+Two optional notes:
+
+- **Vite's dependency optimizer** pre-bundles with esbuild and rewrites that
+  URL without moving the asset, which is the one common way to land on the
+  fallback in `vite dev`. Excluding the package skips the extra download:
 
   ```ts
-  // vite.config.ts
+  // vite.config.ts — an optimisation, not a requirement
   export default defineConfig({ optimizeDeps: { exclude: ["@mocanvas/wasm"] } })
   ```
 
-- **A bundler that does not understand `new URL(..., import.meta.url)`** needs
-  the location passed in. Serve `node_modules/@mocanvas/wasm/pkg/mocanvas_bg.wasm`
-  yourself and load the engine before rendering:
+  `vite build` is unaffected either way.
+
+- **To serve the asset from a location of your own**, load the engine before
+  rendering:
 
   ```ts
   import { loadEngine } from "@mocanvas/wasm"
   await loadEngine("/assets/mocanvas_bg.wasm") // URL, Response or bytes
   ```
 
-  The engine is a singleton, so a later `<Mocanvas />` reuses it.
-
-The `.wasm` file is ~256 KB and is fetched separately; it is deliberately not
-inlined as base64 into the JavaScript bundle.
+  An explicit input is used as given, with no fallback. The engine is a
+  singleton, so a later `<Mocanvas />` reuses it.
 
 ## Packages
 

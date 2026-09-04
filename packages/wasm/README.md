@@ -33,35 +33,57 @@ console.log(frame.drawn, frame.batches.length / 7)
 
 ## Loading the `.wasm` file
 
-With no argument, `loadEngine()` resolves the module as
-`new URL("../pkg/mocanvas_bg.wasm", import.meta.url)`. Vite, webpack 5 and
-Rollup all recognise that form: they emit the file as an asset and rewrite the
-URL to point at it. The file is ~256 KB and is fetched separately; it is
-deliberately not inlined as base64 into the JavaScript bundle.
+`loadEngine()` needs no configuration in any bundler.
 
-Two cases need help:
+With no argument it resolves the module as
+`new URL("../pkg/mocanvas_bg.wasm", import.meta.url)` — Vite, webpack 5 and
+Rollup all recognise that form and emit the file as an asset — then fetches it
+and checks the first four bytes are the WebAssembly magic number. The file is
+~256 KB and is fetched separately; it is deliberately not inlined into the
+JavaScript bundle.
 
-- **Vite** pre-bundles dependencies with esbuild, which does not rewrite the
-  URL. Exclude the package from the optimizer:
+If those bytes are not a module, the URL is not usable: a dev server answering
+every unknown path with `index.html`, a 404 page, a JSON error. Rather than let
+a `CompileError: expected magic word 00 61 73 6d` escape, the loader falls back
+to a base64 copy of the engine that ships in the package, pulled in with a
+dynamic `import()` so it sits in its own chunk and is never downloaded on the
+happy path. It logs one warning when it does.
 
-  ```ts
-  // vite.config.ts
-  export default defineConfig({ optimizeDeps: { exclude: ["@mocanvas/wasm"] } })
-  ```
+### Avoiding the fallback
 
-- **A bundler that does not understand `new URL(..., import.meta.url)`** needs
-  the location passed in. Copy or serve
-  `node_modules/@mocanvas/wasm/pkg/mocanvas_bg.wasm` and pass its URL — or a
-  `Response`, or the compiled bytes:
+The one common way to end up on that path is Vite's dependency optimizer, which
+pre-bundles with esbuild and rewrites `import.meta.url` without moving the
+asset. Excluding the package skips the extra download:
 
-  ```ts
-  await loadEngine("/assets/mocanvas_bg.wasm")
-  await loadEngine(fetch("/assets/mocanvas_bg.wasm"))
-  ```
+```ts
+// vite.config.ts — an optimisation, not a requirement
+export default defineConfig({ optimizeDeps: { exclude: ["@mocanvas/wasm"] } })
+```
 
-In Node there is no bundler and `fetch` does not read `file:` URLs, so
-`loadEngine()` with no argument is a browser path only. Load the bytes
-yourself instead:
+`vite build` is unaffected either way: Rollup emits the `.wasm` as an asset and
+the URL resolves.
+
+### Pointing at the file yourself
+
+A bundler that does not understand `new URL(..., import.meta.url)` at all, or a
+setup that serves the asset from somewhere specific, can pass the location in.
+Copy or serve `node_modules/@mocanvas/wasm/pkg/mocanvas_bg.wasm` and pass its
+URL — or a `Response`, or the compiled bytes, or a `WebAssembly.Module`:
+
+```ts
+await loadEngine("/assets/mocanvas_bg.wasm")
+await loadEngine(fetch("/assets/mocanvas_bg.wasm"))
+```
+
+An explicit input is taken at face value: it is handed straight to the glue,
+with no validation and no fallback, so a wrong location surfaces as its own
+error instead of being papered over.
+
+### Node
+
+In Node `fetch` does not read `file:` URLs, so `loadEngine()` with no argument
+reaches the embedded copy (with the warning). For tests and scripts, load the
+bytes yourself instead:
 
 ```ts
 import { readFileSync } from "node:fs"

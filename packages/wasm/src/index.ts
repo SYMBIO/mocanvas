@@ -473,24 +473,96 @@ export class EngineBridge {
 }
 
 let initPromise: Promise<WebAssembly.Memory> | null = null
+let warnedEmbedded = false
+
+/** `\0asm` — the four bytes every WebAssembly module starts with. */
+const WASM_MAGIC = [0x00, 0x61, 0x73, 0x6d]
+
+function isWasm(bytes: ArrayBuffer): boolean {
+  if (bytes.byteLength < WASM_MAGIC.length) return false
+  const head = new Uint8Array(bytes, 0, WASM_MAGIC.length)
+  return WASM_MAGIC.every((b, i) => head[i] === b)
+}
+
+/**
+ * Fetch the module URL ourselves and check it really is WebAssembly.
+ *
+ * A dev server that rewrites unknown paths to `index.html` (Vite's SPA
+ * fallback, hit whenever the optimizer has moved this module and the relative
+ * URL no longer points anywhere) answers with a `200` full of HTML. Handing
+ * that to the glue raises `CompileError: expected magic word 00 61 73 6d,
+ * found 3c 21 64 6f` from deep inside a vendored file. Returning `null` here
+ * instead lets the caller reach for the embedded copy.
+ */
+async function fetchWasm(url: URL): Promise<ArrayBuffer | null> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const bytes = await res.arrayBuffer()
+    return isWasm(bytes) ? bytes : null
+  } catch {
+    // No `fetch`, a `file:` URL (Node), CORS, an offline network: all the same
+    // answer — we could not get the bytes from the URL.
+    return null
+  }
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  if (typeof atob === "function") {
+    const bin = atob(b64)
+    const out = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
+    return out
+  }
+  // Node without `atob` (or a runtime that only has `Buffer`).
+  const buf = (globalThis as { Buffer?: { from(s: string, enc: string): Uint8Array } }).Buffer
+  if (!buf) throw new Error("mocanvas: no base64 decoder (`atob` or `Buffer`) in this runtime")
+  return new Uint8Array(buf.from(b64, "base64"))
+}
+
+/**
+ * The default load path: the URL first, the embedded copy as a safety net.
+ *
+ * The base64 module is generated at build time (see `scripts/prepare-pkg.mjs`)
+ * and pulled in with a *dynamic* import, so every bundler gives it its own
+ * chunk and the happy path never downloads it.
+ */
+async function loadDefault(): Promise<WebAssembly.Memory> {
+  const url = new URL("../pkg/mocanvas_bg.wasm", import.meta.url)
+  const fetched = await fetchWasm(url)
+  if (fetched) return (await init({ module_or_path: fetched })).memory
+
+  if (!warnedEmbedded) {
+    warnedEmbedded = true
+    console.warn(
+      `mocanvas: could not fetch the WebAssembly module from ${url.href} — it was not served as WebAssembly. ` +
+        "Falling back to the copy embedded in the bundle; the canvas works, but that is a larger download than it needs to be. " +
+        'To take the URL instead, add optimizeDeps: { exclude: ["@mocanvas/wasm"] } to your Vite config.',
+    )
+  }
+  const { wasmBase64 } = await import("../pkg/mocanvas-wasm-base64.js")
+  return (await init({ module_or_path: base64ToBytes(wasmBase64) })).memory
+}
 
 /**
  * Load the WASM module (once) and create an engine.
  *
  * With no argument the module is resolved as
- * `new URL("../pkg/mocanvas_bg.wasm", import.meta.url)`, which Vite, webpack 5
+ * `new URL("../pkg/mocanvas_bg.wasm", import.meta.url)` — which Vite, webpack 5
  * and Rollup all recognise: they emit the `.wasm` file as an asset and rewrite
- * the URL to point at it. The same relative path is correct from `src/` during
- * development and from `dist/` in the published package.
+ * the URL — then fetched and checked for the WebAssembly magic number. If those
+ * bytes are not a module (a dev server's HTML fallback, a 404 page, a JSON
+ * error), an embedded base64 copy is used instead and a one-time warning is
+ * logged. No consumer configuration is required either way.
  *
- * Bundlers that do not understand `new URL(..., import.meta.url)` need the
- * location passed in: `loadEngine("/assets/mocanvas_bg.wasm")`, a `URL`, a
- * `Response`, or the compiled bytes. See the package README.
+ * Passing an input takes over completely: `loadEngine("/assets/mocanvas_bg.wasm")`,
+ * a `URL`, a `Response`, the compiled bytes or a `WebAssembly.Module` are handed
+ * to the glue as-is, with no validation and no fallback, so a mistake in the
+ * location you chose surfaces as its own error. See the package README.
  */
 export async function loadEngine(input?: InitInput): Promise<EngineBridge> {
   if (!initPromise) {
-    const module_or_path = input ?? new URL("../pkg/mocanvas_bg.wasm", import.meta.url)
-    initPromise = init({ module_or_path }).then((o) => o.memory)
+    initPromise = input === undefined ? loadDefault() : init({ module_or_path: input }).then((o) => o.memory)
   }
   const memory = await initPromise
   return new EngineBridge(new Engine(), memory)
