@@ -1,6 +1,10 @@
 /**
  * Arrow body and arrowhead math.
  *
+ * A body is a straight run, an arc, or — for an elbow arrow — the polyline
+ * routed by `elbow-helpers`. Everything below works on all three, so callers
+ * ask for a point, a tangent or a length without caring which one they hold.
+ *
  * Bend convention: `bend` is the signed perpendicular offset of the arc's
  * midpoint from the chord midpoint. The perpendicular is `Per(Uni(end-start))`
  * = (-dy, dx), so for a left-to-right arrow a positive bend bows the arc toward
@@ -26,7 +30,17 @@ export interface ArcBody {
   sweep: number
 }
 
-export type ArrowBody = StraightBody | ArcBody
+/**
+ * A body made of straight runs: the elbow arrow's axis-aligned route with its
+ * corners already rounded. Built by `getElbowBody` in `elbow-helpers`; every
+ * body operation below treats it as a polyline parameterized by arc length.
+ */
+export interface ElbowBody {
+  kind: "elbow"
+  points: Vec[]
+}
+
+export type ArrowBody = StraightBody | ArcBody | ElbowBody
 
 const EPS = 1e-6
 
@@ -66,20 +80,70 @@ export function getArrowBody(start: VecLike, end: VecLike, bend: number): ArrowB
   return { kind: "arc", center, radius, startAngle, sweep }
 }
 
+/** Cumulative length at each point of a polyline; `at(-1)` is its total length. */
+function cumulativeLengths(points: Vec[]): number[] {
+  const out = [0]
+  for (let i = 1; i < points.length; i++) out.push(out[i - 1]! + Vec.Dist(points[i - 1]!, points[i]!))
+  return out
+}
+
+/** Index of the segment holding `distance`, as an index into `points`. */
+function segmentAt(lengths: number[], distance: number): number {
+  for (let i = 1; i < lengths.length; i++) {
+    if (distance <= lengths[i]! || i === lengths.length - 1) return i - 1
+  }
+  return 0
+}
+
+/** The point `distance` along a polyline, clamped to its ends. */
+function pointAtDistance(points: Vec[], lengths: number[], distance: number): Vec {
+  if (points.length === 0) return new Vec()
+  if (points.length === 1) return points[0]!.clone()
+  const i = segmentAt(lengths, distance)
+  const segment = lengths[i + 1]! - lengths[i]!
+  const t = segment < EPS ? 0 : (distance - lengths[i]!) / segment
+  return Vec.Lrp(points[i]!, points[i + 1]!, Math.max(0, Math.min(1, t)))
+}
+
 export function getBodyLength(body: ArrowBody): number {
-  return body.kind === "straight" ? Vec.Dist(body.start, body.end) : Math.abs(body.sweep) * body.radius
+  if (body.kind === "straight") return Vec.Dist(body.start, body.end)
+  if (body.kind === "elbow") return cumulativeLengths(body.points).at(-1) ?? 0
+  return Math.abs(body.sweep) * body.radius
 }
 
 /** Point at parameter `t` in [0, 1] along the body. */
 export function getPointOnBody(body: ArrowBody, t: number): Vec {
   if (body.kind === "straight") return Vec.Lrp(body.start, body.end, t)
+  if (body.kind === "elbow") {
+    const lengths = cumulativeLengths(body.points)
+    return pointAtDistance(body.points, lengths, (lengths.at(-1) ?? 0) * t)
+  }
   const a = body.startAngle + body.sweep * t
   return new Vec(body.center.x + body.radius * Math.cos(a), body.center.y + body.radius * Math.sin(a))
 }
 
-/** Unit direction of travel at parameter `t`. */
+/**
+ * Unit direction of travel at parameter `t`. On an elbow that is the direction
+ * of the leg `t` falls on, so `t = 1` gives the direction of the final leg —
+ * which is where the end arrowhead points.
+ */
 export function getTangentOnBody(body: ArrowBody, t: number): Vec {
   if (body.kind === "straight") return Vec.Uni(Vec.Sub(body.end, body.start))
+  if (body.kind === "elbow") {
+    const points = body.points
+    if (points.length < 2) return new Vec(1, 0)
+    const lengths = cumulativeLengths(points)
+    const i = segmentAt(lengths, (lengths.at(-1) ?? 0) * Math.max(0, Math.min(1, t)))
+    // Degenerate segments carry no direction; walk to the nearest one that does.
+    for (let step = 0; step < points.length; step++) {
+      for (const j of [i + step, i - step]) {
+        if (j < 0 || j >= points.length - 1) continue
+        const d = Vec.Sub(points[j + 1]!, points[j]!)
+        if (Vec.Len(d) > EPS) return Vec.Uni(d)
+      }
+    }
+    return new Vec(1, 0)
+  }
   const a = body.startAngle + body.sweep * t
   const dir = Math.sign(body.sweep) || 1
   return new Vec(-Math.sin(a) * dir, Math.cos(a) * dir)
@@ -98,6 +162,18 @@ export function shortenBody(body: ArrowBody, startBy: number, endBy: number): Ar
   if (body.kind === "straight") {
     return { kind: "straight", start: getPointOnBody(body, s / length), end: getPointOnBody(body, 1 - e / length) }
   }
+  if (body.kind === "elbow") {
+    const lengths = cumulativeLengths(body.points)
+    const from = s
+    const to = length - e
+    const points: Vec[] = [pointAtDistance(body.points, lengths, from)]
+    for (let i = 1; i < body.points.length - 1; i++) {
+      const at = lengths[i]!
+      if (at > from + EPS && at < to - EPS) points.push(body.points[i]!.clone())
+    }
+    points.push(pointAtDistance(body.points, lengths, to))
+    return { kind: "elbow", points }
+  }
   const dir = Math.sign(body.sweep) || 1
   const dStart = (s / body.radius) * dir
   const dEnd = (e / body.radius) * dir
@@ -110,9 +186,10 @@ export function shortenBody(body: ArrowBody, startBy: number, endBy: number): Ar
   }
 }
 
-/** Geometry for the body: a two-point polyline or a cubic approximation of the arc. */
+/** Geometry for the body: a polyline (straight or elbow) or a cubic approximation of the arc. */
 export function bodyToGeometry(body: ArrowBody): Geometry2d {
   if (body.kind === "straight") return new Polyline2d({ points: [body.start, body.end] })
+  if (body.kind === "elbow") return new Polyline2d({ points: body.points })
   const count = Math.max(2, Math.ceil(Math.abs(body.sweep) / (Math.PI / 2)))
   return new CubicSpline2d({
     segments: arcToCubicSegments(body.center, body.radius, body.startAngle, body.sweep, count),

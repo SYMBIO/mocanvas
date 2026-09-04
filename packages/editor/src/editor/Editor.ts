@@ -2272,6 +2272,161 @@ export class Editor extends EventEmitter<EditorEvents> {
     const pageId = this.getCurrentPageId()
     return this.getCollaborators().filter((p) => p.currentPageId === pageId)
   }
+
+  // ---- resizing ----------------------------------------------------------
+
+  /**
+   * Scale one shape by `scale` about a point, letting its `ShapeUtil.onResize`
+   * produce the prop change — the same contract the select tool's resize state
+   * uses. The shape's origin is moved by the same scale about `scaleOrigin`
+   * (its page bounds center by default), measured in a frame rotated by
+   * `scaleAxisRotation`.
+   *
+   * Locked shapes and shapes whose util says `canResize` is false are left
+   * alone. `onResizeStart` / `onResizeEnd` bracket the change; the util is
+   * told the resize came from the `bottom_right` handle.
+   */
+  resizeShape(id: ShapeId | UnknownShape, scale: VecLike, options: ResizeShapeOptions = {}): this {
+    const shape = this.getShape(id)
+    if (!shape || shape.isLocked) return this
+    const util = this.getShapeUtil(shape)
+    if (!util.canResize(shape)) return this
+    if (!Number.isFinite(scale.x) || !Number.isFinite(scale.y)) return this
+
+    const initialBounds = options.initialBounds ?? this.getShapeGeometryBounds(shape)?.toJson()
+    if (!initialBounds) return this
+
+    let scaleX = scale.x
+    let scaleY = scale.y
+    if (options.isAspectRatioLocked ?? util.isAspectRatioLocked(shape)) {
+      const s = Math.max(Math.abs(scaleX), Math.abs(scaleY))
+      scaleX = Math.sign(scaleX || 1) * s
+      scaleY = Math.sign(scaleY || 1) * s
+    }
+
+    const m = this.getShapePageTransform(shape)
+    const pagePos = new Vec(m.e, m.f)
+    const origin = options.scaleOrigin ?? this.getShapePageBounds(shape)?.center ?? pagePos
+    const axis = options.scaleAxisRotation ?? 0
+    // Move the origin in the scale frame, then bring it back to page space.
+    const inFrame = Vec.Rot(Vec.Sub(pagePos, origin), -axis)
+    const scaled = new Vec(inFrame.x * scaleX, inFrame.y * scaleY)
+    const newPoint = this.getPointInParentSpace(shape, Vec.Add(origin, Vec.Rot(scaled, axis)))
+
+    this.run(() => {
+      util.onResizeStart?.(shape)
+      const change = util.onResize?.(shape, {
+        newPoint,
+        handle: "bottom_right",
+        mode: options.mode ?? "scale_shape",
+        scaleX,
+        scaleY,
+        initialBounds,
+        initialShape: shape,
+      })
+      this.updateShapes([{ id: shape.id, type: shape.type, x: newPoint.x, y: newPoint.y, ...(change ?? {}) }])
+      const current = this.getShape(shape.id)
+      if (current) util.onResizeEnd?.(shape, current)
+    })
+    return this
+  }
+
+  /**
+   * Scale several shapes by the same factor about one point — by default the
+   * center of their common page bounds, so the group scales as a unit.
+   */
+  resizeShapes(
+    ids: readonly (ShapeId | UnknownShape)[],
+    scale: VecLike,
+    options: Omit<ResizeShapeOptions, "initialBounds"> = {},
+  ): this {
+    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s)
+    if (shapes.length === 0) return this
+    const boxes = shapes.map((s) => this.getShapePageBounds(s)).filter((b): b is Box => !!b)
+    if (boxes.length === 0) return this
+    const scaleOrigin = options.scaleOrigin ?? Box.Common(boxes).center
+    this.run(() => {
+      for (const shape of shapes) this.resizeShape(shape.id, scale, { ...options, scaleOrigin })
+    })
+    return this
+  }
+
+  /**
+   * Resize shapes so each one spans the common bounds of all of them on one
+   * axis. Every shape given contributes to the common bounds, but only the
+   * unlocked, resizable ones are stretched.
+   */
+  stretchShapes(ids: readonly ShapeId[], operation: "horizontal" | "vertical"): this {
+    const items: { shape: UnknownShape; b: Box }[] = []
+    for (const id of ids) {
+      const shape = this.getShape(id)
+      if (!shape) continue
+      const b = this.getShapePageBounds(shape)
+      if (b) items.push({ shape, b })
+    }
+    if (items.length < 2) return this
+    const common = Box.Common(items.map((it) => it.b))
+    const horizontal = operation === "horizontal"
+    this.run(() => {
+      for (const { shape, b } of items) {
+        if (shape.isLocked || !this.getShapeUtil(shape).canResize(shape)) continue
+        const scale = horizontal
+          ? { x: b.w === 0 ? 1 : common.w / b.w, y: 1 }
+          : { x: 1, y: b.h === 0 ? 1 : common.h / b.h }
+        this.resizeShape(shape.id, scale, { scaleOrigin: { x: b.x, y: b.y }, isAspectRatioLocked: false })
+        // The scale happened about the old top-left corner; slide the shape so
+        // its leading edge sits on the common bounds.
+        const after = this.getShapePageBounds(shape.id)
+        if (!after) continue
+        const d = horizontal ? new Vec(common.x - after.x, 0) : new Vec(0, common.y - after.y)
+        if (d.x !== 0 || d.y !== 0) this.nudgeShapes([shape.id], d)
+      }
+    })
+    return this
+  }
+
+  // ---- export ------------------------------------------------------------
+  // The implementations live in `mocanvas` (which depends on this package, not
+  // the other way round), so they are installed through a registration seam.
+
+  /**
+   * Serialize shapes to an SVG string; `undefined` when there is nothing to
+   * export. Defaults to the selection, or the whole page when nothing is
+   * selected. Throws until an export implementation is registered.
+   */
+  getSvgString(ids?: readonly ShapeId[], opts?: EditorSvgExportOptions): EditorSvgExportResult | undefined {
+    const impl = exportImplementation
+    if (!impl) throw new Error(missingImplementation("getSvgString", "registerExportImplementation"))
+    return impl.getSvgString(this, ids, opts)
+  }
+
+  /**
+   * Render shapes to an image blob (`png` by default). Same shape selection
+   * rules as `getSvgString`. Throws until an export implementation is
+   * registered.
+   */
+  async toImage(ids?: readonly ShapeId[], opts?: EditorImageExportOptions): Promise<EditorImageExportResult> {
+    const impl = exportImplementation
+    if (!impl) throw new Error(missingImplementation("toImage", "registerExportImplementation"))
+    return await impl.toImage(this, ids, opts)
+  }
+
+  // ---- text measurement --------------------------------------------------
+
+  /**
+   * Measures runs of text the way the editor renders them. Installed through
+   * the same seam as the export functions; throws until something registers
+   * one.
+   */
+  get textMeasure(): EditorTextMeasure {
+    if (!textMeasureProvider) throw new Error(missingImplementation("textMeasure", "registerTextMeasureImplementation"))
+    return textMeasureProvider(this)
+  }
+
+  // ---- menus -------------------------------------------------------------
+
+  /** Which menus are open right now. Backed by the `instance` session record. */
+  readonly menus: MenuManager = new MenuManager(this)
 }
 
 function sameClips(a: readonly (ClipRect | undefined)[], b: readonly (ClipRect | undefined)[]): boolean {
@@ -2284,4 +2439,183 @@ function sameClips(a: readonly (ClipRect | undefined)[], b: readonly (ClipRect |
     if (x[0] !== y[0] || x[1] !== y[1] || x[2] !== y[2] || x[3] !== y[3]) return false
   }
   return true
+}
+
+// ---- resize options ---------------------------------------------------------
+
+export interface ResizeShapeOptions {
+  /** Shape-local bounds the scale is measured against. Defaults to the shape's geometry bounds. */
+  initialBounds?: { x: number; y: number; w: number; h: number }
+  /** Page point that stays put. Defaults to the center of the shape's page bounds. */
+  scaleOrigin?: VecLike
+  /** Rotation (radians) of the frame the scale axes are measured in. Defaults to 0. */
+  scaleAxisRotation?: number
+  /** Force (or forbid) a uniform scale. Defaults to the util's `isAspectRatioLocked`. */
+  isAspectRatioLocked?: boolean
+  /** Handed to `onResize`. Defaults to `"scale_shape"`. */
+  mode?: "scale_shape" | "resize_bounds"
+}
+
+// ---- registration seams -----------------------------------------------------
+// SVG/image export and text measurement are implemented in `mocanvas`, which
+// depends on this package. They are installed here at import time so the
+// `Editor` methods can stay where callers expect them without inverting the
+// dependency.
+
+export interface EditorSvgExportOptions {
+  /** Page units added around the shapes' bounds. */
+  padding?: number
+  /** Paint a full-size background rectangle. */
+  background?: boolean
+  /** Multiplier applied to the output `width`/`height`. */
+  scale?: number
+  /** Use the dark background colour. */
+  darkMode?: boolean
+}
+
+export interface EditorSvgExportResult {
+  svg: string
+  /** Output size in CSS pixels (bounds × scale). */
+  width: number
+  height: number
+}
+
+export interface EditorImageExportOptions extends EditorSvgExportOptions {
+  /** Output format. Implementations default to `"png"`. */
+  format?: "svg" | "png" | "jpeg" | "webp"
+  /** Encoder quality for lossy formats (0..1). */
+  quality?: number
+  /** Device pixel ratio multiplier for raster output. */
+  pixelRatio?: number
+}
+
+export interface EditorImageExportResult {
+  blob: Blob
+  width: number
+  height: number
+}
+
+export interface EditorExportImplementation {
+  getSvgString(
+    editor: Editor,
+    ids?: readonly ShapeId[],
+    opts?: EditorSvgExportOptions,
+  ): EditorSvgExportResult | undefined
+  toImage(editor: Editor, ids?: readonly ShapeId[], opts?: EditorImageExportOptions): Promise<EditorImageExportResult>
+}
+
+let exportImplementation: EditorExportImplementation | null = null
+
+/**
+ * Install the implementation behind `Editor.getSvgString` and `Editor.toImage`.
+ * `mocanvas` calls this at import time; pass `null` to remove it. Returns a
+ * function that removes the implementation again (only if it is still the
+ * registered one).
+ */
+export function registerExportImplementation(impl: EditorExportImplementation | null): () => void {
+  exportImplementation = impl
+  return () => {
+    if (exportImplementation === impl) exportImplementation = null
+  }
+}
+
+/** The registered export implementation, or `null` when nothing has registered one. */
+export function getExportImplementation(): EditorExportImplementation | null {
+  return exportImplementation
+}
+
+export interface EditorTextMeasureOptions {
+  fontFamily: string
+  fontSize: number
+  fontWeight?: string | number
+  /** Unitless line height (multiplier of the font size). */
+  lineHeight: number
+  /** Wrap width in CSS px, including `padding`. Omit for a single unwrapped run per paragraph. */
+  maxWidth?: number
+  /** Padding applied on every side; included in the returned `w`/`h`. */
+  padding?: number
+}
+
+export interface EditorTextMeasurement {
+  w: number
+  h: number
+  lineCount: number
+}
+
+export interface EditorTextMeasure {
+  measureText(text: string, opts: EditorTextMeasureOptions): EditorTextMeasurement
+}
+
+export type EditorTextMeasureProvider = (editor: Editor) => EditorTextMeasure
+
+let textMeasureProvider: EditorTextMeasureProvider | null = null
+
+/**
+ * Install the measurer behind `Editor.textMeasure`. `mocanvas` calls this at
+ * import time; pass `null` to remove it. Returns a function that removes the
+ * provider again (only if it is still the registered one).
+ */
+export function registerTextMeasureImplementation(provider: EditorTextMeasureProvider | null): () => void {
+  textMeasureProvider = provider
+  return () => {
+    if (textMeasureProvider === provider) textMeasureProvider = null
+  }
+}
+
+/** The registered text measure provider, or `null` when nothing has registered one. */
+export function getTextMeasureProvider(): EditorTextMeasureProvider | null {
+  return textMeasureProvider
+}
+
+function missingImplementation(member: string, register: string): string {
+  return (
+    `Editor.${member} has no implementation registered. Importing \`mocanvas\` installs it — ` +
+    `import { Mocanvas } from "mocanvas" (or "mocanvas" for its side effect) anywhere in your app. ` +
+    `To install your own, call ${register}(...) from "@mocanvas/editor".`
+  )
+}
+
+// ---- menus ------------------------------------------------------------------
+
+/**
+ * The set of menus that are open, kept in the `instance` session record so it
+ * survives tool changes, is visible to anything reading the store, and is
+ * reactive: reading `getOpenMenus()` inside a signal re-runs it on every change.
+ *
+ * Ids are opaque strings owned by the UI; nothing here interprets them.
+ */
+export class MenuManager {
+  constructor(private readonly editor: Editor) {}
+
+  /** The open menu ids, in the order they were opened. */
+  getOpenMenus(): string[] {
+    return [...this.editor.getInstanceState().openMenus]
+  }
+
+  isMenuOpen(id: string): boolean {
+    return this.editor.getInstanceState().openMenus.includes(id)
+  }
+
+  /** Mark a menu as open. Opening an already-open menu changes nothing. */
+  addOpenMenu(id: string): this {
+    const open = this.editor.getInstanceState().openMenus
+    if (open.includes(id)) return this
+    this.editor.updateInstanceState({ openMenus: [...open, id] })
+    return this
+  }
+
+  /** Mark a menu as closed. Closing a menu that is not open changes nothing. */
+  removeOpenMenu(id: string): this {
+    const open = this.editor.getInstanceState().openMenus
+    if (!open.includes(id)) return this
+    this.editor.updateInstanceState({ openMenus: open.filter((menu) => menu !== id) })
+    return this
+  }
+
+  /** Close every open menu. */
+  clearOpenMenus(): this {
+    if (this.editor.getInstanceState().openMenus.length === 0) return this
+    this.editor.updateInstanceState({ openMenus: [] })
+    return this
+  }
 }

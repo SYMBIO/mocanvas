@@ -147,11 +147,16 @@ function firstCrossing(path: Vec[], segments: [Vec, Vec][]): Vec | null {
   return null
 }
 
-/** Sample the arrow body from `from` to `to` (bowed by `bend`) as a polyline starting at `from`. */
+/**
+ * Sample the arrow body from `from` to `to` (bowed by `bend`) as a polyline
+ * starting at `from`. An elbow arrow is sampled the same way: where it meets
+ * the bound shape is decided by the line of sight from the other terminal —
+ * the route is built afterwards, from the terminals this returns.
+ */
 function sampleBody(from: Vec, to: Vec, bend: number, reverse: boolean): Vec[] {
   // The body is always described start → end so the bend sign keeps its meaning.
   const body = reverse ? getArrowBody(to, from, bend) : getArrowBody(from, to, bend)
-  if (body.kind === "straight") return [from, to]
+  if (body.kind !== "arc") return [from, to]
   const count = Math.max(8, Math.min(128, Math.ceil((Math.abs(body.sweep) * body.radius) / 4)))
   const pts: Vec[] = []
   for (let i = 0; i <= count; i++) {
@@ -164,6 +169,44 @@ function sampleBody(from: Vec, to: Vec, bend: number, reverse: boolean): Vec[] {
 export interface ArrowTerminals {
   start: Vec
   end: Vec
+}
+
+/** Which axis an elbow arrow leaves a terminal on, when that terminal is bound. */
+export interface ElbowTerminalAxes {
+  start?: "x" | "y"
+  end?: "x" | "y"
+}
+
+/**
+ * For each bound terminal, the axis of the normal of the bound shape's nearest
+ * edge: `"x"` on a left or right edge, `"y"` on a top or bottom one. An elbow
+ * arrow routes its first and last leg along these, so it leaves and enters a
+ * bound shape square-on instead of diagonally. A free terminal is absent from
+ * the result and the router falls back to the dominant axis.
+ *
+ * The bound shape's bounds are measured in arrow space, so a rotated shape is
+ * compared against the box it occupies from the arrow's point of view — which
+ * is the frame the route itself is built in.
+ */
+export function getBoundElbowAxes(editor: Editor, arrow: ArrowShape, terminals: ArrowTerminals): ElbowTerminalAxes {
+  const bindings = getArrowBindings(editor, arrow)
+  const out: ElbowTerminalAxes = {}
+  for (const terminal of ["start", "end"] as const) {
+    const binding = bindings[terminal]
+    const shape = binding ? editor.getShape(binding.toId) : undefined
+    if (!shape) continue
+    const m = editor.getShapePageTransform(shape)
+    const corners = editor
+      .getShapeGeometry(shape)
+      .bounds.corners.map((p) => editor.getPointInShapeSpace(arrow, applyTransform(m, p)))
+    const box = Box.FromPoints(corners)
+    if (box.w < 1e-6 && box.h < 1e-6) continue
+    const p = terminals[terminal]
+    const dx = Math.min(Math.abs(p.x - box.minX), Math.abs(p.x - box.maxX))
+    const dy = Math.min(Math.abs(p.y - box.minY), Math.abs(p.y - box.maxY))
+    out[terminal] = dx <= dy ? "x" : "y"
+  }
+  return out
 }
 
 /**

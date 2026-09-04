@@ -29,9 +29,9 @@ the prefix as type aliases (`TLShape = Shape`, `TLShapeId = ShapeId`, ...).
 | `camera`          | same   | `id x y z meta` (session) |
 | `instance`        | same   | `currentPageId isFocused isDebugMode isGridMode isReadonly ...` (session) |
 | `instance_page_state` | same | `pageId selectedShapeIds hoveredShapeId editingShapeId ...` (session) |
-| `binding`         | later  | arrow bindings arrive with arrows in phase 2 |
+| `binding`         | same   | `id type fromId toId props meta`; the arrow bindings that use it ship in `mocanvas` |
 | `asset`           | same   | `id type props meta`; `type` is `image` \| `video` \| `bookmark`; image/video props `w h name isAnimated mimeType src fileSize?`, bookmark `title description image favicon src` |
-| `pointer`, `instance_presence` | later | collaboration |
+| `pointer`, `instance_presence` | **differs** | `instance_presence` is the same record in the `presence` scope; `@mocanvas/sync` keeps it in step with the local editor and `editor.getCollaborators()` reads the others back. There is no `pointer` record: the local cursor lives on `editor.inputs` and is published through presence |
 
 Style values (`color`, `fill`, `dash`, `size`, `font`, `align`, `verticalAlign`)
 keep the same string unions so `.tldr` files load without translation.
@@ -57,12 +57,12 @@ keep the same string unions so `.tldr` files load without translation.
 | `getStyleForNextShape` `setStyleForNextShapes` `setStyleForSelectedShapes` `getSharedStyles` | same | `StyleProp.define` / `defineEnum`; default styles use `mocanvas:` ids |
 | `snaps` | same shape | `SnapManager.snapTranslate` returns nudge + guide lines |
 | `nudgeShapes` `rotateShapesBy` `flipShapes` `alignShapes` `distributeShapes` `stackShapes` `toggleLock` | same | `flipShapes` mirrors positions, not geometry |
-| `resizeShape` `stretchShapes` | phase 3 | interactive resize lives in the select tool |
-| `getSvgString` `toImage` | **differs** | not Editor methods: import the free functions `getSvgString(editor, ids?, opts?)` and `exportToBlob(editor, opts)` from `mocanvas` |
+| `resizeShape` `resizeShapes` `stretchShapes` | same | `resizeShape(id, scale, opts?)` scales one shape about `scaleOrigin` (its page bounds center by default) in a frame rotated by `scaleAxisRotation`, and hands the prop change to `ShapeUtil.onResize` exactly as the select tool does; `resizeShapes` scales a group about their common center; `stretchShapes(ids, 'horizontal' \| 'vertical')` makes every shape span the common bounds on one axis. Locked and `canResize: false` shapes are skipped. Interactive resize still lives in the select tool |
+| `getSvgString` `toImage` | same | `getSvgString(ids?, opts?)` returns `{ svg, width, height }`; `toImage(ids?, opts?)` resolves to `{ blob, width, height }`. Both are thin methods over an implementation that `mocanvas` installs at import time through `registerExportImplementation({ getSvgString, toImage })`; without it they fail with an error saying so. The free functions `getSvgString(editor, ids?, opts?)` and `exportToBlob(editor, opts)` from `mocanvas` are unchanged |
 | `putExternalContent` `registerExternalContentHandler` `registerExternalAssetHandler` | same | content types `files` `text` `url` `svg-text`; `getAssetForExternalContent` produces an asset without storing it; defaults are installed by `useExternalContent` / `registerDefaultExternalContentHandlers` |
 | `getAsset` `getAssets` `createAssets` `updateAssets` `deleteAssets` | same | assets are document-scoped, not per page |
 | `inputs` | same shape | pointer/keyboard state on the editor |
-| `user` `menus` `textMeasure` | **missing** | `user` arrives with collaboration; text measuring is `getTextMeasure()` from `mocanvas`; no menu registry |
+| `user` `menus` `textMeasure` | same | `user` is the local identity (`getId` `getName` `getColor` plus setters, session-only, used by `@mocanvas/sync`); `menus` is `addOpenMenu` `removeOpenMenu` `getOpenMenus` `clearOpenMenus` `isMenuOpen` over the reactive `instance.openMenus` field; `textMeasure` is installed by `mocanvas` through `registerTextMeasureImplementation(getTextMeasure)` and throws until it is (the free `getTextMeasure()` still works) |
 | `sideEffects` | same | store side effects |
 | `store` | same | `Store` instance |
 
@@ -70,7 +70,11 @@ keep the same string unions so `.tldr` files load without translation.
 
 | Shape | Status | Notes |
 | ----- | ------ | ----- |
+| `arrow` | same | props `kind start end bend elbowMidPoint arrowheadStart arrowheadEnd labelPosition text scale` plus the `color labelColor fill dash size font` styles. `kind` is honoured: `"arc"` (default) bows by `bend`, `"elbow"` routes axis-aligned legs and ignores `bend`, with `elbowMidPoint` (`0..1`) sliding the middle leg along the routing axis. A bound elbow leaves the shape along its nearest edge's normal. **differs**: `kind` is a plain prop, not a style, so it is not in `getSharedStyles` and has no style-panel control; an elbow's midpoint handle replaces the arc's `bend` handle |
 | `image` | same | props `w h assetId playing url crop flipX flipY altText`; drawn by the DOM overlay (`<img>`) for now, GPU texture path pending |
+| `bookmark` | same | props `w h assetId url`; the link card (banner, title, description, favicon + host) is drawn by the DOM overlay from the `bookmark` asset; the url is an inert `<a>` — the canvas keeps the pointer unless the shape is being edited |
+| `embed` | **differs** | props `w h url`; only urls on an exported permit list (`embedDefinitions`, `getEmbedDefinition`) are put in a sandboxed `<iframe>` — anything else renders a placeholder card. An app extends the list by pushing its own `EmbedDefinition` |
+| `video` | same | props `w h assetId time playing url altText`; drawn by the DOM overlay (`<video>`) from the `video` asset, muted and `playsInline`, with controls only while editing |
 
 ## `ShapeUtil<T>`
 
@@ -78,11 +82,11 @@ keep the same string unions so `.tldr` files load without translation.
 | ------ | ------ |
 | `static type`, `static props`, `static migrations` | same |
 | `getDefaultProps` `getGeometry` `component` | same |
-| `indicator` | **differs** | declared and implemented by every util, but the default indicators layer draws geometry bounds instead of calling it |
+| `indicator` | same | the default indicators layer calls it for every selected and hovered shape and draws the result inside that shape's page transform, with the selection colour and a zoom-independent hairline inherited from the wrapping `<g>`; a util that returns `null` falls back to a rectangle around its geometry bounds |
 | `canEdit` `canResize` `canBind` `canCrop` `canScroll` `hideRotateHandle` `hideResizeHandles` `hideSelectionBoundsBg` `hideSelectionBoundsFg` `isAspectRatioLocked` | same |
 | `onResize` `onResizeStart` `onResizeEnd` `onTranslateStart` `onTranslate` `onTranslateEnd` `onRotateStart` `onRotate` `onRotateEnd` `onDoubleClick` `onDoubleClickEdge` `onEditEnd` `onBeforeCreate` `onBeforeUpdate` `onChildrenChange` `onDragShapesOver` `onDragShapesOut` `onDropShapesOver` | same |
 | `getHandles` `onHandleDrag` | same |
-| `toSvg` `toBackgroundSvg` | **differs** | SVG export lives in a registry: `registerShapeSvgRenderer(type, fn)` from `mocanvas` |
+| `toSvg` `toBackgroundSvg` | same | optional; return SVG markup as a string or a React node, in shape-local space. The exporter prefers a util's own method, then a renderer registered with `registerShapeSvgRenderer(type, fn)` from `mocanvas` (still supported, and the way to override a type whose util you do not own), then the shape's geometry outline. `toBackgroundSvg` output is drawn behind every exported shape |
 | `getRenderStyle` | **new** — returns the GPU style words (fill, stroke, width, dash, opacity). Custom shapes that don't implement it are drawn by `component` in the DOM overlay. |
 
 ## `StateNode`
@@ -106,3 +110,20 @@ record types and unknown props survive a load/save round trip untouched.
   when it must interleave with a DOM shape.
 - **No watermark, license key, or telemetry.**
 - **Text**: phase 1 uses `richText` if present, else `text`; rendered in the DOM overlay.
+
+## Installing the editor's optional members
+
+`Editor.getSvgString`, `Editor.toImage` and `Editor.textMeasure` cannot live in
+`@mocanvas/editor`: exporting needs the default shapes' SVG renderers and
+measuring text needs the DOM, and both live in `mocanvas`, which depends on the
+editor rather than the other way round. Importing `mocanvas` registers them.
+
+An app built on `@mocanvas/editor` alone gets a clear error from those three
+until it either imports `mocanvas` or registers its own:
+
+```ts
+import { registerExportImplementation, registerTextMeasureImplementation } from "@mocanvas/editor"
+
+registerExportImplementation({ getSvgString, toImage })
+registerTextMeasureImplementation(() => myTextMeasure)
+```

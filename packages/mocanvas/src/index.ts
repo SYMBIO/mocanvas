@@ -1,3 +1,6 @@
+// Fills in the Editor members that need this package's shapes and the DOM.
+import "./install"
+
 export * from "@mocanvas/editor"
 export * from "./shapes"
 export * from "./bindings"

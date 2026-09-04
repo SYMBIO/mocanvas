@@ -2,7 +2,7 @@
  * Export shapes to a standalone SVG document string.
  */
 import { Box, type Editor, type ShapeId, type UnknownShape } from "@mocanvas/editor"
-import { shapeToSvg, type SvgExportContext } from "./shape-svg"
+import { shapeToBackgroundSvg, shapeToSvg, type SvgExportContext } from "./shape-svg"
 import { attrs, matrixAttr, svgNum } from "./svg-utils"
 
 export interface SvgExportOptions {
@@ -84,17 +84,23 @@ export function getSvgString(editor: Editor, ids?: readonly ShapeId[], opts: Svg
 
   const included = new Set(shapes.map((s) => s.id))
   const defs: string[] = []
+  // `ShapeUtil.toBackgroundSvg` output, collected separately and emitted before
+  // every shape so a backdrop stays behind the whole drawing rather than only
+  // behind its own shape. It is not clipped by an ancestor frame.
+  const backdrop: string[] = []
   const body: string[] = []
   const prefix = `mc${(clipCounter++).toString(36)}`
 
   const emit = (shape: UnknownShape): void => {
     const transform = editor.getShapePageTransform(shape)
-    const inner = shapeToSvg(editor, shape, ctx)
     const g = attrs({
       transform: matrixAttr(transform),
       opacity: shape.opacity < 1 ? shape.opacity : undefined,
       "data-shape-type": shape.type,
     })
+    const behind = shapeToBackgroundSvg(editor, shape, ctx)
+    if (behind !== undefined) backdrop.push(`<g ${g} data-shape-background="true">${behind}</g>`)
+    const inner = shapeToSvg(editor, shape, ctx)
     body.push(`<g ${g}>${inner}</g>`)
 
     const children = editor.getSortedChildIdsForParent(shape.id).filter((id) => included.has(id))
@@ -132,6 +138,7 @@ export function getSvgString(editor: Editor, ids?: readonly ShapeId[], opts: Svg
   if (opts.background) {
     parts.push(`<rect ${attrs({ x: view.x, y: view.y, width: view.w, height: view.h, fill: background })}/>`)
   }
+  parts.push(...backdrop)
   parts.push(...body)
   parts.push(`</svg>`)
   return { svg: parts.join(""), width, height }

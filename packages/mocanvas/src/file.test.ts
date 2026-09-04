@@ -75,7 +75,14 @@ describe("loadMocanvasFile", () => {
   it("keeps props no util declares, so a round trip preserves them", () => {
     const editor = makeEditor()
     loadMocanvasFile(editor, fixture)
+    // `note.textLastEditedBy` and `geo.flipX` are props no util here declares.
+    const note = shapesOf(editor).find((s) => s.type === "note")!
+    expect((note.props as Record<string, unknown>)["textLastEditedBy"]).toBeDefined()
+    const geo = shapesOf(editor).find((s) => s.type === "geo")!
+    expect((geo.props as Record<string, unknown>)["flipX"]).toBe(false)
+    // The arrow's `kind` and `elbowMidPoint` are declared now, and read back.
     const arrow = shapesOf(editor).find((s) => s.type === "arrow")!
+    expect((arrow.props as Record<string, unknown>)["kind"]).toBe("arc")
     expect((arrow.props as Record<string, unknown>)["elbowMidPoint"]).toBe(0.5)
   })
 
@@ -110,14 +117,35 @@ describe("loadMocanvasFile", () => {
     const withUnknown = {
       tldrawFileFormatVersion: 1,
       schema: parsed.schema,
-      records: [...parsed.records, { id: "shape:odd", typeName: "shape", type: "bookmark", parentId: "page:page", index: "a9", x: 0, y: 0, rotation: 0, isLocked: false, opacity: 1, meta: {}, props: { url: "https://example.com" } }],
+      records: [...parsed.records, { id: "shape:odd", typeName: "shape", type: "widget", parentId: "page:page", index: "a9", x: 0, y: 0, rotation: 0, isLocked: false, opacity: 1, meta: {}, props: { url: "https://example.com" } }],
     }
     const result = loadMocanvasFile(editor, withUnknown)
     expect(result.ok).toBe(true)
     expect(result.warnings).toHaveLength(1)
-    expect(result.warnings[0]).toContain("bookmark")
+    expect(result.warnings[0]).toContain("widget")
     expect(editor.getCurrentPageShapeIds().size).toBe(15)
     expect(editor.getShape("shape:odd" as never)).toBeDefined()
+  })
+
+  it("loads bookmark, embed and video shapes as known types", () => {
+    const editor = makeEditor()
+    const parsed = parseTldrFile(fixture)
+    if (!parsed.ok) throw new Error("fixture did not parse")
+    const base = { typeName: "shape", parentId: "page:page", x: 0, y: 0, rotation: 0, isLocked: false, opacity: 1, meta: {} }
+    const result = loadMocanvasFile(editor, {
+      tldrawFileFormatVersion: 1,
+      schema: parsed.schema,
+      records: [
+        ...parsed.records,
+        { ...base, id: "shape:bm", type: "bookmark", index: "a9", props: { w: 300, h: 320, assetId: null, url: "https://example.com" } },
+        { ...base, id: "shape:em", type: "embed", index: "aA", props: { w: 720, h: 500, url: "https://vimeo.com/123456789" } },
+        { ...base, id: "shape:vi", type: "video", index: "aB", props: { w: 640, h: 360, assetId: null, time: 0, playing: true, url: "", altText: "" } },
+      ],
+    })
+    expect(result.ok).toBe(true)
+    // None of the three is reported as a type we have no util for.
+    expect(result.warnings.filter((w) => w.includes("no registered util"))).toEqual([])
+    expect(editor.getCurrentPageShapeIds().size).toBe(17)
   })
 
   it("returns an empty warnings array when the file cannot be parsed at all", () => {

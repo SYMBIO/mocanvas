@@ -122,11 +122,24 @@ function expectWellFormedStyle(style: { fill: number; stroke: number; strokeWidt
 }
 
 describe("defaultShapeUtils", () => {
-  it("registers nine distinct types with the required members", () => {
-    expect(defaultShapeUtils).toHaveLength(9)
+  it("registers twelve distinct types with the required members", () => {
+    expect(defaultShapeUtils).toHaveLength(12)
     const types = defaultShapeUtils.map((U) => U.type)
-    expect(new Set(types).size).toBe(9)
-    expect(types).toEqual(["group", "geo", "draw", "line", "arrow", "text", "note", "frame", "image"])
+    expect(new Set(types).size).toBe(12)
+    expect(types).toEqual([
+      "group",
+      "geo",
+      "draw",
+      "line",
+      "arrow",
+      "text",
+      "note",
+      "frame",
+      "image",
+      "bookmark",
+      "embed",
+      "video",
+    ])
     for (const U of defaultShapeUtils) {
       const util = new U(editor)
       expect(util.type).toBe(U.type)

@@ -26,6 +26,22 @@ export interface TranslateInfo<T extends UnknownShape> {
   initialShape: T
 }
 
+/** Export-wide settings handed to `ShapeUtil.toSvg` / `toBackgroundSvg`. */
+export interface ShapeSvgContext {
+  /** Whether the export is being drawn against the dark theme. */
+  darkMode: boolean
+  /** The page background colour of the export, as `#rrggbb`. */
+  background: string
+}
+
+/**
+ * What an SVG export callback may return: a raw markup string (inserted
+ * verbatim, so it must be well-formed and escaped by the util) or a React node
+ * the exporter serializes. `undefined` means "I have nothing to draw", which
+ * lets the exporter fall through to its own renderers.
+ */
+export type ShapeSvgResult = string | ReactNode
+
 /**
  * Describes how a shape type behaves: its default props, geometry, rendering
  * and interaction callbacks. One instance per shape type per editor.
@@ -44,7 +60,30 @@ export abstract class ShapeUtil<T extends UnknownShape = UnknownShape> {
   abstract getDefaultProps(): T["props"]
   abstract getGeometry(shape: T): Geometry2d
   abstract component(shape: T): ReactNode
+
+  /**
+   * The outline drawn over the shape when it is selected or hovered, in
+   * shape-local coordinates. The indicators layer supplies `fill: none`, the
+   * selection colour and a zoom-independent stroke width, so an indicator is
+   * usually just a bare `<path>` or `<rect>`. Return `null` to fall back to a
+   * rectangle around the shape's geometry bounds.
+   */
   abstract indicator(shape: T): ReactNode
+
+  /**
+   * The shape as SVG, in shape-local coordinates: the exporter wraps the
+   * result in a `<g>` carrying the shape's page transform and opacity.
+   * Implement it to make a custom shape exportable without registering
+   * anything; leave it undefined to fall through to the exporter's own
+   * renderers.
+   */
+  toSvg?(shape: T, ctx: ShapeSvgContext): ShapeSvgResult
+
+  /**
+   * Extra SVG drawn *behind* every exported shape (a backdrop, a drop shadow,
+   * a grid). Same coordinate space and wrapping as `toSvg`.
+   */
+  toBackgroundSvg?(shape: T, ctx: ShapeSvgContext): ShapeSvgResult
 
   /**
    * GPU style for the shape's geometry. Return `null` (the default) to render

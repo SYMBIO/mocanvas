@@ -282,6 +282,28 @@ function cssCursor(type: string): string {
   return CURSORS[type] ?? type
 }
 
+/**
+ * The outline to draw over one shape: whatever its util's `indicator()`
+ * returns, or a rectangle around the shape's geometry bounds when the util has
+ * no indicator (or returns nothing). Both are expressed in *shape-local*
+ * coordinates; the caller wraps them in the shape's page transform.
+ *
+ * Pure and exported so a custom `Indicators` component can reuse the same rule
+ * instead of guessing at it.
+ */
+export function getShapeIndicatorNode<T extends UnknownShape>(
+  util: { indicator?(shape: T): ReactNode },
+  shape: T,
+  bounds: { x: number; y: number; w: number; h: number } | undefined,
+): ReactNode {
+  const own = util.indicator?.(shape)
+  // `null`/`undefined`/`false` are the ways React spells "nothing here"; every
+  // other node — including an empty fragment — is the util's own answer.
+  if (own !== null && own !== undefined && own !== false) return own
+  if (!bounds) return null
+  return <rect x={bounds.x} y={bounds.y} width={bounds.w} height={bounds.h} />
+}
+
 /** Selection bounds and hover indicator. */
 const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor: Editor }) {
   const bounds = editor.getSelectionPageBounds()
@@ -293,13 +315,35 @@ const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor:
   const toScreen = (x: number, y: number) => [(x + cam.x) * z, (y + cam.y) * z] as const
   const items: ReactNode[] = []
 
+  /*
+   * One shape's outline, inside the camera transform and then the shape's own
+   * page transform, so the util's shape-local indicator lands on the shape at
+   * any pan, zoom or rotation.
+   *
+   * Paint is set on the group and inherited: an indicator is normally a bare
+   * `<path>`/`<rect>`, and one that wants its own fill or dash just says so.
+   * The stroke width is divided by the zoom because the group scales by it —
+   * the quotient renders as a constant INDICATOR_STROKE CSS px, the same
+   * hairline at 10% and at 800%, which is what makes an indicator readable at
+   * all zooms. (`vector-effect="non-scaling-stroke"` would do the same for the
+   * inherited width, but it would also silently reinterpret any width an
+   * indicator sets for itself as screen px, breaking the promise that
+   * everything inside the group is in shape-local units.)
+   */
   const indicatorFor = (shape: UnknownShape, key: string, stroke: string) => {
     const b = editor.getShapeGeometryBounds(shape)
-    if (!b) return null
+    const node = getShapeIndicatorNode(editor.getShapeUtil(shape), shape, b)
+    if (node === null) return null
     const m = editor.getShapePageTransform(shape)
     return (
-      <g key={key} transform={`matrix(${z} 0 0 ${z} ${cam.x * z} ${cam.y * z}) matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`}>
-        <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="none" stroke={stroke} strokeWidth={INDICATOR_STROKE / z} />
+      <g
+        key={key}
+        transform={`matrix(${z} 0 0 ${z} ${cam.x * z} ${cam.y * z}) matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={INDICATOR_STROKE / z}
+      >
+        {node}
       </g>
     )
   }
@@ -320,14 +364,10 @@ const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor:
     if (selected.length === 1) {
       const shape = selected[0]!
       const util = editor.getShapeUtil(shape)
-      const b = editor.getShapeGeometryBounds(shape)!
       const m = editor.getShapePageTransform(shape)
       if (!util.hideSelectionBoundsFg(shape)) {
-        items.push(
-          <g key="bounds" transform={`matrix(${z} 0 0 ${z} ${cam.x * z} ${cam.y * z}) matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`}>
-            <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="none" stroke={stroke} strokeWidth={INDICATOR_STROKE / z} />
-          </g>,
-        )
+        const ind = indicatorFor(shape, "bounds", stroke)
+        if (ind) items.push(ind)
       }
       const handles = util.getHandles?.(shape) ?? []
       for (const hd of handles) {

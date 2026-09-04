@@ -1,12 +1,15 @@
 import type { ShapeUtilConstructor } from "@mocanvas/editor"
 import { ArrowShapeUtil } from "./ArrowShapeUtil"
+import { BookmarkShapeUtil } from "./BookmarkShapeUtil"
 import { DrawShapeUtil } from "./DrawShapeUtil"
+import { EmbedShapeUtil } from "./EmbedShapeUtil"
 import { FrameShapeUtil } from "./FrameShapeUtil"
 import { GeoShapeUtil } from "./GeoShapeUtil"
 import { ImageShapeUtil } from "./ImageShapeUtil"
 import { LineShapeUtil } from "./LineShapeUtil"
 import { NoteShapeUtil } from "./NoteShapeUtil"
 import { TextShapeUtil } from "./TextShapeUtil"
+import { VideoShapeUtil } from "./VideoShapeUtil"
 
 export * from "./GeoShapeUtil"
 export * from "./DrawShapeUtil"
@@ -16,6 +19,9 @@ export * from "./TextShapeUtil"
 export * from "./NoteShapeUtil"
 export * from "./FrameShapeUtil"
 export * from "./ImageShapeUtil"
+export * from "./BookmarkShapeUtil"
+export * from "./EmbedShapeUtil"
+export * from "./VideoShapeUtil"
 export * from "./shape-theme"
 export * from "./geo-helpers"
 export * from "./arrow-helpers"
@@ -39,4 +45,8 @@ export const defaultShapeUtils: ShapeUtilConstructor[] = [
   NoteShapeUtil,
   FrameShapeUtil,
   ImageShapeUtil,
+  BookmarkShapeUtil,
+  EmbedShapeUtil,
+  VideoShapeUtil,
 ]
+export * from "./elbow-helpers"

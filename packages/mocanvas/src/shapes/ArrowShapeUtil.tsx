@@ -22,7 +22,9 @@ import {
   getArrowBindings,
   getArrowBindingTargetAtPoint,
   getArrowTerminalsInArrowSpace,
+  getBoundElbowAxes,
   getNormalizedAnchor,
+  type ArrowTerminals,
 } from "../bindings/arrow-terminals"
 import type { ArrowBinding, ArrowTerminal } from "../bindings/ArrowBindingUtil"
 import { TextLabel } from "../text/TextEditor"
@@ -38,8 +40,10 @@ import {
   getPointOnBody,
   getTangentOnBody,
   shortenBody,
+  type ArrowBody,
   type ArrowheadKind,
 } from "./arrow-helpers"
+import { ELBOW_CORNER_STROKES, getElbowMidPointFromPoint, getElbowRoute, type ElbowRoute } from "./elbow-helpers"
 import { propsOf, readEnum, readNumber, readPoint, readStyle, readText } from "./prop-access"
 import { getDashId, getStrokeRgba, getTextCssColor } from "./shape-theme"
 import { pathWordsToSvgD } from "./svg-path"
@@ -47,11 +51,18 @@ import { pathWordsToSvgD } from "./svg-path"
 export type { ArrowheadKind } from "./arrow-helpers"
 
 export interface ArrowShapeProps {
+  /**
+   * How the body is routed: `"arc"` bows from start to end by `bend`,
+   * `"elbow"` runs in axis-aligned legs (and ignores `bend`).
+   */
+  kind: ArrowKind
   /** Static start terminal in arrow-local space; ignored while the terminal is bound. */
   start: { x: number; y: number }
   /** Static end terminal in arrow-local space; ignored while the terminal is bound. */
   end: { x: number; y: number }
   bend: number
+  /** Where an elbow's middle leg sits along the routing axis, `0..1`; unused by `"arc"`. */
+  elbowMidPoint: number
   color: DefaultColorStyle
   labelColor: DefaultColorStyle
   fill: DefaultFillStyle
@@ -72,6 +83,10 @@ const LABEL_PADDING = ARROW_LABEL_PADDING
 
 const ARROWHEADS = ["none", "arrow", "triangle", "square", "dot", "diamond", "inverted", "bar", "pipe"] as const
 
+/** Routing kinds an arrow can have. */
+export const ARROW_KINDS = ["arc", "elbow"] as const
+export type ArrowKind = (typeof ARROW_KINDS)[number]
+
 /**
  * The shape with every declared prop present and of the declared type. Terminal
  * resolution and binding code read the arrow as a whole, so the normalized copy
@@ -88,9 +103,11 @@ export function readArrowShape(shape: ArrowShape): ArrowShape {
 export function readArrowProps(shape: { props?: unknown }): ArrowShapeProps {
   const p = propsOf(shape)
   return {
+    kind: readEnum(p, "kind", ARROW_KINDS, "arc"),
     start: readPoint(p, "start", { x: 0, y: 0 }),
     end: readPoint(p, "end", { x: 2, y: 0 }),
     bend: readNumber(p, "bend", 0),
+    elbowMidPoint: readNumber(p, "elbowMidPoint", 0.5),
     color: readStyle(p, "color", DefaultColorStyle),
     labelColor: readStyle(p, "labelColor", DefaultLabelColorStyle),
     fill: readStyle(p, "fill", DefaultFillStyle),
@@ -107,6 +124,13 @@ export function readArrowProps(shape: { props?: unknown }): ArrowShapeProps {
 
 export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
   static override type = "arrow" as const
+  /**
+   * `kind` is deliberately not among these. A style is shared across shape
+   * types, remembered for the next shape and applied to a whole selection at
+   * once; arc-versus-elbow is routing that belongs to the one arrow, and
+   * declaring it a style would put it in every mixed selection's shared styles
+   * (and in the style panel) with nothing else to share it with.
+   */
   static override props = {
     color: DefaultColorStyle,
     labelColor: DefaultLabelColorStyle,
@@ -118,9 +142,11 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
 
   getDefaultProps(): ArrowShapeProps {
     return {
+      kind: "arc",
       start: { x: 0, y: 0 },
       end: { x: 2, y: 0 },
       bend: 0,
+      elbowMidPoint: 0.5,
       color: "black",
       labelColor: "black",
       fill: "none",
@@ -135,11 +161,35 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
     }
   }
 
+  /**
+   * The arrow's terminals and the body running between them, in arrow-local
+   * space. `"arc"` bows by `bend`; `"elbow"` routes axis-aligned legs, leaving
+   * a bound shape along its nearest edge's normal, with corners rounded in
+   * proportion to the stroke. The elbow's route is handed back as well, for the
+   * midpoint handle.
+   */
+  private resolveBody(shape: ArrowShape): { props: ArrowShapeProps; terminals: ArrowTerminals; body: ArrowBody; route: ElbowRoute | null } {
+    const normalized = readArrowShape(shape)
+    const props = normalized.props
+    const terminals = getArrowTerminalsInArrowSpace(this.editor, normalized)
+    if (props.kind !== "elbow") {
+      return { props, terminals, body: getArrowBody(terminals.start, terminals.end, props.bend), route: null }
+    }
+    const axes = getBoundElbowAxes(this.editor, normalized, terminals)
+    const route = getElbowRoute(terminals.start, terminals.end, {
+      midPoint: props.elbowMidPoint,
+      startAxis: axes.start,
+      endAxis: axes.end,
+      cornerRadius: STROKE_SIZES[props.size] * props.scale * ELBOW_CORNER_STROKES,
+    })
+    return { props, terminals, body: { kind: "elbow", points: route.points }, route }
+  }
+
   getGeometry(shape: ArrowShape): Geometry2d {
-    const { bend, arrowheadStart, arrowheadEnd, size, scale, text, labelPosition, font } = readArrowProps(shape)
-    const { start, end } = getArrowTerminalsInArrowSpace(this.editor, readArrowShape(shape))
+    const { props, terminals, body: full } = this.resolveBody(shape)
+    const { arrowheadStart, arrowheadEnd, size, scale, text, labelPosition, font } = props
+    const { start, end } = terminals
     const strokeWidth = STROKE_SIZES[size] * scale
-    const full = getArrowBody(start, end, bend)
     const length = getBodyLength(full)
     const headLength = getArrowheadLength(strokeWidth, length)
     const body = shortenBody(full, getArrowheadInset(arrowheadStart, headLength), getArrowheadInset(arrowheadEnd, headLength))
@@ -166,11 +216,10 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
   }
 
   component(shape: ArrowShape): ReactNode {
-    const { text, font, size, scale, labelColor, bend, labelPosition } = readArrowProps(shape)
+    const { text, font, size, scale, labelColor, labelPosition } = readArrowProps(shape)
     const isEditing = this.editor.getEditingShapeId() === shape.id
     if (!text && !isEditing) return null
-    const { start, end } = getArrowTerminalsInArrowSpace(this.editor, readArrowShape(shape))
-    const c = getPointOnBody(getArrowBody(start, end, bend), Math.max(0, Math.min(1, labelPosition)))
+    const c = getPointOnBody(this.resolveBody(shape).body, Math.max(0, Math.min(1, labelPosition)))
     return (
       <div
         style={{
@@ -246,14 +295,27 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
     if (trimmed !== text) this.editor.updateShape<ArrowShape>({ id: shape.id, type: "arrow", props: { text: trimmed } })
   }
 
+  /**
+   * Start and end handles move (and bind) the terminals. Between them sits one
+   * virtual handle: an arc's `bend` handle rides the middle of the curve, while
+   * an elbow's `midpoint` handle sits on its middle leg and slides that leg.
+   * An elbow with no middle leg (an L route, or a straight run) has neither.
+   */
   override getHandles(shape: ArrowShape): ShapeHandle[] {
-    const { start, end } = getArrowTerminalsInArrowSpace(this.editor, readArrowShape(shape))
-    const mid = getPointOnBody(getArrowBody(start, end, readArrowProps(shape).bend), 0.5)
-    return [
-      { id: "start", type: "vertex", index: "a1", x: start.x, y: start.y },
-      { id: "bend", type: "virtual", index: "a2", x: mid.x, y: mid.y },
-      { id: "end", type: "vertex", index: "a3", x: end.x, y: end.y },
-    ]
+    const { terminals, body, route } = this.resolveBody(shape)
+    const { start, end } = terminals
+    const handles: ShapeHandle[] = [{ id: "start", type: "vertex", index: "a1", x: start.x, y: start.y }]
+    if (route) {
+      if (route.midLeg) {
+        const mid = Vec.Lrp(route.midLeg[0], route.midLeg[1], 0.5)
+        handles.push({ id: "midpoint", type: "virtual", index: "a2", x: mid.x, y: mid.y })
+      }
+    } else {
+      const mid = getPointOnBody(body, 0.5)
+      handles.push({ id: "bend", type: "virtual", index: "a2", x: mid.x, y: mid.y })
+    }
+    handles.push({ id: "end", type: "vertex", index: "a3", x: end.x, y: end.y })
+    return handles
   }
 
   override onHandleDrag(shape: ArrowShape, info: { handle: ShapeHandle; isPrecise: boolean; initial?: ArrowShape }): Partial<ArrowShape> | void {
@@ -265,6 +327,12 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
       case "bend": {
         const { start, end } = getArrowTerminalsInArrowSpace(this.editor, readArrowShape(shape))
         return { props: { ...shape.props, bend: getBendFromPoint(start, end, handle) } }
+      }
+      case "midpoint": {
+        const { terminals, route } = this.resolveBody(shape)
+        if (!route?.slideAxis) return
+        const elbowMidPoint = getElbowMidPointFromPoint(terminals.start, terminals.end, handle, route.slideAxis)
+        return { props: { ...shape.props, elbowMidPoint } }
       }
       default:
         return
