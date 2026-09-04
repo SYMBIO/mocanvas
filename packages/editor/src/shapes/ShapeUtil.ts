@@ -67,6 +67,14 @@ export abstract class ShapeUtil<T extends UnknownShape = UnknownShape> {
     return false
   }
 
+  /**
+   * Whether the shape clips its descendants to its own geometry bounds (e.g.
+   * frames). Children are then rendered with a scissor rect on the GPU.
+   */
+  isClipShape(_shape: T): boolean {
+    return false
+  }
+
   canEdit(_shape: T): boolean {
     return false
   }

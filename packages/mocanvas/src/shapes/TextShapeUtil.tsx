@@ -7,6 +7,7 @@ import {
   DefaultHorizontalAlignStyle,
   DefaultSizeStyle,
   type BaseShape,
+  type Editor,
   type Geometry2d,
   type ResizeInfo,
   type StyleWords,
@@ -14,7 +15,10 @@ import {
 import type { ReactNode } from "react"
 import { TextLabel } from "../text/TextEditor"
 import { getTextShapeSize } from "../text/text-layout"
-import { getTextCssColor } from "./shape-theme"
+import { getTextTextureKey, renderTextToCanvas, type TextTextureSpec } from "../text/TextTexture"
+import { LINE_HEIGHT } from "./text-helpers"
+import { propsOf, readBoolean, readEnum, readNumber, readStyle, readText } from "./prop-access"
+import { getFontFamily, getStrokeRgba, getTextCssColor } from "./shape-theme"
 
 export interface TextShapeProps {
   color: DefaultColorStyle
@@ -29,15 +33,66 @@ export interface TextShapeProps {
 
 export type TextShape = BaseShape<"text", TextShapeProps>
 
+const TEXT_ALIGNS = ["start", "middle", "end"] as const
+
+/**
+ * `shape.props` with every declared prop present and of the declared type, so
+ * measuring and rendering survive a record that arrived without one.
+ */
+export function readTextProps(shape: { props?: unknown }): TextShapeProps {
+  const p = propsOf(shape)
+  return {
+    color: readStyle(p, "color", DefaultColorStyle),
+    size: readStyle(p, "size", DefaultSizeStyle),
+    font: readStyle(p, "font", DefaultFontStyle),
+    textAlign: readEnum(p, "textAlign", TEXT_ALIGNS, "start"),
+    w: readNumber(p, "w", 100),
+    text: readText(p),
+    scale: readNumber(p, "scale", 1),
+    autoSize: readBoolean(p, "autoSize", true),
+  }
+}
+
 /** Measured size of a text shape: intrinsic when `autoSize`, else wrapped at `w`. */
 export function getTextShapeSizeFor(shape: TextShape): { w: number; h: number; lineCount: number } {
-  const { text, size, scale, w, font, autoSize } = shape.props
+  const { text, size, scale, w, font, autoSize } = readTextProps(shape)
   return getTextShapeSize({ text, font, fontSize: FONT_SIZES[size] * scale, autoSize, w })
 }
 
 /** Height of the text block at its current width. */
 export function getTextShapeHeight(shape: TextShape): number {
   return getTextShapeSizeFor(shape).h
+}
+
+/** The box `getGeometry` produces: what a texture for this shape must cover. */
+export function getTextShapeBox(shape: TextShape): { w: number; h: number } {
+  const { w, h } = getTextShapeSizeFor(shape)
+  const props = readTextProps(shape)
+  return { w: Math.max(1, props.autoSize ? Math.max(w, props.w) : props.w), h }
+}
+
+/** The rasterization spec for a text shape at the editor's current resolution bucket. */
+export function getTextShapeTextureSpec(editor: Editor, shape: TextShape): TextTextureSpec {
+  const { text, font, size, scale, color, textAlign, autoSize } = readTextProps(shape)
+  const box = getTextShapeBox(shape)
+  return {
+    text,
+    fontFamily: getFontFamily(font),
+    fontSize: FONT_SIZES[size] * scale,
+    color: getTextCssColor(color),
+    align: textAlign,
+    verticalAlign: "start",
+    lineHeight: LINE_HEIGHT,
+    width: box.w,
+    height: box.h,
+    ...(autoSize ? {} : { maxWidth: box.w }),
+    resolution: editor.getTextureResolution(),
+  }
+}
+
+/** Whether this environment can rasterize text at all (no `document` in Node/SSR). */
+function canRasterizeText(): boolean {
+  return typeof document !== "undefined"
 }
 
 const SIZE_KEYS: readonly (keyof TextShapeProps)[] = ["text", "font", "size", "scale", "autoSize"]
@@ -51,17 +106,40 @@ export class TextShapeUtil extends ShapeUtil<TextShape> {
   }
 
   getGeometry(shape: TextShape): Geometry2d {
-    const { w, h } = getTextShapeSizeFor(shape)
-    return new Rectangle2d({ width: Math.max(1, shape.props.autoSize ? Math.max(w, shape.props.w) : shape.props.w), height: h, isFilled: true })
+    const box = getTextShapeBox(shape)
+    return new Rectangle2d({ width: box.w, height: box.h, isFilled: true })
   }
 
-  /** Text is drawn by the DOM overlay, not the GPU. */
-  override getRenderStyle(_shape: TextShape): StyleWords | null {
-    return null
+  /**
+   * A texture of the rasterized label, so the GPU draws the text instead of the
+   * DOM. The shape being edited (and any environment without a canvas) keeps
+   * the DOM path; `fill` is the text colour so the level-of-detail quad the
+   * engine draws below a few pixels still looks right.
+   */
+  override getRenderStyle(shape: TextShape): StyleWords | null {
+    const key = this.getTextureKey(shape)
+    if (!key) return null
+    const texture = this.editor.textures.acquire(key.key, async () => renderTextToCanvas(key.spec))
+    if (!texture) return null
+    return { fill: getStrokeRgba(readTextProps(shape).color), stroke: 0, strokeWidth: 0, dash: 0, opacity: 1, texture }
+  }
+
+  /** The DOM label stands in while editing and until the texture is ready. */
+  override needsOverlay(shape: TextShape): boolean {
+    const key = this.getTextureKey(shape)
+    return key === null || !this.editor.textures.isReady(key.key)
+  }
+
+  private getTextureKey(shape: TextShape): { key: string; spec: TextTextureSpec } | null {
+    if (this.editor.getEditingShapeId() === shape.id) return null
+    if (readText(shape.props).length === 0) return null
+    if (!canRasterizeText()) return null
+    const spec = getTextShapeTextureSpec(this.editor, shape)
+    return { key: getTextTextureKey(spec), spec }
   }
 
   component(shape: TextShape): ReactNode {
-    const { text, font, size, scale, color, textAlign, w, autoSize } = shape.props
+    const { text, font, size, scale, color, textAlign, w, autoSize } = readTextProps(shape)
     return (
       <TextLabel
         shape={shape}
@@ -93,7 +171,7 @@ export class TextShapeUtil extends ShapeUtil<TextShape> {
   }
 
   override getText(shape: TextShape): string {
-    return shape.props.text
+    return readText(shape.props)
   }
 
   /** Auto-sized text keeps `w` in sync with its measured width. */
@@ -102,26 +180,27 @@ export class TextShapeUtil extends ShapeUtil<TextShape> {
   }
 
   override onBeforeUpdate(prev: TextShape, next: TextShape): TextShape | void {
-    if (!next.props.autoSize) return
-    if (!SIZE_KEYS.some((k) => prev.props[k] !== next.props[k])) return
+    if (!readTextProps(next).autoSize) return
+    if (!SIZE_KEYS.some((k) => propsOf(prev)[k] !== propsOf(next)[k])) return
     return this.fitWidth(next)
   }
 
   private fitWidth(shape: TextShape): TextShape | void {
-    if (!shape.props.autoSize) return
+    const props = readTextProps(shape)
+    if (!props.autoSize) return
     const { w } = getTextShapeSizeFor(shape)
-    if (w !== shape.props.w) return { ...shape, props: { ...shape.props, w } }
+    if (w !== props.w) return { ...shape, props: { ...shape.props, w } }
   }
 
   /** A text shape left empty after editing is removed. */
   override onEditEnd(shape: TextShape): void {
-    if (shape.props.text.trim().length === 0) this.editor.deleteShapes([shape.id])
+    if (readText(shape.props).trim().length === 0) this.editor.deleteShapes([shape.id])
   }
 
   /** Resizing a text shape changes its wrap width and turns auto-size off. */
   override onResize(shape: TextShape, info: ResizeInfo<TextShape>): Partial<TextShape> {
     const { scaleX, initialShape, newPoint } = info
-    const w = Math.max(1, Math.abs(initialShape.props.w * scaleX))
+    const w = Math.max(1, Math.abs(readTextProps(initialShape).w * scaleX))
     return { x: newPoint.x, y: newPoint.y, props: { ...shape.props, w, autoSize: false } }
   }
 }

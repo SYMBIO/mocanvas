@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   Box,
   createShapeId,
+  FONT_SIZES,
   GEO_SHAPE_KINDS,
   Group2d,
   PATH_OP,
@@ -21,6 +22,7 @@ import {
   LineShapeUtil,
   NoteShapeUtil,
   TextShapeUtil,
+  getNoteFontSize,
   defaultShapeUtils,
   type ArrowShape,
   type ArrowheadKind,
@@ -99,11 +101,11 @@ function expectWellFormedStyle(style: { fill: number; stroke: number; strokeWidt
 }
 
 describe("defaultShapeUtils", () => {
-  it("registers eight distinct types with the required members", () => {
-    expect(defaultShapeUtils).toHaveLength(8)
+  it("registers nine distinct types with the required members", () => {
+    expect(defaultShapeUtils).toHaveLength(9)
     const types = defaultShapeUtils.map((U) => U.type)
-    expect(new Set(types).size).toBe(8)
-    expect(types).toEqual(["group", "geo", "draw", "line", "arrow", "text", "note", "frame"])
+    expect(new Set(types).size).toBe(9)
+    expect(types).toEqual(["group", "geo", "draw", "line", "arrow", "text", "note", "frame", "image"])
     for (const U of defaultShapeUtils) {
       const util = new U(editor)
       expect(util.type).toBe(U.type)
@@ -475,6 +477,23 @@ describe("NoteShapeUtil", () => {
     expect(style.fill).toBe(0xfbe9c9ff)
     expect(style.stroke).toBe(0)
     expect(style.strokeWidth).toBe(0)
+  })
+
+  it("uses the size style unless the stored adjustment is a plausible font size", () => {
+    const props = { ...util.getDefaultProps(), text: "Sticky note" }
+    expect(getNoteFontSize(makeShape<NoteShape>("note", { ...props, fontSizeAdjustment: 0 }))).toBe(FONT_SIZES.m)
+    // A placeholder `1` would otherwise render the label at one pixel.
+    expect(getNoteFontSize(makeShape<NoteShape>("note", { ...props, fontSizeAdjustment: 1 }))).toBe(FONT_SIZES.m)
+    expect(getNoteFontSize(makeShape<NoteShape>("note", { ...props, fontSizeAdjustment: 14 }))).toBe(14)
+    expect(getNoteFontSize(makeShape<NoteShape>("note", { ...props, fontSizeAdjustment: 14, scale: 2 }))).toBe(28)
+  })
+
+  it("reads a shape whose props are missing or misshapen without throwing", () => {
+    const shape = { ...makeShape<NoteShape>("note", util.getDefaultProps()), props: { text: null, size: "enormous", scale: "1" } } as unknown as NoteShape
+    expect(util.getGeometry(shape).bounds).toEqual(new Box(0, 0, 200, 200))
+    expect(util.getText(shape)).toBe("")
+    expect(util.hasOverlayLabel(shape)).toBe(true)
+    expectWellFormedStyle(util.getRenderStyle(shape))
   })
 })
 

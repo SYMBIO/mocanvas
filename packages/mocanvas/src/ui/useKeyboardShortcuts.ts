@@ -1,5 +1,9 @@
 import { useEffect } from "react"
+import { atom } from "@mocanvas/state"
 import type { Editor } from "@mocanvas/editor"
+
+/** Whether the frame-statistics chip is visible. Toggled with ⌥D. */
+export const debugStatsOpen = atom("debugStatsOpen", false)
 
 function isEditable(t: EventTarget | null): boolean {
   return t instanceof HTMLElement && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)
@@ -127,7 +131,14 @@ export function useKeyboardShortcuts(editor: Editor | null): void {
             return
         }
       }
-      if (e.altKey) return
+      if (e.altKey) {
+        // ⌥D toggles the debug stats chip. On macOS Alt+D types "∂", so match the physical key too.
+        if (e.code === "KeyD" || key === "d" || key === "\u2202") {
+          e.preventDefault()
+          debugStatsOpen.set(!debugStatsOpen.get())
+        }
+        return
+      }
       switch (key) {
         case "v":
           editor.setCurrentTool("select")
@@ -154,6 +165,16 @@ export function useKeyboardShortcuts(editor: Editor | null): void {
           break
         case "t":
           editor.setCurrentTool("text")
+          break
+        // arrow/line/frame are optional tools: apps may register a smaller set.
+        case "a":
+          if (editor.root.children?.["arrow"]) editor.setCurrentTool("arrow")
+          break
+        case "l":
+          if (editor.root.children?.["line"]) editor.setCurrentTool("line")
+          break
+        case "f":
+          if (editor.root.children?.["frame"]) editor.setCurrentTool("frame")
           break
         case "q":
           editor.updateInstanceState({ isToolLocked: !editor.getInstanceState().isToolLocked })

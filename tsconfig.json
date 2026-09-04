@@ -21,6 +21,9 @@
     },
     {
       "path": "apps/playground"
+    },
+    {
+      "path": "apps/bench"
     }
   ]
 }

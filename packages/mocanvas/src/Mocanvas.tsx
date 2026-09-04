@@ -15,6 +15,7 @@ import { defaultShapeUtils } from "./shapes"
 import { defaultTools } from "./tools"
 import { DefaultUi } from "./ui/DefaultUi"
 import { useKeyboardShortcuts } from "./ui/useKeyboardShortcuts"
+import { useExternalContent } from "./external/useExternalContent"
 
 export interface MocanvasProps {
   /** Reuse a store (e.g. for persistence or collaboration). */
@@ -77,6 +78,7 @@ export function Mocanvas(props: MocanvasProps) {
   }, [store])
 
   useKeyboardShortcuts(editor)
+  useExternalContent(editor, containerRef)
 
   return (
     <div ref={containerRef} className={className} style={{ position: "relative", width: "100%", height: "100%", ...style }}>

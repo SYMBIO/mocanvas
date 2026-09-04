@@ -1,0 +1,392 @@
+/*
+ * Default UI theme. Everything is driven by custom properties declared on the
+ * editor container (`.mocanvas`), so an app can restyle the whole UI by
+ * overriding a handful of variables. Colours meet WCAG AA (>= 4.5:1) for text
+ * in both the light and dark palettes.
+ */
+
+.mocanvas,
+.mocanvas-panel {
+  --mocanvas-ui-panel: #ffffff;
+  --mocanvas-ui-panel-border: #e3e5ea;
+  --mocanvas-ui-text: #16181d;
+  --mocanvas-ui-muted: #616570;
+  --mocanvas-ui-accent: #2563eb;
+  --mocanvas-ui-accent-fg: #ffffff;
+  --mocanvas-ui-accent-soft: rgba(37, 99, 235, 0.12);
+  --mocanvas-ui-hover: rgba(16, 24, 40, 0.06);
+  --mocanvas-ui-shadow: 0 8px 24px rgba(15, 18, 25, 0.1), 0 1px 3px rgba(15, 18, 25, 0.08);
+  --mocanvas-ui-radius: 12px;
+  --mocanvas-ui-radius-sm: 8px;
+  --mocanvas-ui-tip-bg: #16181d;
+  --mocanvas-ui-tip-fg: #f6f7f9;
+  --mocanvas-ui-tip-muted: #a9aeb9;
+  --mocanvas-ui-btn: 40px;
+  --mocanvas-ui-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mocanvas-ui-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mocanvas,
+  .mocanvas-panel {
+    --mocanvas-ui-panel: #1b1d22;
+    --mocanvas-ui-panel-border: #34373f;
+    --mocanvas-ui-text: #eceef3;
+    --mocanvas-ui-muted: #a4a9b4;
+    --mocanvas-ui-accent: #6ea8fe;
+    --mocanvas-ui-accent-fg: #0e1116;
+    --mocanvas-ui-accent-soft: rgba(110, 168, 254, 0.18);
+    --mocanvas-ui-hover: rgba(255, 255, 255, 0.09);
+    --mocanvas-ui-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.6);
+    --mocanvas-ui-tip-bg: #2b2f37;
+    --mocanvas-ui-tip-fg: #f2f4f8;
+    --mocanvas-ui-tip-muted: #a4a9b4;
+  }
+}
+
+/* --- surfaces ----------------------------------------------------------- */
+
+.mocanvas-panel {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  box-sizing: border-box;
+  padding: 4px;
+  background: var(--mocanvas-ui-panel);
+  border: 1px solid var(--mocanvas-ui-panel-border);
+  border-radius: var(--mocanvas-ui-radius);
+  box-shadow: var(--mocanvas-ui-shadow);
+  color: var(--mocanvas-ui-text);
+  font-family: var(--mocanvas-ui-font);
+  font-size: 13px;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mocanvas-toolbar {
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.mocanvas-zoombar {
+  left: 12px;
+  bottom: 12px;
+}
+
+.mocanvas-stylepanel {
+  right: 12px;
+  top: 12px;
+  width: 232px;
+  max-height: calc(100% - 84px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 10px;
+}
+
+.mocanvas-stats {
+  right: 12px;
+  bottom: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 9px;
+  font-family: var(--mocanvas-ui-mono);
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--mocanvas-ui-muted);
+  border-radius: var(--mocanvas-ui-radius-sm);
+}
+
+.mocanvas-stats b {
+  color: var(--mocanvas-ui-text);
+  font-weight: 600;
+}
+
+.mocanvas-divider {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 1px;
+  margin: 4px 3px;
+  background: var(--mocanvas-ui-panel-border);
+}
+
+/* --- buttons ------------------------------------------------------------ */
+
+.mocanvas-btn {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  box-sizing: border-box;
+  width: var(--mocanvas-ui-btn);
+  height: var(--mocanvas-ui-btn);
+  min-width: var(--mocanvas-ui-btn);
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: var(--mocanvas-ui-radius-sm);
+  background: transparent;
+  color: var(--mocanvas-ui-text);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, transform 0.08s ease;
+}
+
+.mocanvas-btn--wide {
+  width: auto;
+  min-width: 56px;
+  padding: 0 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mocanvas-btn:hover:not(:disabled) {
+  background: var(--mocanvas-ui-hover);
+}
+
+.mocanvas-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.mocanvas-btn[aria-pressed="true"],
+.mocanvas-btn[aria-checked="true"] {
+  background: var(--mocanvas-ui-accent);
+  color: var(--mocanvas-ui-accent-fg);
+}
+
+.mocanvas-btn[aria-expanded="true"] {
+  background: var(--mocanvas-ui-accent-soft);
+}
+
+.mocanvas-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.mocanvas-btn:focus {
+  outline: none;
+}
+
+.mocanvas-btn:focus-visible,
+.mocanvas-swatch:focus-visible,
+.mocanvas-slider:focus-visible {
+  outline: 2px solid var(--mocanvas-ui-accent);
+  outline-offset: 2px;
+}
+
+/* --- segmented controls ------------------------------------------------- */
+
+.mocanvas-seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.mocanvas-seg--dense {
+  --mocanvas-ui-btn: 34px;
+}
+
+.mocanvas-seg .mocanvas-btn:not([aria-checked="true"]):not([aria-pressed="true"]) {
+  background: var(--mocanvas-ui-hover);
+}
+
+.mocanvas-seg .mocanvas-btn:hover:not([aria-checked="true"]):not([aria-pressed="true"]) {
+  background: var(--mocanvas-ui-accent-soft);
+}
+
+.mocanvas-row-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 5px;
+  color: var(--mocanvas-ui-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.mocanvas-mixed {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--mocanvas-ui-muted);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* --- swatches ----------------------------------------------------------- */
+
+.mocanvas-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: box-shadow 0.12s ease, transform 0.08s ease;
+}
+
+.mocanvas-swatch > span {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--mocanvas-swatch-color, currentColor);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+}
+
+.mocanvas-swatch:hover {
+  box-shadow: 0 0 0 2px var(--mocanvas-ui-hover);
+}
+
+.mocanvas-swatch[aria-checked="true"] {
+  box-shadow: 0 0 0 2px var(--mocanvas-ui-accent);
+}
+
+.mocanvas-swatch:active {
+  transform: scale(0.92);
+}
+
+/* --- slider ------------------------------------------------------------- */
+
+.mocanvas-slider {
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--mocanvas-ui-accent);
+  cursor: pointer;
+}
+
+/* --- popover ------------------------------------------------------------ */
+
+.mocanvas-popover {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(5, auto);
+  gap: 2px;
+  padding: 6px;
+  background: var(--mocanvas-ui-panel);
+  border: 1px solid var(--mocanvas-ui-panel-border);
+  border-radius: var(--mocanvas-ui-radius);
+  box-shadow: var(--mocanvas-ui-shadow);
+}
+
+/* --- tooltip ------------------------------------------------------------ */
+
+/*
+ * Pure CSS: the label comes from `data-tooltip`, the optional shortcut from
+ * `data-shortcut`. The two halves meet at the button's centre line so together
+ * they read as a single pill.
+ */
+[data-tooltip]::after,
+[data-shortcut]::before {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  background: var(--mocanvas-ui-tip-bg);
+  font-family: var(--mocanvas-ui-font);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  line-height: 22px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease, visibility 0.12s ease;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  right: 50%;
+  padding: 0 4px 0 9px;
+  border-radius: 6px 0 0 6px;
+  color: var(--mocanvas-ui-tip-fg);
+}
+
+[data-shortcut]::before {
+  content: attr(data-shortcut);
+  left: 50%;
+  padding: 0 9px 0 4px;
+  border-radius: 0 6px 6px 0;
+  color: var(--mocanvas-ui-tip-muted);
+}
+
+/* Without a shortcut the single pill centres on the button. */
+[data-tooltip]:not([data-shortcut])::after {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 9px;
+  border-radius: 6px;
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:hover[data-shortcut]::before {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0.5s;
+}
+
+[data-tooltip]:focus-visible::after,
+[data-tooltip]:focus-visible[data-shortcut]::before {
+  opacity: 1;
+  visibility: visible;
+}
+
+[data-tooltip]:disabled:hover::after,
+[data-tooltip]:disabled:hover[data-shortcut]::before {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Panels anchored to the top edge flip their tooltips downwards. */
+.mocanvas-stylepanel [data-tooltip]::after,
+.mocanvas-stylepanel [data-shortcut]::before {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mocanvas-btn,
+  .mocanvas-swatch,
+  [data-tooltip]::after,
+  [data-shortcut]::before {
+    transition: none;
+  }
+}
+
+.mocanvas-more {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}

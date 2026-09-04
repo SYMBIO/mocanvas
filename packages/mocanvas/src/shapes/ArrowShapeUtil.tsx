@@ -40,6 +40,7 @@ import {
   shortenBody,
   type ArrowheadKind,
 } from "./arrow-helpers"
+import { propsOf, readEnum, readNumber, readPoint, readStyle, readText } from "./prop-access"
 import { getDashId, getStrokeRgba, getTextCssColor } from "./shape-theme"
 import { pathWordsToSvgD } from "./svg-path"
 
@@ -68,6 +69,41 @@ export type ArrowShape = BaseShape<"arrow", ArrowShapeProps>
 
 export const ARROW_LABEL_PADDING = 8
 const LABEL_PADDING = ARROW_LABEL_PADDING
+
+const ARROWHEADS = ["none", "arrow", "triangle", "square", "dot", "diamond", "inverted", "bar", "pipe"] as const
+
+/**
+ * The shape with every declared prop present and of the declared type. Terminal
+ * resolution and binding code read the arrow as a whole, so the normalized copy
+ * is a whole shape rather than a loose props bag.
+ */
+export function readArrowShape(shape: ArrowShape): ArrowShape {
+  return { ...shape, props: readArrowProps(shape) }
+}
+
+/**
+ * `shape.props` with every declared prop present and of the declared type, so
+ * geometry and rendering survive a record that arrived without one.
+ */
+export function readArrowProps(shape: { props?: unknown }): ArrowShapeProps {
+  const p = propsOf(shape)
+  return {
+    start: readPoint(p, "start", { x: 0, y: 0 }),
+    end: readPoint(p, "end", { x: 2, y: 0 }),
+    bend: readNumber(p, "bend", 0),
+    color: readStyle(p, "color", DefaultColorStyle),
+    labelColor: readStyle(p, "labelColor", DefaultLabelColorStyle),
+    fill: readStyle(p, "fill", DefaultFillStyle),
+    dash: readStyle(p, "dash", DefaultDashStyle),
+    size: readStyle(p, "size", DefaultSizeStyle),
+    arrowheadStart: readEnum(p, "arrowheadStart", ARROWHEADS, "none"),
+    arrowheadEnd: readEnum(p, "arrowheadEnd", ARROWHEADS, "arrow"),
+    font: readStyle(p, "font", DefaultFontStyle),
+    text: readText(p),
+    labelPosition: readNumber(p, "labelPosition", 0.5),
+    scale: readNumber(p, "scale", 1),
+  }
+}
 
 export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
   static override type = "arrow" as const
@@ -100,8 +136,8 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
   }
 
   getGeometry(shape: ArrowShape): Geometry2d {
-    const { bend, arrowheadStart, arrowheadEnd, size, scale, text, labelPosition, font } = shape.props
-    const { start, end } = getArrowTerminalsInArrowSpace(this.editor, shape)
+    const { bend, arrowheadStart, arrowheadEnd, size, scale, text, labelPosition, font } = readArrowProps(shape)
+    const { start, end } = getArrowTerminalsInArrowSpace(this.editor, readArrowShape(shape))
     const strokeWidth = STROKE_SIZES[size] * scale
     const full = getArrowBody(start, end, bend)
     const length = getBodyLength(full)
@@ -123,17 +159,17 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
   }
 
   override getRenderStyle(shape: ArrowShape): StyleWords {
-    const { color, dash, size, scale } = shape.props
+    const { color, dash, size, scale } = readArrowProps(shape)
     const stroke = getStrokeRgba(color)
     // The body is open so it never fills; closed arrowheads fill with the stroke color.
     return { stroke, strokeWidth: STROKE_SIZES[size] * scale, fill: stroke, dash: getDashId(dash), opacity: 1 }
   }
 
   component(shape: ArrowShape): ReactNode {
-    const { text, font, size, scale, labelColor, bend, labelPosition } = shape.props
+    const { text, font, size, scale, labelColor, bend, labelPosition } = readArrowProps(shape)
     const isEditing = this.editor.getEditingShapeId() === shape.id
     if (!text && !isEditing) return null
-    const { start, end } = getArrowTerminalsInArrowSpace(this.editor, shape)
+    const { start, end } = getArrowTerminalsInArrowSpace(this.editor, readArrowShape(shape))
     const c = getPointOnBody(getArrowBody(start, end, bend), Math.max(0, Math.min(1, labelPosition)))
     return (
       <div
@@ -175,7 +211,7 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
   }
 
   override hasOverlayLabel(shape: ArrowShape): boolean {
-    return shape.props.text.trim().length > 0 || this.editor.getEditingShapeId() === shape.id
+    return readText(shape.props).trim().length > 0 || this.editor.getEditingShapeId() === shape.id
   }
 
   override canEdit(_shape: ArrowShape): boolean {
@@ -201,17 +237,18 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
   }
 
   override getText(shape: ArrowShape): string {
-    return shape.props.text
+    return readText(shape.props)
   }
 
   override onEditEnd(shape: ArrowShape): void {
-    const trimmed = trimTrailingWhitespace(shape.props.text)
-    if (trimmed !== shape.props.text) this.editor.updateShape<ArrowShape>({ id: shape.id, type: "arrow", props: { text: trimmed } })
+    const text = readText(shape.props)
+    const trimmed = trimTrailingWhitespace(text)
+    if (trimmed !== text) this.editor.updateShape<ArrowShape>({ id: shape.id, type: "arrow", props: { text: trimmed } })
   }
 
   override getHandles(shape: ArrowShape): ShapeHandle[] {
-    const { start, end } = getArrowTerminalsInArrowSpace(this.editor, shape)
-    const mid = getPointOnBody(getArrowBody(start, end, shape.props.bend), 0.5)
+    const { start, end } = getArrowTerminalsInArrowSpace(this.editor, readArrowShape(shape))
+    const mid = getPointOnBody(getArrowBody(start, end, readArrowProps(shape).bend), 0.5)
     return [
       { id: "start", type: "vertex", index: "a1", x: start.x, y: start.y },
       { id: "bend", type: "virtual", index: "a2", x: mid.x, y: mid.y },
@@ -226,7 +263,7 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
       case "end":
         return this.dragTerminal(shape, handle.id, handle, info.isPrecise)
       case "bend": {
-        const { start, end } = getArrowTerminalsInArrowSpace(this.editor, shape)
+        const { start, end } = getArrowTerminalsInArrowSpace(this.editor, readArrowShape(shape))
         return { props: { ...shape.props, bend: getBendFromPoint(start, end, handle) } }
       }
       default:

@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
-import { beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { loadEngineSync, type StyleWords } from "@mocanvas/wasm"
 import { Editor } from "../Editor"
 import { createStore } from "../createStore"
 import { Rectangle2d } from "../../geometry"
-import type { BaseShape, ShapeId } from "../../records/base"
+import { createShapeId, type BaseShape, type ShapeId } from "../../records/base"
 import { BaseBoxShapeUtil } from "../../shapes/ShapeUtil"
 import { StateNode, type StateNodeConstructor } from "../../tools/StateNode"
 
@@ -214,6 +214,8 @@ describe("Editor", () => {
       draw(frame: { drawn: number }) {
         drawn = frame.drawn
       },
+      uploadTexture() {},
+      deleteTexture() {},
       dispose() {},
     }
     editor.renderFrame(backend)
@@ -351,5 +353,85 @@ describe("Editor groups", () => {
     expect(editor.getShape(ids[1]!)!.parentId).toBe(editor.getCurrentPageId())
     expect(editor.getShape(ids[1]!)!.x).toBe(310)
     expect(editor.getSelectedShapeIds().sort()).toEqual([...ids].sort())
+  })
+})
+
+/**
+ * A util that throws for shapes carrying the marker colour, standing in for a
+ * util that cannot read a prop of one particular shape.
+ */
+const BROKEN_COLOR = 0
+type BrokenShape = BaseShape<"broken", { w: number; h: number; color: number }>
+class BrokenUtil extends BaseBoxShapeUtil<BrokenShape> {
+  static override type = "broken" as const
+  getDefaultProps() {
+    return { w: 100, h: 100, color: 0xff0000ff }
+  }
+  getGeometry(shape: BrokenShape) {
+    if (shape.props.color === BROKEN_COLOR) throw new TypeError("Cannot read properties of undefined (reading 'trim')")
+    return new Rectangle2d({ width: shape.props.w, height: shape.props.h, isFilled: true })
+  }
+  component() {
+    return null
+  }
+  indicator() {
+    return null
+  }
+  override getRenderStyle(shape: BrokenShape): StyleWords {
+    return { fill: shape.props.color, stroke: 0, strokeWidth: 0, dash: 0, opacity: 1 }
+  }
+}
+
+describe("Editor shape error isolation", () => {
+  function makeIsolationEditor() {
+    const engine = loadEngineSync(readFileSync(wasmPath))
+    const editor = new Editor({
+      store: createStore(),
+      shapeUtils: [BoxUtil, BrokenUtil],
+      tools: [TestTool],
+      engine,
+      getContainer: () => ({}) as HTMLElement,
+    })
+    editor.updateViewportScreenBounds({ x: 0, y: 0, w: 1000, h: 800 })
+    return editor
+  }
+
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+  afterEach(() => {
+    warn.mockClear()
+  })
+
+  it("keeps rendering a shape's siblings when its util throws", () => {
+    const editor = makeIsolationEditor()
+    const brokenId = createShapeId("broken")
+    editor.createShapes<BrokenShape>([
+      { id: brokenId, type: "broken", x: 0, y: 0, props: { color: BROKEN_COLOR } },
+      { type: "broken", x: 200, y: 0 },
+    ])
+    editor.createShapes<BoxShape>([{ type: "box", x: 400, y: 0 }])
+
+    let drawn = 0
+    editor.renderFrame({
+      kind: "webgl2" as const,
+      resize() {},
+      draw(frame: { drawn: number }) {
+        drawn = frame.drawn
+      },
+      uploadTexture() {},
+      deleteTexture() {},
+      dispose() {},
+    })
+    expect(drawn).toBe(2)
+    expect(warn).toHaveBeenCalled()
+    expect(String(warn.mock.calls[0]![0])).toContain(brokenId)
+  })
+
+  it("warns only once for a shape that keeps failing", () => {
+    const editor = makeIsolationEditor()
+    const brokenId = createShapeId("broken2")
+    editor.createShapes<BrokenShape>([{ id: brokenId, type: "broken", x: 0, y: 0, props: { color: BROKEN_COLOR } }])
+    editor.updateShape({ id: brokenId, type: "broken", x: 1 })
+    editor.updateShape({ id: brokenId, type: "broken", x: 2 })
+    expect(warn).toHaveBeenCalledTimes(1)
   })
 })

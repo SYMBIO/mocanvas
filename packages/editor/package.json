@@ -6,9 +6,28 @@
   "sideEffects": false,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
-  "dependencies": {"@mocanvas/state":"workspace:*","@mocanvas/store":"workspace:*","@mocanvas/wasm":"workspace:*"},
-  "devDependencies": {"@types/react":"^19.1.0","@types/react-dom":"^19.1.0","react":"^19.1.0","react-dom":"^19.1.0","jsdom":"^26.1.0"},
-  "peerDependencies": {"react":">=18","react-dom":">=18"}
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mocanvas/state": "workspace:*",
+    "@mocanvas/store": "workspace:*",
+    "@mocanvas/wasm": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@webgpu/types": "^0.1.72",
+    "jsdom": "^26.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  }
 }

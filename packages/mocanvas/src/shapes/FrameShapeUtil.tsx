@@ -10,6 +10,7 @@ import {
 } from "@mocanvas/editor"
 import type { ReactNode } from "react"
 import { TextLabel } from "../text/TextEditor"
+import { propsOf, readNumber, readString } from "./prop-access"
 
 export interface FrameShapeProps {
   w: number
@@ -34,7 +35,8 @@ export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
   }
 
   getGeometry(shape: FrameShape): Geometry2d {
-    return new Rectangle2d({ width: shape.props.w, height: shape.props.h, isFilled: true })
+    const p = propsOf(shape)
+    return new Rectangle2d({ width: readNumber(p, "w", 160), height: readNumber(p, "h", 90), isFilled: true })
   }
 
   override getRenderStyle(_shape: FrameShape): StyleWords {
@@ -42,7 +44,9 @@ export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
   }
 
   component(shape: FrameShape): ReactNode {
-    const { name, w } = shape.props
+    const p = propsOf(shape)
+    const name = readString(p, "name", "")
+    const w = readNumber(p, "w", 160)
     return (
       <div
         style={{
@@ -77,7 +81,8 @@ export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
   }
 
   indicator(shape: FrameShape): ReactNode {
-    return <rect width={shape.props.w} height={shape.props.h} />
+    const p = propsOf(shape)
+    return <rect width={readNumber(p, "w", 160)} height={readNumber(p, "h", 90)} />
   }
 
   /** The GPU draws the frame body while its name is edited. */
@@ -86,6 +91,11 @@ export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
   }
 
   override hasOverlayLabel(_shape: FrameShape): boolean {
+    return true
+  }
+
+  /** Descendants are clipped to the frame's bounds, on the GPU and in the overlay. */
+  override isClipShape(_shape: FrameShape): boolean {
     return true
   }
 
@@ -102,11 +112,12 @@ export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
   }
 
   override getText(shape: FrameShape): string {
-    return shape.props.name
+    return readString(propsOf(shape), "name", "")
   }
 
   override onEditEnd(shape: FrameShape): void {
-    const trimmed = shape.props.name.trim()
-    if (trimmed !== shape.props.name) this.editor.updateShape<FrameShape>({ id: shape.id, type: "frame", props: { name: trimmed } })
+    const name = readString(propsOf(shape), "name", "")
+    const trimmed = name.trim()
+    if (trimmed !== name) this.editor.updateShape<FrameShape>({ id: shape.id, type: "frame", props: { name: trimmed } })
   }
 }

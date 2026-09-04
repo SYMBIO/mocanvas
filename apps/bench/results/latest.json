@@ -1,0 +1,2096 @@
+{
+  "date": "2026-09-04 08:30:07 UTC",
+  "machine": {
+    "os": "Darwin 25.5.0 (arm64)",
+    "cpu": "Apple M3 Pro",
+    "cores": 11,
+    "memoryGB": 36,
+    "node": "v25.9.0"
+  },
+  "browser": {
+    "version": "151.0.7922.34",
+    "mode": "gpu",
+    "software": true,
+    "gpu": {
+      "webgl2": true,
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+      "vendor": "Google Inc. (Google)"
+    },
+    "args": [
+      "--js-flags=--expose-gc",
+      "--disable-background-timer-throttling",
+      "--disable-renderer-backgrounding",
+      "--disable-backgrounding-occluded-windows",
+      "--hide-scrollbars",
+      "--force-color-profile=srgb",
+      "--font-render-hinting=none",
+      "--ignore-gpu-blocklist",
+      "--enable-gpu-rasterization",
+      "--enable-zero-copy"
+    ]
+  },
+  "versions": {
+    "tldraw": "5.4.0",
+    "playwright": "1.62.1",
+    "mocanvas": "0.0.1",
+    "git": "32ac776-dirty (uncommitted work in packages/ during the run)"
+  },
+  "ns": [
+    1000,
+    5000,
+    20000
+  ],
+  "kinds": [
+    "geo",
+    "mixed"
+  ],
+  "repeats": 3,
+  "viewport": {
+    "width": 1200,
+    "height": 800
+  },
+  "matrix": {
+    "mocanvas": {
+      "1000:geo": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 13.200000002980232,
+        "firstFrameMs": 104.3999999910593,
+        "shapes": 1000,
+        "panAvgMs": 19.792500000000004,
+        "panP50": 16.699999999999818,
+        "panP95": 41.600000000000136,
+        "panMaxMs": 75.20000000000005,
+        "panFps": 50.52418845522293,
+        "panLongTasks": 3,
+        "dragP50": 33.30000000000018,
+        "dragP95": 41.69999999999982,
+        "dragFps": 30.007501875468858,
+        "hitAvgUs": 2.5999999940395355,
+        "hitHits": 437,
+        "memoryMB": 9.5367431640625,
+        "errors": []
+      },
+      "5000:geo": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 39.400000005960464,
+        "firstFrameMs": 216,
+        "shapes": 5000,
+        "panAvgMs": 40.69583333333333,
+        "panP50": 25.09999999999991,
+        "panP95": 84.20000000000073,
+        "panMaxMs": 241.69999999999982,
+        "panFps": 24.57254018634176,
+        "panLongTasks": 28,
+        "dragP50": 125.10000000000036,
+        "dragP95": 174.5,
+        "dragFps": 7.086669973779321,
+        "hitAvgUs": 3.4000000059604645,
+        "hitHits": 496,
+        "memoryMB": 9.5367431640625,
+        "errors": []
+      },
+      "20000:geo": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 138.30000001192093,
+        "firstFrameMs": 500.79999999701977,
+        "shapes": 20000,
+        "panAvgMs": 65.13833333333334,
+        "panP50": 41.600000000000364,
+        "panP95": 193.10000000000036,
+        "panMaxMs": 250.10000000000002,
+        "panFps": 15.351943300156078,
+        "panLongTasks": 50,
+        "dragP50": 441.59999999999854,
+        "dragP95": 532.4999999999982,
+        "dragFps": 2.233306037370655,
+        "hitAvgUs": 6.600000023841858,
+        "hitHits": 500,
+        "memoryMB": 20.694732666015625,
+        "errors": []
+      },
+      "1000:mixed": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 21.30000001192093,
+        "firstFrameMs": 110.09999999403954,
+        "shapes": 1000,
+        "panAvgMs": 17.499999999999996,
+        "panP50": 16.699999999999818,
+        "panP95": 33.30000000000007,
+        "panMaxMs": 41.90000000000009,
+        "panFps": 57.14285714285715,
+        "panLongTasks": 0,
+        "dragP50": 41.59999999999991,
+        "dragP95": 49.90000000000009,
+        "dragFps": 25,
+        "hitAvgUs": 2.2000000178813934,
+        "hitHits": 434,
+        "memoryMB": 9.5367431640625,
+        "errors": []
+      },
+      "5000:mixed": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 58.5,
+        "firstFrameMs": 272.90000000596046,
+        "shapes": 5000,
+        "panAvgMs": 43.465833333333336,
+        "panP50": 33.20000000000027,
+        "panP95": 107.60000000000014,
+        "panMaxMs": 116.70000000000073,
+        "panFps": 23.006576046319903,
+        "panLongTasks": 33,
+        "dragP50": 158.40000000000146,
+        "dragP95": 183.09999999999945,
+        "dragFps": 6.143386644277436,
+        "hitAvgUs": 4,
+        "hitHits": 496,
+        "memoryMB": 12.111663818359375,
+        "errors": []
+      },
+      "20000:mixed": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 217.29999999701977,
+        "firstFrameMs": 737.2999999970198,
+        "shapes": 20000,
+        "panAvgMs": 85.62416666666667,
+        "panP50": 50.099999999999454,
+        "panP95": 266.0999999999999,
+        "panMaxMs": 424.89999999999964,
+        "panFps": 11.678945780494214,
+        "panLongTasks": 61,
+        "dragP50": 750.2999999999993,
+        "dragP95": 900.2000000000007,
+        "dragFps": 1.3017641073261115,
+        "hitAvgUs": 5.4000000059604645,
+        "hitHits": 499,
+        "memoryMB": 33.473968505859375,
+        "errors": []
+      }
+    },
+    "tldraw": {
+      "1000:geo": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 39.20000000298023,
+        "firstFrameMs": 132.90000000596046,
+        "shapes": 1000,
+        "panAvgMs": 8.335,
+        "panP50": 8.299999999999955,
+        "panP95": 9,
+        "panMaxMs": 9.300000000000068,
+        "panFps": 119.97600479904018,
+        "panLongTasks": 0,
+        "dragP50": 33.40000000000009,
+        "dragP95": 41.80000000000018,
+        "dragFps": 27.58747528622006,
+        "hitAvgUs": 34.80000001192093,
+        "hitHits": 160,
+        "memoryMB": 51.021575927734375,
+        "errors": []
+      },
+      "5000:geo": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 142.19999998807907,
+        "firstFrameMs": 539.7999999970198,
+        "shapes": 5000,
+        "panAvgMs": 14.995833333333335,
+        "panP50": 8.799999999999727,
+        "panP95": 33.299999999999955,
+        "panMaxMs": 42.5,
+        "panFps": 66.68519033064739,
+        "panLongTasks": 0,
+        "dragP50": 191.39999999999964,
+        "dragP95": 216.80000000000018,
+        "dragFps": 5.221250489492233,
+        "hitAvgUs": 128.59999999403954,
+        "hitHits": 171,
+        "memoryMB": 214.57672119140625,
+        "errors": []
+      },
+      "20000:geo": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 499.09999999403954,
+        "firstFrameMs": 2481.8999999910593,
+        "shapes": 20000,
+        "panAvgMs": 149.78333333333333,
+        "panP50": 133.39999999999964,
+        "panP95": 291.2000000000007,
+        "panMaxMs": 358.39999999999964,
+        "panFps": 6.67631022588183,
+        "panLongTasks": 119,
+        "dragP50": 983.1999999999971,
+        "dragP95": 1225,
+        "dragFps": 0.9892925568925661,
+        "hitAvgUs": 544.4000000059605,
+        "hitHits": 165,
+        "memoryMB": 802.9937744140625,
+        "errors": []
+      },
+      "1000:mixed": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 62.79999999701977,
+        "firstFrameMs": 163.40000000596046,
+        "shapes": 1000,
+        "panAvgMs": 8.334166666666667,
+        "panP50": 8.299999999999955,
+        "panP95": 9.199999999999818,
+        "panMaxMs": 9.299999999999955,
+        "panFps": 119.98800119988002,
+        "panLongTasks": 0,
+        "dragP50": 33.40000000000009,
+        "dragP95": 42,
+        "dragFps": 27.798369162342475,
+        "hitAvgUs": 51.80000001192093,
+        "hitHits": 138,
+        "memoryMB": 51.021575927734375,
+        "errors": []
+      },
+      "5000:mixed": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 210.29999999701977,
+        "firstFrameMs": 683,
+        "shapes": 5000,
+        "panAvgMs": 16.5975,
+        "panP50": 16.59999999999991,
+        "panP95": 33.40000000000009,
+        "panMaxMs": 50.200000000000045,
+        "panFps": 60.250037656273534,
+        "panLongTasks": 1,
+        "dragP50": 200,
+        "dragP95": 217.20000000000073,
+        "dragFps": 4.962163503287434,
+        "hitAvgUs": 169.40000000596046,
+        "hitHits": 169,
+        "memoryMB": 214.57672119140625,
+        "errors": []
+      },
+      "20000:mixed": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 604.2999999970198,
+        "firstFrameMs": 2477.7000000029802,
+        "shapes": 20000,
+        "panAvgMs": 138.3325,
+        "panP50": 124.90000000000055,
+        "panP95": 283.3000000000002,
+        "panMaxMs": 358.2000000000007,
+        "panFps": 7.228959210597654,
+        "panLongTasks": 120,
+        "dragP50": 816.6999999999971,
+        "dragP95": 966.7000000000044,
+        "dragFps": 1.1980136932965144,
+        "hitAvgUs": 506,
+        "hitHits": 170,
+        "memoryMB": 802.9937744140625,
+        "errors": []
+      }
+    }
+  },
+  "compare": {
+    "ok": true,
+    "shots": {
+      "mocanvas": "/Users/martin.cajthaml/Sites/symbio/mocanvas/apps/bench/results/compare-mocanvas.png",
+      "tldraw": "/Users/martin.cajthaml/Sites/symbio/mocanvas/apps/bench/results/compare-tldraw.png"
+    },
+    "loads": {
+      "mocanvas": {
+        "ok": false,
+        "error": "TypeError: Cannot read properties of undefined (reading 'trim')",
+        "records": 18,
+        "shapes": 14,
+        "warnings": [
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.store\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.asset\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.camera\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.document\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.instance\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.instance_page_state\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.page\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.instance_presence\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.pointer\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.user\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.asset.image\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.asset.video\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.asset.bookmark\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.group\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.text\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.bookmark\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.draw\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.geo\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.note\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.line\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.frame\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.arrow\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.highlight\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.embed\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.image\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.video\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.binding.arrow\" in persisted schema",
+          "arrow: unknown prop \"kind\" (x2)",
+          "arrow: unknown prop \"elbowMidPoint\" (x2)",
+          "arrow: unknown prop \"richText\" (x2)",
+          "arrow: missing prop \"text\" (default used) (x2)",
+          "binding arrow: unknown prop \"snap\"",
+          "draw: unknown prop \"scaleX\"",
+          "draw: unknown prop \"scaleY\"",
+          "draw: segment has no \"points\" array (encoded \"path\" is not decoded)",
+          "geo: unknown prop \"flipX\" (x7)",
+          "geo: unknown prop \"flipY\" (x7)",
+          "geo: unknown prop \"richText\" (x7)",
+          "geo: missing prop \"text\" (default used) (x7)",
+          "frame: unknown prop \"color\"",
+          "text: unknown prop \"richText\"",
+          "text: missing prop \"text\" (default used)",
+          "note: unknown prop \"richText\"",
+          "note: unknown prop \"textLastEditedBy\"",
+          "note: missing prop \"text\" (default used)"
+        ]
+      },
+      "tldraw": {
+        "ok": true,
+        "records": 18,
+        "shapes": 14,
+        "warnings": []
+      }
+    },
+    "diff": {
+      "width": 1200,
+      "height": 800,
+      "totalPixels": 960000,
+      "differentPixels": 113685,
+      "diffPercent": 11.8421875,
+      "inkPixelsMocanvas": 0,
+      "inkPixelsTldraw": 114470,
+      "inkOverlapPercent": 0,
+      "tolerance": 24
+    },
+    "shimmed": {
+      "load": {
+        "ok": true,
+        "records": 18,
+        "shapes": 14,
+        "warnings": [
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.store\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.asset\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.camera\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.document\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.instance\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.instance_page_state\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.page\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.instance_presence\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.pointer\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.user\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.asset.image\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.asset.video\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.asset.bookmark\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.group\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.text\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.bookmark\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.draw\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.geo\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.note\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.line\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.frame\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.arrow\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.highlight\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.embed\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.image\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.video\" in persisted schema",
+          "warn: [store] ignoring unknown migration sequence \"com.tldraw.binding.arrow\" in persisted schema",
+          "arrow: unknown prop \"kind\" (x2)",
+          "arrow: unknown prop \"elbowMidPoint\" (x2)",
+          "binding arrow: unknown prop \"snap\"",
+          "draw: unknown prop \"scaleX\"",
+          "draw: unknown prop \"scaleY\"",
+          "geo: unknown prop \"flipX\" (x7)",
+          "geo: unknown prop \"flipY\" (x7)",
+          "frame: unknown prop \"color\"",
+          "note: unknown prop \"textLastEditedBy\""
+        ]
+      },
+      "file": "/Users/martin.cajthaml/Sites/symbio/mocanvas/apps/bench/results/compare-mocanvas-shimmed.png",
+      "diff": {
+        "width": 1200,
+        "height": 800,
+        "totalPixels": 960000,
+        "differentPixels": 116118,
+        "diffPercent": 12.095625,
+        "inkPixelsMocanvas": 163726,
+        "inkPixelsTldraw": 114470,
+        "inkOverlapPercent": 56.419065183044424,
+        "tolerance": 24
+      }
+    },
+    "fixtureRecords": 18
+  },
+  "raw": [
+    {
+      "lib": "mocanvas",
+      "n": 1000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 19.600000008940697,
+        "firstFrameMs": 220.20000000298023,
+        "count": 1000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 25.620833333333334,
+        "p50": 25,
+        "p95": 42.09999999999991,
+        "maxMs": 75.20000000000005,
+        "fps": 39.03073670515531,
+        "totalMs": 3074.5,
+        "longTasks": 3,
+        "longTaskMs": 184,
+        "zoomFit": 0.15970838477251406
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 35.980000000000004,
+        "p50": 33.399999999999636,
+        "p95": 50.099999999999454,
+        "maxMs": 66.60000000000036,
+        "fps": 27.79321845469705,
+        "totalMs": 2158.8,
+        "longTasks": 3,
+        "longTaskMs": 171
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 3.5999999940395355,
+        "hits": 437
+      },
+      "memoryMB": 9.5367431640625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 1000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 13.200000002980232,
+        "firstFrameMs": 104.3999999910593,
+        "count": 1000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 19.792500000000004,
+        "p50": 16.699999999999818,
+        "p95": 41.600000000000136,
+        "maxMs": 91.69999999999982,
+        "fps": 50.52418845522293,
+        "totalMs": 2375.1000000000004,
+        "longTasks": 6,
+        "longTaskMs": 477,
+        "zoomFit": 0.15970838477251406
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 33.055,
+        "p50": 33.30000000000018,
+        "p95": 41.69999999999982,
+        "maxMs": 50,
+        "fps": 30.252609287551053,
+        "totalMs": 1983.3000000000002,
+        "longTasks": 0,
+        "longTaskMs": 0
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 2.5999999940395355,
+        "hits": 437
+      },
+      "memoryMB": 9.5367431640625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 1000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 12.399999991059303,
+        "firstFrameMs": 100.29999999701977,
+        "count": 1000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 15.068333333333333,
+        "p50": 16.600000000000136,
+        "p95": 25,
+        "maxMs": 25.200000000000045,
+        "fps": 66.3643402278509,
+        "totalMs": 1808.2,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.15970838477251406
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 33.32500000000001,
+        "p50": 33.30000000000018,
+        "p95": 41.600000000000364,
+        "maxMs": 42.59999999999991,
+        "fps": 30.007501875468858,
+        "totalMs": 1999.5000000000005,
+        "longTasks": 0,
+        "longTaskMs": 0
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 2.4000000059604645,
+        "hits": 437
+      },
+      "memoryMB": 9.5367431640625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 1000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 45.400000005960464,
+        "firstFrameMs": 142.1000000089407,
+        "count": 1000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 8.3325,
+        "p50": 8.299999999999955,
+        "p95": 9.099999999999909,
+        "maxMs": 9.299999999999955,
+        "fps": 120.01200120012003,
+        "totalMs": 999.8999999999999,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.16047215819216304
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 36.24833333333333,
+        "p50": 33.40000000000009,
+        "p95": 41.80000000000018,
+        "maxMs": 50.600000000000136,
+        "fps": 27.58747528622006,
+        "totalMs": 2174.8999999999996,
+        "longTasks": 1,
+        "longTaskMs": 54
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 34.80000001192093,
+        "hits": 160
+      },
+      "memoryMB": 51.021575927734375,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 1000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 39.20000000298023,
+        "firstFrameMs": 127.30000001192093,
+        "count": 1000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 8.408333333333333,
+        "p50": 8.299999999999955,
+        "p95": 9,
+        "maxMs": 16.600000000000136,
+        "fps": 118.92963330029733,
+        "totalMs": 1008.9999999999999,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.16047215819216304
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 36.375,
+        "p50": 33.40000000000009,
+        "p95": 49.899999999999864,
+        "maxMs": 67.10000000000014,
+        "fps": 27.491408934707902,
+        "totalMs": 2182.5,
+        "longTasks": 4,
+        "longTaskMs": 237
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 36.599999994039536,
+        "hits": 160
+      },
+      "memoryMB": 51.021575927734375,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 1000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 37.900000005960464,
+        "firstFrameMs": 132.90000000596046,
+        "count": 1000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 8.335,
+        "p50": 8.300000000000068,
+        "p95": 9,
+        "maxMs": 9.300000000000068,
+        "fps": 119.97600479904018,
+        "totalMs": 1000.2,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.16047215819216304
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 35.833333333333336,
+        "p50": 33.40000000000009,
+        "p95": 41.70000000000027,
+        "maxMs": 58.40000000000009,
+        "fps": 27.906976744186046,
+        "totalMs": 2150,
+        "longTasks": 1,
+        "longTaskMs": 54
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 33,
+        "hits": 160
+      },
+      "memoryMB": 51.021575927734375,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 5000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 40.19999998807907,
+        "firstFrameMs": 229.5,
+        "count": 5000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 50.693333333333335,
+        "p50": 33.400000000000546,
+        "p95": 125,
+        "maxMs": 241.69999999999982,
+        "fps": 19.72645975802209,
+        "totalMs": 6083.2,
+        "longTasks": 39,
+        "longTaskMs": 3654,
+        "zoomFit": 0.07304527443996053
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 141.11,
+        "p50": 125.10000000000036,
+        "p95": 174.5,
+        "maxMs": 474.90000000000146,
+        "fps": 7.086669973779321,
+        "totalMs": 8466.6,
+        "longTasks": 62,
+        "longTaskMs": 8574
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 3.4000000059604645,
+        "hits": 496
+      },
+      "memoryMB": 9.5367431640625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 5000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 39.400000005960464,
+        "firstFrameMs": 203.90000000596046,
+        "count": 5000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 34.375,
+        "p50": 25.09999999999991,
+        "p95": 83.19999999999993,
+        "maxMs": 100.10000000000002,
+        "fps": 29.09090909090909,
+        "totalMs": 4125,
+        "longTasks": 28,
+        "longTaskMs": 1905,
+        "zoomFit": 0.07304527443996053
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 129.58,
+        "p50": 125.10000000000036,
+        "p95": 141.89999999999964,
+        "maxMs": 300,
+        "fps": 7.717240314863404,
+        "totalMs": 7774.8,
+        "longTasks": 62,
+        "longTaskMs": 7889
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 3.199999988079071,
+        "hits": 496
+      },
+      "memoryMB": 9.5367431640625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 5000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 39.1000000089407,
+        "firstFrameMs": 216,
+        "count": 5000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 40.69583333333333,
+        "p50": 25,
+        "p95": 84.20000000000073,
+        "maxMs": 450.70000000000005,
+        "fps": 24.57254018634176,
+        "totalMs": 4883.5,
+        "longTasks": 28,
+        "longTaskMs": 2508,
+        "zoomFit": 0.07304527443996053
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 158.88833333333335,
+        "p50": 141.69999999999982,
+        "p95": 266.7000000000007,
+        "maxMs": 350,
+        "fps": 6.293728299749299,
+        "totalMs": 9533.300000000001,
+        "longTasks": 62,
+        "longTaskMs": 9646
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 3.800000011920929,
+        "hits": 496
+      },
+      "memoryMB": 9.5367431640625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 5000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 149.6000000089407,
+        "firstFrameMs": 565.7000000029802,
+        "count": 5000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 15.277500000000002,
+        "p50": 9.099999999999909,
+        "p95": 33.299999999999955,
+        "maxMs": 50,
+        "fps": 65.45573555882834,
+        "totalMs": 1833.3000000000002,
+        "longTasks": 1,
+        "longTaskMs": 51,
+        "zoomFit": 0.07321017555660342
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 201.95333333333335,
+        "p50": 199.09999999999945,
+        "p95": 249.09999999999945,
+        "maxMs": 258.39999999999964,
+        "fps": 4.95163899250652,
+        "totalMs": 12117.2,
+        "longTasks": 61,
+        "longTaskMs": 12156
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 128.59999999403954,
+        "hits": 171
+      },
+      "memoryMB": 214.57672119140625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 5000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 142.19999998807907,
+        "firstFrameMs": 539.7999999970198,
+        "count": 5000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 14.721666666666666,
+        "p50": 8.799999999999727,
+        "p95": 33.30000000000018,
+        "maxMs": 42.5,
+        "fps": 67.92709158836183,
+        "totalMs": 1766.6,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.07321017555660342
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 188.61666666666667,
+        "p50": 183.29999999999927,
+        "p95": 216.80000000000018,
+        "maxMs": 291.7000000000007,
+        "fps": 5.301758416541486,
+        "totalMs": 11317,
+        "longTasks": 61,
+        "longTaskMs": 11327
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 135.80000001192093,
+        "hits": 171
+      },
+      "memoryMB": 214.57672119140625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 5000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 133.20000000298023,
+        "firstFrameMs": 535.1000000089407,
+        "count": 5000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 14.995833333333335,
+        "p50": 8.600000000000136,
+        "p95": 33.200000000000045,
+        "maxMs": 41.80000000000018,
+        "fps": 66.68519033064739,
+        "totalMs": 1799.5000000000002,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.07321017555660342
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 191.525,
+        "p50": 191.39999999999964,
+        "p95": 216.70000000000073,
+        "maxMs": 217,
+        "fps": 5.221250489492233,
+        "totalMs": 11491.5,
+        "longTasks": 61,
+        "longTaskMs": 11530
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 127.59999999403954,
+        "hits": 171
+      },
+      "memoryMB": 202.178955078125,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 20000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 138.30000001192093,
+        "firstFrameMs": 480.5,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 64.455,
+        "p50": 41.600000000000364,
+        "p95": 193.10000000000036,
+        "maxMs": 250.10000000000002,
+        "fps": 15.514700178419053,
+        "totalMs": 7734.6,
+        "longTasks": 53,
+        "longTaskMs": 5786,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 520.6883333333333,
+        "p50": 458.2999999999993,
+        "p95": 900.6000000000022,
+        "maxMs": 1291.5999999999985,
+        "fps": 1.9205346768540363,
+        "totalMs": 31241.299999999996,
+        "longTasks": 63,
+        "longTaskMs": 32758
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 7.5999999940395355,
+        "hits": 500
+      },
+      "memoryMB": 20.694732666015625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 20000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 134.5,
+        "firstFrameMs": 500.79999999701977,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 65.55416666666666,
+        "p50": 41.599999999999454,
+        "p95": 208.40000000000055,
+        "maxMs": 259.0999999999999,
+        "fps": 15.25456047797623,
+        "totalMs": 7866.5,
+        "longTasks": 49,
+        "longTaskMs": 5524,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 447.7666666666666,
+        "p50": 441.59999999999854,
+        "p95": 499.2000000000007,
+        "maxMs": 908.3000000000011,
+        "fps": 2.233306037370655,
+        "totalMs": 26865.999999999996,
+        "longTasks": 63,
+        "longTaskMs": 27891
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 6.600000023841858,
+        "hits": 500
+      },
+      "memoryMB": 20.694732666015625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 20000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 140.6000000089407,
+        "firstFrameMs": 507.1000000089407,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 65.13833333333334,
+        "p50": 41.70000000000027,
+        "p95": 183.4000000000001,
+        "maxMs": 233.29999999999995,
+        "fps": 15.351943300156078,
+        "totalMs": 7816.6,
+        "longTasks": 50,
+        "longTaskMs": 5694,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 444.8500000000001,
+        "p50": 440.7999999999993,
+        "p95": 532.4999999999982,
+        "maxMs": 775.8999999999996,
+        "fps": 2.2479487467685733,
+        "totalMs": 26691.000000000004,
+        "longTasks": 62,
+        "longTaskMs": 27455
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 6,
+        "hits": 500
+      },
+      "memoryMB": 20.694732666015625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 20000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 492.90000000596046,
+        "firstFrameMs": 2520.800000011921,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 154.0258333333333,
+        "p50": 141.5,
+        "p95": 291.6999999999998,
+        "maxMs": 384,
+        "fps": 6.492417397514487,
+        "totalMs": 18483.1,
+        "longTasks": 119,
+        "longTaskMs": 18410,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 1010.8233333333334,
+        "p50": 983.1999999999971,
+        "p95": 1225,
+        "maxMs": 1699.8999999999942,
+        "fps": 0.9892925568925661,
+        "totalMs": 60649.4,
+        "longTasks": 62,
+        "longTaskMs": 60800
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 544.4000000059605,
+        "hits": 165
+      },
+      "memoryMB": 802.9937744140625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 20000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 501.40000000596046,
+        "firstFrameMs": 2466.1000000089407,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 149.78333333333333,
+        "p50": 133.39999999999964,
+        "p95": 275.10000000000036,
+        "maxMs": 358.39999999999964,
+        "fps": 6.67631022588183,
+        "totalMs": 17974,
+        "longTasks": 119,
+        "longTaskMs": 17897,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 1108.185,
+        "p50": 1083.3999999999942,
+        "p95": 1283.2999999999956,
+        "maxMs": 1633.300000000003,
+        "fps": 0.9023764082711822,
+        "totalMs": 66491.09999999999,
+        "longTasks": 61,
+        "longTaskMs": 66615
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 620.4000000059605,
+        "hits": 165
+      },
+      "memoryMB": 802.9937744140625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 20000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 499.09999999403954,
+        "firstFrameMs": 2481.8999999910593,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 148.12416666666664,
+        "p50": 133.39999999999964,
+        "p95": 291.2000000000007,
+        "maxMs": 341.7999999999997,
+        "fps": 6.751092833152367,
+        "totalMs": 17774.899999999998,
+        "longTasks": 120,
+        "longTaskMs": 17777,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 932.73,
+        "p50": 925,
+        "p95": 1150,
+        "maxMs": 1341.4000000000015,
+        "fps": 1.0721216214767404,
+        "totalMs": 55963.8,
+        "longTasks": 62,
+        "longTaskMs": 56056
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 494.2000000178814,
+        "hits": 165
+      },
+      "memoryMB": 802.9937744140625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 1000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 24.599999994039536,
+        "firstFrameMs": 128.29999999701977,
+        "count": 1000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 17.1525,
+        "p50": 16.699999999999818,
+        "p95": 33.30000000000007,
+        "maxMs": 41.90000000000009,
+        "fps": 58.30053927998834,
+        "totalMs": 2058.3,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.16089012062595573
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 40,
+        "p50": 41.59999999999991,
+        "p95": 49.90000000000009,
+        "maxMs": 99.89999999999964,
+        "fps": 25,
+        "totalMs": 2400,
+        "longTasks": 1,
+        "longTaskMs": 97
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 2.2000000178813934,
+        "hits": 434
+      },
+      "memoryMB": 9.5367431640625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 1000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 20.799999997019768,
+        "firstFrameMs": 110.09999999403954,
+        "count": 1000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 17.499999999999996,
+        "p50": 16.699999999999818,
+        "p95": 33.29999999999973,
+        "maxMs": 33.799999999999955,
+        "fps": 57.14285714285715,
+        "totalMs": 2099.9999999999995,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.16089012062595573
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 39.71833333333333,
+        "p50": 41.59999999999991,
+        "p95": 49.599999999999454,
+        "maxMs": 50,
+        "fps": 25.177290084343927,
+        "totalMs": 2383.0999999999995,
+        "longTasks": 1,
+        "longTaskMs": 52
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 2.4000000059604645,
+        "hits": 434
+      },
+      "memoryMB": 9.5367431640625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 1000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 21.30000001192093,
+        "firstFrameMs": 107.5,
+        "count": 1000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 18.4725,
+        "p50": 16.699999999999818,
+        "p95": 33.40000000000009,
+        "maxMs": 75.09999999999991,
+        "fps": 54.13452429286777,
+        "totalMs": 2216.7,
+        "longTasks": 2,
+        "longTaskMs": 139,
+        "zoomFit": 0.16089012062595573
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 48.61000000000001,
+        "p50": 41.69999999999982,
+        "p95": 75,
+        "maxMs": 383.3000000000002,
+        "fps": 20.571898786257968,
+        "totalMs": 2916.6000000000004,
+        "longTasks": 4,
+        "longTaskMs": 663
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 2,
+        "hits": 434
+      },
+      "memoryMB": 9.5367431640625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 1000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 62.79999999701977,
+        "firstFrameMs": 161.70000000298023,
+        "count": 1000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 8.3325,
+        "p50": 8.299999999999955,
+        "p95": 9.200000000000045,
+        "maxMs": 9.300000000000068,
+        "fps": 120.01200120012003,
+        "totalMs": 999.8999999999999,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.16108215522500516
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 36.11000000000001,
+        "p50": 33.40000000000009,
+        "p95": 42,
+        "maxMs": 58.700000000000045,
+        "fps": 27.69315978953198,
+        "totalMs": 2166.6000000000004,
+        "longTasks": 1,
+        "longTaskMs": 56
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 53.80000001192093,
+        "hits": 138
+      },
+      "memoryMB": 51.021575927734375,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 1000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 62.79999999701977,
+        "firstFrameMs": 163.40000000596046,
+        "count": 1000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 8.334166666666667,
+        "p50": 8.299999999999955,
+        "p95": 9,
+        "maxMs": 9.200000000000045,
+        "fps": 119.98800119988002,
+        "totalMs": 1000.0999999999999,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.16108215522500516
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 35.973333333333336,
+        "p50": 33.399999999999636,
+        "p95": 41.799999999999955,
+        "maxMs": 58.299999999999955,
+        "fps": 27.798369162342475,
+        "totalMs": 2158.4,
+        "longTasks": 1,
+        "longTaskMs": 54
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 51.80000001192093,
+        "hits": 138
+      },
+      "memoryMB": 51.021575927734375,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 1000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 59.79999999701977,
+        "firstFrameMs": 164.09999999403954,
+        "count": 1000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 8.334166666666668,
+        "p50": 8.299999999999955,
+        "p95": 9.199999999999818,
+        "maxMs": 9.299999999999955,
+        "fps": 119.98800119987999,
+        "totalMs": 1000.1000000000001,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.16108215522500516
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 35.83166666666667,
+        "p50": 33.40000000000009,
+        "p95": 42.19999999999982,
+        "maxMs": 58.40000000000009,
+        "fps": 27.90827480347923,
+        "totalMs": 2149.9,
+        "longTasks": 1,
+        "longTaskMs": 54
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 50,
+        "hits": 138
+      },
+      "memoryMB": 51.021575927734375,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 5000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 60.30000001192093,
+        "firstFrameMs": 273.90000000596046,
+        "count": 5000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 42.57,
+        "p50": 33.20000000000027,
+        "p95": 107.60000000000002,
+        "maxMs": 116.70000000000073,
+        "fps": 23.49072116513977,
+        "totalMs": 5108.4,
+        "longTasks": 33,
+        "longTaskMs": 2706,
+        "zoomFit": 0.07264896314959529
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 162.77666666666664,
+        "p50": 158.40000000000146,
+        "p95": 183.09999999999945,
+        "maxMs": 259.2000000000007,
+        "fps": 6.143386644277436,
+        "totalMs": 9766.599999999999,
+        "longTasks": 63,
+        "longTaskMs": 10081
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 4,
+        "hits": 496
+      },
+      "memoryMB": 12.111663818359375,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 5000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 58.400000005960464,
+        "firstFrameMs": 267.80000001192093,
+        "count": 5000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 45.485,
+        "p50": 33.19999999999982,
+        "p95": 108.40000000000009,
+        "maxMs": 416.59999999999945,
+        "fps": 21.985269869187643,
+        "totalMs": 5458.2,
+        "longTasks": 32,
+        "longTaskMs": 3036,
+        "zoomFit": 0.07264896314959529
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 160.13500000000002,
+        "p50": 158.39999999999964,
+        "p95": 175.10000000000036,
+        "maxMs": 183.39999999999964,
+        "fps": 6.24473100821182,
+        "totalMs": 9608.1,
+        "longTasks": 62,
+        "longTaskMs": 9766
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 4,
+        "hits": 496
+      },
+      "memoryMB": 12.111663818359375,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 5000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 58.5,
+        "firstFrameMs": 272.90000000596046,
+        "count": 5000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 43.465833333333336,
+        "p50": 33.30000000000018,
+        "p95": 107.60000000000014,
+        "maxMs": 115.80000000000018,
+        "fps": 23.006576046319903,
+        "totalMs": 5215.900000000001,
+        "longTasks": 34,
+        "longTaskMs": 2851,
+        "zoomFit": 0.07264896314959529
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 165.27666666666667,
+        "p50": 166.60000000000036,
+        "p95": 190.70000000000073,
+        "maxMs": 225.09999999999854,
+        "fps": 6.050460843434242,
+        "totalMs": 9916.6,
+        "longTasks": 62,
+        "longTaskMs": 10062
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 3.7999999821186066,
+        "hits": 496
+      },
+      "memoryMB": 12.111663818359375,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 5000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 207.59999999403954,
+        "firstFrameMs": 713,
+        "count": 5000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 17.291666666666668,
+        "p50": 16.59999999999991,
+        "p95": 41.700000000000045,
+        "maxMs": 58.09999999999991,
+        "fps": 57.831325301204814,
+        "totalMs": 2075,
+        "longTasks": 2,
+        "longTaskMs": 112,
+        "zoomFit": 0.07266669050158968
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 195.555,
+        "p50": 192.40000000000055,
+        "p95": 209.19999999999982,
+        "maxMs": 258.3000000000002,
+        "fps": 5.113650891053668,
+        "totalMs": 11733.300000000001,
+        "longTasks": 61,
+        "longTaskMs": 11809
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 169.40000000596046,
+        "hits": 169
+      },
+      "memoryMB": 214.57672119140625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 5000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 220.1000000089407,
+        "firstFrameMs": 683,
+        "count": 5000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 16.5275,
+        "p50": 16.59999999999991,
+        "p95": 33.399999999999864,
+        "maxMs": 50.200000000000045,
+        "fps": 60.505218575102106,
+        "totalMs": 1983.3,
+        "longTasks": 1,
+        "longTaskMs": 50,
+        "zoomFit": 0.07266669050158968
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 201.52499999999998,
+        "p50": 200,
+        "p95": 217.20000000000073,
+        "maxMs": 258.09999999999945,
+        "fps": 4.962163503287434,
+        "totalMs": 12091.499999999998,
+        "longTasks": 61,
+        "longTaskMs": 12146
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 178.40000000596046,
+        "hits": 169
+      },
+      "memoryMB": 214.57672119140625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 5000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 210.29999999701977,
+        "firstFrameMs": 681.3999999910593,
+        "count": 5000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 16.5975,
+        "p50": 16.600000000000136,
+        "p95": 33.40000000000009,
+        "maxMs": 41.59999999999991,
+        "fps": 60.250037656273534,
+        "totalMs": 1991.6999999999998,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.07266669050158968
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 202.63666666666668,
+        "p50": 200,
+        "p95": 233.3000000000011,
+        "maxMs": 275,
+        "fps": 4.934941027454721,
+        "totalMs": 12158.2,
+        "longTasks": 61,
+        "longTaskMs": 12226
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 151,
+        "hits": 169
+      },
+      "memoryMB": 214.57672119140625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 20000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 224.1000000089407,
+        "firstFrameMs": 742.7000000029802,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 84.92833333333333,
+        "p50": 49.900000000000546,
+        "p95": 266.0999999999999,
+        "maxMs": 424.89999999999964,
+        "fps": 11.77463351453186,
+        "totalMs": 10191.4,
+        "longTasks": 55,
+        "longTaskMs": 7703,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 768.1883333333333,
+        "p50": 783.1999999999971,
+        "p95": 850.0999999999985,
+        "maxMs": 1225,
+        "fps": 1.3017641073261115,
+        "totalMs": 46091.299999999996,
+        "longTasks": 62,
+        "longTaskMs": 47409
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 6,
+        "hits": 499
+      },
+      "memoryMB": 33.473968505859375,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 20000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 217.29999999701977,
+        "firstFrameMs": 737.2999999970198,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 85.62416666666667,
+        "p50": 50.099999999999454,
+        "p95": 258.39999999999964,
+        "maxMs": 350,
+        "fps": 11.678945780494214,
+        "totalMs": 10274.9,
+        "longTasks": 61,
+        "longTaskMs": 8338,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 756.7483333333333,
+        "p50": 750.2999999999993,
+        "p95": 900.2000000000007,
+        "maxMs": 1283.2000000000007,
+        "fps": 1.3214432803507992,
+        "totalMs": 45404.9,
+        "longTasks": 62,
+        "longTaskMs": 46720
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 5.4000000059604645,
+        "hits": 499
+      },
+      "memoryMB": 33.473968505859375,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 20000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 203.09999999403954,
+        "firstFrameMs": 724.1999999880791,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 89.51083333333332,
+        "p50": 50.099999999999454,
+        "p95": 283.29999999999995,
+        "maxMs": 758.4000000000001,
+        "fps": 11.171832087363729,
+        "totalMs": 10741.3,
+        "longTasks": 61,
+        "longTaskMs": 8861,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 784.5866666666666,
+        "p50": 725.0999999999985,
+        "p95": 1357.4000000000015,
+        "maxMs": 1675,
+        "fps": 1.274556454353885,
+        "totalMs": 47075.2,
+        "longTasks": 62,
+        "longTaskMs": 48175
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 4.800000011920929,
+        "hits": 499
+      },
+      "memoryMB": 33.473968505859375,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 20000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 654.5999999940395,
+        "firstFrameMs": 2477.7000000029802,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 139.65,
+        "p50": 125,
+        "p95": 283.3000000000002,
+        "maxMs": 358.2000000000007,
+        "fps": 7.160759040458288,
+        "totalMs": 16758,
+        "longTasks": 120,
+        "longTaskMs": 16576,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 834.7149999999999,
+        "p50": 808.3000000000029,
+        "p95": 991.7999999999993,
+        "maxMs": 1099.4000000000015,
+        "fps": 1.1980136932965144,
+        "totalMs": 50082.899999999994,
+        "longTasks": 61,
+        "longTaskMs": 50253
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 506,
+        "hits": 170
+      },
+      "memoryMB": 802.9937744140625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 20000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 604.2999999970198,
+        "firstFrameMs": 2389.7000000029802,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 135.69333333333333,
+        "p50": 124.90000000000055,
+        "p95": 275,
+        "maxMs": 341.7000000000007,
+        "fps": 7.3695588090792965,
+        "totalMs": 16283.199999999999,
+        "longTasks": 120,
+        "longTaskMs": 16309,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 826.5200000000001,
+        "p50": 816.6999999999971,
+        "p95": 916.8000000000029,
+        "maxMs": 1275.1000000000022,
+        "fps": 1.2098920776266755,
+        "totalMs": 49591.200000000004,
+        "longTasks": 61,
+        "longTaskMs": 49672
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 664.1999999880791,
+        "hits": 170
+      },
+      "memoryMB": 802.9937744140625,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 20000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 602.0999999940395,
+        "firstFrameMs": 2518.3999999910593,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 138.3325,
+        "p50": 116.70000000000073,
+        "p95": 292.1999999999998,
+        "maxMs": 399.3999999999978,
+        "fps": 7.228959210597654,
+        "totalMs": 16599.9,
+        "longTasks": 121,
+        "longTaskMs": 16746,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 846.24,
+        "p50": 841.6000000000058,
+        "p95": 966.7000000000044,
+        "maxMs": 1117.0999999999985,
+        "fps": 1.1816978634902628,
+        "totalMs": 50774.4,
+        "longTasks": 61,
+        "longTaskMs": 50909
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 494.59999999403954,
+        "hits": 170
+      },
+      "memoryMB": 802.9937744140625,
+      "consoleErrors": []
+    }
+  ],
+  "visibleDifferences": "Comparing `compare-tldraw.png` with `compare-mocanvas-shimmed.png` (the raw-file mocanvas\nscreenshot is blank — see the load warnings). Ordered roughly by how much they cost in the pixel diff:\n\n1. **Stroke style.** tldraw's default `dash: \"draw\"` renders a hand-drawn stroke: variable width,\n   slightly wobbly geometry, overshooting corners. mocanvas draws a clean, uniform-width geometric\n   stroke. This is the single largest source of differing pixels and it touches every outlined shape —\n   most obvious on the star, hexagon and ellipse.\n2. **Fill saturation.** mocanvas's `semi` and `solid` fills are noticeably more saturated than\n   tldraw's. The blue rectangle's `semi` fill is a clear periwinkle in mocanvas but almost white in\n   tldraw; the red ellipse and violet hexagon are flat saturated colour in mocanvas versus a paler\n   tint in tldraw.\n3. **Outlines on filled shapes.** tldraw strokes solid-filled shapes with a darker outline of the same\n   hue (visible on the red ellipse and violet hexagon). mocanvas fills them with no contrasting stroke,\n   so those shapes read as flat discs.\n4. **Note text is missing.** mocanvas renders the sticky note's yellow body but not its \"Sticky note\"\n   label; tldraw renders the text. mocanvas also omits tldraw's note drop shadow and the subtle\n   top-to-bottom gradient on the note body, so the note is a flat rectangle.\n5. **Font.** tldraw's default draw font is heavy and quirky; mocanvas falls back to a lighter, more\n   conventional sans. \"Hello box\", \"Plain text shape\" and the frame label all differ in weight, letter\n   shapes and advance widths, so the glyphs never line up even where the layout box does.\n6. **Freehand stroke taper.** tldraw's draw stroke tapers to a point at both ends (pressure\n   simulation); mocanvas's is uniform width end to end.\n7. **tldraw watermark.** tldraw paints a \"Get a license for production\" badge in the bottom-right\n   corner. mocanvas has nothing there, so this is a small fixed contribution to the diff that is not a\n   rendering difference at all.\n8. **Framing.** zoom-to-fit lands a few pixels apart — the mocanvas scene sits roughly 2–4 px lower and\n   marginally narrower. Since every shape is offset by that amount, it inflates the diff slightly\n   across the whole image.\n9. **Arrowheads.** Very close. mocanvas's arrowhead on the bent arrow is a little smaller and sits at a\n   slightly different angle, and the bent arrow's curve terminates a few pixels short of tldraw's.\n\nEverything else lines up: shape positions and sizes, the geo shape set (rectangle, ellipse, star,\ntriangle, hexagon), the bent arrow's binding to the rectangle, the straight arrow, the line's spline,\nthe frame and both of its children, and the text shape's position."
+}

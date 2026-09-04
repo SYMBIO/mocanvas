@@ -1,6 +1,7 @@
 import { react as reactSignal } from "@mocanvas/state"
 import { track, useValue } from "@mocanvas/state/react"
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import type { ClipRect } from "@mocanvas/wasm"
 import type { Editor } from "../editor/Editor"
 import type { RenderBackend } from "../render/backend"
 import { createBackend } from "../render/webgl2"
@@ -167,6 +168,7 @@ export function Canvas({ editor, className, style, children, components }: Canva
 /** Shapes rendered by their ShapeUtil.component, positioned in page space via a camera transform. */
 const OverlayLayer = track(function OverlayLayer({ editor }: { editor: Editor }) {
   const ids = editor.getOverlayShapeIds()
+  const clips = editor.getOverlayClips()
   const cam = editor.getCamera()
   const editingId = editor.getEditingShapeId()
   return (
@@ -179,20 +181,34 @@ const OverlayLayer = track(function OverlayLayer({ editor }: { editor: Editor })
         transform: `scale(${cam.z}) translate(${cam.x}px, ${cam.y}px)`,
       }}
     >
-      {ids.map((id) => {
+      {ids.map((id, i) => {
         const shape = editor.getShape(id)
         if (!shape) return null
-        return <OverlayShape key={id} editor={editor} shape={shape} isEditing={editingId === id} />
+        return <OverlayShape key={id} editor={editor} shape={shape} isEditing={editingId === id} clip={clips[i]} />
       })}
     </div>
   )
 })
 
-const OverlayShape = track(function OverlayShape({ editor, shape, isEditing }: { editor: Editor; shape: UnknownShape; isEditing: boolean }) {
+const OverlayShape = track(function OverlayShape({
+  editor,
+  shape,
+  isEditing,
+  clip,
+}: {
+  editor: Editor
+  shape: UnknownShape
+  isEditing: boolean
+  /** Page-space clip rect inherited from a clipping ancestor (a frame). */
+  clip: ClipRect | undefined
+}) {
   const util = editor.getShapeUtil(shape)
   const m = editor.getShapePageTransform(shape)
   const bounds = editor.getShapeGeometryBounds(shape)
-  return (
+  // The clip rect is page-space and the shape may be rotated, so it is applied
+  // by an unrotated wrapper placed at the rect; the shape is offset back into it.
+  const offset = clip ? `translate(${-clip[0]}px, ${-clip[1]}px) ` : ""
+  const el = (
     <div
       className="mocanvas-shape"
       data-shape-id={shape.id}
@@ -204,12 +220,29 @@ const OverlayShape = track(function OverlayShape({ editor, shape, isEditing }: {
         width: bounds?.w ?? 0,
         height: bounds?.h ?? 0,
         transformOrigin: "0 0",
-        transform: `matrix(${m.a}, ${m.b}, ${m.c}, ${m.d}, ${m.e}, ${m.f})`,
+        transform: `${offset}matrix(${m.a}, ${m.b}, ${m.c}, ${m.d}, ${m.e}, ${m.f})`,
         opacity: shape.opacity,
         pointerEvents: isEditing ? "auto" : "none",
       }}
     >
       {util.component(shape)}
+    </div>
+  )
+  if (!clip) return el
+  return (
+    <div
+      className="mocanvas-shape-clip"
+      style={{
+        position: "absolute",
+        left: clip[0],
+        top: clip[1],
+        width: Math.max(0, clip[2] - clip[0]),
+        height: Math.max(0, clip[3] - clip[1]),
+        overflow: "hidden",
+        pointerEvents: "none",
+      }}
+    >
+      {el}
     </div>
   )
 })

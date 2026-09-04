@@ -22,6 +22,7 @@ import type { CSSProperties, ReactNode } from "react"
 import { alignToJustify, alignToTextAlign, TextLabel, verticalAlignToAlignItems } from "../text/TextEditor"
 import { computeGrowY, measureLabel, trimTrailingWhitespace } from "../text/text-layout"
 import { getGeoGeometry } from "./geo-helpers"
+import { propsOf, readNumber, readString, readStyle, readText } from "./prop-access"
 import { getDashId, getFillRgba, getStrokeRgba, getTextCssColor } from "./shape-theme"
 import { pathWordsToSvgD } from "./svg-path"
 
@@ -60,16 +61,46 @@ export function verticalAlignToFlex(align: DefaultVerticalAlignStyle): CSSProper
   return verticalAlignToAlignItems(align)
 }
 
+/**
+ * `shape.props` with every declared prop present and of the declared type.
+ * Geometry and rendering read through this so a record that arrived without a
+ * prop (or with a value from another editor's vocabulary) still draws.
+ */
+export function readGeoProps(shape: { props?: unknown }): GeoShapeProps {
+  const p = propsOf(shape)
+  return {
+    geo: readStyle(p, "geo", GeoShapeGeoStyle),
+    w: readNumber(p, "w", 100),
+    h: readNumber(p, "h", 100),
+    color: readStyle(p, "color", DefaultColorStyle),
+    labelColor: readStyle(p, "labelColor", DefaultLabelColorStyle),
+    fill: readStyle(p, "fill", DefaultFillStyle),
+    dash: readStyle(p, "dash", DefaultDashStyle),
+    size: readStyle(p, "size", DefaultSizeStyle),
+    font: readStyle(p, "font", DefaultFontStyle),
+    align: readStyle(p, "align", DefaultHorizontalAlignStyle),
+    verticalAlign: readStyle(p, "verticalAlign", DefaultVerticalAlignStyle),
+    growY: readNumber(p, "growY", 0),
+    url: readString(p, "url", ""),
+    text: readText(p),
+    scale: readNumber(p, "scale", 1),
+  }
+}
+
 /** Measured size of a geo label (padding included), wrapped at the shape width. */
 export function measureGeoLabel(props: Pick<GeoShapeProps, "text" | "font" | "size" | "scale" | "w">) {
-  const { text, font, size, scale, w } = props
+  const text = readText(props)
+  const font = readStyle(props, "font", DefaultFontStyle)
+  const size = readStyle(props, "size", DefaultSizeStyle)
+  const scale = readNumber(props, "scale", 1)
+  const w = readNumber(props, "w", 100)
   return measureLabel(text, { font, fontSize: FONT_SIZES[size] * scale, maxWidth: Math.max(1, w), padding: LABEL_PADDING * scale })
 }
 
 /** `growY` a geo shape needs so its label fits inside `h`. Empty labels never grow the shape. */
 export function getGeoGrowY(props: Pick<GeoShapeProps, "text" | "font" | "size" | "scale" | "w" | "h">): number {
-  if (!props.text) return 0
-  return computeGrowY(measureGeoLabel(props).h, props.h)
+  if (!readText(props)) return 0
+  return computeGrowY(measureGeoLabel(props).h, readNumber(props, "h", 100))
 }
 
 const LABEL_KEYS: readonly (keyof GeoShapeProps)[] = ["text", "font", "size", "scale", "w", "h"]
@@ -109,18 +140,19 @@ export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
   }
 
   getGeometry(shape: GeoShape): Geometry2d {
-    const { geo, w, h, growY, fill, text } = shape.props
+    const props = readGeoProps(shape)
+    const { geo, w, h, growY, fill, text } = props
     const height = h + growY
     const body = getGeoGeometry(geo, w, height, fill !== "none")
     if (!text) return body
-    return new Group2d({ children: [body, this.getLabelRect(shape)] })
+    return new Group2d({ children: [body, this.getLabelRect(props)] })
   }
 
   /** Where the text label sits inside the body, in shape-local space. */
-  private getLabelRect(shape: GeoShape): Rectangle2d {
-    const { w, h, growY, align, verticalAlign } = shape.props
+  private getLabelRect(props: GeoShapeProps): Rectangle2d {
+    const { w, h, growY, align, verticalAlign } = props
     const height = h + growY
-    const m = measureGeoLabel(shape.props)
+    const m = measureGeoLabel(props)
     const lw = Math.min(w, m.w)
     const lh = Math.min(height, m.h)
     const x = align === "start" || align === "start-legacy" ? 0 : align === "end" || align === "end-legacy" ? w - lw : (w - lw) / 2
@@ -129,7 +161,7 @@ export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
   }
 
   override getRenderStyle(shape: GeoShape): StyleWords {
-    const { color, fill, dash, size, scale } = shape.props
+    const { color, fill, dash, size, scale } = readGeoProps(shape)
     return {
       stroke: getStrokeRgba(color),
       strokeWidth: STROKE_SIZES[size] * scale,
@@ -140,7 +172,7 @@ export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
   }
 
   component(shape: GeoShape): ReactNode {
-    const { text, font, size, scale, labelColor, align, verticalAlign, w, h, growY } = shape.props
+    const { text, font, size, scale, labelColor, align, verticalAlign, w, h, growY } = readGeoProps(shape)
     const isEditing = this.editor.getEditingShapeId() === shape.id
     if (!text && !isEditing) return null
     return (
@@ -172,7 +204,7 @@ export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
   }
 
   override hasOverlayLabel(shape: GeoShape): boolean {
-    return shape.props.text.trim().length > 0 || this.editor.getEditingShapeId() === shape.id
+    return readText(shape.props).trim().length > 0 || this.editor.getEditingShapeId() === shape.id
   }
 
   override canEdit(_shape: GeoShape): boolean {
@@ -180,7 +212,7 @@ export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
   }
 
   override getText(shape: GeoShape): string {
-    return shape.props.text
+    return readText(shape.props)
   }
 
   override onBeforeCreate(next: GeoShape): GeoShape | void {
@@ -189,13 +221,14 @@ export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
   }
 
   override onBeforeUpdate(prev: GeoShape, next: GeoShape): GeoShape | void {
-    if (!LABEL_KEYS.some((k) => prev.props[k] !== next.props[k])) return
+    if (!LABEL_KEYS.some((k) => propsOf(prev)[k] !== propsOf(next)[k])) return
     const growY = getGeoGrowY(next.props)
     if (growY !== next.props.growY) return { ...next, props: { ...next.props, growY } }
   }
 
   override onEditEnd(shape: GeoShape): void {
-    const trimmed = trimTrailingWhitespace(shape.props.text)
-    if (trimmed !== shape.props.text) this.editor.updateShape<GeoShape>({ id: shape.id, type: "geo", props: { text: trimmed } })
+    const text = readText(shape.props)
+    const trimmed = trimTrailingWhitespace(text)
+    if (trimmed !== text) this.editor.updateShape<GeoShape>({ id: shape.id, type: "geo", props: { text: trimmed } })
   }
 }

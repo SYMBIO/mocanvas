@@ -30,7 +30,7 @@ the prefix as type aliases (`TLShape = Shape`, `TLShapeId = ShapeId`, ...).
 | `instance`        | same   | `currentPageId isFocused isDebugMode isGridMode isReadonly ...` (session) |
 | `instance_page_state` | same | `pageId selectedShapeIds hoveredShapeId editingShapeId ...` (session) |
 | `binding`         | later  | arrow bindings arrive with arrows in phase 2 |
-| `asset`           | later  | images in phase 3 |
+| `asset`           | same   | `id type props meta`; `type` is `image` \| `video` \| `bookmark`; image/video props `w h name isAnimated mimeType src fileSize?`, bookmark `title description image favicon src` |
 | `pointer`, `instance_presence` | later | collaboration |
 
 Style values (`color`, `fill`, `dash`, `size`, `font`, `align`, `verticalAlign`)
@@ -58,22 +58,31 @@ keep the same string unions so `.tldr` files load without translation.
 | `snaps` | same shape | `SnapManager.snapTranslate` returns nudge + guide lines |
 | `nudgeShapes` `rotateShapesBy` `flipShapes` `alignShapes` `distributeShapes` `stackShapes` `toggleLock` | same | `flipShapes` mirrors positions, not geometry |
 | `resizeShape` `stretchShapes` | phase 3 | interactive resize lives in the select tool |
-| `getSvgString` `toImage` | phase 2 | |
-| `putExternalContent` `registerExternalContentHandler` | phase 2 | |
-| `inputs` `user` `menus` `textMeasure` | differs | `inputs` same shape; `textMeasure` is DOM-backed in phase 1 |
+| `getSvgString` `toImage` | **differs** | not Editor methods: import the free functions `getSvgString(editor, ids?, opts?)` and `exportToBlob(editor, opts)` from `mocanvas` |
+| `putExternalContent` `registerExternalContentHandler` `registerExternalAssetHandler` | same | content types `files` `text` `url` `svg-text`; `getAssetForExternalContent` produces an asset without storing it; defaults are installed by `useExternalContent` / `registerDefaultExternalContentHandlers` |
+| `getAsset` `getAssets` `createAssets` `updateAssets` `deleteAssets` | same | assets are document-scoped, not per page |
+| `inputs` | same shape | pointer/keyboard state on the editor |
+| `user` `menus` `textMeasure` | **missing** | `user` arrives with collaboration; text measuring is `getTextMeasure()` from `mocanvas`; no menu registry |
 | `sideEffects` | same | store side effects |
 | `store` | same | `Store` instance |
+
+## Shapes
+
+| Shape | Status | Notes |
+| ----- | ------ | ----- |
+| `image` | same | props `w h assetId playing url crop flipX flipY altText`; drawn by the DOM overlay (`<img>`) for now, GPU texture path pending |
 
 ## `ShapeUtil<T>`
 
 | Member | Status |
 | ------ | ------ |
 | `static type`, `static props`, `static migrations` | same |
-| `getDefaultProps` `getGeometry` `component` `indicator` | same |
+| `getDefaultProps` `getGeometry` `component` | same |
+| `indicator` | **differs** | declared and implemented by every util, but the default indicators layer draws geometry bounds instead of calling it |
 | `canEdit` `canResize` `canBind` `canCrop` `canScroll` `hideRotateHandle` `hideResizeHandles` `hideSelectionBoundsBg` `hideSelectionBoundsFg` `isAspectRatioLocked` | same |
 | `onResize` `onResizeStart` `onResizeEnd` `onTranslateStart` `onTranslate` `onTranslateEnd` `onRotateStart` `onRotate` `onRotateEnd` `onDoubleClick` `onDoubleClickEdge` `onEditEnd` `onBeforeCreate` `onBeforeUpdate` `onChildrenChange` `onDragShapesOver` `onDragShapesOut` `onDropShapesOver` | same |
 | `getHandles` `onHandleDrag` | same |
-| `toSvg` `toBackgroundSvg` | phase 2 |
+| `toSvg` `toBackgroundSvg` | **differs** | SVG export lives in a registry: `registerShapeSvgRenderer(type, fn)` from `mocanvas` |
 | `getRenderStyle` | **new** — returns the GPU style words (fill, stroke, width, dash, opacity). Custom shapes that don't implement it are drawn by `component` in the DOM overlay. |
 
 ## `StateNode`

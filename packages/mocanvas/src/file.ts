@@ -1,4 +1,4 @@
-import type { Editor } from "@mocanvas/editor"
+import { normalizeLoadedRecords, type Editor } from "@mocanvas/editor"
 import { parseTldrFile, serializeTldrFile, type ParseTldrFileResult } from "@mocanvas/store"
 
 /** Serialize the editor's document to `.tldr` JSON text. */
@@ -7,12 +7,30 @@ export function serializeMocanvasFile(editor: Editor): string {
   return serializeTldrFile(snapshot.schema, Object.values(snapshot.store))
 }
 
-/** Load a `.tldr` file (text or parsed JSON) into the editor, replacing the document. */
-export function loadMocanvasFile(editor: Editor, json: unknown): ParseTldrFileResult {
+/**
+ * The parse result plus whatever the load could not read cleanly.
+ *
+ * `warnings` is always present (empty when the file needed nothing unusual)
+ * and is worth surfacing: it names shapes whose props were repaired, segments
+ * that had to be dropped, and shape types with no registered util.
+ */
+export type LoadMocanvasFileResult = ParseTldrFileResult & { warnings: string[] }
+
+/**
+ * Load a `.tldr` file (text or parsed JSON) into the editor, replacing the
+ * document.
+ *
+ * Records are normalized before they reach the store, so shapes written by
+ * another generation of the format — a rich-text label, a packed freehand
+ * path, a prop this build did not exist for — arrive in the form the shape
+ * utils expect. `records` in the result are the normalized ones.
+ */
+export function loadMocanvasFile(editor: Editor, json: unknown): LoadMocanvasFileResult {
   const parsed = parseTldrFile(json)
-  if (!parsed.ok) return parsed
+  if (!parsed.ok) return { ...parsed, warnings: [] }
+  const { records, warnings } = normalizeLoadedRecords(parsed.records, { shapeUtils: editor.shapeUtils })
   const store: Record<string, unknown> = {}
-  for (const r of parsed.records) store[r.id] = r
+  for (const r of records) store[r.id] = r
   editor.run(
     () => {
       editor.store.loadStoreSnapshot({ schema: parsed.schema, store: store as never })
@@ -26,5 +44,6 @@ export function loadMocanvasFile(editor: Editor, json: unknown): ParseTldrFileRe
   if (pages.length && !pages.some((p) => p.id === current)) editor.setCurrentPage(pages[0]!.id)
   else editor.setCurrentPage(editor.getCurrentPageId())
   editor.zoomToFit()
-  return parsed
+  for (const warning of warnings) console.warn(`mocanvas: ${warning}`)
+  return { ...parsed, records, warnings }
 }

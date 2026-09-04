@@ -14,11 +14,14 @@ pub struct Style {
     pub dash: u32,
     /// Opacity multiplier 0..1 applied to both fill and stroke.
     pub opacity: f32,
+    /// Host texture id (0 = none). When set, the fill mesh is replaced by one
+    /// textured quad over the shape's local geometry bounds, tinted white × `opacity`.
+    pub texture: u32,
 }
 
 impl Default for Style {
     fn default() -> Self {
-        Self { fill: 0, stroke: 0x1d1d1dff, stroke_width: 2.0, dash: 0, opacity: 1.0 }
+        Self { fill: 0, stroke: 0x1d1d1dff, stroke_width: 2.0, dash: 0, opacity: 1.0, texture: 0 }
     }
 }
 
@@ -27,6 +30,11 @@ impl Style {
     #[inline]
     pub fn has_fill(&self) -> bool {
         (self.fill & 0xff) != 0
+    }
+    /// Whether the fill is a texture.
+    #[inline]
+    pub fn has_texture(&self) -> bool {
+        self.texture != 0
     }
     /// Whether the stroke is visible.
     #[inline]

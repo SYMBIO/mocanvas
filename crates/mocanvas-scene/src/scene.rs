@@ -16,6 +16,8 @@ pub const FLAG_OVERLAY: u32 = 1 << 2;
 pub const FLAG_NO_FILL: u32 = 1 << 3;
 /// Shape is drawn by the GPU and additionally reported to the DOM overlay (text labels).
 pub const FLAG_LABEL: u32 = 1 << 4;
+/// Every descendant is clipped to this shape's page-space geometry AABB (frames).
+pub const FLAG_CLIP: u32 = 1 << 5;
 
 /// Dense index into the scene arrays. Stable until the shape is removed.
 pub type Slot = u32;
@@ -49,6 +51,12 @@ pub struct ShapeRef<'a> {
     pub page_transform: &'a Mat2d,
     /// Page-space axis-aligned bounds.
     pub page_bounds: &'a Box2d,
+    /// Local-space bounds of the outline (empty if no geometry was uploaded).
+    pub local_bounds: &'a Box2d,
+    /// Page-space clip rectangle inherited from the nearest `FLAG_CLIP` ancestor
+    /// (intersected with that ancestor's own clip), or `None` when unclipped.
+    /// May be an empty box when the intersection is empty (fully clipped).
+    pub clip: Option<Box2d>,
     /// Local outline.
     pub path: &'a Path,
     /// Style.
@@ -85,6 +93,7 @@ pub struct Scene {
     local_bounds: Vec<Box2d>,
     page_xf: Vec<Mat2d>,
     page_bounds: Vec<Box2d>,
+    clip_of: Vec<Option<Box2d>>,
     z_rank: Vec<u32>,
     alive: Vec<bool>,
     indexed_env: Vec<Option<Rectangle<[f32; 2]>>>,
@@ -166,6 +175,8 @@ impl Scene {
             h: self.h[s],
             page_transform: &self.page_xf[s],
             page_bounds: &self.page_bounds[s],
+            local_bounds: &self.local_bounds[s],
+            clip: self.clip_of[s],
             path: &self.path[s],
             style: &self.style[s],
             version: self.version[s],
@@ -206,6 +217,7 @@ impl Scene {
         }
         let transform_changed = self.x[s] != x || self.y[s] != y || self.rot[s] != rotation;
         let size_changed = self.w[s] != w || self.h[s] != h;
+        let clip_changed = (self.flags[s] ^ flags) & FLAG_CLIP != 0;
 
         self.kind[s] = kind;
         self.zkey[s] = zkey;
@@ -224,7 +236,7 @@ impl Scene {
         if structural {
             self.order_dirty = true;
         }
-        if transform_changed || structural || size_changed {
+        if transform_changed || structural || size_changed || clip_changed {
             self.recompute_transforms(slot);
         }
     }
@@ -239,7 +251,28 @@ impl Scene {
         self.version[s] = self.version[s].wrapping_add(1);
         self.geom_version[s] = self.geom_version[s].wrapping_add(1);
         self.update_page_bounds(slot);
+        if self.flags[s] & FLAG_CLIP != 0 {
+            self.recompute_clips(slot);
+        }
         true
+    }
+
+    /// Set the fill texture id of a shape (0 = none). The shape must exist.
+    pub fn set_texture(&mut self, handle: Handle, texture: u32) -> bool {
+        let Some(slot) = self.slot(handle) else { return false };
+        let s = slot as usize;
+        if self.style[s].texture == texture {
+            return true;
+        }
+        self.epoch += 1;
+        self.style[s].texture = texture;
+        self.version[s] = self.version[s].wrapping_add(1);
+        true
+    }
+
+    /// Clip rectangle applied to the descendants of a shape, or `None`.
+    pub fn clip_of(&self, handle: Handle) -> Option<Box2d> {
+        self.slot(handle).and_then(|s| self.clip_of[s as usize])
     }
 
     /// Replace the style of a shape. The shape must exist.
@@ -352,6 +385,7 @@ impl Scene {
             self.local_bounds[i] = Box2d::EMPTY;
             self.page_xf[i] = Mat2d::IDENTITY;
             self.page_bounds[i] = Box2d::EMPTY;
+            self.clip_of[i] = None;
             self.z_rank[i] = 0;
             self.alive[i] = true;
             self.indexed_env[i] = None;
@@ -375,6 +409,7 @@ impl Scene {
             self.local_bounds.push(Box2d::EMPTY);
             self.page_xf.push(Mat2d::IDENTITY);
             self.page_bounds.push(Box2d::EMPTY);
+            self.clip_of.push(None);
             self.z_rank.push(0);
             self.alive.push(true);
             self.indexed_env.push(None);
@@ -419,7 +454,7 @@ impl Scene {
         }
     }
 
-    /// Recompute page transform for a slot and its descendants.
+    /// Recompute page transform (and inherited clip) for a slot and its descendants.
     fn recompute_transforms(&mut self, slot: Slot) {
         let mut stack = vec![slot];
         while let Some(s) = stack.pop() {
@@ -428,8 +463,47 @@ impl Scene {
             let local = Mat2d::from_trs(self.x[i], self.y[i], self.rot[i]);
             self.page_xf[i] = parent.mul(&local);
             self.update_page_bounds(s);
+            self.clip_of[i] = self.clip_for(s);
             stack.extend_from_slice(&self.children[i]);
         }
+    }
+
+    /// Recompute the inherited clip of every descendant of `slot` (not `slot` itself).
+    fn recompute_clips(&mut self, slot: Slot) {
+        let mut stack = self.children[slot as usize].clone();
+        while let Some(s) = stack.pop() {
+            let i = s as usize;
+            self.clip_of[i] = self.clip_for(s);
+            stack.extend_from_slice(&self.children[i]);
+        }
+    }
+
+    /// Page-space rectangle a `FLAG_CLIP` shape clips its descendants to: its
+    /// geometry bounds (nominal size if no geometry yet), without stroke padding.
+    fn clip_rect(&self, slot: Slot) -> Box2d {
+        let i = slot as usize;
+        let lb = self.local_bounds[i];
+        let lb = if lb.is_empty() { Box2d::from_xywh(0.0, 0.0, self.w[i], self.h[i]) } else { lb };
+        lb.transformed(&self.page_xf[i])
+    }
+
+    /// Clip inherited by `slot` from its parent chain: the nearest clipping
+    /// ancestor's rect intersected with that ancestor's own inherited clip.
+    fn clip_for(&self, slot: Slot) -> Option<Box2d> {
+        let p = self.parent[slot as usize];
+        if p == 0 {
+            return None;
+        }
+        let ps = self.slot(p)?;
+        let inherited = self.clip_of[ps as usize];
+        if self.flags[ps as usize] & FLAG_CLIP == 0 {
+            return inherited;
+        }
+        let own = self.clip_rect(ps);
+        Some(match inherited {
+            Some(c) => c.intersection(&own),
+            None => own,
+        })
     }
 
     fn update_page_bounds(&mut self, slot: Slot) {
@@ -554,6 +628,58 @@ mod tests {
         assert_eq!(sc.len(), 3);
         assert!(sc.get(3).is_none());
         assert!(sc.get(9).is_some());
+    }
+
+    #[test]
+    fn clip_inherits_from_nearest_clip_ancestor_and_intersects() {
+        let mut sc = Scene::new();
+        // outer frame (clip) at (100,100) size 200x200
+        sc.upsert(1, 1, 0, ZKey(1), FLAG_CLIP, 100.0, 100.0, 0.0, 200.0, 200.0);
+        sc.set_geometry(1, Path::rect(&Box2d::from_xywh(0.0, 0.0, 200.0, 200.0)));
+        // plain child of the frame → clipped to the frame rect (no stroke padding)
+        sc.upsert(2, 1, 1, ZKey(1), 0, 10.0, 10.0, 0.0, 50.0, 50.0);
+        assert_eq!(sc.get(1).unwrap().clip, None);
+        assert_eq!(sc.get(2).unwrap().clip, Some(Box2d::from_xywh(100.0, 100.0, 200.0, 200.0)));
+        // nested frame partially outside the outer one: it is clipped by the outer rect
+        sc.upsert(3, 1, 1, ZKey(2), FLAG_CLIP, 150.0, 150.0, 0.0, 100.0, 100.0);
+        assert_eq!(sc.get(3).unwrap().clip, Some(Box2d::from_xywh(100.0, 100.0, 200.0, 200.0)));
+        // grandchild: nested rect (250..350) ∩ outer (100..300) = 250..300
+        sc.upsert(4, 1, 3, ZKey(1), 0, 0.0, 0.0, 0.0, 10.0, 10.0);
+        assert_eq!(sc.get(4).unwrap().clip, Some(Box2d::from_xywh(250.0, 250.0, 50.0, 50.0)));
+        assert_eq!(sc.clip_of(4), sc.get(4).unwrap().clip);
+        // moving the outer frame propagates to every descendant
+        sc.upsert(1, 1, 0, ZKey(1), FLAG_CLIP, 0.0, 0.0, 0.0, 200.0, 200.0);
+        assert_eq!(sc.get(2).unwrap().clip, Some(Box2d::from_xywh(0.0, 0.0, 200.0, 200.0)));
+        assert_eq!(sc.get(4).unwrap().clip, Some(Box2d::from_xywh(150.0, 150.0, 50.0, 50.0)));
+        // geometry change of a clip shape updates the descendants' clip
+        sc.set_geometry(1, Path::rect(&Box2d::from_xywh(0.0, 0.0, 160.0, 160.0)));
+        assert_eq!(sc.get(2).unwrap().clip, Some(Box2d::from_xywh(0.0, 0.0, 160.0, 160.0)));
+        assert_eq!(sc.get(4).unwrap().clip, Some(Box2d::from_xywh(150.0, 150.0, 10.0, 10.0)));
+        // clearing the flag removes the clip from descendants
+        sc.upsert(1, 1, 0, ZKey(1), 0, 0.0, 0.0, 0.0, 200.0, 200.0);
+        assert_eq!(sc.get(2).unwrap().clip, None);
+        assert_eq!(sc.get(4).unwrap().clip, Some(Box2d::from_xywh(150.0, 150.0, 100.0, 100.0)));
+        // reparenting to the root drops the clip
+        sc.upsert(4, 1, 0, ZKey(1), 0, 0.0, 0.0, 0.0, 10.0, 10.0);
+        assert_eq!(sc.get(4).unwrap().clip, None);
+    }
+
+    #[test]
+    fn disjoint_nested_clip_is_empty() {
+        let mut sc = Scene::new();
+        sc.upsert(1, 1, 0, ZKey(1), FLAG_CLIP, 0.0, 0.0, 0.0, 100.0, 100.0);
+        sc.upsert(2, 1, 1, ZKey(1), FLAG_CLIP, 500.0, 500.0, 0.0, 100.0, 100.0);
+        sc.upsert(3, 1, 2, ZKey(1), 0, 0.0, 0.0, 0.0, 10.0, 10.0);
+        assert!(sc.get(3).unwrap().clip.unwrap().is_empty());
+    }
+
+    #[test]
+    fn set_texture_updates_style() {
+        let mut sc = rect_scene();
+        assert!(sc.set_texture(1, 7));
+        assert_eq!(sc.get(1).unwrap().style.texture, 7);
+        assert!(sc.get(1).unwrap().style.has_texture());
+        assert!(!sc.set_texture(99, 7));
     }
 
     #[test]

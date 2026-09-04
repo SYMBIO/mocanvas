@@ -1,0 +1,28 @@
+{
+  "name": "bench",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "bench": "node scripts/bench.mjs",
+    "fixture": "node scripts/make-fixture.mjs"
+  },
+  "dependencies": {
+    "mocanvas": "workspace:*",
+    "@mocanvas/editor": "workspace:*",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "tldraw": "^5.4.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.1.0",
+    "playwright": "^1.55.0",
+    "pngjs": "^7.0.0"
+  }
+}

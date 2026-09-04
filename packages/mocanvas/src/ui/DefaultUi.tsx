@@ -1,135 +1,266 @@
-import { GeoShapeGeoStyle, track, useEditor, type Editor, type GeoShapeKind } from "@mocanvas/editor"
-import type { CSSProperties } from "react"
+import { GeoShapeGeoStyle, GEO_SHAPE_KINDS, track, useEditor, useValue, type Editor, type GeoShapeKind } from "@mocanvas/editor"
+import { Fragment, useEffect, useRef, useState } from "react"
+import { Icon, type IconName } from "./icons"
 import { StylePanel } from "./StylePanel"
+import { debugStatsOpen } from "./useKeyboardShortcuts"
+import "./ui.css"
 
-const panel: CSSProperties = {
-  position: "absolute",
-  display: "flex",
-  gap: 4,
-  padding: 6,
-  background: "var(--mocanvas-panel, #fff)",
-  border: "1px solid var(--mocanvas-panel-border, #e5e7eb)",
-  borderRadius: 10,
-  boxShadow: "0 4px 16px rgba(0,0,0,.08)",
-  fontFamily: "system-ui, sans-serif",
-  fontSize: 13,
-  pointerEvents: "auto",
-  zIndex: 10,
+const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || "")
+/** Accelerator prefix for tooltips: `⌘` on Apple platforms, `Ctrl+` elsewhere. */
+export const MOD_KEY = IS_MAC ? "⌘" : "Ctrl+"
+
+const stopPointer = (e: { stopPropagation: () => void }) => e.stopPropagation()
+
+function titleCase(s: string): string {
+  return s.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-const btn = (active: boolean): CSSProperties => ({
-  minWidth: 34,
-  height: 34,
-  padding: "0 8px",
-  borderRadius: 8,
-  border: "none",
-  cursor: "pointer",
-  background: active ? "var(--mocanvas-selection, #3b82f6)" : "transparent",
-  color: active ? "#fff" : "#111",
-  fontWeight: 600,
-})
+// ---------------------------------------------------------------------------
+// Toolbar configuration
+// ---------------------------------------------------------------------------
 
-interface ToolButton {
+export interface ToolbarItem {
+  /** Unique key; also the geo kind for geo entries. */
   id: string
+  /** Tool id that must be registered for this entry to appear. */
+  tool: string
+  icon: IconName
   label: string
-  title: string
+  /** Displayed in the tooltip, next to the label. */
+  shortcut?: string
+  /** Geo kind the entry selects, for entries driving the `geo` tool. */
   geo?: GeoShapeKind
+  /** Tools outside the default set: shown only when the app registers them. */
+  optional?: boolean
 }
 
-const TOOLS: ToolButton[] = [
-  { id: "select", label: "↖", title: "Select (V)" },
-  { id: "hand", label: "✋", title: "Hand (H)" },
-  { id: "draw", label: "✎", title: "Draw (D)" },
-  { id: "eraser", label: "◫", title: "Eraser (E)" },
-  { id: "geo", label: "▭", title: "Rectangle (R)", geo: "rectangle" },
-  { id: "geo", label: "◯", title: "Ellipse (O)", geo: "ellipse" },
-  { id: "geo", label: "△", title: "Triangle", geo: "triangle" },
-  { id: "geo", label: "◇", title: "Diamond", geo: "diamond" },
-  { id: "geo", label: "☆", title: "Star", geo: "star" },
-  { id: "note", label: "▤", title: "Note (N)" },
-  { id: "text", label: "T", title: "Text (T)" },
+/** Toolbar entries, grouped; groups are separated by a divider. */
+export const TOOLBAR_GROUPS: readonly (readonly ToolbarItem[])[] = [
+  [
+    { id: "select", tool: "select", icon: "select", label: "Select", shortcut: "V" },
+    { id: "hand", tool: "hand", icon: "hand", label: "Hand", shortcut: "H" },
+  ],
+  [
+    { id: "draw", tool: "draw", icon: "draw", label: "Draw", shortcut: "D" },
+    { id: "eraser", tool: "eraser", icon: "eraser", label: "Eraser", shortcut: "E" },
+  ],
+  [
+    { id: "rectangle", tool: "geo", icon: "geo-rectangle", label: "Rectangle", shortcut: "R", geo: "rectangle" },
+    { id: "ellipse", tool: "geo", icon: "geo-ellipse", label: "Ellipse", shortcut: "O", geo: "ellipse" },
+    { id: "triangle", tool: "geo", icon: "geo-triangle", label: "Triangle", geo: "triangle" },
+    { id: "diamond", tool: "geo", icon: "geo-diamond", label: "Diamond", geo: "diamond" },
+    { id: "star", tool: "geo", icon: "geo-star", label: "Star", geo: "star" },
+  ],
+  [
+    { id: "text", tool: "text", icon: "text", label: "Text", shortcut: "T" },
+    { id: "note", tool: "note", icon: "note", label: "Note", shortcut: "N" },
+    { id: "arrow", tool: "arrow", icon: "arrow", label: "Arrow", shortcut: "A", optional: true },
+    { id: "line", tool: "line", icon: "line", label: "Line", shortcut: "L", optional: true },
+    { id: "frame", tool: "frame", icon: "frame", label: "Frame", shortcut: "F", optional: true },
+  ],
 ]
 
-/** Bottom toolbar. */
+/** Geo kinds that live behind the "more shapes" popover. */
+export const PRIMARY_GEO_KINDS: readonly GeoShapeKind[] = TOOLBAR_GROUPS.flat()
+  .map((t) => t.geo)
+  .filter((g): g is GeoShapeKind => g !== undefined)
+
+export const MORE_GEO_KINDS: readonly GeoShapeKind[] = GEO_SHAPE_KINDS.filter((k) => !PRIMARY_GEO_KINDS.includes(k))
+
+/** Tool ids the editor currently has registered. */
+function registeredTools(editor: Editor): Set<string> {
+  return new Set(Object.keys(editor.root.children ?? {}))
+}
+
+// ---------------------------------------------------------------------------
+// Shared button
+// ---------------------------------------------------------------------------
+
+interface UiButtonProps {
+  icon: IconName
+  label: string
+  shortcut?: string
+  pressed?: boolean
+  expanded?: boolean
+  disabled?: boolean
+  className?: string
+  onClick: () => void
+}
+
+function UiButton({ icon, label, shortcut, pressed, expanded, disabled, className, onClick }: UiButtonProps) {
+  return (
+    <button
+      type="button"
+      className={className ? `mocanvas-btn ${className}` : "mocanvas-btn"}
+      aria-label={label}
+      data-tooltip={label}
+      {...(shortcut ? { "data-shortcut": shortcut } : {})}
+      {...(pressed === undefined ? {} : { "aria-pressed": pressed })}
+      {...(expanded === undefined ? {} : { "aria-expanded": expanded })}
+      {...(disabled ? { disabled: true } : {})}
+      onClick={onClick}
+    >
+      <Icon name={icon} />
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Toolbar
+// ---------------------------------------------------------------------------
+
+/** Bottom toolbar: tools, grouped, plus a popover with the rest of the shapes. */
 export const Toolbar = track(function Toolbar() {
   const editor = useEditor()
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!moreOpen) return
+    const onDown = (e: PointerEvent) => {
+      if (!moreRef.current?.contains(e.target as Node)) setMoreOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMoreOpen(false)
+    }
+    document.addEventListener("pointerdown", onDown, true)
+    document.addEventListener("keydown", onKey, true)
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true)
+      document.removeEventListener("keydown", onKey, true)
+    }
+  }, [moreOpen])
+
+  const available = registeredTools(editor)
   const toolId = editor.getCurrentToolId()
   const geo = toolId === "geo" ? ((editor.getStateDescendant("geo") as { geo?: GeoShapeKind } | undefined)?.geo ?? "rectangle") : null
+
+  const pickGeo = (kind: GeoShapeKind) => {
+    editor.setStyleForNextShapes(GeoShapeGeoStyle, kind)
+    editor.setCurrentTool("geo", { geo: kind, force: true })
+  }
+
+  const groups = TOOLBAR_GROUPS.map((group) => group.filter((item) => available.has(item.tool))).filter((group) => group.length > 0)
+  const hasGeo = available.has("geo") && MORE_GEO_KINDS.length > 0
+  const moreActive = toolId === "geo" && geo !== null && !PRIMARY_GEO_KINDS.includes(geo)
+
   return (
-    <div style={{ ...panel, left: "50%", bottom: 12, transform: "translateX(-50%)" }} onPointerDown={(e) => e.stopPropagation()}>
-      {TOOLS.map((t) => {
-        const active = t.id === toolId && (t.geo === undefined || t.geo === geo)
-        return (
-          <button
-            key={t.title}
-            type="button"
-            title={t.title}
-            style={btn(active)}
-            onClick={() => {
-              if (t.geo) {
-                editor.setStyleForNextShapes(GeoShapeGeoStyle, t.geo)
-                editor.setCurrentTool("geo", { geo: t.geo, force: true })
-              } else editor.setCurrentTool(t.id)
-            }}
-          >
-            {t.label}
-          </button>
-        )
-      })}
+    <div className="mocanvas-panel mocanvas-toolbar" role="toolbar" aria-label="Tools" onPointerDown={stopPointer}>
+      {groups.map((group, i) => (
+        <Fragment key={group[0]!.id}>
+          {i > 0 ? <span className="mocanvas-divider" aria-hidden="true" /> : null}
+          {group.map((item) => (
+            <UiButton
+              key={item.id}
+              icon={item.icon}
+              label={item.label}
+              {...(item.shortcut ? { shortcut: item.shortcut } : {})}
+              pressed={item.tool === toolId && (item.geo === undefined || item.geo === geo)}
+              onClick={() => (item.geo ? pickGeo(item.geo) : editor.setCurrentTool(item.tool))}
+            />
+          ))}
+          {hasGeo && group.some((item) => item.geo) ? (
+            <span className="mocanvas-more" ref={moreRef}>
+              <UiButton
+                icon="chevron-down"
+                label="More shapes"
+                pressed={moreActive}
+                expanded={moreOpen}
+                onClick={() => setMoreOpen((v) => !v)}
+              />
+              {moreOpen ? (
+                <div className="mocanvas-popover" role="menu" aria-label="More shapes">
+                  {MORE_GEO_KINDS.map((kind) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      role="menuitemradio"
+                      className="mocanvas-btn"
+                      aria-label={titleCase(kind)}
+                      aria-checked={geo === kind}
+                      data-tooltip={titleCase(kind)}
+                      onClick={() => {
+                        pickGeo(kind)
+                        setMoreOpen(false)
+                      }}
+                    >
+                      <Icon name={`geo-${kind}`} />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </span>
+          ) : null}
+        </Fragment>
+      ))}
     </div>
   )
 })
+
+// ---------------------------------------------------------------------------
+// Zoom bar
+// ---------------------------------------------------------------------------
 
 /** Zoom controls and undo/redo. */
 export const ZoomBar = track(function ZoomBar() {
   const editor = useEditor()
-  const z = editor.getZoomLevel()
+  const zoom = Math.round(editor.getZoomLevel() * 100)
   return (
-    <div style={{ ...panel, left: 12, bottom: 12 }} onPointerDown={(e) => e.stopPropagation()}>
-      <button type="button" style={btn(false)} title="Zoom out (⌘-)" onClick={() => editor.zoomOut()}>
-        −
+    <div className="mocanvas-panel mocanvas-zoombar" role="toolbar" aria-label="View" onPointerDown={stopPointer}>
+      <UiButton icon="zoom-out" label="Zoom out" shortcut={`${MOD_KEY}−`} onClick={() => editor.zoomOut()} />
+      <button
+        type="button"
+        className="mocanvas-btn mocanvas-btn--wide"
+        aria-label={`Reset zoom, currently ${zoom}%`}
+        data-tooltip="Reset zoom"
+        data-shortcut={`${MOD_KEY}0`}
+        onClick={() => editor.resetZoom()}
+      >
+        {zoom}%
       </button>
-      <button type="button" style={{ ...btn(false), minWidth: 56 }} title="Reset zoom (⌘0)" onClick={() => editor.resetZoom()}>
-        {Math.round(z * 100)}%
-      </button>
-      <button type="button" style={btn(false)} title="Zoom in (⌘+)" onClick={() => editor.zoomIn()}>
-        +
-      </button>
-      <button type="button" style={btn(false)} title="Zoom to fit (⌘1)" onClick={() => editor.zoomToFit()}>
-        ⤢
-      </button>
-      <span style={{ width: 1, background: "#e5e7eb", margin: "4px 2px" }} />
-      <button type="button" style={btn(false)} title="Undo (⌘Z)" disabled={!editor.getCanUndo()} onClick={() => editor.undo()}>
-        ↶
-      </button>
-      <button type="button" style={btn(false)} title="Redo (⌘⇧Z)" disabled={!editor.getCanRedo()} onClick={() => editor.redo()}>
-        ↷
-      </button>
+      <UiButton icon="zoom-in" label="Zoom in" shortcut={`${MOD_KEY}+`} onClick={() => editor.zoomIn()} />
+      <UiButton icon="zoom-fit" label="Zoom to fit" shortcut={`${MOD_KEY}1`} onClick={() => editor.zoomToFit()} />
+      <span className="mocanvas-divider" aria-hidden="true" />
+      <UiButton icon="undo" label="Undo" shortcut={`${MOD_KEY}Z`} disabled={!editor.getCanUndo()} onClick={() => editor.undo()} />
+      <UiButton icon="redo" label="Redo" shortcut={`${MOD_KEY}⇧Z`} disabled={!editor.getCanRedo()} onClick={() => editor.redo()} />
     </div>
   )
 })
 
-/** Frame statistics. */
+// ---------------------------------------------------------------------------
+// Debug stats
+// ---------------------------------------------------------------------------
+
+/** Compact frame-statistics chip. Toggled with ⌥D. */
 export const DebugStats = track(function DebugStats({ editor }: { editor: Editor }) {
   const stats = editor.getLastFrameStats()
   const count = editor.getCurrentPageShapeIds().size
   return (
-    <div style={{ ...panel, right: 12, top: 12, fontFamily: "ui-monospace, monospace", fontSize: 11, color: "#374151", flexDirection: "column", gap: 2, padding: "6px 10px" }}>
-      <span>shapes {count}</span>
-      <span>drawn {stats.drawn} · culled {stats.culled}</span>
-      <span>frame {stats.ms.toFixed(2)} ms</span>
-      <span>engine {editor.engine.shapeCount}</span>
+    <div className="mocanvas-panel mocanvas-stats" role="status" aria-label="Frame statistics" onPointerDown={stopPointer}>
+      <span>
+        <b>{count}</b> shapes · <b>{editor.engine.shapeCount}</b> engine
+      </span>
+      <span>
+        <b>{stats.drawn}</b> drawn · <b>{stats.culled}</b> culled
+      </span>
+      <span>
+        <b>{stats.ms.toFixed(2)}</b> ms/frame
+      </span>
     </div>
   )
 })
 
 export function DefaultUi({ editor, showStats = true }: { editor: Editor; showStats?: boolean }) {
+  const statsOpen = useValue(debugStatsOpen)
+  useEffect(() => {
+    debugStatsOpen.set(showStats)
+  }, [showStats])
   return (
     <>
       <Toolbar />
       <ZoomBar />
       <StylePanel />
-      {showStats ? <DebugStats editor={editor} /> : null}
+      {statsOpen ? <DebugStats editor={editor} /> : null}
     </>
   )
 }

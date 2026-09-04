@@ -13,6 +13,7 @@ import {
 } from "@mocanvas/editor"
 import { getIndexBetween, sortByIndex, type IndexKey } from "@mocanvas/store"
 import type { ReactNode } from "react"
+import { propsOf, readEnum, readNumber, readString, readStyle } from "./prop-access"
 import { getStrokeRgba, getDashId } from "./shape-theme"
 import { catmullRomToBezier } from "./spline-helpers"
 import { pathWordsToSvgD } from "./svg-path"
@@ -35,9 +36,23 @@ export interface LineShapeProps {
 
 export type LineShape = BaseShape<"line", LineShapeProps>
 
-/** The line's points in drawing order. */
-export function getLinePoints(shape: LineShape): LinePoint[] {
-  return sortByIndex(Object.values(shape.props.points) as (LinePoint & { index: IndexKey })[])
+const SPLINES = ["line", "cubic"] as const
+
+/** The line's points in drawing order, skipping any entry that is not a point. */
+export function getLinePoints(shape: { props?: unknown }): LinePoint[] {
+  const stored = propsOf(shape)["points"]
+  if (typeof stored !== "object" || stored === null) return []
+  const points: (LinePoint & { index: IndexKey })[] = []
+  for (const [id, value] of Object.entries(stored as Record<string, unknown>)) {
+    if (typeof value !== "object" || value === null) continue
+    points.push({
+      id: readString(value, "id", id),
+      index: readString(value, "index", "a1") as IndexKey,
+      x: readNumber(value, "x", 0),
+      y: readNumber(value, "y", 0),
+    })
+  }
+  return sortByIndex(points)
 }
 
 function midIndex(a: string, b: string): string {
@@ -69,19 +84,21 @@ export class LineShapeUtil extends ShapeUtil<LineShape> {
   getGeometry(shape: LineShape): Geometry2d {
     const points = getLinePoints(shape)
     if (points.length === 0) return new Polyline2d({ points: [{ x: 0, y: 0 }] })
-    if (shape.props.spline === "cubic" && points.length > 2) {
+    if (readEnum(propsOf(shape), "spline", SPLINES, "line") === "cubic" && points.length > 2) {
       return new CubicSpline2d({ segments: catmullRomToBezier(points), isClosed: false, isFilled: false })
     }
     return new Polyline2d({ points })
   }
 
   override getRenderStyle(shape: LineShape): StyleWords {
-    const { color, size, scale } = shape.props
+    const p = propsOf(shape)
+    const color = readStyle(p, "color", DefaultColorStyle)
+    const size = readStyle(p, "size", DefaultSizeStyle)
     return {
       stroke: getStrokeRgba(color),
-      strokeWidth: STROKE_SIZES[size] * scale,
+      strokeWidth: STROKE_SIZES[size] * readNumber(p, "scale", 1),
       fill: 0,
-      dash: getDashId(shape.props.dash),
+      dash: getDashId(readStyle(p, "dash", DefaultDashStyle)),
       opacity: 1,
     }
   }
@@ -116,7 +133,8 @@ export class LineShapeUtil extends ShapeUtil<LineShape> {
 
   override onHandleDrag(shape: LineShape, info: { handle: ShapeHandle }): Partial<LineShape> {
     const { handle } = info
-    const points = { ...shape.props.points }
+    const points: Record<string, LinePoint> = {}
+    for (const p of getLinePoints(shape)) points[p.id] = p
     const existing = points[handle.id]
     if (existing) {
       points[handle.id] = { ...existing, x: handle.x, y: handle.y }

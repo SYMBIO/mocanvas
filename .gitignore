@@ -6,3 +6,6 @@ packages/wasm/pkg
 .DS_Store
 .turbo
 coverage
+
+# benchmark artifacts (regenerate with: pnpm --filter bench bench)
+apps/bench/results/*.png

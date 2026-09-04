@@ -88,9 +88,22 @@ REMOVE_SHAPE   op=2  handle                                                 (2 w
 SET_GEOMETRY   op=3  handle nwords [path command words...]                  (3+n words)
 SET_STYLE      op=4  handle fill_rgba stroke_rgba stroke_w_f32 dash opacity (7 words)
 CLEAR          op=5                                                         (1 word)
+SET_TEXTURE    op=6  handle texture                                         (3 words)
 
 Word counts include the opcode.
 ```
+
+`flags` bits: `HIDDEN=1`, `LOCKED=2`, `OVERLAY=4` (DOM only), `NO_FILL=8`,
+`LABEL=16` (GPU + DOM label), `CLIP=32`. A `CLIP` shape (frames) clips every
+descendant to its page-space geometry AABB; the nearest clipping ancestor wins
+and nested clips intersect. The shape itself is not clipped by its own rect.
+
+`SET_TEXTURE` sets the host texture id of a shape's fill (`0` = none) and is
+independent of `SET_STYLE`, which keeps the current texture. With a texture the
+fill mesh is replaced by one quad over the shape's local geometry bounds with
+`uv` `(0,0)` at the min corner and `(1,1)` at the max corner, coloured
+white × opacity; the stroke is drawn as usual. Texture ids are allocated by the
+host and uploaded through `RenderBackend.uploadTexture(id, source)`.
 
 `kind` is a `u16` shape-kind id registered at startup for each `ShapeUtil`.
 `zkey` is the fractional index converted to a 64-bit sortable key (see
@@ -105,14 +118,27 @@ engine.frame(cam_x, cam_y, cam_z, vp_w, vp_h) -> FrameInfo
 
 `FrameInfo` exposes pointers and lengths into WASM memory for:
 
-- `vertices: f32[]` interleaved `x y r g b a` (6 floats)
+- `vertices: f32[]` interleaved `x y u v r g b a` (8 floats, 32-byte stride);
+  solid geometry has `u = v = 0`
 - `indices: u32[]`
-- `batches: u32[]` triples `(first_index, index_count, texture_or_0)`
-- `overlay: u32[]` handles of visible shapes that need the DOM overlay,
-  in z-order, each followed by its screen-space `x y w h rot` as f32 bits.
+- `batches: u32[]`, 7 words each:
+  `first_index index_count texture clip_minx clip_miny clip_maxx clip_maxy`.
+  The clip words are page-space f32 bits; all four zero = unclipped. A new
+  batch starts whenever the texture or the clip rect changes.
+- `overlay: u32[]`, 10 words each, for visible shapes that need the DOM
+  overlay, in z-order: `handle x y w h rot clip_minx clip_miny clip_maxx
+  clip_maxy` as f32 bits, with `x y w h` the page-space bounds and the clip
+  rect as in `batches`.
+
+Shapes whose page bounds fall entirely outside their clip rect are culled and
+never reach either buffer. Level-of-detail quads and textured quads carry the
+clip like any other geometry.
 
 TS wraps these in typed-array views (no copy) and issues one
-`bufferSubData` + one `drawElements` per batch.
+`bufferSubData` + one `drawElements` per batch. The WebGL2 backend binds the
+batch's texture (a 1×1 white texture for `0`, sampled in the fragment shader)
+and, for clipped batches only, enables `SCISSOR_TEST` with the clip rect
+mapped page → device pixels (`(p + cam) * zoom * dpr`, y flipped).
 
 ### Queries
 

@@ -14,6 +14,7 @@ export const OP = {
   SET_GEOMETRY: 3,
   SET_STYLE: 4,
   CLEAR: 5,
+  SET_TEXTURE: 6,
 } as const
 
 /** Path opcodes; must match `mocanvas-geo::PathCmd`. */
@@ -33,6 +34,8 @@ export const FLAG = {
   NO_FILL: 1 << 3,
   /** GPU-drawn and also reported to the DOM overlay (labels). */
   LABEL: 1 << 4,
+  /** Descendants are clipped to this shape's page-space geometry AABB (frames). */
+  CLIP: 1 << 5,
 } as const
 
 /** Hit-test filter bits. */
@@ -51,16 +54,46 @@ export interface CameraState {
   z: number
 }
 
+/** Floats per vertex in `FrameBuffers.vertices`: `x y u v r g b a`. */
+export const VERTEX_FLOATS = 8
+/** `u32` words per record in `FrameBuffers.batches`. */
+export const BATCH_WORDS = 7
+/** `u32` words per record in `FrameBuffers.overlay`. */
+export const OVERLAY_WORDS = 10
+
+/** Page-space clip rectangle `[minX, minY, maxX, maxY]`. */
+export type ClipRect = [number, number, number, number]
+
 export interface FrameBuffers {
-  /** Interleaved x y r g b a in page space. View into WASM memory; valid until the next engine call. */
+  /**
+   * Interleaved `x y u v r g b a` (8 floats) in page space; solid geometry has
+   * `u = v = 0`. View into WASM memory; valid until the next engine call.
+   */
   vertices: Float32Array
   indices: Uint32Array
-  /** (firstIndex, indexCount, texture) triples. */
+  /**
+   * `BATCH_WORDS` (7) words per batch: `firstIndex indexCount texture clipMinX
+   * clipMinY clipMaxX clipMaxY`. The clip words are f32 bits in page space; all
+   * four zero means unclipped. Texture 0 = solid color. A new batch starts
+   * whenever the texture or the clip rect changes — use `readBatch`.
+   */
   batches: Uint32Array
-  /** (handle, x, y, w, h, rot) sextets with floats as bits — use `readOverlay`. */
+  /**
+   * `OVERLAY_WORDS` (10) words per entry: `handle x y w h rot clipMinX clipMinY
+   * clipMaxX clipMaxY` with floats as bits — use `readOverlay`.
+   */
   overlay: Uint32Array
   drawn: number
   culled: number
+}
+
+export interface Batch {
+  firstIndex: number
+  indexCount: number
+  /** Host texture id, 0 = solid color. */
+  texture: number
+  /** Page-space clip rect, or undefined when unclipped. */
+  clip?: ClipRect
 }
 
 export interface OverlayEntry {
@@ -70,6 +103,8 @@ export interface OverlayEntry {
   w: number
   h: number
   rotation: number
+  /** Page-space clip rect inherited from the nearest clipping ancestor, if any. */
+  clip?: ClipRect
 }
 
 export interface StyleWords {
@@ -79,6 +114,12 @@ export interface StyleWords {
   strokeWidth: number
   dash: number
   opacity: number
+  /**
+   * Host texture id (0 or undefined = none). Not part of SET_STYLE; send it with
+   * `CommandWriter.setTexture`. When set, the fill is drawn as one textured quad
+   * over the shape's local bounds (uv 0..1), tinted white × opacity.
+   */
+  texture?: number
 }
 
 const scratchF32 = new Float32Array(1)
@@ -94,6 +135,16 @@ export function f32bits(v: number): number {
 export function bitsf32(v: number): number {
   scratchU32[0] = v
   return scratchF32[0]!
+}
+
+/** Four clip words (f32 bits) at `offset` → rect, or undefined when all zero (unclipped). */
+export function readClip(words: Uint32Array, offset: number): ClipRect | undefined {
+  const a = words[offset]!
+  const b = words[offset + 1]!
+  const c = words[offset + 2]!
+  const d = words[offset + 3]!
+  if ((a | b | c | d) === 0) return undefined
+  return [bitsf32(a), bitsf32(b), bitsf32(c), bitsf32(d)]
 }
 
 /**
@@ -194,6 +245,17 @@ export class CommandWriter {
     this.len = i
   }
 
+  /** Set the fill texture of a shape (0 = solid fill). Independent of `setStyle`. */
+  setTexture(handle: Handle, texture: number): void {
+    this.ensure(3)
+    const v = this.view
+    let i = this.len
+    v[i++] = OP.SET_TEXTURE
+    v[i++] = handle
+    v[i++] = texture >>> 0
+    this.len = i
+  }
+
   clear(): void {
     this.ensure(1)
     this.view[this.len++] = OP.CLEAR
@@ -246,16 +308,34 @@ export class EngineBridge {
   /** Decode the overlay buffer of a frame. */
   static readOverlay(overlay: Uint32Array): OverlayEntry[] {
     const out: OverlayEntry[] = []
-    for (let i = 0; i + 6 <= overlay.length; i += 6) {
-      out.push({
+    for (let i = 0; i + OVERLAY_WORDS <= overlay.length; i += OVERLAY_WORDS) {
+      const entry: OverlayEntry = {
         handle: overlay[i]!,
         x: bitsf32(overlay[i + 1]!),
         y: bitsf32(overlay[i + 2]!),
         w: bitsf32(overlay[i + 3]!),
         h: bitsf32(overlay[i + 4]!),
         rotation: bitsf32(overlay[i + 5]!),
-      })
+      }
+      const clip = readClip(overlay, i + 6)
+      if (clip) entry.clip = clip
+      out.push(entry)
     }
+    return out
+  }
+
+  /** Decode one batch record starting at word `offset` (a multiple of `BATCH_WORDS`). */
+  static readBatch(batches: Uint32Array, offset: number): Batch {
+    const b: Batch = { firstIndex: batches[offset]!, indexCount: batches[offset + 1]!, texture: batches[offset + 2]! }
+    const clip = readClip(batches, offset + 3)
+    if (clip) b.clip = clip
+    return b
+  }
+
+  /** Decode the batch buffer of a frame. */
+  static readBatches(batches: Uint32Array): Batch[] {
+    const out: Batch[] = []
+    for (let i = 0; i + BATCH_WORDS <= batches.length; i += BATCH_WORDS) out.push(EngineBridge.readBatch(batches, i))
     return out
   }
 

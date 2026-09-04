@@ -24,6 +24,26 @@ that projects can migrate, but it is not derived from it.
    `license-checker` run in CI.
 6. **If in doubt, name it differently** and add an alias in the compat package.
 
+## The one exception: `apps/bench`
+
+`apps/bench` is a private, never-published benchmark harness. It is the only
+place in this repository that may depend on `tldraw`, name it, or read its
+`.d.ts` declaration files, and it does so purely to drive the other library
+through its public API so the two can be measured and their rendering compared.
+
+The exception is bounded:
+
+- `apps/bench` is `"private": true` and is never published.
+- Nothing under `packages/**` or `apps/playground` may import it, import
+  `tldraw`, or mention it.
+- Reading tldraw's *implementation* (bundled `.js`/`.mjs`, or its source) is
+  still forbidden there. Declaration files and public documentation only.
+- No code is copied in either direction. The fixture in
+  `apps/bench/public/compare.tldr` is data produced by running the other
+  library, which is exactly the kind of sample document rule 2 permits.
+- License tooling (`license-checker`, `cargo deny`) must therefore *exclude*
+  `apps/bench` rather than have rule 5's allowlist relaxed for everyone.
+
 ## Where the compat surface is documented
 
 `docs/COMPAT.md` lists every public symbol that intentionally matches, and every

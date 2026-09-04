@@ -9,7 +9,7 @@ import {
   ZERO_INDEX_KEY,
   type IndexKey,
 } from "@mocanvas/store"
-import { EngineBridge, FLAG, type CameraState, type FrameBuffers, type StyleWords } from "@mocanvas/wasm"
+import { EngineBridge, FLAG, type CameraState, type ClipRect, type FrameBuffers, type StyleWords } from "@mocanvas/wasm"
 import { Box, Vec, type BoxLike, type Geometry2d, type VecLike } from "../geometry"
 import {
   CameraRecordType,
@@ -44,6 +44,19 @@ import {
   type BindingPartial,
   type UnknownBinding,
 } from "../records/binding"
+import {
+  AssetRecordType,
+  type Asset,
+  type AssetCreate,
+  type AssetId,
+  type AssetPartial,
+  type ExternalAssetContent,
+  type ExternalAssetHandler,
+  type ExternalAssetType,
+  type ExternalContent,
+  type ExternalContentHandler,
+  type ExternalContentType,
+} from "../records/asset"
 import { createRootState } from "../tools/RootState"
 import type { StateNode, StateNodeConstructor } from "../tools/StateNode"
 import type { RenderBackend } from "../render/backend"
@@ -57,6 +70,7 @@ import {
   type WheelEventInfo,
 } from "./events"
 import { HandleTable } from "./HandleTable"
+import { bucketTextureResolution, TextureManager } from "./TextureManager"
 import { getStylePropsOf, SharedStyleMap, type StyleProp } from "../records/styleProp"
 import { HistoryManager } from "./HistoryManager"
 import { SnapManager } from "./SnapManager"
@@ -143,6 +157,8 @@ export class Editor extends EventEmitter<EditorEvents> {
   readonly options: EditorConfig
   readonly inputs: EditorInputs
   readonly handles = new HandleTable()
+  /** GPU textures referenced by shape styles (images, rasterized text). */
+  readonly textures: TextureManager = new TextureManager({ onChange: (keys) => this.onTexturesChanged(keys) })
   readonly snaps: SnapManager
   readonly getContainer: () => HTMLElement
   readonly sideEffects: EditorStore["sideEffects"]
@@ -150,10 +166,13 @@ export class Editor extends EventEmitter<EditorEvents> {
   private readonly kindIds = new Map<string, number>()
   private readonly _frameEpoch: Atom<number>
   private readonly _overlayShapeIds: Atom<readonly ShapeId[]>
+  private readonly _overlayClips: Atom<readonly (ClipRect | undefined)[]>
   private readonly _isDisposed: Atom<boolean>
   private readonly _lastFrame: Atom<{ drawn: number; culled: number; ms: number }>
   private readonly disposables: (() => void)[] = []
   private syncedPageId: PageId | null = null
+  /** Shapes whose last write to the engine threw; they are warned about once. */
+  private readonly brokenShapeIds = new Set<ShapeId>()
 
   constructor(opts: EditorOptions) {
     super()
@@ -166,6 +185,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
     this._frameEpoch = atom("editor.frameEpoch", 0)
     this._overlayShapeIds = atom<readonly ShapeId[]>("editor.overlayShapeIds", [])
+    this._overlayClips = atom<readonly (ClipRect | undefined)[]>("editor.overlayClips", [])
     this._isDisposed = atom("editor.isDisposed", false)
     this._lastFrame = atom("editor.lastFrame", { drawn: 0, culled: 0, ms: 0 })
 
@@ -210,6 +230,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
     this.ensureBaseRecords()
     this.registerBindingSideEffects()
+    this.registerTextureSideEffects()
 
     this.history = new HistoryManager(this.store, () => this.emit("update"))
 
@@ -241,6 +262,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     if (this._isDisposed.get()) return
     this._isDisposed.set(true)
     for (const d of this.disposables) d()
+    this.textures.dispose()
     this.history.destroy()
     this.removeAllListeners()
   }
@@ -300,6 +322,14 @@ export class Editor extends EventEmitter<EditorEvents> {
   /** Shapes the DOM overlay must render this frame, in draw order. */
   getOverlayShapeIds(): readonly ShapeId[] {
     return this._overlayShapeIds.get()
+  }
+
+  /**
+   * Page-space clip rects for the overlay shapes, parallel to
+   * `getOverlayShapeIds()`; `undefined` where the shape is unclipped.
+   */
+  getOverlayClips(): readonly (ClipRect | undefined)[] {
+    return this._overlayClips.get()
   }
 
   // ---- batching / history ------------------------------------------------
@@ -730,7 +760,11 @@ export class Editor extends EventEmitter<EditorEvents> {
         for (const [key, style] of this.getStylePropsForType(partial.type)) {
           if (style.id in styles) props[key] = styles[style.id]
         }
-        Object.assign(props, partial.props ?? {})
+        // An explicitly `undefined` prop must not shadow the util's default,
+        // or the new shape would reach the engine missing a prop it declares.
+        for (const [key, value] of Object.entries(partial.props ?? {})) {
+          if (value !== undefined) props[key] = value
+        }
         let shape = ShapeRecordType.create({
           id: partial.id ?? ShapeRecordType.createId(),
           type: partial.type,
@@ -1929,7 +1963,27 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.bumpFrame()
   }
 
+  /**
+   * Write one shape to the engine, isolating it from its siblings.
+   *
+   * A shape util can throw on a shape it does not fully understand (a prop a
+   * file left out, a value it did not expect). That must cost that one shape,
+   * never the rest of the page: the failure is logged once and the shape is
+   * skipped, so a single bad record can no longer blank the canvas.
+   */
   private writeShapeToEngine(shape: UnknownShape, withGeometry: boolean): void {
+    try {
+      this.writeShapeToEngineUnsafe(shape, withGeometry)
+      this.brokenShapeIds.delete(shape.id)
+    } catch (error) {
+      if (!this.brokenShapeIds.has(shape.id)) {
+        this.brokenShapeIds.add(shape.id)
+        console.warn(`mocanvas: skipping shape ${shape.id} (${shape.type}); its shape util threw`, error)
+      }
+    }
+  }
+
+  private writeShapeToEngineUnsafe(shape: UnknownShape, withGeometry: boolean): void {
     const util = this.shapeUtils[shape.type]
     const h = this.handles.handle(shape.id)
     const parent = isShapeId(shape.parentId) ? this.handles.handle(shape.parentId) : 0
@@ -1939,9 +1993,12 @@ export class Editor extends EventEmitter<EditorEvents> {
     let style: StyleWords | null = null
     let geometry: Geometry2d | undefined
     if (util) {
-      style = util.getRenderStyle(shape)
+      // Texture references acquired while deriving the style are attributed to
+      // this shape, so re-writing it neither leaks nor drops references.
+      style = this.textures.withOwner(shape.id, () => util.getRenderStyle(shape))
       if (style === null || util.needsOverlay(shape)) flags |= FLAG.OVERLAY
       else if (util.hasOverlayLabel(shape)) flags |= FLAG.LABEL
+      if (util.isClipShape(shape)) flags |= FLAG.CLIP
       geometry = util.getGeometry(shape)
       if (geometry.isClosed && !geometry.isFilled) flags |= FLAG.NO_FILL
     } else {
@@ -1953,6 +2010,7 @@ export class Editor extends EventEmitter<EditorEvents> {
       this.engine.cmd.setGeometry(h, geometry.toPathWords())
       if (style) {
         this.engine.cmd.setStyle(h, { ...style, opacity: style.opacity * shape.opacity })
+        this.engine.cmd.setTexture(h, style.texture ?? 0)
       }
     }
   }
@@ -1962,6 +2020,8 @@ export class Editor extends EventEmitter<EditorEvents> {
   /** Build and draw one frame. Called by the canvas component inside rAF. */
   renderFrame(backend: RenderBackend): FrameBuffers {
     const t0 = performance.now()
+    this.textures.setBackend(backend)
+    this.syncTextureResolution()
     this.flushEngine()
     const cam = this.getCamera()
     const vp = this.getViewportScreenBounds()
@@ -1971,18 +2031,70 @@ export class Editor extends EventEmitter<EditorEvents> {
 
     const overlay = EngineBridge.readOverlay(frame.overlay)
     const ids: ShapeId[] = []
+    const clips: (ClipRect | undefined)[] = []
     for (const o of overlay) {
       const id = this.handles.id(o.handle)
-      if (id) ids.push(id as ShapeId)
+      if (id) {
+        ids.push(id as ShapeId)
+        clips.push(o.clip)
+      }
     }
     unsafe__withoutCapture(() => {
       const prev = this._overlayShapeIds.get()
       if (prev.length !== ids.length || prev.some((id, i) => id !== ids[i])) this._overlayShapeIds.set(ids)
+      if (!sameClips(this._overlayClips.get(), clips)) this._overlayClips.set(clips)
       const ms = performance.now() - t0
       this._lastFrame.set({ drawn: frame.drawn, culled: frame.culled, ms })
       this.emit("frame", { drawn: frame.drawn, culled: frame.culled, ms })
     })
     return frame
+  }
+
+  // ---- textures ----------------------------------------------------------
+
+  /**
+   * Device-pixel scale at which rasterized textures (text labels) should be
+   * drawn: the device pixel ratio times the zoom, bucketed to powers of two.
+   */
+  getTextureResolution(): number {
+    return bucketTextureResolution(this.getZoomLevel(), this.getInstanceState().devicePixelRatio)
+  }
+
+  private textureResolution = 0
+
+  /** Re-derive texture-backed styles when the resolution bucket changes. */
+  private syncTextureResolution(): void {
+    const next = this.getTextureResolution()
+    if (next === this.textureResolution) return
+    this.textureResolution = next
+    this.rewriteTextureOwners(this.textures.getAllOwners())
+  }
+
+  private registerTextureSideEffects(): void {
+    this.disposables.push(
+      this.sideEffects.registerAfterDeleteHandler("shape", (shape) => {
+        this.textures.releaseOwner(shape.id)
+      }),
+    )
+  }
+
+  /** A texture finished (or failed) loading: re-write its shapes and redraw. */
+  private onTexturesChanged(keys: readonly string[]): void {
+    const owners = new Set<string>()
+    for (const key of keys) for (const owner of this.textures.getOwners(key)) owners.add(owner)
+    this.rewriteTextureOwners(owners)
+    this.bumpFrame()
+  }
+
+  private rewriteTextureOwners(owners: Iterable<string>): void {
+    let dirty = false
+    for (const owner of owners) {
+      const shape = this.getShape(owner as ShapeId)
+      if (!shape || this.getAncestorPageId(shape) !== this.syncedPageId) continue
+      this.writeShapeToEngine(shape, true)
+      dirty = true
+    }
+    if (dirty) this.flushEngine()
   }
 
   // ---- misc helpers ------------------------------------------------------
@@ -1991,4 +2103,146 @@ export class Editor extends EventEmitter<EditorEvents> {
   static degToRad(d: number): number {
     return d * RAD_PER_DEG
   }
+
+  // ---- assets ------------------------------------------------------------
+
+  private readonly _allAssets: Computed<Asset[]> = computed("editor.allAssets", () =>
+    this.store.query.records("asset").get() as Asset[],
+  )
+
+  getAsset<A extends Asset = Asset>(id: AssetId | A): A | undefined {
+    const assetId = typeof id === "string" ? id : id.id
+    return this.store.get(assetId) as A | undefined
+  }
+
+  /** Every asset in the document (assets are not per page). */
+  getAssets(): Asset[] {
+    return this._allAssets.get()
+  }
+
+  createAsset<A extends Asset>(asset: AssetCreate<A>): this {
+    return this.createAssets([asset])
+  }
+
+  createAssets<A extends Asset>(assets: readonly AssetCreate<A>[]): this {
+    if (assets.length === 0) return this
+    this.run(() => {
+      const records: Asset[] = assets.map(
+        (a) =>
+          AssetRecordType.create({
+            id: a.id ?? AssetRecordType.createId(),
+            type: a.type,
+            props: { ...a.props },
+            meta: { ...(a.meta ?? {}) } as Asset["meta"],
+          } as Asset) as Asset,
+      )
+      this.store.put(records)
+    })
+    return this
+  }
+
+  updateAsset<A extends Asset>(partial: AssetPartial<A>): this {
+    return this.updateAssets([partial])
+  }
+
+  updateAssets<A extends Asset>(partials: readonly AssetPartial<A>[]): this {
+    this.run(() => {
+      const records: Asset[] = []
+      for (const partial of partials) {
+        const prev = this.getAsset<A>(partial.id)
+        if (!prev) continue
+        records.push({
+          ...prev,
+          props: partial.props ? { ...prev.props, ...partial.props } : prev.props,
+          meta: partial.meta ? { ...prev.meta, ...partial.meta } : prev.meta,
+        } as Asset)
+      }
+      if (records.length) this.store.put(records)
+    })
+    return this
+  }
+
+  deleteAsset(id: AssetId | Asset): this {
+    return this.deleteAssets([id])
+  }
+
+  deleteAssets(ids: readonly (AssetId | Asset)[]): this {
+    const assetIds = ids.map((a) => (typeof a === "string" ? a : a.id)).filter((id) => this.store.has(id))
+    if (assetIds.length === 0) return this
+    this.run(() => this.store.remove(assetIds))
+    return this
+  }
+
+  // ---- external content --------------------------------------------------
+
+  // Handlers are keyed by content type, so each entry only ever sees the member
+  // of the union it registered for; they are stored under the widest handler type.
+  private readonly externalContentHandlers = new Map<ExternalContentType, ExternalContentHandler>()
+  private readonly externalAssetHandlers = new Map<ExternalAssetType, ExternalAssetHandler>()
+
+  /**
+   * Register the handler for one kind of dropped/pasted content. Replaces any
+   * previous handler for that type; `null` removes it. Returns a function that
+   * removes the handler again (only if it is still the registered one).
+   */
+  registerExternalContentHandler<T extends ExternalContentType>(type: T, handler: ExternalContentHandler<T> | null): () => void {
+    const entry = handler as unknown as ExternalContentHandler | null
+    if (entry) this.externalContentHandlers.set(type, entry)
+    else this.externalContentHandlers.delete(type)
+    return () => {
+      if (entry && this.externalContentHandlers.get(type) === entry) this.externalContentHandlers.delete(type)
+    }
+  }
+
+  /** Register how an asset record is produced from a file or url. Returns a function that removes it again. */
+  registerExternalAssetHandler<T extends ExternalAssetType>(type: T, handler: ExternalAssetHandler<T> | null): () => void {
+    const entry = handler as unknown as ExternalAssetHandler | null
+    if (entry) this.externalAssetHandlers.set(type, entry)
+    else this.externalAssetHandlers.delete(type)
+    return () => {
+      if (entry && this.externalAssetHandlers.get(type) === entry) this.externalAssetHandlers.delete(type)
+    }
+  }
+
+  hasExternalContentHandler(type: ExternalContentType): boolean {
+    return this.externalContentHandlers.has(type)
+  }
+
+  hasExternalAssetHandler(type: ExternalAssetType): boolean {
+    return this.externalAssetHandlers.has(type)
+  }
+
+  /**
+   * Handle content dropped or pasted onto the canvas by dispatching to the
+   * registered handler for `info.type`. Resolves once the handler is done;
+   * resolves immediately when no handler is registered.
+   */
+  async putExternalContent(info: ExternalContent): Promise<void> {
+    const handler = this.externalContentHandlers.get(info.type)
+    if (!handler) return
+    await handler(info)
+  }
+
+  /**
+   * Produce (but do not store) an asset record for a file or url through the
+   * registered asset handler. `undefined` when there is no handler or the
+   * handler declines the content.
+   */
+  async getAssetForExternalContent(info: ExternalAssetContent): Promise<Asset | undefined> {
+    const handler = this.externalAssetHandlers.get(info.type)
+    if (!handler) return undefined
+    return await handler(info)
+  }
+}
+
+function sameClips(a: readonly (ClipRect | undefined)[], b: readonly (ClipRect | undefined)[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i]
+    const y = b[i]
+    if (x === y) continue
+    if (!x || !y) return false
+    if (x[0] !== y[0] || x[1] !== y[1] || x[2] !== y[2] || x[3] !== y[3]) return false
+  }
+  return true
 }

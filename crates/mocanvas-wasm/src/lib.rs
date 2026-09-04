@@ -20,10 +20,12 @@ pub mod op {
     pub const REMOVE_SHAPE: u32 = 2;
     /// `handle nwords [f32 path words...]` (3 + n words).
     pub const SET_GEOMETRY: u32 = 3;
-    /// `handle fill stroke stroke_w(f32) dash opacity(f32)` (7 words).
+    /// `handle fill stroke stroke_w(f32) dash opacity(f32)` (7 words). Keeps the texture.
     pub const SET_STYLE: u32 = 4;
     /// Remove everything (1 word).
     pub const CLEAR: u32 = 5;
+    /// `handle texture` (3 words). Texture 0 = solid fill.
+    pub const SET_TEXTURE: u32 = 6;
 }
 
 /// The engine: one scene (the current page) and one renderer.
@@ -137,15 +139,24 @@ impl Engine {
                         return self.fail(count, "truncated SET_STYLE");
                     }
                     let c = &self.cmd[i..i + 7];
+                    let texture = self.scene.get(c[1]).map_or(0, |s| s.style.texture);
                     let style = Style {
                         fill: c[2],
                         stroke: c[3],
                         stroke_width: f32::from_bits(c[4]),
                         dash: c[5],
                         opacity: f32::from_bits(c[6]),
+                        texture,
                     };
                     self.scene.set_style(c[1], style);
                     i += 7;
+                }
+                op::SET_TEXTURE => {
+                    if i + 3 > len {
+                        return self.fail(count, "truncated SET_TEXTURE");
+                    }
+                    self.scene.set_texture(self.cmd[i + 1], self.cmd[i + 2]);
+                    i += 3;
                 }
                 op::CLEAR => {
                     self.scene.clear();
@@ -192,7 +203,7 @@ impl Engine {
         self.renderer.frame(&mut self.scene, &vp, z);
     }
 
-    /// Pointer to interleaved `x y r g b a` f32 vertices.
+    /// Pointer to interleaved `x y u v r g b a` f32 vertices (8 per vertex).
     pub fn vertices_ptr(&self) -> *const f32 {
         self.renderer.out.vertices.as_ptr()
     }
@@ -208,19 +219,21 @@ impl Engine {
     pub fn indices_len(&self) -> usize {
         self.renderer.out.indices.len()
     }
-    /// Pointer to `(first_index, count, texture)` batch triples.
+    /// Pointer to batch records: `first_index count texture clip_minx clip_miny clip_maxx
+    /// clip_maxy` (clip as f32 bits; all four zero = no clip).
     pub fn batches_ptr(&self) -> *const u32 {
         self.renderer.out.batches.as_ptr()
     }
-    /// Number of u32 in the batch buffer (3 per batch).
+    /// Number of u32 in the batch buffer (7 per batch).
     pub fn batches_len(&self) -> usize {
         self.renderer.out.batches.len()
     }
-    /// Pointer to overlay entries (`handle x y w h rot`, floats as bits).
+    /// Pointer to overlay entries (`handle x y w h rot clip_minx clip_miny clip_maxx
+    /// clip_maxy`, floats as bits; clip all zero = unclipped).
     pub fn overlay_ptr(&self) -> *const u32 {
         self.renderer.out.overlay.as_ptr()
     }
-    /// Number of u32 in the overlay buffer (6 per entry).
+    /// Number of u32 in the overlay buffer (10 per entry).
     pub fn overlay_len(&self) -> usize {
         self.renderer.out.overlay.len()
     }

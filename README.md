@@ -44,6 +44,12 @@ pnpm test:rust        # cargo test
 pnpm typecheck
 ```
 
+## Guides
+
+- [docs/MIGRATION.md](docs/MIGRATION.md) — moving an existing tldraw app over.
+- [docs/CUSTOM_SHAPES.md](docs/CUSTOM_SHAPES.md) — writing a custom shape and
+  its tool from scratch.
+
 ## Architecture
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Short version: the
