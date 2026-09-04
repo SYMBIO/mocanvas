@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import { Box, CubicSpline2d, GEO_SHAPE_KINDS, Group2d, Polygon2d, type GeoShapeKind } from "@mocanvas/editor"
 import {
+  HEXAGON_FLAT_SIDE_SPAN,
+  STAR_INNER_RATIO,
   fitPointsToBox,
   getCloudSegments,
   getGeoDecorations,
@@ -61,6 +63,61 @@ describe("geo polygons", () => {
         expect(Number.isFinite(p.x)).toBe(true)
         expect(Number.isFinite(p.y)).toBe(true)
       }
+    }
+  })
+
+  it("the star's arms keep their measured inner radius", () => {
+    // The star is a 5/5 vertex ring fitted to the box, so recovering the ratio
+    // means undoing that anisotropic fit. Its raw ring spans 2·cos18° in x and
+    // 1 + sin54° in y, independently of the ratio itself.
+    const RAW_W = 2 * Math.cos((18 * Math.PI) / 180)
+    const RAW_H = 1 + Math.sin((54 * Math.PI) / 180)
+    for (const [w, h] of [
+      [100, 100],
+      [250, 80],
+      [40, 300],
+    ] as const) {
+      const pts = getGeoPolygonPoints("star", w, h)!
+      const radii = pts.map((p) => Math.hypot((p.x / w) * RAW_W - RAW_W / 2, (p.y / h) * RAW_H - 1))
+      // even indices are the arm tips, odd indices the notches between them
+      for (let i = 0; i < radii.length; i++) {
+        expect(radii[i]!, `vertex ${i} of ${w}×${h}`).toBeCloseTo(i % 2 === 0 ? 1 : STAR_INNER_RATIO, 6)
+      }
+      // guard the constant itself: thinner arms than this is the old bug
+      expect(STAR_INNER_RATIO).toBeCloseTo(0.5, 6)
+      // the notch between the two lower arms sits at (1 + ratio) / (1 + sin54°)
+      expect(pts[5]!.x).toBeCloseTo(w / 2, 6)
+      expect(pts[5]!.y / h).toBeCloseTo((1 + STAR_INNER_RATIO) / RAW_H, 6)
+    }
+  })
+
+  it("the hexagon is pointy-topped with full-width vertical sides", () => {
+    expect(HEXAGON_FLAT_SIDE_SPAN).toBeCloseTo(0.5, 6)
+    for (const [w, h] of [
+      [100, 100],
+      [250, 80],
+      [40, 300],
+    ] as const) {
+      const pts = getGeoPolygonPoints("hexagon", w, h)!
+      const lo = (1 - HEXAGON_FLAT_SIDE_SPAN) / 2
+      const hi = (1 + HEXAGON_FLAT_SIDE_SPAN) / 2
+      const expected = [
+        [0.5, 0],
+        [1, lo],
+        [1, hi],
+        [0.5, 1],
+        [0, hi],
+        [0, lo],
+      ]
+      pts.forEach((p, i) => {
+        expect(p.x, `vertex ${i}.x of ${w}×${h}`).toBeCloseTo(expected[i]![0]! * w, 6)
+        expect(p.y, `vertex ${i}.y of ${w}×${h}`).toBeCloseTo(expected[i]![1]! * h, 6)
+      })
+      // the two sides are vertical, span half the height and are a full box
+      // width apart — the flat-to-flat measure the reference render agrees with
+      expect(pts[1]!.x - pts[5]!.x).toBeCloseTo(w, 6)
+      expect(pts[2]!.y - pts[1]!.y).toBeCloseTo(HEXAGON_FLAT_SIDE_SPAN * h, 6)
+      expect(pts[4]!.y - pts[5]!.y).toBeCloseTo(HEXAGON_FLAT_SIDE_SPAN * h, 6)
     }
   })
 

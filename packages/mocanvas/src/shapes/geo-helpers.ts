@@ -17,6 +17,30 @@ import { arcToCubicSegments, lineSegment, type CubicSegment } from "./spline-hel
 
 const TAU = Math.PI * 2
 
+/**
+ * Inner radius of the five-pointed star, as a fraction of the outer radius.
+ * Measured off a reference render (interior-IoU and outline least-squares fits
+ * of the same star both put it at 0.51 ± 0.02, calibrated against a render of
+ * known ratio); a plain half reads the same to well under a pixel at any
+ * sensible size. A smaller ratio makes the arms too thin.
+ */
+export const STAR_INNER_RATIO = 0.5
+
+/**
+ * Angle of the hexagon's first vertex. A vertex sits at the top and one at the
+ * bottom, which leaves the left and right sides vertical and running the full
+ * width of the box — that is the orientation the reference draws, and it is
+ * what `HEXAGON_FLAT_SIDE_SPAN` describes.
+ */
+const HEXAGON_START_ANGLE = -Math.PI / 2
+
+/**
+ * Fraction of the box height spanned by the hexagon's two vertical sides. They
+ * are centred, so they run from `(1 - span) / 2` to `(1 + span) / 2` of the
+ * height, and the distance across them is the full box width.
+ */
+export const HEXAGON_FLAT_SIDE_SPAN = 0.5
+
 /** Affinely stretch points so their bounding box becomes exactly [0,w]×[0,h]. */
 export function fitPointsToBox(points: readonly VecLike[], w: number, h: number): VecLike[] {
   if (points.length === 0) return []
@@ -98,11 +122,11 @@ export function getGeoPolygonPoints(kind: GeoShapeKind, w: number, h: number): V
     case "pentagon":
       return regularPolygon(5, -Math.PI / 2, w, h)
     case "hexagon":
-      return regularPolygon(6, 0, w, h)
+      return regularPolygon(6, HEXAGON_START_ANGLE, w, h)
     case "octagon":
       return regularPolygon(8, Math.PI / 8, w, h)
     case "star":
-      return regularPolygon(5, -Math.PI / 2, w, h, 0.4)
+      return regularPolygon(5, -Math.PI / 2, w, h, STAR_INNER_RATIO)
     case "rhombus": {
       const off = Math.min(w / 3, h)
       return [
