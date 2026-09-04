@@ -32,7 +32,7 @@ class BoxUtil extends BaseBoxShapeUtil<BoxShape> {
   component() {
     return null
   }
-  indicator() {
+  override indicator() {
     return null
   }
   override getRenderStyle(): StyleWords {
@@ -52,7 +52,7 @@ class PinUtil extends BaseBoxShapeUtil<PinShape> {
   component() {
     return null
   }
-  indicator() {
+  override indicator() {
     return null
   }
   override canResize(): boolean {
@@ -276,6 +276,8 @@ describe("Editor textMeasure seam", () => {
   it("delegates to the registered measurer", () => {
     const measure: EditorTextMeasure = {
       measureText: vi.fn(() => ({ w: 42, h: 24, lineCount: 2 })),
+      measureHtml: vi.fn(() => ({ w: 42, h: 24 })),
+      measureHtmlBatch: vi.fn(() => [{ w: 42, h: 24 }]),
     }
     const provider = vi.fn(() => measure)
     dispose = registerTextMeasureImplementation(provider)

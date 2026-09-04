@@ -10,6 +10,7 @@ import {
 } from "@mocanvas/editor"
 import type { CSSProperties, ReactNode } from "react"
 import { propsOf, readNumber, readString } from "./prop-access"
+import { rectPath } from "./indicator-paths"
 
 export interface BookmarkShapeProps {
   w: number
@@ -304,8 +305,8 @@ export class BookmarkShapeUtil extends BaseBoxShapeUtil<BookmarkShape> {
     )
   }
 
-  indicator(shape: BookmarkShape): ReactNode {
+  override getIndicatorPath(shape: BookmarkShape): Path2D {
     const { w, h } = readBookmarkBox(shape)
-    return <rect width={w} height={h} rx={BOOKMARK_RADIUS} />
+    return rectPath(w, h, BOOKMARK_RADIUS)
   }
 }

@@ -11,8 +11,20 @@ function isEditable(t: EventTarget | null): boolean {
 
 let clipboardFallback = ""
 
+export interface KeyboardShortcutOptions {
+  /**
+   * Bind the plain-key tool switches (`v`, `h`, `n`, …). Leave it on for an
+   * editor with no chrome; turn it OFF whenever `DefaultUi` is mounted, because
+   * the UI tool list binds those keys itself — and it is the list an app's
+   * `TLUiOverrides.tools` can rewrite, so a binding hard-coded here would
+   * survive an override that meant to remove it. Defaults to `true`.
+   */
+  tools?: boolean
+}
+
 /** Default keyboard shortcuts: tool switching, undo/redo, select all, zoom, clipboard. */
-export function useKeyboardShortcuts(editor: Editor | null): void {
+export function useKeyboardShortcuts(editor: Editor | null, options: KeyboardShortcutOptions = {}): void {
+  const bindTools = options.tools ?? true
   useEffect(() => {
     if (!editor) return
     const isMac = /Mac|iPhone|iPad/.test(navigator.platform ?? "")
@@ -139,6 +151,12 @@ export function useKeyboardShortcuts(editor: Editor | null): void {
         }
         return
       }
+      // Tool lock is not a tool switch: it stays bound either way.
+      if (key === "q") {
+        editor.updateInstanceState({ isToolLocked: !editor.getInstanceState().isToolLocked })
+        return
+      }
+      if (!bindTools) return
       switch (key) {
         case "v":
           editor.setCurrentTool("select")
@@ -176,14 +194,11 @@ export function useKeyboardShortcuts(editor: Editor | null): void {
         case "f":
           if (editor.root.children?.["frame"]) editor.setCurrentTool("frame")
           break
-        case "q":
-          editor.updateInstanceState({ isToolLocked: !editor.getInstanceState().isToolLocked })
-          break
         default:
           break
       }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [editor])
+  }, [editor, bindTools])
 }

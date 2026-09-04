@@ -1,12 +1,11 @@
 import {
-  BaseBoxShapeUtil,
+  BaseFrameLikeShapeUtil,
   hexToRgba,
   Rectangle2d,
   type BaseShape,
   type DefaultColorStyle,
   type Geometry2d,
   type StyleWords,
-  type UnknownShape,
 } from "@mocanvas/editor"
 import type { ReactNode } from "react"
 import { TextLabel } from "../text/TextEditor"
@@ -20,6 +19,7 @@ import {
   FRAME_STROKE,
   FRAME_STROKE_WIDTH,
 } from "./shape-theme"
+import { rectPath } from "./indicator-paths"
 
 export interface FrameShapeProps {
   w: number
@@ -30,7 +30,15 @@ export interface FrameShapeProps {
 
 export type FrameShape = BaseShape<"frame", FrameShapeProps>
 
-export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
+/**
+ * The artboard: a container that both groups and **crops**.
+ *
+ * Everything that makes it a container — adoption on drag-in, release on
+ * drag-out, the lock gates, the ancestor-cycle guard — comes from
+ * {@link BaseFrameLikeShapeUtil}; the frame itself only adds its chrome (the
+ * body fill, the editable name strip) and keeps the base's clipping box.
+ */
+export class FrameShapeUtil extends BaseFrameLikeShapeUtil<FrameShape> {
   static override type = "frame" as const
 
   getDefaultProps(): FrameShapeProps {
@@ -83,9 +91,9 @@ export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
     )
   }
 
-  indicator(shape: FrameShape): ReactNode {
+  override getIndicatorPath(shape: FrameShape): Path2D {
     const p = propsOf(shape)
-    return <rect width={readNumber(p, "w", 160)} height={readNumber(p, "h", 90)} />
+    return rectPath(readNumber(p, "w", 160), readNumber(p, "h", 90))
   }
 
   /** The GPU draws the frame body while its name is edited. */
@@ -97,20 +105,7 @@ export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
     return true
   }
 
-  /** Descendants are clipped to the frame's bounds, on the GPU and in the overlay. */
-  override isClipShape(_shape: FrameShape): boolean {
-    return true
-  }
-
   override canEdit(_shape: FrameShape): boolean {
-    return true
-  }
-
-  override canReceiveNewChildrenOfType(_shape: FrameShape, _type: string): boolean {
-    return true
-  }
-
-  override canDropShapes(_shape: FrameShape, _shapes: UnknownShape[]): boolean {
     return true
   }
 

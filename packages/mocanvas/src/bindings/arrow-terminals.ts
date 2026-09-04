@@ -71,7 +71,7 @@ export function getArrowBindingTargetAtPoint(editor: Editor, arrow: UnknownShape
   for (let i = shapes.length - 1; i >= 0; i--) {
     const shape = shapes[i]!
     if (shape.id === arrow.id || shape.type === "arrow" || shape.isLocked || ancestors.has(shape.id)) continue
-    if (!editor.getShapeUtil(shape).canBind({ fromShapeType: "arrow", toShapeType: shape.type, bindingType: "arrow" })) continue
+    if (!editor.getShapeUtil(shape).canBind({ fromShape: arrow, toShape: shape, bindingType: "arrow" })) continue
     const bounds = editor.getShapePageBounds(shape)
     if (!bounds || !Box.ContainsPoint(bounds, pagePoint, margin)) continue
     const local = editor.getPointInShapeSpace(shape, pagePoint)

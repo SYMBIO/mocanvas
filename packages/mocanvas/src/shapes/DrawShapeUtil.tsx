@@ -17,6 +17,7 @@ import type { ReactNode } from "react"
 import { smoothPoints } from "./draw-helpers"
 import { propsOf, readArray, readBoolean, readEnum, readNumber, readStyle } from "./prop-access"
 import { getFillRgba, getStrokeRgba, getDashId } from "./shape-theme"
+import { polylinePath } from "./indicator-paths"
 
 export interface DrawPoint {
   x: number
@@ -131,11 +132,10 @@ export class DrawShapeUtil extends ShapeUtil<DrawShape> {
     return null
   }
 
-  indicator(shape: DrawShape): ReactNode {
+  override getIndicatorPath(shape: DrawShape): Path2D {
     const points = getDrawOutlinePoints(shape)
-    if (readBoolean(propsOf(shape), "isClosed", false) && points.length > 2) points.push(points[0]!)
-    const d = points.map((p) => `${Math.round(p.x * 100) / 100},${Math.round(p.y * 100) / 100}`).join(" ")
-    return <polyline points={d} fill="none" />
+    const isClosed = readBoolean(propsOf(shape), "isClosed", false) && points.length > 2
+    return polylinePath(points, isClosed)
   }
 
   override canResize(_shape: DrawShape): boolean {

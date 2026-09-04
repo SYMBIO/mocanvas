@@ -1,6 +1,7 @@
 import { BaseBoxShapeUtil, Rectangle2d, type BaseShape, type Geometry2d, type StyleWords } from "@mocanvas/editor"
 import type { CSSProperties, ReactNode } from "react"
 import { propsOf, readNumber, readString } from "./prop-access"
+import { rectPath } from "./indicator-paths"
 
 export interface EmbedShapeProps {
   w: number
@@ -276,9 +277,9 @@ export class EmbedShapeUtil extends BaseBoxShapeUtil<EmbedShape> {
     )
   }
 
-  indicator(shape: EmbedShape): ReactNode {
+  override getIndicatorPath(shape: EmbedShape): Path2D {
     const { w, h } = readEmbedBox(shape)
-    return <rect width={w} height={h} rx={EMBED_RADIUS} />
+    return rectPath(w, h, EMBED_RADIUS)
   }
 
   /** There is nothing to type into an embed; the shape has no text of its own. */

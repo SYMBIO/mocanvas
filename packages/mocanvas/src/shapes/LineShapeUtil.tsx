@@ -17,6 +17,7 @@ import { propsOf, readEnum, readNumber, readString, readStyle } from "./prop-acc
 import { getStrokeRgba, getDashId } from "./shape-theme"
 import { catmullRomToBezier } from "./spline-helpers"
 import { pathWordsToSvgD } from "./svg-path"
+import { svgPath } from "./indicator-paths"
 
 export interface LinePoint {
   id: string
@@ -107,8 +108,8 @@ export class LineShapeUtil extends ShapeUtil<LineShape> {
     return null
   }
 
-  indicator(shape: LineShape): ReactNode {
-    return <path d={pathWordsToSvgD(this.getGeometry(shape).toPathWords())} />
+  override getIndicatorPath(shape: LineShape): Path2D {
+    return svgPath(pathWordsToSvgD(this.getGeometry(shape).toPathWords()))
   }
 
   override getHandles(shape: LineShape): ShapeHandle[] {

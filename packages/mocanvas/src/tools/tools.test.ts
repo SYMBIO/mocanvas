@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { createStore, Editor, loadEngineSync, type ShapeId, type UnknownShape } from "@mocanvas/editor"
 import { defaultBindingUtils, type ArrowBinding } from "../bindings"
 import { defaultShapeUtils, getLinePoints, type ArrowShape, type FrameShape, type GeoShape, type LineShape } from "../shapes"
-import { defaultTools } from "./index"
+import { BaseBoxShapeTool, defaultTools } from "./index"
 
 const wasmPath = fileURLToPath(new URL("../../../wasm/pkg/mocanvas_bg.wasm", import.meta.url))
 
@@ -315,5 +315,205 @@ describe("FrameTool", () => {
     expect(shapesOfType(editor, "frame")).toHaveLength(0)
     expect(editor.getCanUndo()).toBe(false)
     expect(editor.getPath()).toBe("root.frame.idle")
+  })
+})
+
+describe("BaseBoxShapeTool", () => {
+  /** A placement tool for a shape type the built-ins know nothing about. */
+  class BoxTool extends BaseBoxShapeTool {
+    static override id = "testbox"
+    static override initial = "idle"
+    override shapeType = "frame" as const
+    /** What `onCreate` was handed, so the test can see the finished shape. */
+    created: UnknownShape | null | undefined
+    override onCreate(shape: UnknownShape | null): void {
+      this.created = shape
+      this.editor.setCurrentTool("select")
+    }
+  }
+
+  function makeBoxEditor(): Editor {
+    const engine = loadEngineSync(readFileSync(wasmPath))
+    const editor = new Editor({
+      store: createStore(),
+      shapeUtils: defaultShapeUtils,
+      bindingUtils: defaultBindingUtils,
+      tools: [...defaultTools, BoxTool],
+      engine,
+      getContainer: () => ({}) as HTMLElement,
+    })
+    editor.updateViewportScreenBounds({ x: 0, y: 0, w: 1000, h: 800 })
+    return editor
+  }
+
+  let editor: Editor
+  beforeEach(() => {
+    editor = makeBoxEditor()
+  })
+
+  function tool(): BoxTool {
+    return editor.root.children!["testbox"] as BoxTool
+  }
+
+  it("drags out a box between the two corners", () => {
+    editor.setCurrentTool("testbox")
+    drag(editor, [100, 100], [300, 200], [500, 400])
+
+    const shape = shapesOfType<FrameShape>(editor, "frame")[0]!
+    expect(shape.x).toBe(100)
+    expect(shape.y).toBe(100)
+    expect(shape.props).toMatchObject({ w: 400, h: 300 })
+    expect(tool().created?.id).toBe(shape.id)
+  })
+
+  it("moves the origin instead of producing a negative box when dragged up and left", () => {
+    editor.setCurrentTool("testbox")
+    drag(editor, [500, 400], [400, 300], [100, 100])
+
+    const shape = shapesOfType<FrameShape>(editor, "frame")[0]!
+    expect(shape.x).toBe(100)
+    expect(shape.y).toBe(100)
+    expect(shape.props).toMatchObject({ w: 400, h: 300 })
+  })
+
+  it("squares the box while shift is held", () => {
+    editor.setCurrentTool("testbox")
+    pointer(editor, "pointer_down", 100, 100)
+    pointer(editor, "pointer_move", 300, 300)
+    pointer(editor, "pointer_move", 500, 250, { shiftKey: true })
+    pointer(editor, "pointer_up", 500, 250, { shiftKey: true })
+
+    const shape = shapesOfType<FrameShape>(editor, "frame")[0]!
+    expect(shape.props.w).toBe(400)
+    expect(shape.props.h).toBe(400)
+  })
+
+  it("places a default-sized box centred on a click", () => {
+    editor.setCurrentTool("testbox")
+    click(editor, 500, 400)
+
+    const shape = shapesOfType<FrameShape>(editor, "frame")[0]!
+    // The util's own defaults, so the tool and `createShape` agree on "a new one".
+    expect(shape.props).toMatchObject({ w: 160, h: 90 })
+    expect(shape.x).toBe(500 - 80)
+    expect(shape.y).toBe(400 - 45)
+  })
+
+  it("selects what it created and calls onCreate exactly once", () => {
+    editor.setCurrentTool("testbox")
+    drag(editor, [100, 100], [300, 300])
+
+    const shape = shapesOfType<FrameShape>(editor, "frame")[0]!
+    expect(editor.getSelectedShapeIds()).toEqual([shape.id])
+    expect(tool().created?.id).toBe(shape.id)
+    expect(editor.getCurrentToolId()).toBe("select")
+  })
+
+  it("cancels without a shape and without touching history", () => {
+    editor.setCurrentTool("testbox")
+    pointer(editor, "pointer_down", 100, 100)
+    pointer(editor, "pointer_move", 300, 300)
+    editor.cancel()
+
+    expect(shapesOfType(editor, "frame")).toHaveLength(0)
+    expect(editor.getCanUndo()).toBe(false)
+    // A cancelled gesture never created anything, so `onCreate` never ran.
+    expect(tool().created).toBeUndefined()
+    expect(editor.getPath()).toBe("root.testbox.idle")
+  })
+
+  it("keeps placing while tool lock is on", () => {
+    class LockedTool extends BaseBoxShapeTool {
+      static override id = "lockedbox"
+      static override initial = "idle"
+      override shapeType = "frame" as const
+    }
+    const engine = loadEngineSync(readFileSync(wasmPath))
+    const locked = new Editor({
+      store: createStore(),
+      shapeUtils: defaultShapeUtils,
+      bindingUtils: defaultBindingUtils,
+      tools: [...defaultTools, LockedTool],
+      engine,
+      getContainer: () => ({}) as HTMLElement,
+    })
+    locked.updateViewportScreenBounds({ x: 0, y: 0, w: 1000, h: 800 })
+    locked.updateInstanceState({ isToolLocked: true })
+
+    locked.setCurrentTool("lockedbox")
+    drag(locked, [100, 100], [300, 300])
+    expect(locked.getCurrentToolId()).toBe("lockedbox")
+
+    locked.updateInstanceState({ isToolLocked: false })
+    drag(locked, [400, 400], [600, 600])
+    expect(locked.getCurrentToolId()).toBe("select")
+  })
+})
+
+describe("frame-like drop targets while translating", () => {
+  let editor: Editor
+  beforeEach(() => {
+    editor = makeEditor()
+  })
+
+  /** Press ON a shape — the select tool branches on the event's own target. */
+  function pressShape(shape: UnknownShape, x: number, y: number): void {
+    editor.dispatch({
+      type: "pointer",
+      name: "pointer_down",
+      point: { x, y },
+      pointerId: 1,
+      button: 0,
+      isPen: false,
+      shiftKey: false,
+      altKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      accelKey: false,
+      target: "shape",
+      shape,
+    })
+  }
+
+  function makeFrame(): FrameShape {
+    editor.setCurrentTool("frame")
+    drag(editor, [100, 100], [300, 300], [500, 500])
+    editor.setCurrentTool("select")
+    return shapesOfType<FrameShape>(editor, "frame")[0]!
+  }
+
+  it("hints the container the drag is over, and clears the hint when it ends", () => {
+    const geo = createGeo(editor, 700, 700)
+    const frame = makeFrame()
+
+    pressShape(editor.getShape(geo.id)!, 710, 710)
+    pointer(editor, "pointer_move", 300, 300)
+    expect(editor.getHintingShapeIds()).toEqual([frame.id])
+
+    pointer(editor, "pointer_up", 300, 300)
+    expect(editor.getHintingShapeIds()).toEqual([])
+    expect(editor.getShape(geo.id)!.parentId).toBe(frame.id as ShapeId)
+  })
+
+  it("lifts a child back onto the page when it is dragged out", () => {
+    const geo = createGeo(editor, 150, 150)
+    const frame = makeFrame()
+    expect(editor.getShape(geo.id)!.parentId).toBe(frame.id as ShapeId)
+
+    pressShape(editor.getShape(geo.id)!, 160, 160)
+    pointer(editor, "pointer_move", 800, 800)
+    pointer(editor, "pointer_up", 800, 800)
+    expect(editor.getShape(geo.id)!.parentId).toBe(editor.getCurrentPageId())
+  })
+
+  it("leaves a click alone: only a real drag reparents", () => {
+    const geo = createGeo(editor, 150, 150)
+    makeFrame()
+    const pageId = editor.getCurrentPageId()
+    editor.reparentShapes([geo.id], pageId)
+
+    pressShape(editor.getShape(geo.id)!, 160, 160)
+    pointer(editor, "pointer_up", 160, 160)
+    expect(editor.getShape(geo.id)!.parentId).toBe(pageId)
   })
 })

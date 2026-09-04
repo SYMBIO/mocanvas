@@ -1,10 +1,33 @@
-import { GeoShapeGeoStyle, GEO_SHAPE_KINDS, track, useEditor, useValue, type Editor, type GeoShapeKind } from "@mocanvas/editor"
-import { Fragment, useEffect, useRef, useState, type Ref } from "react"
+import {
+  GeoShapeGeoStyle,
+  MocanvasUiProvider,
+  track,
+  useEditor,
+  useEditorComponents,
+  useIsToolSelected,
+  useTools,
+  useValue,
+  type Editor,
+  type GeoShapeKind,
+  type TLComponents,
+  type TLUiOverrides,
+} from "@mocanvas/editor"
+import { Fragment, useEffect, useRef, useState, type ReactNode, type Ref } from "react"
+import { MocanvasUiMenuItem } from "./DefaultToolbar"
 import { Icon, type IconName } from "./icons"
 import { Popover, UiTooltip } from "./overlays"
 import { StylePanel } from "./StylePanel"
+import { MORE_GEO_KINDS, PRIMARY_GEO_KINDS, TOOLBAR_GROUPS, type ToolbarItem } from "./toolbar-config"
+import { buildDefaultActionItems, buildDefaultToolItems, registeredToolIds } from "./tools-context"
+import { ToolShortcuts } from "./useToolShortcuts"
 import { debugStatsOpen } from "./useKeyboardShortcuts"
 import "./ui.css"
+
+// The toolbar's contents moved to `toolbar-config` (data, no React) so the UI
+// tool list can be built without importing the components. Re-exported here so
+// the module that has always published them still does.
+export { MORE_GEO_KINDS, PRIMARY_GEO_KINDS, TOOLBAR_GROUPS }
+export type { ToolbarItem }
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || "")
 /** Accelerator prefix for tooltips: `⌘` on Apple platforms, `Ctrl+` elsewhere. */
@@ -14,63 +37,6 @@ const stopPointer = (e: { stopPropagation: () => void }) => e.stopPropagation()
 
 function titleCase(s: string): string {
   return s.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
-// ---------------------------------------------------------------------------
-// Toolbar configuration
-// ---------------------------------------------------------------------------
-
-export interface ToolbarItem {
-  /** Unique key; also the geo kind for geo entries. */
-  id: string
-  /** Tool id that must be registered for this entry to appear. */
-  tool: string
-  icon: IconName
-  label: string
-  /** Displayed in the tooltip, next to the label. */
-  shortcut?: string
-  /** Geo kind the entry selects, for entries driving the `geo` tool. */
-  geo?: GeoShapeKind
-  /** Tools outside the default set: shown only when the app registers them. */
-  optional?: boolean
-}
-
-/** Toolbar entries, grouped; groups are separated by a divider. */
-export const TOOLBAR_GROUPS: readonly (readonly ToolbarItem[])[] = [
-  [
-    { id: "select", tool: "select", icon: "select", label: "Select", shortcut: "V" },
-    { id: "hand", tool: "hand", icon: "hand", label: "Hand", shortcut: "H" },
-  ],
-  [
-    { id: "draw", tool: "draw", icon: "draw", label: "Draw", shortcut: "D" },
-    { id: "eraser", tool: "eraser", icon: "eraser", label: "Eraser", shortcut: "E" },
-  ],
-  [
-    { id: "rectangle", tool: "geo", icon: "geo-rectangle", label: "Rectangle", shortcut: "R", geo: "rectangle" },
-    { id: "ellipse", tool: "geo", icon: "geo-ellipse", label: "Ellipse", shortcut: "O", geo: "ellipse" },
-    { id: "triangle", tool: "geo", icon: "geo-triangle", label: "Triangle", geo: "triangle" },
-    { id: "diamond", tool: "geo", icon: "geo-diamond", label: "Diamond", geo: "diamond" },
-    { id: "star", tool: "geo", icon: "geo-star", label: "Star", geo: "star" },
-  ],
-  [
-    { id: "text", tool: "text", icon: "text", label: "Text", shortcut: "T" },
-    { id: "note", tool: "note", icon: "note", label: "Note", shortcut: "N" },
-    { id: "arrow", tool: "arrow", icon: "arrow", label: "Arrow", shortcut: "A", optional: true },
-    { id: "line", tool: "line", icon: "line", label: "Line", shortcut: "L", optional: true },
-    { id: "frame", tool: "frame", icon: "frame", label: "Frame", shortcut: "F", optional: true },
-  ],
-]
-
-/** Geo kinds that live behind the "more shapes" popover. */
-export const PRIMARY_GEO_KINDS: readonly GeoShapeKind[] = TOOLBAR_GROUPS.flat()
-  .map((t) => t.geo)
-  .filter((g): g is GeoShapeKind => g !== undefined)
-
-export const MORE_GEO_KINDS: readonly GeoShapeKind[] = GEO_SHAPE_KINDS.filter((k) => !PRIMARY_GEO_KINDS.includes(k))
-
-/** Tool ids the editor currently has registered. */
-function registeredTools(editor: Editor): Set<string> {
-  return new Set(Object.keys(editor.root.children ?? {}))
 }
 
 // ---------------------------------------------------------------------------
@@ -112,24 +78,47 @@ function UiButton({ icon, label, shortcut, pressed, expanded, disabled, classNam
 // Toolbar
 // ---------------------------------------------------------------------------
 
-/** Bottom toolbar: tools, grouped, plus a popover with the rest of the shapes. */
+/**
+ * One toolbar button driven by the UI tool list. Renders nothing when the
+ * item is not registered — the normal state for an optional tool on an editor
+ * that was built without it.
+ */
+function ToolItem({ id }: { id: string }) {
+  const tools = useTools()
+  const tool = tools[id]
+  const isSelected = useIsToolSelected(tool)
+  if (!tool) return null
+  return <MocanvasUiMenuItem {...tool} isSelected={isSelected} />
+}
+
+/**
+ * The default tool bar: the grouped tools, plus a popover holding the geo
+ * kinds that have no button of their own.
+ *
+ * Built from the UI tool list, so an app's `TLUiOverrides.tools` — relabelling
+ * a tool, rebinding its key, adding one of its own — shows up here without
+ * replacing the component.
+ */
 export const Toolbar = track(function Toolbar() {
   const editor = useEditor()
+  const tools = useTools()
   const [moreOpen, setMoreOpen] = useState(false)
   const moreRef = useRef<HTMLButtonElement>(null)
 
-  const available = registeredTools(editor)
   const toolId = editor.getCurrentToolId()
   const geo = toolId === "geo" ? ((editor.getStateDescendant("geo") as { geo?: GeoShapeKind } | undefined)?.geo ?? "rectangle") : null
 
-  const pickGeo = (kind: GeoShapeKind) => {
-    editor.setStyleForNextShapes(GeoShapeGeoStyle, kind)
-    editor.setCurrentTool("geo", { geo: kind, force: true })
-  }
-
-  const groups = TOOLBAR_GROUPS.map((group) => group.filter((item) => available.has(item.tool))).filter((group) => group.length > 0)
-  const hasGeo = available.has("geo") && MORE_GEO_KINDS.length > 0
+  // Groups whose entries the tool list actually has; an app that trimmed the
+  // tool set, or an override that removed an item, empties a group away.
+  const groups = TOOLBAR_GROUPS.map((group) => group.filter((item) => tools[item.id] !== undefined)).filter((group) => group.length > 0)
+  const hasGeo = registeredToolIds(editor).has("geo") && MORE_GEO_KINDS.length > 0
   const moreActive = toolId === "geo" && geo !== null && !PRIMARY_GEO_KINDS.includes(geo)
+
+  // Any item an override added that is not part of the default layout. It gets
+  // a place rather than being silently dropped, which is what a custom tool
+  // registered through `overrides.tools` needs to be usable at all.
+  const known = new Set(TOOLBAR_GROUPS.flat().map((item) => item.id))
+  const extras = Object.keys(tools).filter((id) => !known.has(id) && !MORE_GEO_KINDS.includes(id as GeoShapeKind))
 
   return (
     <div className="mocanvas-panel mocanvas-toolbar" role="toolbar" aria-label="Tools" onPointerDown={stopPointer}>
@@ -137,14 +126,7 @@ export const Toolbar = track(function Toolbar() {
         <Fragment key={group[0]!.id}>
           {i > 0 ? <span className="mocanvas-divider" aria-hidden="true" /> : null}
           {group.map((item) => (
-            <UiButton
-              key={item.id}
-              icon={item.icon}
-              label={item.label}
-              {...(item.shortcut ? { shortcut: item.shortcut } : {})}
-              pressed={item.tool === toolId && (item.geo === undefined || item.geo === geo)}
-              onClick={() => (item.geo ? pickGeo(item.geo) : editor.setCurrentTool(item.tool))}
-            />
+            <ToolItem key={item.id} id={item.id} />
           ))}
           {hasGeo && group.some((item) => item.geo) ? (
             <span className="mocanvas-more">
@@ -167,7 +149,8 @@ export const Toolbar = track(function Toolbar() {
                     aria-checked={geo === kind}
                     data-tooltip={titleCase(kind)}
                     onClick={() => {
-                      pickGeo(kind)
+                      editor.setStyleForNextShapes(GeoShapeGeoStyle, kind)
+                      editor.setCurrentTool("geo", { geo: kind, force: true })
                       setMoreOpen(false)
                     }}
                   >
@@ -179,6 +162,14 @@ export const Toolbar = track(function Toolbar() {
           ) : null}
         </Fragment>
       ))}
+      {extras.length > 0 ? (
+        <>
+          <span className="mocanvas-divider" aria-hidden="true" />
+          {extras.map((id) => (
+            <ToolItem key={id} id={id} />
+          ))}
+        </>
+      ) : null}
     </div>
   )
 })
@@ -218,7 +209,8 @@ export const ZoomBar = track(function ZoomBar() {
 // ---------------------------------------------------------------------------
 
 /** Compact frame-statistics chip. Toggled with ⌥D. */
-export const DebugStats = track(function DebugStats({ editor }: { editor: Editor }) {
+export const DebugStats = track(function DebugStats() {
+  const editor = useEditor()
   const stats = editor.getLastFrameStats()
   const count = editor.getCurrentPageShapeIds().size
   return (
@@ -236,18 +228,88 @@ export const DebugStats = track(function DebugStats({ editor }: { editor: Editor
   )
 })
 
-export function DefaultUi({ editor, showStats = true }: { editor: Editor; showStats?: boolean }) {
+// ---------------------------------------------------------------------------
+// The chrome
+// ---------------------------------------------------------------------------
+
+/**
+ * The chrome mocanvas renders when an app overrides nothing. Every entry is a
+ * slot an app can replace or remove through `components`.
+ */
+export const defaultComponents: TLComponents = {
+  Toolbar,
+  NavigationPanel: ZoomBar,
+  StylePanel,
+  DebugPanel: DebugStats,
+  Tooltip: UiTooltip,
+}
+
+/** Reads the merged chrome map and lays the panels out. */
+function Chrome({ showStats }: { showStats: boolean }) {
+  const c = useEditorComponents()
   const statsOpen = useValue(debugStatsOpen)
   useEffect(() => {
     debugStatsOpen.set(showStats)
   }, [showStats])
   return (
     <>
-      <Toolbar />
-      <ZoomBar />
-      <StylePanel />
-      {statsOpen ? <DebugStats editor={editor} /> : null}
-      <UiTooltip />
+      {c.Background ? <c.Background /> : null}
+      {c.Grid ? <c.Grid /> : null}
+      {c.OnTheCanvas ? <c.OnTheCanvas /> : null}
+      {c.Toolbar ? <c.Toolbar /> : null}
+      {c.NavigationPanel ? <c.NavigationPanel /> : null}
+      {c.StylePanel ? <c.StylePanel /> : null}
+      {c.MenuPanel ? <c.MenuPanel /> : null}
+      {c.PageMenu ? <c.PageMenu /> : null}
+      {c.ActionsMenu ? <c.ActionsMenu /> : null}
+      {c.QuickActions ? <c.QuickActions /> : null}
+      {c.HelperButtons ? <c.HelperButtons /> : null}
+      {c.ImageToolbar ? <c.ImageToolbar /> : null}
+      {c.VideoToolbar ? <c.VideoToolbar /> : null}
+      {c.SharePanel ? <c.SharePanel /> : null}
+      {c.TopPanel ? <c.TopPanel /> : null}
+      {statsOpen && c.DebugPanel ? <c.DebugPanel /> : null}
+      {c.ContextMenu ? <c.ContextMenu /> : null}
+      {c.InFrontOfTheCanvas ? <c.InFrontOfTheCanvas /> : null}
+      {c.Tooltip ? <c.Tooltip /> : null}
+      <ToolShortcuts />
     </>
+  )
+}
+
+export interface DefaultUiProps {
+  editor: Editor
+  /** Replace (`ComponentType`) or remove (`null`) a chrome slot. */
+  components?: TLComponents
+  /** Rewrite the tool and action lists the chrome renders from. */
+  overrides?: TLUiOverrides
+  showStats?: boolean
+  /** Rendered inside the UI context, so it can use `useTools()` and friends. */
+  children?: ReactNode
+}
+
+/**
+ * mocanvas's chrome, and the context every part of it reads.
+ *
+ * Customisation goes through the two override maps rather than around them:
+ * `components` swaps a panel out, `overrides` rewrites the tool and action
+ * lists that the panels — mocanvas's own or the app's — render from. Both are
+ * live for anything rendered inside, including a `components.Toolbar` of the
+ * app's own, which is why a custom toolbar can call `useTools()` and get the
+ * same list the default one would have used.
+ */
+export function DefaultUi({ editor, components, overrides, showStats = true, children }: DefaultUiProps) {
+  return (
+    <MocanvasUiProvider
+      editor={editor}
+      defaultComponents={defaultComponents}
+      defaultTools={buildDefaultToolItems}
+      defaultActions={buildDefaultActionItems}
+      {...(components ? { components } : {})}
+      {...(overrides ? { overrides } : {})}
+    >
+      <Chrome showStats={showStats} />
+      {children}
+    </MocanvasUiProvider>
   )
 }

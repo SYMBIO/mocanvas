@@ -39,6 +39,13 @@ export type Asset = ImageAsset | VideoAsset | BookmarkAsset
 export type AssetType = Asset["type"]
 export type AssetId = RecordId<Asset>
 
+/**
+ * Per-type validation lives in `../assets/assetValidators` — `imageAssetValidator`,
+ * `videoAssetValidator` and `bookmarkAssetValidator`, plus the `assetValidator`
+ * union over the three. It is deliberately not attached here yet: turning it on
+ * would start rejecting asset records inside `parseTldrFile`, and documents
+ * written by older editors have not been checked against it.
+ */
 export const AssetRecordType = createRecordType<Asset>("asset", { scope: "document" }).withDefaultProperties(() => ({
   meta: {},
 }))

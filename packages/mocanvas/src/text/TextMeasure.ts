@@ -18,6 +18,32 @@ export interface TextMeasurement {
   lineCount: number
 }
 
+export interface TextMeasureHtmlOptions {
+  fontFamily: string
+  fontSize: number
+  fontWeight?: string | number
+  /** CSS `font-style`, e.g. `"italic"`. */
+  fontStyle?: string
+  /** Unitless line height (multiplier of the font size). */
+  lineHeight: number
+  /** Wrap width in CSS px, including `padding`. Omit (or `null`) for no wrapping. */
+  maxWidth?: number | null
+  /** CSS padding, as a number of px or any padding shorthand (`"0px"`, `"4px 8px"`). */
+  padding?: number | string
+  /**
+   * Also report `scrollWidth`: the width the content wants before wrapping, so a
+   * shrink-to-fit pass can tell "wraps" from "overflows".
+   */
+  measureScrollWidth?: boolean
+  /** Extra CSS declarations applied to the probe, e.g. `{ "font-variant": "small-caps" }`. */
+  otherStyles?: Record<string, string>
+}
+
+export interface TextHtmlMeasurement extends TextMeasurement {
+  /** Width the content wants before wrapping. Equals `w` unless `measureScrollWidth` was set. */
+  scrollWidth: number
+}
+
 const MAX_CACHE_ENTRIES = 2000
 
 /** Placeholder so an empty text (or a trailing newline) still occupies one line. */
@@ -33,10 +59,17 @@ export function toDisplayText(text: string): string {
  * Measures runs of text with a hidden DOM element, mirroring the CSS the
  * `<TextLabel>` component uses (pre-wrap + break-word, border-box padding).
  * Falls back to `estimateTextSize` where no `document` exists (tests, SSR).
+ *
+ * `measureHtml` measures a rich-text label the same way, from the HTML
+ * `renderHtmlFromRichTextForMeasurement` produces. Both paths share the cache
+ * and the probe element, so a rich-text label and the plain-text label it
+ * flattens to are measured by the same code.
  */
 export class TextMeasure {
   private element: HTMLDivElement | null = null
+  private htmlElement: HTMLDivElement | null = null
   private readonly cache = new Map<string, TextMeasurement>()
+  private readonly htmlCache = new Map<string, TextHtmlMeasurement>()
 
   measureText(text: string, opts: TextMeasureOptions): TextMeasurement {
     const key = cacheKey(text, opts)
@@ -51,6 +84,36 @@ export class TextMeasure {
     return result
   }
 
+  /**
+   * Measure a run of HTML — a rich-text label — laid out the way the DOM
+   * overlay renders it.
+   *
+   * Only pass HTML this package generated (`richTextToHtml` escapes text and
+   * scheme-checks link hrefs); the probe is inert but it is still a live DOM
+   * subtree.
+   */
+  measureHtml(html: string, opts: TextMeasureHtmlOptions): TextHtmlMeasurement {
+    const key = htmlCacheKey(html, opts)
+    const hit = this.htmlCache.get(key)
+    if (hit) return hit
+    const result = typeof document === "undefined" ? this.estimateHtml(html, opts) : this.measureHtmlDom(html, opts)
+    if (this.htmlCache.size >= MAX_CACHE_ENTRIES) {
+      const oldest = this.htmlCache.keys().next().value
+      if (oldest !== undefined) this.htmlCache.delete(oldest)
+    }
+    this.htmlCache.set(key, result)
+    return result
+  }
+
+  /**
+   * Measure several HTML runs against one probe. Nothing is shared between the
+   * items beyond the element itself; the win is one style write and one layout
+   * flush per item instead of one per call site.
+   */
+  measureHtmlBatch(items: readonly { html: string; opts: TextMeasureHtmlOptions }[]): TextHtmlMeasurement[] {
+    return items.map((item) => this.measureHtml(item.html, item.opts))
+  }
+
   /** Number of cached measurements (for tests and debugging). */
   get cacheSize(): number {
     return this.cache.size
@@ -58,12 +121,16 @@ export class TextMeasure {
 
   clearCache(): void {
     this.cache.clear()
+    this.htmlCache.clear()
   }
 
   dispose(): void {
     this.cache.clear()
+    this.htmlCache.clear()
     this.element?.remove()
     this.element = null
+    this.htmlElement?.remove()
+    this.htmlElement = null
   }
 
   private estimate(text: string, opts: TextMeasureOptions): TextMeasurement {
@@ -96,6 +163,86 @@ export class TextMeasure {
     return { w: Math.ceil(rect.width * 100) / 100, h: Math.ceil(rect.height * 100) / 100, lineCount }
   }
 
+  private estimateHtml(html: string, opts: TextMeasureHtmlOptions): TextHtmlMeasurement {
+    const text = htmlToProbeText(html)
+    const padding = paddingPx(opts.padding)
+    const base = this.estimate(text, {
+      fontFamily: opts.fontFamily,
+      fontSize: opts.fontSize,
+      lineHeight: opts.lineHeight,
+      ...(opts.fontWeight === undefined ? {} : { fontWeight: opts.fontWeight }),
+      ...(opts.maxWidth === undefined || opts.maxWidth === null ? {} : { maxWidth: opts.maxWidth }),
+      padding,
+    })
+    // Unwrapped, the widest paragraph is what the content wants.
+    const unwrapped = this.estimate(text, { fontFamily: opts.fontFamily, fontSize: opts.fontSize, lineHeight: opts.lineHeight, padding })
+    return { ...base, scrollWidth: opts.measureScrollWidth ? unwrapped.w : base.w }
+  }
+
+  private measureHtmlDom(html: string, opts: TextMeasureHtmlOptions): TextHtmlMeasurement {
+    const el = this.getHtmlElement()
+    const s = el.style
+    s.fontFamily = opts.fontFamily
+    s.fontSize = `${opts.fontSize}px`
+    s.fontWeight = opts.fontWeight === undefined ? "normal" : String(opts.fontWeight)
+    s.fontStyle = opts.fontStyle ?? "normal"
+    s.lineHeight = String(opts.lineHeight)
+    s.padding = typeof opts.padding === "number" ? `${opts.padding}px` : (opts.padding ?? "0px")
+    s.maxWidth = opts.maxWidth === undefined || opts.maxWidth === null ? "none" : `${Math.max(1, opts.maxWidth)}px`
+    // `removeProperty` first, so a probe reused with fewer styles is not measured with the last call's.
+    for (const name of readCustomStyleNames(el)) s.removeProperty(name)
+    for (const [name, value] of Object.entries(opts.otherStyles ?? {})) s.setProperty(name, value)
+    writeCustomStyleNames(el, Object.keys(opts.otherStyles ?? {}))
+    el.innerHTML = html
+
+    const rect = el.getBoundingClientRect()
+    const padding = paddingPx(opts.padding)
+    const lineHeightPx = opts.fontSize * opts.lineHeight
+    const contentH = Math.max(0, rect.height - padding * 2)
+    const lineCount = lineHeightPx > 0 ? Math.max(1, Math.round(contentH / lineHeightPx)) : 1
+    let scrollWidth = rect.width
+    if (opts.measureScrollWidth) {
+      // `scrollWidth` is an integer and never smaller than the client width, so
+      // an unwrapped re-measure is the only way to learn the wanted width.
+      const previousMax = s.maxWidth
+      s.maxWidth = "none"
+      scrollWidth = el.getBoundingClientRect().width
+      s.maxWidth = previousMax
+    }
+    return {
+      w: Math.ceil(rect.width * 100) / 100,
+      h: Math.ceil(rect.height * 100) / 100,
+      lineCount,
+      scrollWidth: Math.ceil(scrollWidth * 100) / 100,
+    }
+  }
+
+  private getHtmlElement(): HTMLDivElement {
+    if (this.htmlElement && this.htmlElement.isConnected) return this.htmlElement
+    installHtmlProbeStyles()
+    const el = document.createElement("div")
+    el.setAttribute("aria-hidden", "true")
+    el.className = "mocanvas-text-measure-html"
+    Object.assign(el.style, {
+      position: "fixed",
+      top: "-10000px",
+      left: "-10000px",
+      visibility: "hidden",
+      pointerEvents: "none",
+      whiteSpace: "pre-wrap",
+      overflowWrap: "break-word",
+      wordBreak: "normal",
+      width: "max-content",
+      boxSizing: "border-box",
+      margin: "0",
+      border: "0",
+      zIndex: "-1",
+    } satisfies Partial<CSSStyleDeclaration>)
+    document.body.appendChild(el)
+    this.htmlElement = el
+    return el
+  }
+
   private getElement(): HTMLDivElement {
     if (this.element && this.element.isConnected) return this.element
     const el = document.createElement("div")
@@ -125,6 +272,84 @@ export class TextMeasure {
 function cacheKey(text: string, o: TextMeasureOptions): string {
   return `${o.fontFamily}|${o.fontSize}|${o.fontWeight ?? ""}|${o.lineHeight}|${o.maxWidth ?? ""}|${o.padding ?? 0}|${text}`
 }
+
+function htmlCacheKey(html: string, o: TextMeasureHtmlOptions): string {
+  const other = Object.entries(o.otherStyles ?? {})
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${k}:${v}`)
+    .join(";")
+  return `${o.fontFamily}|${o.fontSize}|${o.fontWeight ?? ""}|${o.fontStyle ?? ""}|${o.lineHeight}|${o.maxWidth ?? ""}|${o.padding ?? 0}|${o.measureScrollWidth ? 1 : 0}|${other}|${html}`
+}
+
+/** Padding as a single number of px; a shorthand contributes its first value. */
+function paddingPx(padding: number | string | undefined): number {
+  if (typeof padding === "number") return Number.isFinite(padding) ? padding : 0
+  if (typeof padding !== "string") return 0
+  const first = padding.trim().split(/\s+/)[0] ?? ""
+  const value = Number.parseFloat(first)
+  return Number.isFinite(value) ? value : 0
+}
+
+/** Block-level tags whose boundaries read as a line break when HTML is flattened for the estimate. */
+const BLOCK_TAG = /<\/?(?:p|div|li|ul|ol|h[1-6]|blockquote|pre|tr|br|hr)\b[^>]*>/gi
+
+/** The text an HTML run lays out as, for the `document`-less estimate. */
+function htmlToProbeText(html: string): string {
+  return html
+    .replace(BLOCK_TAG, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\n{2,}/g, "\n")
+    .replace(/^\n|\n$/g, "")
+}
+
+/** Custom property names set on the probe by the previous call, so they can be cleared. */
+function readCustomStyleNames(el: HTMLElement): string[] {
+  const raw = el.dataset["mocanvasOtherStyles"]
+  return raw === undefined || raw.length === 0 ? [] : raw.split(",")
+}
+
+function writeCustomStyleNames(el: HTMLElement, names: readonly string[]): void {
+  if (names.length === 0) delete el.dataset["mocanvasOtherStyles"]
+  else el.dataset["mocanvasOtherStyles"] = names.join(",")
+}
+
+let htmlProbeStylesInstalled = false
+
+/**
+ * Zero the browser's default block margins inside the HTML probe. A `<p>`'s
+ * 1em margin would otherwise measure as extra height that the label — which
+ * renders with the same rules — never has.
+ */
+function installHtmlProbeStyles(): void {
+  if (htmlProbeStylesInstalled || typeof document === "undefined") return
+  htmlProbeStylesInstalled = true
+  const style = document.createElement("style")
+  style.setAttribute("data-mocanvas", "text-measure")
+  style.textContent = RICH_TEXT_BLOCK_CSS.replace(/__SCOPE__/g, ".mocanvas-text-measure-html")
+  document.head.appendChild(style)
+}
+
+/**
+ * The CSS a rich-text label lays out under, in both the measuring probe and the
+ * DOM overlay. `__SCOPE__` is replaced with the selector of the container.
+ *
+ * Exported so the overlay renders under exactly the rules the measurer used —
+ * one copy of the numbers, not two.
+ */
+export const RICH_TEXT_BLOCK_CSS = [
+  "__SCOPE__ p,__SCOPE__ h1,__SCOPE__ h2,__SCOPE__ h3,__SCOPE__ h4,__SCOPE__ h5,__SCOPE__ h6,__SCOPE__ blockquote,__SCOPE__ pre,__SCOPE__ ul,__SCOPE__ ol{margin:0;padding:0;font-size:inherit;font-weight:inherit;line-height:inherit;}",
+  "__SCOPE__ ul,__SCOPE__ ol{padding-inline-start:1.4em;}",
+  "__SCOPE__ li{margin:0;}",
+  "__SCOPE__ pre,__SCOPE__ code{font-family:inherit;white-space:pre-wrap;}",
+  "__SCOPE__ hr{margin:0;border:0;border-top:1px solid currentColor;}",
+  "__SCOPE__ a{color:inherit;}",
+].join("")
 
 let singleton: TextMeasure | null = null
 

@@ -42,7 +42,7 @@ abstract class TestBoxUtil<T extends BaseShape<string, BoxProps>> extends ShapeU
   component() {
     return null
   }
-  indicator() {
+  override indicator() {
     return null
   }
   override getRenderStyle(): StyleWords {

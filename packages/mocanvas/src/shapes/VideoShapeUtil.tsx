@@ -10,6 +10,7 @@ import {
 } from "@mocanvas/editor"
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react"
 import { propsOf, readBoolean, readNumber, readString } from "./prop-access"
+import { rectPath } from "./indicator-paths"
 
 export interface VideoShapeProps {
   w: number
@@ -186,9 +187,9 @@ export class VideoShapeUtil extends BaseBoxShapeUtil<VideoShape> {
     )
   }
 
-  indicator(shape: VideoShape): ReactNode {
+  override getIndicatorPath(shape: VideoShape): Path2D {
     const { w, h } = readVideoBox(shape)
-    return <rect width={w} height={h} />
+    return rectPath(w, h)
   }
 
   /** Editing a video means taking its controls, not typing into it. */

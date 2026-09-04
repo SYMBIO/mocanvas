@@ -1,0 +1,752 @@
+[
+ {
+  "f": "packages/canvas/src/__tests__/board-paste-external-url.test.ts",
+  "l": 5,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'defaultHandleExternalUrlContent'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/board-tool-shortcuts.test.ts",
+  "l": 105,
+  "c": "TS2353",
+  "m": "Object literal may only specify known properties, and 'translations' does not exist in type 'TLUiOverrides'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/board-tool-shortcuts.test.ts",
+  "l": 107,
+  "c": "TS2339",
+  "m": "Property 'translations' does not exist on type 'TLUiOverrides'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/canvas-grid.test.tsx",
+  "l": 49,
+  "c": "TS2322",
+  "m": "Type '{ x: number; y: number; z: number; size: number; }' is not assignable to type 'IntrinsicAttributes & object'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/canvas-grid.test.tsx",
+  "l": 58,
+  "c": "TS2322",
+  "m": "Type '{ x: number; y: number; z: number; size: number; }' is not assignable to type 'IntrinsicAttributes & object'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/canvas-grid.test.tsx",
+  "l": 67,
+  "c": "TS2322",
+  "m": "Type '{ x: number; y: number; z: number; size: number; }' is not assignable to type 'IntrinsicAttributes & object'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/canvas-grid.test.tsx",
+  "l": 73,
+  "c": "TS2322",
+  "m": "Type '{ x: number; y: number; z: number; size: number; }' is not assignable to type 'IntrinsicAttributes & object'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/canvas-grid.test.tsx",
+  "l": 80,
+  "c": "TS2322",
+  "m": "Type '{ x: number; y: number; z: number; size: number; }' is not assignable to type 'IntrinsicAttributes & object'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/canvas-grid.test.tsx",
+  "l": 87,
+  "c": "TS2322",
+  "m": "Type '{ x: number; y: number; z: number; size: number; }' is not assignable to type 'IntrinsicAttributes & object'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/feed-post-block-shape-util.test.tsx",
+  "l": 892,
+  "c": "TS2339",
+  "m": "Property 'onClick' does not exist on type 'FeedPostBlockShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/feed-post-block-shape-util.test.tsx",
+  "l": 894,
+  "c": "TS2339",
+  "m": "Property 'onClick' does not exist on type 'FeedPostBlockShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/feed-post-block-shape-util.test.tsx",
+  "l": 896,
+  "c": "TS2339",
+  "m": "Property 'onClick' does not exist on type 'FeedPostBlockShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/feed-post-block-shape-util.test.tsx",
+  "l": 904,
+  "c": "TS2339",
+  "m": "Property 'onClick' does not exist on type 'FeedPostBlockShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/feed-post-block-shape-util.test.tsx",
+  "l": 913,
+  "c": "TS2339",
+  "m": "Property 'onClick' does not exist on type 'FeedPostBlockShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/format-block-shape-util.test.tsx",
+  "l": 27,
+  "c": "TS2339",
+  "m": "Property 'onClick' does not exist on type 'FormatBlockShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/format-block-shape-util.test.tsx",
+  "l": 29,
+  "c": "TS2339",
+  "m": "Property 'onClick' does not exist on type 'FormatBlockShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/format-block-shape-util.test.tsx",
+  "l": 31,
+  "c": "TS2339",
+  "m": "Property 'onClick' does not exist on type 'FormatBlockShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/format-block-shape-util.test.tsx",
+  "l": 39,
+  "c": "TS2339",
+  "m": "Property 'onClick' does not exist on type 'FormatBlockShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/ghost-preview-geometry.test.ts",
+  "l": 8,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'getPolygonVertices'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/ghost-preview.test.tsx",
+  "l": 8,
+  "c": "TS2724",
+  "m": "'\"tldraw\"' has no exported member named 'defaultShapeTools'. Did you mean 'defaultShapeUtils'?"
+ },
+ {
+  "f": "packages/canvas/src/__tests__/ghost-preview.test.tsx",
+  "l": 69,
+  "c": "TS2322",
+  "m": "Type '{ children: Element; editor: Editor; }' is not assignable to type 'IntrinsicAttributes & ProviderProps<Editor | null>'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/hydrate-canvas-store.test.ts",
+  "l": 86,
+  "c": "TS2339",
+  "m": "Property 'assets' does not exist on type 'EditorStoreProps'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/hydrate-canvas-store.test.ts",
+  "l": 87,
+  "c": "TS2339",
+  "m": "Property 'assets' does not exist on type 'EditorStoreProps'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/hydrate-canvas-store.test.ts",
+  "l": 88,
+  "c": "TS2339",
+  "m": "Property 'assets' does not exist on type 'EditorStoreProps'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-2045-note-text-normalization.test.ts",
+  "l": 10,
+  "c": "TS2339",
+  "m": "Property 'richText' does not exist on type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-2045-note-text-normalization.test.ts",
+  "l": 44,
+  "c": "TS2353",
+  "m": "Object literal may only specify known properties, and 'richText' does not exist in type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-2045-note-text-normalization.test.ts",
+  "l": 244,
+  "c": "TS2353",
+  "m": "Object literal may only specify known properties, and 'richText' does not exist in type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-2045-note-text-normalization.test.ts",
+  "l": 277,
+  "c": "TS2339",
+  "m": "Property 'richText' does not exist on type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-2045-note-text-normalization.test.ts",
+  "l": 286,
+  "c": "TS2353",
+  "m": "Object literal may only specify known properties, and 'richText' does not exist in type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-2045-note-text-normalization.test.ts",
+  "l": 324,
+  "c": "TS2339",
+  "m": "Property 'richText' does not exist on type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-2045-note-text-normalization.test.ts",
+  "l": 375,
+  "c": "TS2353",
+  "m": "Object literal may only specify known properties, and 'richText' does not exist in type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-2045-note-text-normalization.test.ts",
+  "l": 433,
+  "c": "TS2353",
+  "m": "Object literal may only specify known properties, and 'richText' does not exist in type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-2045-note-text-normalization.test.ts",
+  "l": 433,
+  "c": "TS2339",
+  "m": "Property 'richText' does not exist on type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-921-placement-size-legacy-user.test.ts",
+  "l": 5,
+  "c": "TS2724",
+  "m": "'\"tldraw\"' has no exported member named 'defaultShapeTools'. Did you mean 'defaultShapeUtils'?"
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-921-placement-size.test.tsx",
+  "l": 6,
+  "c": "TS2724",
+  "m": "'\"tldraw\"' has no exported member named 'defaultShapeTools'. Did you mean 'defaultShapeUtils'?"
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-922-note-default-size.test.ts",
+  "l": 6,
+  "c": "TS2724",
+  "m": "'\"tldraw\"' has no exported member named 'defaultShapeTools'. Did you mean 'defaultShapeUtils'?"
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-942-fold-arrange-parity.test.ts",
+  "l": 164,
+  "c": "TS2339",
+  "m": "Property 'point' does not exist on type 'Mat'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-942-fold-arrange-parity.test.ts",
+  "l": 195,
+  "c": "TS2345",
+  "m": "Argument of type 'ShapeId' is not assignable to parameter of type 'UnknownShape'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-942-fold-arrange-parity.test.ts",
+  "l": 195,
+  "c": "TS2339",
+  "m": "Property 'rotation' does not exist on type 'Mat'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-942-fold-arrange-parity.test.ts",
+  "l": 208,
+  "c": "TS2339",
+  "m": "Property 'rotation' does not exist on type 'Mat'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-942-fold-arrange-parity.test.ts",
+  "l": 334,
+  "c": "TS2339",
+  "m": "Property 'translate' does not exist on type 'Mat'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-942-fold-arrange-parity.test.ts",
+  "l": 344,
+  "c": "TS2339",
+  "m": "Property 'translate' does not exist on type 'Mat'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-942-fold-arrange-parity.test.ts",
+  "l": 350,
+  "c": "TS2339",
+  "m": "Property 'translate' does not exist on type 'Mat'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-942-fold-arrange-parity.test.ts",
+  "l": 351,
+  "c": "TS2339",
+  "m": "Property 'translate' does not exist on type 'Mat'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-942-fold-arrange-parity.test.ts",
+  "l": 352,
+  "c": "TS2339",
+  "m": "Property 'Compose' does not exist on type 'typeof Mat'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/mol-942-fold-arrange-parity.test.ts",
+  "l": 360,
+  "c": "TS2339",
+  "m": "Property 'translate' does not exist on type 'Mat'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 126,
+  "c": "TS2554",
+  "m": "Expected 1 arguments, but got 0."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 402,
+  "c": "TS2344",
+  "m": "Type 'SectionShapeUtil' does not satisfy the constraint 'BaseShape<string, object>'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 404,
+  "c": "TS2722",
+  "m": "Cannot invoke an object which is possibly 'undefined'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 404,
+  "c": "TS2345",
+  "m": "Argument of type 'SectionShape' is not assignable to parameter of type 'SectionShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 418,
+  "c": "TS2344",
+  "m": "Type 'SectionShapeUtil' does not satisfy the constraint 'BaseShape<string, object>'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 420,
+  "c": "TS2722",
+  "m": "Cannot invoke an object which is possibly 'undefined'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 420,
+  "c": "TS2345",
+  "m": "Argument of type 'SectionShape' is not assignable to parameter of type 'SectionShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 431,
+  "c": "TS2344",
+  "m": "Type 'SectionShapeUtil' does not satisfy the constraint 'BaseShape<string, object>'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 433,
+  "c": "TS2722",
+  "m": "Cannot invoke an object which is possibly 'undefined'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 433,
+  "c": "TS2345",
+  "m": "Argument of type 'SectionShape' is not assignable to parameter of type 'SectionShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 504,
+  "c": "TS2344",
+  "m": "Type 'SectionShapeUtil' does not satisfy the constraint 'BaseShape<string, object>'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 506,
+  "c": "TS2322",
+  "m": "Type '{ children: ReactNode; editor: Editor; }' is not assignable to type 'IntrinsicAttributes & ProviderProps<Editor | null>'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 507,
+  "c": "TS2345",
+  "m": "Argument of type 'SectionShape' is not assignable to parameter of type 'SectionShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 578,
+  "c": "TS2344",
+  "m": "Type 'SectionShapeUtil' does not satisfy the constraint 'BaseShape<string, object>'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 580,
+  "c": "TS2322",
+  "m": "Type '{ children: ReactNode; editor: Editor; }' is not assignable to type 'IntrinsicAttributes & ProviderProps<Editor | null>'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/section-shape-util.test.tsx",
+  "l": 581,
+  "c": "TS2345",
+  "m": "Argument of type 'SectionShape' is not assignable to parameter of type 'SectionShapeUtil'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/selection-context.test.ts",
+  "l": 7,
+  "c": "TS2724",
+  "m": "'\"tldraw\"' has no exported member named 'defaultShapeTools'. Did you mean 'defaultShapeUtils'?"
+ },
+ {
+  "f": "packages/canvas/src/__tests__/sticky-anchor-binding-util.test.ts",
+  "l": 273,
+  "c": "TS2339",
+  "m": "Property 'migrateSnapshot' does not exist on type 'EditorStore'."
+ },
+ {
+  "f": "packages/canvas/src/__tests__/tldraw-yjs-binding.test.ts",
+  "l": 10,
+  "c": "TS2724",
+  "m": "'\"tldraw\"' has no exported member named 'StoreSnapshot'. Did you mean 'TLStoreSnapshot'?"
+ },
+ {
+  "f": "packages/canvas/src/agent-presence.ts",
+  "l": 85,
+  "c": "TS2322",
+  "m": "Type 'null' is not assignable to type '{ x: number; y: number; z: number; }'."
+ },
+ {
+  "f": "packages/canvas/src/board-derived-materialization.ts",
+  "l": 1,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'RecordsDiff'."
+ },
+ {
+  "f": "packages/canvas/src/board-derived-materialization.ts",
+  "l": 58,
+  "c": "TS2345",
+  "m": "Argument of type '([, record]: [any, any]) => any' is not assignable to parameter of type '(value: unknown, index: number, array: unknown[]) => any'."
+ },
+ {
+  "f": "packages/canvas/src/board-derived-materialization.ts",
+  "l": 60,
+  "c": "TS2345",
+  "m": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+ },
+ {
+  "f": "packages/canvas/src/board-embed-match.ts",
+  "l": 1,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'getEmbedInfo'."
+ },
+ {
+  "f": "packages/canvas/src/board-external-content.ts",
+  "l": 98,
+  "c": "TS2322",
+  "m": "Type '\"embed\"' is not assignable to type '\"text\" | \"files\" | \"url\" | \"svg-text\"'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 5,
+  "c": "TS2724",
+  "m": "'\"tldraw\"' has no exported member named 'NoteShapeOptions'. Did you mean 'NoteShapeProps'?"
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 6,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'NoteShapeUtilDisplayValues'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 142,
+  "c": "TS2339",
+  "m": "Property 'richText' does not exist on type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 148,
+  "c": "TS2339",
+  "m": "Property 'richText' does not exist on type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 148,
+  "c": "TS2339",
+  "m": "Property 'richText' does not exist on type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 149,
+  "c": "TS2339",
+  "m": "Property 'richText' does not exist on type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 149,
+  "c": "TS2339",
+  "m": "Property 'richText' does not exist on type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 177,
+  "c": "TS2339",
+  "m": "Property 'richText' does not exist on type 'NoteShapeProps'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 199,
+  "c": "TS18048",
+  "m": "'measured.scrollWidth' is possibly 'undefined'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 352,
+  "c": "TS2345",
+  "m": "Argument of type 'TLShape' is not assignable to parameter of type 'NoteShape'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 353,
+  "c": "TS2339",
+  "m": "Property 'font' does not exist on type 'object'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 353,
+  "c": "TS2339",
+  "m": "Property 'font' does not exist on type 'object'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 354,
+  "c": "TS2339",
+  "m": "Property 'size' does not exist on type 'object'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 354,
+  "c": "TS2339",
+  "m": "Property 'size' does not exist on type 'object'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 355,
+  "c": "TS2339",
+  "m": "Property 'growY' does not exist on type 'object'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 355,
+  "c": "TS2339",
+  "m": "Property 'growY' does not exist on type 'object'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 356,
+  "c": "TS2339",
+  "m": "Property 'fontSizeAdjustment' does not exist on type 'object'."
+ },
+ {
+  "f": "packages/canvas/src/board-note-size.ts",
+  "l": 356,
+  "c": "TS2339",
+  "m": "Property 'fontSizeAdjustment' does not exist on type 'object'."
+ },
+ {
+  "f": "packages/canvas/src/campaign-phase-shape-util.tsx",
+  "l": 120,
+  "c": "TS2353",
+  "m": "Object literal may only specify known properties, and 'excludeFromShapeBounds' does not exist in type '{ x?: number; y?: number; width: number; height: number; isFilled: boolean; isLabel?: boolean; }'."
+ },
+ {
+  "f": "packages/canvas/src/canvas-grid.tsx",
+  "l": 59,
+  "c": "TS2339",
+  "m": "Property 'x' does not exist on type '{}'."
+ },
+ {
+  "f": "packages/canvas/src/canvas-grid.tsx",
+  "l": 59,
+  "c": "TS2339",
+  "m": "Property 'y' does not exist on type '{}'."
+ },
+ {
+  "f": "packages/canvas/src/canvas-grid.tsx",
+  "l": 59,
+  "c": "TS2339",
+  "m": "Property 'z' does not exist on type '{}'."
+ },
+ {
+  "f": "packages/canvas/src/canvas-readonly-mount.ts",
+  "l": 1,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'TLOnMountHandler'."
+ },
+ {
+  "f": "packages/canvas/src/canvas-readonly-mount.ts",
+  "l": 29,
+  "c": "TS7006",
+  "m": "Parameter 'editor' implicitly has an 'any' type."
+ },
+ {
+  "f": "packages/canvas/src/feed-post-block-shape-util.tsx",
+  "l": 11,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'TLEditStartInfo'."
+ },
+ {
+  "f": "packages/canvas/src/feed-post-block-shape-util.tsx",
+  "l": 646,
+  "c": "TS2416",
+  "m": "Property 'canEdit' in type 'FeedPostBlockShapeUtil' is not assignable to the same property in base type 'ShapeUtil<FeedPostBlockShape>'."
+ },
+ {
+  "f": "packages/canvas/src/feed-post-block-shape-util.tsx",
+  "l": 969,
+  "c": "TS2339",
+  "m": "Property 'h' does not exist on type 'object'."
+ },
+ {
+  "f": "packages/canvas/src/feed-post-block-shape-util.tsx",
+  "l": 1038,
+  "c": "TS2339",
+  "m": "Property 'focus' does not exist on type 'Editor'."
+ },
+ {
+  "f": "packages/canvas/src/feed-post-block-shape-util.tsx",
+  "l": 1059,
+  "c": "TS2339",
+  "m": "Property 'slotsJson' does not exist on type 'object'."
+ },
+ {
+  "f": "packages/canvas/src/format-canvas.tsx",
+  "l": 16,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'TLOnMountHandler'."
+ },
+ {
+  "f": "packages/canvas/src/format-canvas.tsx",
+  "l": 366,
+  "c": "TS2375",
+  "m": "Type 'TLComponents' is not assignable to type 'Partial<CanvasComponents>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
+ },
+ {
+  "f": "packages/canvas/src/ghost-preview-geometry.ts",
+  "l": 5,
+  "c": "TS2724",
+  "m": "'\"tldraw\"' has no exported member named 'getGeoTypeDefinition'. Did you mean 'getEmbedDefinition'?"
+ },
+ {
+  "f": "packages/canvas/src/ghost-preview-geometry.ts",
+  "l": 6,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'getPolygonVertices'."
+ },
+ {
+  "f": "packages/canvas/src/ghost-preview-geometry.ts",
+  "l": 376,
+  "c": "TS7006",
+  "m": "Parameter 'point' implicitly has an 'any' type."
+ },
+ {
+  "f": "packages/canvas/src/ghost-preview.tsx",
+  "l": 120,
+  "c": "TS2551",
+  "m": "Property 'getIsPointing' does not exist on type 'EditorInputs'. Did you mean 'isPointing'?"
+ },
+ {
+  "f": "packages/canvas/src/ghost-preview.tsx",
+  "l": 125,
+  "c": "TS2551",
+  "m": "Property 'getCurrentPagePoint' does not exist on type 'EditorInputs'. Did you mean 'currentPagePoint'?"
+ },
+ {
+  "f": "packages/canvas/src/hydrate-canvas-store.ts",
+  "l": 62,
+  "c": "TS2339",
+  "m": "Property 'migrateSnapshot' does not exist on type 'EditorStore'."
+ },
+ {
+  "f": "packages/canvas/src/local-presence.ts",
+  "l": 4,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'atom'."
+ },
+ {
+  "f": "packages/canvas/src/local-presence.ts",
+  "l": 6,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'react'."
+ },
+ {
+  "f": "packages/canvas/src/pipeline/connection-binding-util.ts",
+  "l": 3,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'createComputedCache'."
+ },
+ {
+  "f": "packages/canvas/src/pipeline/connection-shape-util.tsx",
+  "l": 2,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'CubicBezier2d'."
+ },
+ {
+  "f": "packages/canvas/src/section-shape-util.tsx",
+  "l": 14,
+  "c": "TS2305",
+  "m": "Module '\"tldraw\"' has no exported member 'TLEditStartInfo'."
+ },
+ {
+  "f": "packages/canvas/src/section-shape-util.tsx",
+  "l": 347,
+  "c": "TS2353",
+  "m": "Object literal may only specify known properties, and 'excludeFromShapeBounds' does not exist in type '{ x?: number; y?: number; width: number; height: number; isFilled: boolean; isLabel?: boolean; }'."
+ },
+ {
+  "f": "packages/canvas/src/section-shape-util.tsx",
+  "l": 369,
+  "c": "TS2322",
+  "m": "Type 'null' is not assignable to type 'number'."
+ },
+ {
+  "f": "packages/canvas/src/section-shape-util.tsx",
+  "l": 370,
+  "c": "TS2322",
+  "m": "Type 'string' is not assignable to type 'number'."
+ },
+ {
+  "f": "packages/canvas/src/section-shape-util.tsx",
+  "l": 398,
+  "c": "TS2416",
+  "m": "Property 'canEdit' in type 'SectionShapeUtil' is not assignable to the same property in base type 'BaseFrameLikeShapeUtil<SectionShape>'."
+ },
+ {
+  "f": "packages/canvas/src/section-shape-util.tsx",
+  "l": 407,
+  "c": "TS4113",
+  "m": "This member cannot have an 'override' modifier because it is not declared in the base class 'BaseFrameLikeShapeUtil<SectionShape>'."
+ },
+ {
+  "f": "packages/canvas/src/section-tool.ts",
+  "l": 41,
+  "c": "TS2339",
+  "m": "Property 'contains' does not exist on type 'Box'."
+ },
+ {
+  "f": "packages/canvas/src/selection-anchor-point.ts",
+  "l": 22,
+  "c": "TS18048",
+  "m": "'bounds' is possibly 'undefined'."
+ },
+ {
+  "f": "packages/canvas/src/selection-anchor-point.ts",
+  "l": 22,
+  "c": "TS18048",
+  "m": "'bounds' is possibly 'undefined'."
+ },
+ {
+  "f": "packages/canvas/src/selection-anchor-point.ts",
+  "l": 24,
+  "c": "TS18048",
+  "m": "'bounds' is possibly 'undefined'."
+ },
+ {
+  "f": "packages/canvas/src/selection-anchor-point.ts",
+  "l": 24,
+  "c": "TS18048",
+  "m": "'bounds' is possibly 'undefined'."
+ },
+ {
+  "f": "packages/canvas/src/selection-context.ts",
+  "l": 124,
+  "c": "TS2722",
+  "m": "Cannot invoke an object which is possibly 'undefined'."
+ },
+ {
+  "f": "packages/canvas/src/sticky-anchor-binding-util.ts",
+  "l": 236,
+  "c": "TS2322",
+  "m": "Type 'UnknownShape' is not assignable to type 'ShapeId'."
+ }
+]

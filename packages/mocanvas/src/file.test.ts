@@ -51,8 +51,11 @@ describe("loadMocanvasFile", () => {
     for (const shape of labelled) {
       const props = shape.props as Record<string, unknown>
       expect(typeof props["text"]).toBe("string")
-      expect(props["richText"]).toBeUndefined()
     }
+    // The rich-text document is kept alongside the derived plain text: dropping
+    // it on load lost every mark in the file on the next save.
+    const withRichText = labelled.filter((s) => (s.props as Record<string, unknown>)["richText"] !== undefined)
+    expect(withRichText.length).toBeGreaterThan(0)
     const texts = labelled.map((s) => (s.props as { text: string }).text).filter(Boolean)
     expect(texts).toContain("Hello box")
     expect(texts).toContain("Sticky note")

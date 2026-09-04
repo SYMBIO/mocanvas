@@ -30,6 +30,7 @@ export * from "./draw-helpers"
 export * from "./text-helpers"
 export * from "./prop-access"
 export { pathWordsToSvgD } from "./svg-path"
+export * from "./indicator-paths"
 
 /** The built-in shape utils, in the order they are registered. */
 export { GroupShapeUtil, type GroupShape } from "./GroupShapeUtil"

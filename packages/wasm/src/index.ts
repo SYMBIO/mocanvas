@@ -565,14 +565,30 @@ export async function loadEngine(input?: InitInput): Promise<EngineBridge> {
     initPromise = input === undefined ? loadDefault() : init({ module_or_path: input }).then((o) => o.memory)
   }
   const memory = await initPromise
-  return new EngineBridge(new Engine(), memory)
+  currentEngine = new EngineBridge(new Engine(), memory)
+  return currentEngine
 }
 
 /** Synchronous variant for tests / Node: pass the compiled bytes. */
 export function loadEngineSync(bytes: SyncInitInput): EngineBridge {
   const out = initSync({ module: bytes })
   initPromise = Promise.resolve(out.memory)
-  return new EngineBridge(new Engine(), out.memory)
+  currentEngine = new EngineBridge(new Engine(), out.memory)
+  return currentEngine
+}
+
+let currentEngine: EngineBridge | null = null
+
+/**
+ * The engine created by the most recent `loadEngine` / `loadEngineSync`, or
+ * `null` if the module has never been loaded in this realm.
+ *
+ * `new Editor({...})` falls back to this when no `engine` is passed, which is
+ * what lets an app construct an editor without threading the bridge through
+ * its own code.
+ */
+export function getLoadedEngine(): EngineBridge | null {
+  return currentEngine
 }
 
 export function engineVersion(): string {

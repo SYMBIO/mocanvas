@@ -1,6 +1,6 @@
 import { react as reactSignal } from "@mocanvas/state"
 import { track, useValue } from "@mocanvas/state/react"
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import type { ClipRect } from "@mocanvas/wasm"
 import type { Editor } from "../editor/Editor"
 import type { RenderBackend } from "../render/backend"
@@ -10,6 +10,8 @@ import { Vec } from "../geometry"
 import { EditorProvider } from "./EditorContext"
 import { useCanvasEvents } from "./useCanvasEvents"
 import { getSelectionHandlePositions } from "../editor/selectionHandles"
+import { ShapeIndicatorOverlayUtil, type TLIndicatorHost } from "../indicators/ShapeIndicatorOverlayUtil"
+import { getIndicatorSource } from "../indicators/resolve"
 
 export interface CanvasProps {
   editor: Editor
@@ -19,6 +21,14 @@ export interface CanvasProps {
   children?: ReactNode
   /** Override the default selection/brush indicators. */
   components?: Partial<CanvasComponents>
+  /**
+   * The overlay util that paints shape indicators onto the canvas layer.
+   *
+   * A *class*, not an instance — one is constructed per editor. Pass
+   * `ShapeIndicatorOverlayUtil.configure({ lineWidth })` to restyle, or a
+   * subclass to control which shapes get an outline.
+   */
+  indicatorOverlayUtil?: typeof ShapeIndicatorOverlayUtil
 }
 
 export interface CanvasComponents {
@@ -64,9 +74,11 @@ const HANDLE = { corner: 9, rotate: 5.5, shape: 6, virtual: 4 } as const
 
 /**
  * The canvas: a WebGL2 surface driven by the engine, a DOM overlay for shapes
- * that render through `ShapeUtil.component`, and an SVG layer for indicators.
+ * that render through `ShapeUtil.component`, a 2D canvas overlay for shape
+ * indicators, and an SVG layer for the selection handles, snap lines, the brush
+ * — and for any util still on the deprecated `indicator()` hook.
  */
-export function Canvas({ editor, className, style, children, components }: CanvasProps) {
+export function Canvas({ editor, className, style, children, components, indicatorOverlayUtil }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [backend, setBackend] = useState<RenderBackend | null>(null)
@@ -176,6 +188,7 @@ export function Canvas({ editor, className, style, children, components }: Canva
         {Background ? <Background editor={editor} /> : null}
         <canvas ref={canvasRef} style={{ ...layerStyle, display: "block" }} />
         <OverlayLayer editor={editor} />
+        <IndicatorCanvas editor={editor} util={indicatorOverlayUtil ?? ShapeIndicatorOverlayUtil} />
         <svg style={{ ...layerStyle, pointerEvents: "none", overflow: "visible" }}>
           <Indicators editor={editor} />
           <SnapLines editor={editor} />
@@ -185,6 +198,67 @@ export function Canvas({ editor, className, style, children, components }: Canva
       </div>
     </EditorProvider>
   )
+}
+
+/**
+ * The canvas indicator overlay: every selection, hover and drop-target outline,
+ * stroked into one 2D context above the scene.
+ *
+ * A canvas rather than SVG because the count is unbounded — a marquee over a
+ * thousand shapes is a thousand outlines, and a thousand DOM nodes created and
+ * destroyed per pointer move is the thing that makes a big board feel slow.
+ *
+ * The layer is sized in device pixels and drawn under a `dpr` transform, so
+ * everything below it (and inside {@link ShapeIndicatorOverlayUtil.render}) can
+ * be expressed in CSS pixels and page units without a factor in sight.
+ */
+function IndicatorCanvas({ editor, util }: { editor: Editor; util: typeof ShapeIndicatorOverlayUtil }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const overlay = useMemo(() => new util(editor as unknown as TLIndicatorHost), [editor, util])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    let raf = 0
+    let dirty = true
+    const draw = () => {
+      raf = 0
+      if (!dirty) return
+      dirty = false
+      const ctx = canvas.getContext("2d")
+      if (!ctx) return
+      const viewport = editor.getViewportScreenBounds()
+      const dpr = editor.getInstanceState().devicePixelRatio || 1
+      const w = Math.max(0, Math.round(viewport.w * dpr))
+      const h = Math.max(0, Math.round(viewport.h * dpr))
+      // Assigning either dimension resets the whole context, so the transform
+      // below has to be re-established every frame regardless.
+      if (canvas.width !== w) canvas.width = w
+      if (canvas.height !== h) canvas.height = h
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.clearRect(0, 0, w, h)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      overlay.render(ctx)
+    }
+    const stop = reactSignal("canvas.indicators", () => {
+      editor.getCamera()
+      editor.getViewportScreenBounds()
+      editor.getSelectedShapeIds()
+      editor.getHoveredShapeId()
+      editor.getHintingShapeIds()
+      editor.getCurrentToolId()
+      // Shape edits move the outline with the shape.
+      editor.getFrameEpoch()
+      dirty = true
+      if (!raf) raf = requestAnimationFrame(draw)
+    })
+    return () => {
+      stop()
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [editor, overlay])
+
+  return <canvas ref={canvasRef} style={{ ...layerStyle, pointerEvents: "none", display: "block" }} />
 }
 
 /** Shapes rendered by their ShapeUtil.component, positioned in page space via a camera transform. */
@@ -290,6 +364,10 @@ function cssCursor(type: string): string {
  *
  * Pure and exported so a custom `Indicators` component can reuse the same rule
  * instead of guessing at it.
+ *
+ * @deprecated The SVG indicator layer only draws utils still on the deprecated
+ * `indicator()` hook. A util that implements `getIndicatorPath` is stroked on
+ * the canvas overlay by `ShapeIndicatorOverlayUtil` instead.
  */
 export function getShapeIndicatorNode<T extends UnknownShape>(
   util: { indicator?(shape: T): ReactNode },
@@ -331,8 +409,12 @@ const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor:
    * everything inside the group is in shape-local units.)
    */
   const indicatorFor = (shape: UnknownShape, key: string, stroke: string) => {
+    const util = editor.getShapeUtil(shape)
+    // Ported utils are stroked on the canvas overlay; drawing them here as well
+    // would double the stroke and undo the point of the move.
+    if (getIndicatorSource(util) !== "react") return null
     const b = editor.getShapeGeometryBounds(shape)
-    const node = getShapeIndicatorNode(editor.getShapeUtil(shape), shape, b)
+    const node = getShapeIndicatorNode(util, shape, b)
     if (node === null) return null
     const m = editor.getShapePageTransform(shape)
     return (

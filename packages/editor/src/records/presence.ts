@@ -73,6 +73,12 @@ export function isInstancePresenceId(id: string): id is InstancePresenceId {
  * The local person's identity, held in a signal so that renaming or
  * recolouring re-renders anything that shows it. Session-only: nothing here is
  * persisted with the document.
+ *
+ * @deprecated Superseded by the identity/preferences split in `../user`: an
+ * identity is a `User` record resolved through a `UserStore`, and the settings
+ * are a plain `UserPreferencesState` read through a `UserPreferencesManager`.
+ * The manager implements every method below, so `Editor.user` can be switched
+ * over without touching its call sites; this interface stays until it is.
  */
 export interface UserPreferences {
   getId(): string
@@ -88,7 +94,13 @@ export interface UserPreferencesInit {
   color?: string
 }
 
-/** Create a `UserPreferences` backed by one session atom. */
+/**
+ * Create a `UserPreferences` backed by one session atom.
+ *
+ * @deprecated See {@link UserPreferences}. New code should build a
+ * `CurrentUser` (`createCurrentUser`, or `useCurrentUser` in React) and wrap it
+ * in a `UserPreferencesManager`.
+ */
 export function createUserPreferences(init: UserPreferencesInit = {}): UserPreferences {
   const id = init.id ?? `user:${uniqueId(12)}`
   const state: Atom<{ name: string; color: string }> = atom("editor.user", {

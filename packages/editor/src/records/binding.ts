@@ -1,6 +1,7 @@
 import type { RecordId } from "@mocanvas/store"
 import { createRecordType } from "@mocanvas/store"
 import type { JsonObject, ShapeId } from "./base"
+import type { BindingPropsForType } from "./props"
 
 /** A directed relationship between two shapes (e.g. an arrow end attached to a shape). */
 export interface BaseBinding<Type extends string, Props extends object> {
@@ -13,7 +14,12 @@ export interface BaseBinding<Type extends string, Props extends object> {
   meta: JsonObject
 }
 export type UnknownBinding = BaseBinding<string, object>
-export type Binding = UnknownBinding
+/**
+ * A binding record. Like {@link Shape}, naming the type resolves its props
+ * through the augmentable `TLGlobalBindingPropsMap`; a bare `Binding`
+ * keeps the open `object` props.
+ */
+export type Binding<Type extends string = string> = BaseBinding<Type, BindingPropsForType<Type>>
 export type BindingId = RecordId<UnknownBinding>
 
 export const BindingRecordType = createRecordType<UnknownBinding>("binding", { scope: "document" }).withDefaultProperties(

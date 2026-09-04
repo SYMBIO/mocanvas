@@ -15,3 +15,13 @@ export * from "./file"
 export * from "./Mocanvas"
 export * from "./export"
 export * from "./external"
+
+// --- workstream E: toolbar built on the override surface -----------------------
+export {
+  DefaultToolbar,
+  MocanvasUiMenuItem,
+  type DefaultToolbarProps,
+  type MocanvasUiMenuItemProps,
+} from "./ui/DefaultToolbar"
+export { buildDefaultToolItems, buildDefaultActionItems, registeredToolIds } from "./ui/tools-context"
+export { useToolShortcuts, ToolShortcuts, toolKeyMap } from "./ui/useToolShortcuts"

@@ -265,7 +265,7 @@ describe("ArrowBindingUtil", () => {
     const terminals = getArrowTerminalsInArrowSpace(editor, shape)
     expect(handles[1]!.x).toBeGreaterThan(terminals.start.x)
     expect(handles[1]!.x).toBeLessThan(terminals.end.x)
-    expect(util.canBind({ fromShapeType: "arrow", toShapeType: "arrow", bindingType: "arrow" })).toBe(false)
+    expect(util.canBind({ fromShape: shape, toShape: shape, bindingType: "arrow" })).toBe(false)
     expect(util.hideSelectionBoundsBg(shape)).toBe(true)
     expect(util.hideSelectionBoundsFg(shape)).toBe(true)
     expect(util.hideResizeHandles(shape)).toBe(true)

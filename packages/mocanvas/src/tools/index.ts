@@ -10,6 +10,7 @@ import { NoteTool } from "./NoteTool"
 import { SelectTool } from "./SelectTool"
 import { TextTool } from "./TextTool"
 
+export { BaseBoxShapeTool } from "./BaseBoxShapeTool"
 export { ArrowTool, DrawTool, EraserTool, FrameTool, GeoTool, HandTool, LineTool, NoteTool, SelectTool, TextTool }
 
 export const defaultTools: StateNodeConstructor[] = [

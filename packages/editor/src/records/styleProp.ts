@@ -1,3 +1,4 @@
+import { describeValue, listForMessage, ValidationError } from "../validation/validator"
 import {
   DEFAULT_COLORS,
   DEFAULT_DASHES,
@@ -40,20 +41,45 @@ export class StyleProp<T> {
   validate(value: unknown): T {
     return this.validator ? this.validator(value) : (value as T)
   }
+
+  /**
+   * Whether `value` is a legal value for this style. Present so that a style
+   * prop can stand in for a validator wherever a `static props` map is read.
+   */
+  isValid(value: unknown): boolean {
+    try {
+      this.validate(value)
+      return true
+    } catch {
+      return false
+    }
+  }
 }
 
 export class EnumStyleProp<T extends string> extends StyleProp<T> {
-  constructor(
-    id: string,
-    defaultValue: T,
-    readonly values: readonly T[],
-  ) {
+  /**
+   * The accepted values — this style prop's OWN array, copied from the caller's.
+   *
+   * `registerColorsFromThemes` extends this list in place (the validator closes
+   * over the same array, so replacing it would leave the validator behind). The
+   * copy is what keeps that in-place edit from reaching back into the tuple the
+   * caller passed in: `DefaultColorStyle` is built from the exported
+   * `DEFAULT_COLORS`, and sharing the array made registering an app's palette
+   * silently rewrite `DEFAULT_COLORS` for everyone importing it.
+   */
+  readonly values: readonly T[]
+
+  constructor(id: string, defaultValue: T, values: readonly T[]) {
+    const own: T[] = [...values]
     super(id, defaultValue, (v) => {
-      if (typeof v !== "string" || !(values as readonly string[]).includes(v)) {
-        throw new Error(`Invalid value for style ${id}: ${String(v)}`)
+      if (typeof v !== "string" || !(own as readonly string[]).includes(v)) {
+        throw new ValidationError(
+          `Expected one of ${listForMessage(own.map((value) => JSON.stringify(value)))}, got ${describeValue(v)}`,
+        )
       }
       return v as T
     })
+    this.values = own
   }
 }
 
@@ -118,8 +144,13 @@ export class SharedStyleMap {
   }
 }
 
-/** Style props declared on a ShapeUtil's `static props` map, by prop key. */
-export function getStylePropsOf(props: Record<string, unknown> | undefined): Map<string, StyleProp<unknown>> {
+/**
+ * Style props declared on a ShapeUtil's `static props` map, by prop key.
+ *
+ * The map holds validators of several kinds; only the {@link StyleProp}
+ * entries are styles, and only those are returned.
+ */
+export function getStylePropsOf(props: object | undefined): Map<string, StyleProp<unknown>> {
   const out = new Map<string, StyleProp<unknown>>()
   if (!props) return out
   for (const [key, v] of Object.entries(props)) {

@@ -19,6 +19,7 @@ import { getTextTextureKey, renderTextToCanvas, type TextTextureSpec } from "../
 import { LINE_HEIGHT } from "./text-helpers"
 import { propsOf, readBoolean, readEnum, readNumber, readStyle, readText } from "./prop-access"
 import { getFontFamily, getStrokeRgba, getTextCssColor } from "./shape-theme"
+import { rectPath } from "./indicator-paths"
 
 export interface TextShapeProps {
   color: DefaultColorStyle
@@ -157,9 +158,9 @@ export class TextShapeUtil extends ShapeUtil<TextShape> {
     )
   }
 
-  indicator(shape: TextShape): ReactNode {
+  override getIndicatorPath(shape: TextShape): Path2D {
     const b = this.getGeometry(shape).bounds
-    return <rect width={b.w} height={b.h} />
+    return rectPath(b.w, b.h)
   }
 
   override canEdit(_shape: TextShape): boolean {

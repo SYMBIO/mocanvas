@@ -19,6 +19,28 @@ export {
 } from "./presence"
 
 export {
+  compareStamps,
+  createCrdt,
+  createEmptyCrdtState,
+  createEmptyStampedDiff,
+  createLamportClock,
+  CRDT_STATE_VERSION,
+  DEFAULT_TOMBSTONE_LIMIT,
+  DEFAULT_TOMBSTONE_MAX_AGE_MS,
+  isStampedDiffEmpty,
+  stampedDiffFromSnapshot,
+  type Crdt,
+  type CrdtOptions,
+  type CrdtRecordState,
+  type CrdtState,
+  type LamportClock,
+  type Stamp,
+  type StampedDiff,
+  type StampedPut,
+  type StampedRemove,
+} from "./crdt"
+
+export {
   decodeMessage,
   encodeMessage,
   PROTOCOL_VERSION,
@@ -28,6 +50,7 @@ export {
   type PresenceMessage,
   type SnapshotMessage,
   type SyncMessage,
+  type UnsupportedMessage,
 } from "./protocol"
 
 export {

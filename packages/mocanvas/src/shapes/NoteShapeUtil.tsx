@@ -18,6 +18,7 @@ import { TextLabel } from "../text/TextEditor"
 import { computeGrowY, measureLabel, trimTrailingWhitespace } from "../text/text-layout"
 import { propsOf, readNumber, readString, readStyle, readText } from "./prop-access"
 import { getNoteBodyGradientCss, getNoteFillRgba, getNoteShadowCss, getNoteTextCssColor } from "./shape-theme"
+import { rectPath } from "./indicator-paths"
 
 export interface NoteShapeProps {
   color: DefaultColorStyle
@@ -170,9 +171,9 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape> {
     )
   }
 
-  indicator(shape: NoteShape): ReactNode {
+  override getIndicatorPath(shape: NoteShape): Path2D {
     const { scale, growY } = readNoteProps(shape)
-    return <rect width={NOTE_SIZE * scale} height={NOTE_SIZE * scale + growY} />
+    return rectPath(NOTE_SIZE * scale, NOTE_SIZE * scale + growY)
   }
 
   /**

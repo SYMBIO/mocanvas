@@ -24,7 +24,7 @@ class BoxUtil extends BaseBoxShapeUtil<BoxShape> {
   component() {
     return null
   }
-  indicator() {
+  override indicator() {
     return null
   }
   override getRenderStyle(shape: BoxShape): StyleWords {
@@ -322,7 +322,7 @@ describe("Editor groups", () => {
     component() {
       return null
     }
-    indicator() {
+    override indicator() {
       return null
     }
   }
@@ -374,7 +374,7 @@ class BrokenUtil extends BaseBoxShapeUtil<BrokenShape> {
   component() {
     return null
   }
-  indicator() {
+  override indicator() {
     return null
   }
   override getRenderStyle(shape: BrokenShape): StyleWords {

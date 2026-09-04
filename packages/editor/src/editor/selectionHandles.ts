@@ -50,15 +50,18 @@ export function getSelectionHandlePositions(
   const rotation = single ? editor.getSelectionRotation() : 0
   // Local bounds of a single shape (rotated with it), or the page bounds of many.
   let bounds: Box
+  // Handles are drawn inside the container and hit-tested against
+  // container-relative pointer positions, so this is VIEWPORT space, not the
+  // window-relative screen space of `pageToScreen`.
   let toScreen: (p: VecLike) => Vec
   if (single) {
     const b = editor.getShapeGeometryBounds(single)!
     const m = editor.getShapePageTransform(single)
     bounds = b
-    toScreen = (p) => editor.pageToScreen({ x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f })
+    toScreen = (p) => editor.pageToViewport({ x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f })
   } else {
     bounds = editor.getSelectionPageBounds()!
-    toScreen = (p) => editor.pageToScreen(p)
+    toScreen = (p) => editor.pageToViewport(p)
   }
   const { x, y, w, h } = bounds
   const cx = x + w / 2

@@ -457,3 +457,117 @@ export class Group2d extends Geometry2d {
     return this.children.some((c) => c.hitTestPoint(point, margin, hitInside))
   }
 }
+
+/**
+ * A 2D affine transform, stored as the six values of the matrix
+ *
+ * ```
+ * | a  c  e |
+ * | b  d  f |
+ * | 0  0  1 |
+ * ```
+ *
+ * The components are plain fields, so anything that already reads `.a`…`.f` off
+ * a transform object keeps working; the methods are what let a caller push a
+ * point through one without unpacking it by hand.
+ */
+export class Mat {
+  constructor(
+    public a: number,
+    public b: number,
+    public c: number,
+    public d: number,
+    public e: number,
+    public f: number,
+  ) {}
+
+  static Identity(): Mat {
+    return new Mat(1, 0, 0, 1, 0, 0)
+  }
+
+  /** Adopt any `{a,b,c,d,e,f}` — including the plain literals used internally. */
+  static From(m: MatLike): Mat {
+    return new Mat(m.a, m.b, m.c, m.d, m.e, m.f)
+  }
+
+  /** `a` then `b`, i.e. the matrix product `a × b`. */
+  static Multiply(m: MatLike, n: MatLike): Mat {
+    return new Mat(
+      m.a * n.a + m.c * n.b,
+      m.b * n.a + m.d * n.b,
+      m.a * n.c + m.c * n.d,
+      m.b * n.c + m.d * n.d,
+      m.a * n.e + m.c * n.f + m.e,
+      m.b * n.e + m.d * n.f + m.f,
+    )
+  }
+
+  clone(): Mat {
+    return new Mat(this.a, this.b, this.c, this.d, this.e, this.f)
+  }
+
+  /** Push a point through the transform. */
+  applyToPoint(p: VecLike): Vec {
+    return new Vec(this.a * p.x + this.c * p.y + this.e, this.b * p.x + this.d * p.y + this.f)
+  }
+
+  applyToPoints(points: readonly VecLike[]): Vec[] {
+    return points.map((p) => this.applyToPoint(p))
+  }
+
+  /**
+   * The inverse transform, for going from page space back into shape space.
+   * A singular matrix (a zero-scale shape) has no inverse; the identity is
+   * returned rather than `NaN`s, so a degenerate shape maps points to
+   * themselves instead of poisoning everything downstream.
+   */
+  invert(): Mat {
+    const det = this.a * this.d - this.b * this.c
+    if (det === 0 || !Number.isFinite(det)) return Mat.Identity()
+    return new Mat(
+      this.d / det,
+      -this.b / det,
+      -this.c / det,
+      this.a / det,
+      (this.c * this.f - this.d * this.e) / det,
+      (this.b * this.e - this.a * this.f) / det,
+    )
+  }
+
+  /** The uniform scale this transform applies, as the mean of its two axes. */
+  getScale(): number {
+    return (Math.hypot(this.a, this.b) + Math.hypot(this.c, this.d)) / 2
+  }
+
+  /** The rotation this transform applies, in radians. */
+  getRotation(): number {
+    return Math.atan2(this.b, this.a)
+  }
+
+  decompose(): { x: number; y: number; scaleX: number; scaleY: number; rotation: number } {
+    return {
+      x: this.e,
+      y: this.f,
+      scaleX: Math.hypot(this.a, this.b),
+      scaleY: Math.hypot(this.c, this.d),
+      rotation: Math.atan2(this.b, this.a),
+    }
+  }
+
+  toCssString(): string {
+    return `matrix(${this.a}, ${this.b}, ${this.c}, ${this.d}, ${this.e}, ${this.f})`
+  }
+}
+
+/** The structural form of a {@link Mat}: any object carrying the six components. */
+export interface MatLike {
+  a: number
+  b: number
+  c: number
+  d: number
+  e: number
+  f: number
+}
+
+/** A `Mat` compatible alias, matching the name transforms are usually given. */
+export type MatModel = MatLike

@@ -4,6 +4,8 @@ import type { Editor } from "../editor/Editor"
 import type { Geometry2d, VecLike } from "../geometry"
 import type { ShapeHandle, SelectionHandle } from "../editor/events"
 import type { UnknownShape } from "../records/base"
+import type { TLIndicatorPathResult } from "../indicators/types"
+import type { BindingCanBindOptions } from "../bindings/BindingUtil"
 
 export interface ShapeUtilConstructor<T extends UnknownShape = UnknownShape, U extends ShapeUtil<T> = ShapeUtil<T>> {
   new (editor: Editor): U
@@ -62,13 +64,40 @@ export abstract class ShapeUtil<T extends UnknownShape = UnknownShape> {
   abstract component(shape: T): ReactNode
 
   /**
-   * The outline drawn over the shape when it is selected or hovered, in
-   * shape-local coordinates. The indicators layer supplies `fill: none`, the
-   * selection colour and a zoom-independent stroke width, so an indicator is
-   * usually just a bare `<path>` or `<rect>`. Return `null` to fall back to a
-   * rectangle around the shape's geometry bounds.
+   * The outline drawn over the shape when it is selected, hovered or hinted,
+   * in **shape-local** coordinates, as a canvas path.
+   *
+   * The compositor supplies everything else: it applies the shape's page
+   * transform, strokes in the theme's selection colour, and picks a
+   * zoom-independent width (1.5 CSS px selected or hovered, 2.5 hinted). So an
+   * indicator is usually three lines:
+   *
+   * ```ts
+   * override getIndicatorPath(shape: MyShape): Path2D {
+   *   const path = new Path2D()
+   *   path.rect(0, 0, shape.props.w, shape.props.h)
+   *   return path
+   * }
+   * ```
+   *
+   * Return a {@link TLIndicatorPath} instead of a bare `Path2D` to punch a hole
+   * in the outline (a label strip) or to add strokes outside that hole.
+   * Return `undefined`, or an empty path, to draw no outline at all.
+   *
+   * Leaving the method unimplemented falls back to a rectangle around the
+   * shape's geometry bounds.
    */
-  abstract indicator(shape: T): ReactNode
+  getIndicatorPath?(shape: T): TLIndicatorPathResult
+
+  /**
+   * @deprecated Implement {@link ShapeUtil.getIndicatorPath} instead.
+   *
+   * The v4 indicator: an SVG fragment in shape-local coordinates, drawn on a
+   * separate SVG layer. Still honoured for a util that has not been ported —
+   * but only when that util does *not* implement `getIndicatorPath`, so a util
+   * mid-port is never drawn twice.
+   */
+  indicator?(shape: T): ReactNode
 
   /**
    * The shape as SVG, in shape-local coordinates: the exporter wraps the
@@ -114,13 +143,69 @@ export abstract class ShapeUtil<T extends UnknownShape = UnknownShape> {
     return false
   }
 
+  /**
+   * Whether this shape is a *container*: something that adopts the shapes
+   * dragged onto it and carries them when it moves.
+   *
+   * The one question every "is this a frame?" test should ask. Hardcoding
+   * `shape.type === "frame"` is what this replaces: an app's own section,
+   * phase or artboard shape is frame-like too, and nothing in the editor can
+   * know their type names.
+   *
+   * Being frame-like says nothing about *clipping* — see
+   * {@link ShapeUtil.getClipPath}, which a grouping container returns
+   * `undefined` from while staying frame-like.
+   */
+  isFrameLike(_shape: T): boolean {
+    return false
+  }
+
+  /**
+   * Whether this shape paints a surface its children sit on, and so must be
+   * drawn behind them rather than interleaved by index.
+   */
+  providesBackgroundForChildren(_shape: T): boolean {
+    return false
+  }
+
+  /**
+   * The region descendants are clipped to, as a polygon in **shape-local**
+   * coordinates, or `undefined` for "clips nothing".
+   *
+   * This is the difference between an artboard and a region of the board: a
+   * frame crops what hangs over its edge, a section groups what sits inside it
+   * and crops nothing. Returning `undefined` is the whole of the second
+   * behaviour.
+   */
+  getClipPath(_shape: T): VecLike[] | undefined {
+    return undefined
+  }
+
+  /**
+   * Whether a child of this type may be *removed* from this container.
+   *
+   * Deliberately separate from {@link ShapeUtil.canReceiveNewChildrenOfType}:
+   * admission is allowed to be strict while recovery stays permissive, so a
+   * child that arrived from an older snapshot can always be lifted back out.
+   */
+  canRemoveChildrenOfType(_shape: T, _type: string): boolean {
+    return false
+  }
+
   canEdit(_shape: T): boolean {
     return false
   }
   canResize(_shape: T): boolean {
     return true
   }
-  canBind(_opts: { fromShapeType: string; toShapeType: string; bindingType: string }): boolean {
+  /**
+   * Whether a binding may attach to this shape.
+   *
+   * Takes the **records** rather than their type names (v5): read `.type` off
+   * them for the old behaviour, or anything else the decision needs — a locked
+   * target, a prop, a parent — without a second lookup.
+   */
+  canBind(_opts: BindingCanBindOptions): boolean {
     return true
   }
   canCrop(_shape: T): boolean {
@@ -174,6 +259,8 @@ export abstract class ShapeUtil<T extends UnknownShape = UnknownShape> {
   onEditEnd?(shape: T): void
   onChildrenChange?(shape: T): Partial<UnknownShape>[] | void
   onDragShapesOver?(shape: T, shapes: UnknownShape[]): void
+  /** Shapes were dragged *into* this container and should be adopted. */
+  onDragShapesIn?(shape: T, shapes: UnknownShape[]): void
   onDragShapesOut?(shape: T, shapes: UnknownShape[]): void
   onDropShapesOver?(shape: T, shapes: UnknownShape[]): void
 }

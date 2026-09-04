@@ -1,4 +1,8 @@
-import { Rectangle2d, ShapeUtil, type BaseShape, type Geometry2d, type StyleWords } from "@mocanvas/editor"
+import { Rectangle2d, ShapeUtil, type BaseShape, type Geometry2d, type StyleWords, type TLIndicatorPath } from "@mocanvas/editor"
+import { boxPath } from "./indicator-paths"
+
+/** Dash pattern of a group's outline, in screen px: 4 on, 4 off. */
+const GROUP_INDICATOR_DASH = [4, 4] as const
 
 export type GroupShape = BaseShape<"group", Record<string, never>>
 
@@ -59,8 +63,8 @@ export class GroupShapeUtil extends ShapeUtil<GroupShape> {
     return null
   }
 
-  indicator(shape: GroupShape) {
-    const b = this.getGeometry(shape).bounds
-    return <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="none" strokeDasharray="4 4" />
+  /** Dashed, so a group's outline is never mistaken for a shape of its own. */
+  override getIndicatorPath(shape: GroupShape): TLIndicatorPath {
+    return { path: boxPath(this.getGeometry(shape).bounds), lineDash: GROUP_INDICATOR_DASH }
   }
 }

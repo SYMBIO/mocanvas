@@ -25,6 +25,7 @@ import { getGeoGeometry } from "./geo-helpers"
 import { propsOf, readNumber, readString, readStyle, readText } from "./prop-access"
 import { getDashId, getFillRgba, getStrokeRgba, getTextCssColor } from "./shape-theme"
 import { pathWordsToSvgD } from "./svg-path"
+import { svgPath } from "./indicator-paths"
 
 export interface GeoShapeProps {
   geo: GeoShapeKind
@@ -194,8 +195,8 @@ export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
     )
   }
 
-  indicator(shape: GeoShape): ReactNode {
-    return <path d={pathWordsToSvgD(this.getGeometry(shape).toPathWords())} />
+  override getIndicatorPath(shape: GeoShape): Path2D {
+    return svgPath(pathWordsToSvgD(this.getGeometry(shape).toPathWords()))
   }
 
   /** The GPU keeps drawing the body while editing; only the label lives in the DOM. */

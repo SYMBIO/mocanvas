@@ -116,15 +116,27 @@ export abstract class StateNode {
   }
 
   /** Move this node's current child to `id`, exiting the old one and entering the new one. */
+  /**
+   * Enter a child state.
+   *
+   * `id` may be a dotted path — `transition("select.idle")` enters `select` and
+   * then walks into its `idle` child, which is how a tool hands control back to
+   * a specific state of another tool rather than to that tool's initial state.
+   */
   transition(id: string, info: object = {}): this {
     if (!this.children) throw new Error(`StateNode "${this.id}" has no children to transition to`)
-    const next = this.children[id]
-    if (!next) throw new Error(`StateNode "${this.id}" has no child "${id}"`)
+    const dot = id.indexOf(".")
+    const head = dot === -1 ? id : id.slice(0, dot)
+    const next = this.children[head]
+    if (!next) throw new Error(`StateNode "${this.id}" has no child "${head}"`)
     const i = info as Record<string, unknown>
     const prev = this._current.get()
-    if (prev) prev.exit(i, id)
+    if (prev) prev.exit(i, head)
     this._current.set(next)
     next.enter(i, prev?.id ?? "initial")
+    // `enter` already moved into the child's initial state; walk on to the
+    // requested one, which must happen after enter so the parent is active.
+    if (dot !== -1) next.transition(id.slice(dot + 1), info)
     return this
   }
 

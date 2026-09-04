@@ -1,4 +1,6 @@
 import {
+  getLoadedEngine,
+  registerEngineProvider,
   registerExportImplementation,
   registerTextMeasureImplementation,
   type Editor,
@@ -30,3 +32,10 @@ registerExportImplementation({
 })
 
 registerTextMeasureImplementation(getTextMeasure)
+
+/**
+ * Let `new Editor({ ... })` be constructed without threading the engine
+ * through: it picks up whatever `loadEngine()` last produced. `<Mocanvas />`
+ * loads it before mounting, so an app that uses the component never sees this.
+ */
+registerEngineProvider(getLoadedEngine)

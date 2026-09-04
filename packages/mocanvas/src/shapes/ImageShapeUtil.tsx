@@ -10,6 +10,7 @@ import {
 } from "@mocanvas/editor"
 import type { CSSProperties, ReactNode } from "react"
 import { propsOf, readBoolean, readNumber, readString } from "./prop-access"
+import { rectPath } from "./indicator-paths"
 
 /** Normalized crop window: both corners in [0, 1] of the source image. */
 export interface ImageCrop {
@@ -207,9 +208,9 @@ export class ImageShapeUtil extends BaseBoxShapeUtil<ImageShape> {
     )
   }
 
-  indicator(shape: ImageShape): ReactNode {
+  override getIndicatorPath(shape: ImageShape): Path2D {
     const { w, h } = readImageBox(shape)
-    return <rect width={w} height={h} />
+    return rectPath(w, h)
   }
 
   override isAspectRatioLocked(_shape: ImageShape): boolean {

@@ -48,7 +48,7 @@ class BlobShapeUtil extends ShapeUtil<BlobShape> {
   component() {
     return null
   }
-  indicator() {
+  override indicator() {
     return null
   }
   override getRenderStyle(): StyleWords {

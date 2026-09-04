@@ -1,5 +1,6 @@
 import type { IndexKey, RecordId } from "@mocanvas/store"
 import { createRecordType } from "@mocanvas/store"
+import type { ShapePropsForType } from "./props"
 
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
@@ -162,7 +163,13 @@ export interface BaseShape<Type extends string, Props extends object> {
   meta: JsonObject
 }
 export type UnknownShape = BaseShape<string, object>
-export type Shape = UnknownShape
+/**
+ * A shape record. Give it a type name and its props resolve through
+ * {@link ShapePropsForType} — so `Shape<"format">` has the props the `format`
+ * shape registered in `TLGlobalShapePropsMap`, while a bare `Shape` (or a type
+ * nobody registered) keeps the open `object` props it always had.
+ */
+export type Shape<Type extends string = string> = BaseShape<Type, ShapePropsForType<Type>>
 export type ShapeId = RecordId<UnknownShape>
 export type ParentId = PageId | ShapeId
 

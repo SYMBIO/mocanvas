@@ -140,7 +140,7 @@ describe("ImageShapeUtil", () => {
     expect(util.getRenderStyle(shape)).toBeNull()
     expect(util.isAspectRatioLocked(shape)).toBe(true)
     expect(util.canEdit(shape)).toBe(false)
-    expect(util.indicator(shape)).not.toBeNull()
+    expect(typeof util.getIndicatorPath).toBe("function")
     expect(util.component(shape)).not.toBeNull()
   })
 

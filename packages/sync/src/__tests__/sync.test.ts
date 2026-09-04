@@ -14,6 +14,7 @@ import { ZERO_INDEX_KEY, type HistoryEntry } from "@mocanvas/store"
 import { createSyncClient, type SyncClient } from "../SyncClient"
 import { createMemoryHub, createMemoryTransportPair, type Transport } from "../transport"
 import { decodeMessage, encodeMessage, PROTOCOL_VERSION, type SyncMessage } from "../protocol"
+import { createEmptyCrdtState } from "../crdt"
 import { createPresenceSync, presenceIdForClient, type PresenceEditor } from "../presence"
 
 /** Let every queued microtask (the in-memory transport's delivery) run. */
@@ -51,8 +52,13 @@ describe("protocol", () => {
     })
     const messages: SyncMessage<EditorRecord>[] = [
       { type: "hello", clientId: "c1", version: PROTOCOL_VERSION },
-      { type: "snapshot", records: [shape] },
-      { type: "diff", clientId: "c1", seq: 3, diff: { added: { [shape.id]: shape }, updated: {}, removed: {} } },
+      { type: "snapshot", records: [shape], state: createEmptyCrdtState() },
+      {
+        type: "diff",
+        clientId: "c1",
+        seq: 3,
+        diff: { puts: [{ record: shape, fields: { x: { lamport: 1, client: "c1" } } }], removes: [] },
+      },
       { type: "presence", clientId: "c1", record: presence },
       { type: "bye", clientId: "c1" },
     ]
@@ -65,9 +71,21 @@ describe("protocol", () => {
     expect(decodeMessage("not json")).toBeNull()
     expect(decodeMessage("null")).toBeNull()
     expect(decodeMessage(JSON.stringify({ type: "nope" }))).toBeNull()
-    expect(decodeMessage(JSON.stringify({ type: "hello", clientId: 7, version: 1 }))).toBeNull()
+    expect(decodeMessage(JSON.stringify({ type: "hello", clientId: 7, version: PROTOCOL_VERSION }))).toBeNull()
     expect(decodeMessage(JSON.stringify({ type: "diff", clientId: "c", seq: 0, diff: null }))).toBeNull()
+    expect(
+      decodeMessage(JSON.stringify({ type: "diff", clientId: "c", seq: 0, diff: { puts: [{}], removes: [] } })),
+    ).toBeNull()
     expect(decodeMessage(JSON.stringify({ type: "snapshot", records: [{ id: "x" }] }))).toBeNull()
+    // records fine, state missing
+    expect(decodeMessage(JSON.stringify({ type: "snapshot", records: [] }))).toBeNull()
+  })
+
+  it("reports a peer on another protocol version instead of misparsing it", () => {
+    const older = JSON.stringify({ type: "diff", clientId: "c1", seq: 0, diff: { added: {} }, version: 1 })
+    expect(decodeMessage(older)).toEqual({ type: "unsupported", version: 1, clientId: "c1" })
+    const newer = JSON.stringify({ type: "snapshot", records: [], version: PROTOCOL_VERSION + 1 })
+    expect(decodeMessage(newer)).toEqual({ type: "unsupported", version: PROTOCOL_VERSION + 1 })
   })
 })
 

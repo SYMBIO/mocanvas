@@ -54,13 +54,29 @@ import type {
   DefaultVerticalAlignStyle as DefaultVerticalAlignStyleValue,
   GeoShapeKind,
 } from "@mocanvas/mocanvas"
-import { Mocanvas, createSchema, createStore, Canvas, Editor } from "@mocanvas/mocanvas"
+import type {
+  Asset,
+  AssetId,
+  AssetStore,
+  BaseBinding,
+  BaseShape,
+  Binding,
+  CurrentUser,
+  EmbedDefinition,
+  InstancePresence,
+  InstancePresenceId,
+  MocanvasUiMenuItemProps,
+  User,
+  UserPreferencesState,
+  UserStore,
+} from "@mocanvas/mocanvas"
+import { Mocanvas, createSchema, createStore, Canvas, Editor, MocanvasUiMenuItem, useCurrentUser } from "@mocanvas/mocanvas"
 
 // ---- records ----------------------------------------------------------------
 export type TLRecord = EditorRecord
 export type TLStore = EditorStore
 export type TLStoreSnapshot = EditorStoreSnapshot
-export type TLShape = Shape
+export type TLShape<Type extends string = string> = Shape<Type>
 export type TLUnknownShape = UnknownShape
 export type TLShapeId = ShapeId
 export type TLParentId = ParentId
@@ -73,7 +89,7 @@ export type TLCamera = Camera
 export type TLCameraId = CameraId
 export type TLInstance = Instance
 export type TLInstancePageState = InstancePageState
-export type TLBinding = UnknownBinding
+export type TLBinding<Type extends string = string> = Binding<Type>
 export type TLBindingId = BindingId
 export type TLArrowBinding = ArrowBinding
 
@@ -110,6 +126,7 @@ export type TLShapeUtilConstructor<T extends UnknownShape = UnknownShape> = Shap
 export type TLStateNodeConstructor = StateNodeConstructor
 export type TLBindingUtilConstructor = BindingUtilConstructor
 export type TLAnyShapeUtilConstructor = ShapeUtilConstructor
+export type TLAnyBindingUtilConstructor = BindingUtilConstructor
 
 // ---- values -----------------------------------------------------------------
 /** The batteries-included component. */
@@ -119,3 +136,32 @@ export const TldrawEditor = Canvas
 export const createTLStore = createStore
 export const createTLSchema = createSchema
 export type TLEditor = Editor
+
+// ---- custom shape and binding authoring -------------------------------------
+// The two base types a custom shape/binding is declared with. `Props` is the
+// object registered in `TLGlobalShapePropsMap` / `TLGlobalBindingPropsMap`.
+export type TLBaseShape<Type extends string, Props extends object> = BaseShape<Type, Props>
+export type TLBaseBinding<Type extends string, Props extends object> = BaseBinding<Type, Props>
+
+// ---- assets -----------------------------------------------------------------
+export type TLAsset = Asset
+export type TLAssetId = AssetId
+export type TLAssetStore = AssetStore
+
+// ---- users and presence -----------------------------------------------------
+export type TLUser = User
+export type TLUserStore = UserStore
+export type TLCurrentUser = CurrentUser
+export type TLUserPreferences = UserPreferencesState
+export type TLInstancePresence = InstancePresence
+export type TLInstancePresenceID = InstancePresenceId
+/** The `Tldraw`-spelled identity hook. */
+export const useTldrawCurrentUser = useCurrentUser
+
+// ---- embeds -----------------------------------------------------------------
+export type TLEmbedDefinition = EmbedDefinition
+
+// ---- UI ---------------------------------------------------------------------
+/** The `Tldraw`-spelled menu item. */
+export const TldrawUiMenuItem = MocanvasUiMenuItem
+export type TldrawUiMenuItemProps = MocanvasUiMenuItemProps

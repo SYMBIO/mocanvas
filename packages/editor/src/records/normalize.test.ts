@@ -96,11 +96,12 @@ describe("decodeDrawSegmentPath", () => {
 })
 
 describe("normalizeLoadedRecords", () => {
-  it("turns a rich text label into plain text and drops the document", () => {
+  it("derives plain text from a rich text label and keeps the document", () => {
     const rich = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Hello box" }] }] }
     const { records, warnings } = normalizeLoadedRecords([shape("geo", { w: 1, h: 2, color: "red", richText: rich })], { shapeUtils })
     expect(propsOf(records[0]!)["text"]).toBe("Hello box")
-    expect("richText" in propsOf(records[0]!)).toBe(false)
+    // Kept, not dropped: discarding it here lost every mark on the next save.
+    expect("richText" in propsOf(records[0]!)).toBe(true)
     expect(warnings).toEqual([])
   })
 

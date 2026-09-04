@@ -153,8 +153,8 @@ function isShapeRecord(record: UnknownRecord): record is UnknownRecord & Unknown
 /**
  * Rewrite loaded records so the shape utils see the props they declare.
  *
- * Per shape: `props.richText` becomes `props.text` (the rich-text document is
- * dropped, not kept alongside), packed freehand `segments[].path` becomes
+ * Per shape: `props.richText` is KEPT and `props.text` is derived from it for
+ * utils that only read plain text, packed freehand `segments[].path` becomes
  * `segments[].points`, and any prop the util declares a default for but the
  * file omits is filled in from that default. Props the util does not declare
  * are left untouched so a round trip preserves them, and shapes of a type with
@@ -185,16 +185,21 @@ export function normalizeLoadedRecords(records: readonly UnknownRecord[], option
     const source = isPlainObject(record.props) ? record.props : {}
     let props: Props | null = isPlainObject(record.props) ? null : { ...source }
 
-    // Rich text label -> plain text.
+    // Rich text label: keep the document, derive `text` alongside it.
+    //
+    // The document used to be dropped here, which made a load/save round trip
+    // lose every mark in the file. It is kept now; utils that only understand
+    // plain text still find `props.text`.
     if ("richText" in source) {
       const unknownNodes = new Set<string>()
       const text = richTextToPlainText(source["richText"], unknownNodes)
       for (const node of unknownNodes) {
         warnings.push(`${record.id}: unsupported rich text node "${node}"; its text was kept, its formatting dropped`)
       }
-      props ??= { ...source }
-      delete props["richText"]
-      if (typeof props["text"] !== "string") props["text"] = text
+      if (typeof source["text"] !== "string") {
+        props ??= { ...source }
+        props["text"] = text
+      }
     }
 
     // Packed freehand paths -> point arrays.

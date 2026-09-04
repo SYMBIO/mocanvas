@@ -1,5 +1,7 @@
 import {
   Box,
+  dropShapesOnFrameLike,
+  getFrameLikeDropTarget,
   StateNode,
   Vec,
   type ClickEventInfo,
@@ -349,6 +351,25 @@ class Translating extends StateNode {
       updates.push({ id, type: initial.type, x: next.x, y: next.y, ...(change ?? {}) })
     }
     editor.updateShapes(updates)
+    this.updateDropTarget()
+  }
+
+  /** The container the pointer is currently over, and whether a drag happened at all. */
+  private dropTarget: UnknownShape | undefined
+  private didDrag = false
+
+  /**
+   * Mark the container the drag is currently over, so its indicator draws in
+   * the heavier "hinting" weight while the pointer is inside it. Cleared on
+   * exit, including a cancel — a stale hint outlives the gesture otherwise.
+   */
+  private updateDropTarget(): void {
+    const editor = this.editor
+    if (!editor.inputs.isDragging) return
+    this.didDrag = true
+    const dragging = [...this.initialShapes.keys()].map((id) => editor.getShape(id)).filter((s): s is UnknownShape => !!s)
+    this.dropTarget = getFrameLikeDropTarget(editor, editor.inputs.currentPagePoint, dragging)
+    editor.setHintingShapes(this.dropTarget ? [this.dropTarget.id] : [])
   }
 
   private complete(): void {
@@ -360,12 +381,34 @@ class Translating extends StateNode {
         if (change) editor.updateShape({ id, type: initial.type, ...change })
       }
     }
+    this.dropOnTarget()
     this.parent!.transition("idle")
+  }
+
+  /**
+   * Hand the dragged shapes to whatever container they were released over —
+   * or back to the page when they were released over nothing.
+   *
+   * Reads the target the last move computed rather than re-deriving it: by the
+   * time the gesture completes the pointer is already up, so "is the user
+   * dragging" is no longer true and the point is no longer the drop point.
+   */
+  private dropOnTarget(): void {
+    // A click that happens to land inside a frame must not silently reparent
+    // the shape it selected.
+    if (!this.didDrag) return
+    const editor = this.editor
+    const dragging = [...this.initialShapes.keys()].map((id) => editor.getShape(id)).filter((s): s is UnknownShape => !!s)
+    if (dragging.length === 0) return
+    dropShapesOnFrameLike(editor, this.dropTarget, dragging)
   }
 
   override onExit(): void {
     this.editor.snaps.clearLines()
+    this.editor.setHintingShapes([])
     this.initialBounds = undefined
+    this.dropTarget = undefined
+    this.didDrag = false
   }
 }
 

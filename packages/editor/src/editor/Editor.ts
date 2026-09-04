@@ -10,7 +10,7 @@ import {
   type IndexKey,
 } from "@mocanvas/store"
 import { EngineBridge, FLAG, type CameraState, type ClipRect, type FrameBuffers, type StyleWords } from "@mocanvas/wasm"
-import { Box, Vec, type BoxLike, type Geometry2d, type VecLike } from "../geometry"
+import { Box, Mat, Vec, type BoxLike, type Geometry2d, type VecLike } from "../geometry"
 import {
   CameraRecordType,
   DOCUMENT_ID,
@@ -71,17 +71,36 @@ import {
 } from "./events"
 import { HandleTable } from "./HandleTable"
 import { bucketTextureResolution, TextureManager } from "./TextureManager"
-import { createUserPreferences, type InstancePresence, type UserPreferences } from "../records/presence"
+import type { InstancePresence } from "../records/presence"
+import { createCurrentUser, UserPreferencesManager } from "../user"
 import { getStylePropsOf, SharedStyleMap, type StyleProp } from "../records/styleProp"
 import { HistoryManager } from "./HistoryManager"
 import { SnapManager } from "./SnapManager"
+import { getOwnerDocument, getOwnerWindow, type ContainerDocument, type ContainerWindow } from "./container"
+import { Timers } from "./Timers"
+import { FontManager } from "./FontManager"
+import { PerformanceManager } from "./PerformanceManager"
+import {
+  DEFAULT_CAMERA_OPTIONS,
+  easeInOutCubic,
+  getBaseZoomForCameraOptions,
+  type TLCameraMoveOptions,
+  type TLCameraOptions,
+} from "./CameraOptions"
+import { ThemeManager, type TLColorMode, type TLTheme } from "../theme"
 
 export interface EditorOptions {
   store: EditorStore
   shapeUtils: readonly ShapeUtilConstructor[]
   bindingUtils?: readonly BindingUtilConstructor[]
   tools: readonly StateNodeConstructor[]
-  engine: EngineBridge
+  /**
+   * The WebAssembly engine. Optional: when omitted, the engine registered
+   * through {@link registerEngineProvider} is used — `mocanvas` registers one
+   * that returns whatever `loadEngine()` last produced. Pass it explicitly to
+   * run two editors on separate engines.
+   */
+  engine?: EngineBridge
   /** Id of the tool to start in. Defaults to the first tool. */
   initialState?: string
   getContainer: () => HTMLElement
@@ -111,6 +130,13 @@ export const DEFAULT_EDITOR_CONFIG: EditorConfig = {
   animationMediumMs: 320,
 }
 
+/**
+ * Live pointer and modifier state.
+ *
+ * The `*ScreenPoint` members are in VIEWPORT space (container-relative pixels),
+ * which is the space canvas events arrive in; `*PagePoint` are in page space.
+ * For a window-relative point use `editor.pageToScreen(...)`.
+ */
 export interface EditorInputs {
   originPagePoint: Vec
   originScreenPoint: Vec
@@ -145,6 +171,16 @@ export interface HitTestOptions {
 const RAD_PER_DEG = Math.PI / 180
 
 /**
+ * How long a collaborator may go without refreshing their presence record
+ * before they stop being drawn. Long enough that a slow tool call or a tab
+ * switch does not blink someone out; short enough that a closed laptop does.
+ *
+ * The 60s figure comes from the consumer's own tests, which describe a
+ * heartbeat existing to survive exactly this cut-off.
+ */
+export const COLLABORATOR_INACTIVE_TIMEOUT = 60_000
+
+/**
  * The editor: document access, selection, camera, tool dispatch, and the
  * bridge that mirrors the current page into the WASM engine.
  */
@@ -163,6 +199,14 @@ export class Editor extends EventEmitter<EditorEvents> {
   readonly snaps: SnapManager
   readonly getContainer: () => HTMLElement
   readonly sideEffects: EditorStore["sideEffects"]
+  /** Timeouts, intervals and animation frames that die with the editor. */
+  readonly timers: Timers
+  /** On-demand loading of the typefaces the canvas needs. */
+  readonly fonts: FontManager
+  /** Colours and display values for the current theme and colour mode. */
+  readonly theme: ThemeManager
+  /** Timing events for profilers and dev overlays. Nothing depends on it. */
+  readonly performance: PerformanceManager = new PerformanceManager()
 
   private readonly kindIds = new Map<string, number>()
   private readonly _frameEpoch: Atom<number>
@@ -170,21 +214,37 @@ export class Editor extends EventEmitter<EditorEvents> {
   private readonly _overlayClips: Atom<readonly (ClipRect | undefined)[]>
   private readonly _isDisposed: Atom<boolean>
   private readonly _lastFrame: Atom<{ drawn: number; culled: number; ms: number }>
+  private readonly _cameraOptions: Atom<TLCameraOptions>
   private readonly disposables: (() => void)[] = []
   private syncedPageId: PageId | null = null
   /** Shapes whose last write to the engine threw; they are warned about once. */
   private readonly brokenShapeIds = new Set<ShapeId>()
+  /** Handle of the camera animation in flight, if any. */
+  private cameraAnimation: number | undefined
+  /**
+   * Events a shape's own DOM already dealt with. They are held weakly: the
+   * entry disappears with the event object once the dispatch that carried it
+   * is over.
+   */
+  private readonly handledEvents = new WeakSet<object>()
 
   constructor(opts: EditorOptions) {
     super()
     this.store = opts.store
-    this.engine = opts.engine
+    this.engine = opts.engine ?? requireEngine()
     this.getContainer = opts.getContainer
     this.options = { ...DEFAULT_EDITOR_CONFIG, ...opts.options }
     this.sideEffects = this.store.sideEffects
     this.snaps = new SnapManager(this)
+    this.timers = new Timers(() => this.getContainerWindow())
+    this.fonts = new FontManager(this)
+    this.theme = new ThemeManager(this)
 
     this._frameEpoch = atom("editor.frameEpoch", 0)
+    this._cameraOptions = atom<TLCameraOptions>("editor.cameraOptions", {
+      ...DEFAULT_CAMERA_OPTIONS,
+      zoomSteps: [...this.options.zoomSteps],
+    })
     this._overlayShapeIds = atom<readonly ShapeId[]>("editor.overlayShapeIds", [])
     this._overlayClips = atom<readonly (ClipRect | undefined)[]>("editor.overlayClips", [])
     this._isDisposed = atom("editor.isDisposed", false)
@@ -262,7 +322,12 @@ export class Editor extends EventEmitter<EditorEvents> {
   dispose(): void {
     if (this._isDisposed.get()) return
     this._isDisposed.set(true)
+    this.stopCameraAnimation()
     for (const d of this.disposables) d()
+    this.timers.dispose()
+    this.fonts.dispose()
+    this.theme.dispose()
+    this.performance.dispose()
     this.textures.dispose()
     this.history.destroy()
     this.removeAllListeners()
@@ -270,6 +335,52 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   getIsDisposed(): boolean {
     return this._isDisposed.get()
+  }
+
+  /**
+   * Whether `dispose()` has run. Async work started before disposal checks this
+   * before touching the store again; reading it inside a signal re-runs the
+   * reader when the editor goes away.
+   */
+  get isDisposed(): boolean {
+    return this._isDisposed.get()
+  }
+
+  // ---- container ----------------------------------------------------------
+  // The editor never reaches for the ambient `document` / `window`: a canvas
+  // inside an iframe, a popped-out window or an Electron webview lives in a
+  // different realm, where the globals of the host page measure, listen and
+  // load against the wrong document.
+
+  /** The element the canvas is mounted in. */
+  get container(): HTMLElement {
+    return this.getContainer()
+  }
+
+  /**
+   * The document the canvas is painted in. `undefined` when there is no DOM at
+   * all (server rendering, node tests) or the container is not attached yet.
+   */
+  getContainerDocument(): ContainerDocument | undefined {
+    return getOwnerDocument(this.safeContainer())
+  }
+
+  /** The window the canvas is painted in; `undefined` outside a DOM. */
+  getContainerWindow(): ContainerWindow | undefined {
+    return getOwnerWindow(this.safeContainer())
+  }
+
+  /**
+   * `getContainer` is supplied by the host and may legitimately throw once the
+   * editor is torn down. Realm lookups treat that as "no container".
+   */
+  private safeContainer(): HTMLElement | undefined {
+    try {
+      const el = this.getContainer()
+      return typeof (el as Partial<Element>).ownerDocument === "undefined" ? undefined : el
+    } catch {
+      return undefined
+    }
   }
 
   private ensureBaseRecords(): void {
@@ -358,11 +469,13 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   undo(): this {
     this.history.undo()
+    this.performance.emit("undo", { steps: 1 })
     return this
   }
 
   redo(): this {
     this.history.redo()
+    this.performance.emit("redo", { steps: 1 })
     return this
   }
 
@@ -378,6 +491,18 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   squashToMark(id: string): this {
     this.history.squashToMark(id)
+    return this
+  }
+
+  /**
+   * Throw away the undo and redo stacks, keeping the document exactly as it is.
+   *
+   * This is what a host calls once its own setup writes are done: loading a
+   * board, registering derived state or migrating shapes are all changes the
+   * user never made and must not be able to undo their way behind.
+   */
+  clearHistory(): this {
+    this.history.clear()
     return this
   }
 
@@ -424,6 +549,64 @@ export class Editor extends EventEmitter<EditorEvents> {
       { history: "ignore" },
     )
     return this
+  }
+
+  /**
+   * Whether the document may be changed.
+   *
+   * Read-only blocks EDITING, not participating: commenting, selecting, moving
+   * the camera and following someone else all stay available, so tools must ask
+   * this rather than assuming a read-only viewer can do nothing.
+   */
+  getIsReadonly(): boolean {
+    return this.getInstanceState().isReadonly
+  }
+
+  /**
+   * Set the cursor shown over the canvas. Tools set it on enter and put it back
+   * to `default` on exit; nothing resets it for them.
+   */
+  setCursor(cursor: Partial<Instance["cursor"]>): this {
+    const current = this.getInstanceState().cursor
+    const next = { type: cursor.type ?? current.type, rotation: cursor.rotation ?? current.rotation }
+    if (current.type === next.type && current.rotation === next.rotation) return this
+    return this.updateInstanceState({ cursor: next })
+  }
+
+  /** The cursor currently shown over the canvas. */
+  getCursor(): Instance["cursor"] {
+    return this.getInstanceState().cursor
+  }
+
+  /**
+   * Claim an event that a shape's own DOM has already dealt with, so the tool
+   * tree leaves it alone.
+   *
+   * A shape rendered as real DOM (an editable label, an embedded input) handles
+   * its own double-click, pointer-down and Enter. Without claiming them they
+   * also bubble to the canvas, where the select tool reads them as gestures on
+   * the shape and, for instance, re-enters edit mode on the Enter that was
+   * meant to leave it.
+   *
+   * React synthetic events and native events are both accepted; the underlying
+   * native event is what gets marked, so either wrapper of the same event is
+   * recognised afterwards.
+   *
+   * SEMANTICS-ASSUMED: this is advisory, not a `stopPropagation`. The mark is
+   * only honoured where something checks {@link isEventHandled} before turning
+   * a DOM event into an editor event, which keeps the decision in the layer
+   * that owns the DOM rather than mutating the event itself.
+   */
+  markEventAsHandled(event: { nativeEvent?: unknown } | Event | null | undefined): this {
+    const target = nativeEventOf(event)
+    if (target) this.handledEvents.add(target)
+    return this
+  }
+
+  /** Whether {@link markEventAsHandled} was called for this event. */
+  isEventHandled(event: { nativeEvent?: unknown } | Event | null | undefined): boolean {
+    const target = nativeEventOf(event)
+    return target !== undefined && this.handledEvents.has(target)
   }
 
   getCurrentPageId(): PageId {
@@ -575,6 +758,74 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this.getShape(s.parentId)
   }
 
+  /**
+   * Every shape between this one and the page, OUTERMOST FIRST — so the last
+   * entry is the shape's direct parent and the first is its top-level ancestor.
+   * Empty when the shape sits directly on the page.
+   *
+   * A parent chain that loops (a corrupt snapshot) stops at the repeat rather
+   * than spinning forever.
+   */
+  getShapeAncestors(shape: UnknownShape | ShapeId): UnknownShape[] {
+    const start = typeof shape === "string" ? this.getShape(shape) : shape
+    if (!start) return []
+    const ancestors: UnknownShape[] = []
+    const seen = new Set<ShapeId>([start.id])
+    let current = start
+    while (!isPageId(current.parentId)) {
+      const parent = this.getShape(current.parentId)
+      if (!parent || seen.has(parent.id)) break
+      seen.add(parent.id)
+      ancestors.push(parent)
+      current = parent
+    }
+    return ancestors.reverse()
+  }
+
+  /**
+   * The page-space polygon a shape is clipped to by its ancestors, or
+   * `undefined` when nothing clips it.
+   *
+   * Only ancestors whose `ShapeUtil.isClipShape()` says so clip — a frame does,
+   * a plain container or a group does not. Several clipping ancestors intersect
+   * into one convex polygon; an intersection that is empty (a shape scrolled
+   * entirely out of its frame) comes back as an empty array, which is not the
+   * same answer as "unclipped".
+   *
+   * SEMANTICS-ASSUMED: the consumer only pins the `undefined` case (a section
+   * clips nothing). Empty-array-for-empty-intersection is chosen over
+   * `undefined` because collapsing them would make a fully clipped shape look
+   * unclipped, which is the more damaging of the two mistakes.
+   */
+  getShapeMask(shape: UnknownShape | ShapeId): VecLike[] | undefined {
+    const start = typeof shape === "string" ? this.getShape(shape) : shape
+    if (!start) return undefined
+
+    let mask: VecLike[] | undefined
+    for (const ancestor of this.getShapeAncestors(start)) {
+      if (!this.getShapeUtil(ancestor).isClipShape(ancestor)) continue
+      const corners = this.getShapePageCorners(ancestor)
+      if (!corners) continue
+      mask = mask === undefined ? corners : intersectConvexPolygons(mask, corners)
+      if (mask.length === 0) return []
+    }
+    return mask
+  }
+
+  /** A shape's geometry bounds as four page-space points, rotation included. */
+  private getShapePageCorners(shape: UnknownShape): VecLike[] | undefined {
+    const bounds = this.getShapeGeometryBounds(shape)
+    if (!bounds) return undefined
+    const m = this.getShapePageTransform(shape)
+    const at = (x: number, y: number): VecLike => ({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f })
+    return [
+      at(bounds.x, bounds.y),
+      at(bounds.x + bounds.w, bounds.y),
+      at(bounds.x + bounds.w, bounds.y + bounds.h),
+      at(bounds.x, bounds.y + bounds.h),
+    ]
+  }
+
   getSortedChildIdsForParent(parentId: ParentId): ShapeId[] {
     const children = this._allShapes.get().filter((s) => s.parentId === parentId)
     return sortByIndex(children).map((s) => s.id)
@@ -593,30 +844,21 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   /** Local → parent transform components. */
-  getShapeLocalTransform(shape: UnknownShape): { a: number; b: number; c: number; d: number; e: number; f: number } {
+  getShapeLocalTransform(shape: UnknownShape): Mat {
     const c = Math.cos(shape.rotation)
     const s = Math.sin(shape.rotation)
-    return { a: c, b: s, c: -s, d: c, e: shape.x, f: shape.y }
+    return new Mat(c, s, -s, c, shape.x, shape.y)
   }
 
-  getShapeParentTransform(shape: UnknownShape): { a: number; b: number; c: number; d: number; e: number; f: number } {
+  getShapeParentTransform(shape: UnknownShape): Mat {
     const parent = this.getShapeParent(shape)
-    return parent ? this.getShapePageTransform(parent) : { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }
+    return parent ? this.getShapePageTransform(parent) : Mat.Identity()
   }
 
-  getShapePageTransform(shape: UnknownShape | ShapeId): { a: number; b: number; c: number; d: number; e: number; f: number } {
+  getShapePageTransform(shape: UnknownShape | ShapeId): Mat {
     const s = typeof shape === "string" ? this.getShape(shape) : shape
-    if (!s) return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }
-    const p = this.getShapeParentTransform(s)
-    const l = this.getShapeLocalTransform(s)
-    return {
-      a: p.a * l.a + p.c * l.b,
-      b: p.b * l.a + p.d * l.b,
-      c: p.a * l.c + p.c * l.d,
-      d: p.b * l.c + p.d * l.d,
-      e: p.a * l.e + p.c * l.f + p.e,
-      f: p.b * l.e + p.d * l.f + p.f,
-    }
+    if (!s) return Mat.Identity()
+    return Mat.Multiply(this.getShapeParentTransform(s), this.getShapeLocalTransform(s))
   }
 
   getShapePageBounds(shape: UnknownShape | ShapeId): Box | undefined {
@@ -1600,6 +1842,33 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this.getCurrentPageState().erasingShapeIds
   }
 
+  /**
+   * Mark shapes as hinted: the drop targets of the gesture in flight.
+   *
+   * A hinted shape draws its indicator with a heavier stroke than a selected or
+   * hovered one, which is how "this is where it will land" reads. An empty
+   * array clears the hint, and every gesture that sets one is responsible for
+   * clearing it when it ends.
+   */
+  setHintingShapes(ids: readonly (ShapeId | UnknownShape)[]): this {
+    const next = ids.map((id) => (typeof id === "string" ? id : id.id))
+    const current = this.getCurrentPageState().hintingShapeIds
+    if (current.length === next.length && current.every((id, i) => id === next[i])) return this
+    return this.updateCurrentPageState({ hintingShapeIds: next })
+  }
+
+  /** The shapes currently marked as drop targets. */
+  getHintingShapeIds(): ShapeId[] {
+    return this.getCurrentPageState().hintingShapeIds
+  }
+
+  /** The shape records behind `getHintingShapeIds()`, skipping any that are gone. */
+  getHintingShapes(): UnknownShape[] {
+    return this.getHintingShapeIds()
+      .map((id) => this.getShape(id))
+      .filter((shape): shape is UnknownShape => shape !== undefined)
+  }
+
   // ---- camera / viewport -------------------------------------------------
 
   private cameraId(): Camera["id"] {
@@ -1614,19 +1883,141 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this.getCamera().z
   }
 
-  setCamera(point: Partial<VecModel>, _opts: { animation?: { duration: number } } = {}): this {
+  /**
+   * The camera zoom, quantised to a small step.
+   *
+   * Geometry that has to stay a constant size on screen divides by the zoom —
+   * a heading band, a hit target, a hairline. Reading {@link getZoomLevel}
+   * there makes the shape's geometry a function of the exact zoom, so every
+   * frame of a pinch recomputes and re-uploads it. Rounding to a step means the
+   * geometry only changes when the zoom has moved enough to be visible.
+   *
+   * SEMANTICS-ASSUMED: the step is 1/64 of a zoom unit, chosen so the error is
+   * under half a pixel on a 32px band — small enough not to be seen, coarse
+   * enough that a slow pinch recomputes tens of times rather than hundreds.
+   */
+  getEfficientZoomLevel(): number {
+    return Math.round(this.getCamera().z * 64) / 64
+  }
+
+  /**
+   * Move the camera. Omitted components keep their current value and the zoom
+   * is clamped to the editor's zoom range.
+   *
+   * With `animation.duration` the camera eases to the target over that many
+   * milliseconds instead of jumping; any animation already in flight is
+   * abandoned first, so the newest instruction always wins. A locked camera
+   * (see `setCameraOptions`) ignores the move unless `force` is passed.
+   */
+  setCamera(point: Partial<VecModel>, opts: TLCameraMoveOptions = {}): this {
+    this.stopCameraAnimation()
+    if (this._cameraOptions.get().isLocked && opts.force !== true) return this
+
     const cam = this.getCamera()
     const z = Math.min(this.options.zoomMax, Math.max(this.options.zoomMin, point.z ?? cam.z))
     const x = point.x ?? cam.x
     const y = point.y ?? cam.y
     if (cam.x === x && cam.y === y && cam.z === z) return this
+
+    const duration = opts.immediate === true ? 0 : (opts.animation?.duration ?? 0)
+    if (duration > 0) {
+      this.animateCameraTo({ x, y, z }, duration, opts.animation?.easing ?? easeInOutCubic)
+      return this
+    }
+
+    this.performance.emit("camera-start", { animated: false })
+    this.writeCamera({ x, y, z })
+    this.performance.emit("camera-end", { animated: false })
+    return this
+  }
+
+  /** Put a camera position into the store without history or clamping. */
+  private writeCamera(next: { x: number; y: number; z: number }): void {
+    const cam = this.getCamera()
+    if (cam.x === next.x && cam.y === next.y && cam.z === next.z) return
     this.run(
       () => {
-        this.store.put([{ ...cam, x, y, z }])
+        this.store.put([{ ...cam, ...next }])
       },
       { history: "ignore" },
     )
+  }
+
+  private animateCameraTo(
+    target: { x: number; y: number; z: number },
+    duration: number,
+    easing: (t: number) => number,
+  ): void {
+    const from = { ...this.getCamera() }
+    const start = timeNow()
+    this.performance.emit("camera-start", { animated: true })
+
+    const step = (): void => {
+      if (this.isDisposed) return
+      const t = Math.min(1, (timeNow() - start) / duration)
+      const k = easing(t)
+      this.writeCamera({
+        x: from.x + (target.x - from.x) * k,
+        y: from.y + (target.y - from.y) * k,
+        z: from.z + (target.z - from.z) * k,
+      })
+      if (t >= 1) {
+        this.cameraAnimation = undefined
+        this.performance.emit("camera-end", { animated: true })
+        return
+      }
+      this.cameraAnimation = this.timers.requestAnimationFrame(step)
+    }
+    this.cameraAnimation = this.timers.requestAnimationFrame(step)
+  }
+
+  /**
+   * End any camera animation where it currently is.
+   *
+   * This is what a hand on the board mid-flight does: the camera stops at the
+   * frame the user interrupted it on rather than continuing to a destination
+   * they have already overruled.
+   */
+  stopCameraAnimation(): this {
+    if (this.cameraAnimation === undefined) return this
+    this.timers.cancelAnimationFrame(this.cameraAnimation)
+    this.cameraAnimation = undefined
+    this.performance.emit("camera-end", { animated: true })
     return this
+  }
+
+  /** The camera's current policy: lock, wheel behaviour, speeds, zoom steps. */
+  getCameraOptions(): TLCameraOptions {
+    return this._cameraOptions.get()
+  }
+
+  /** Change part of the camera policy; omitted keys keep their value. */
+  setCameraOptions(options: Partial<TLCameraOptions>): this {
+    this._cameraOptions.update((current) => ({ ...current, ...options }))
+    return this
+  }
+
+  /**
+   * The zoom level that counts as `1` for this editor: `zoomSteps` are
+   * multiples of it, so the same step list means the same thing whatever the
+   * viewport size. Without camera constraints it is simply 1.
+   */
+  getBaseZoom(): number {
+    const vp = this.getViewportScreenBounds()
+    return getBaseZoomForCameraOptions(this._cameraOptions.get(), { w: vp.w, h: vp.h })
+  }
+
+  /**
+   * How much a newly placed shape should be scaled by so it looks the same size
+   * on screen at any zoom.
+   *
+   * It is `1` normally; in the user's dynamic-size mode it is `1 / zoom`, which
+   * is what makes a sticky dropped on a zoomed-out board come out big enough to
+   * read. Placement states multiply their default size by it and pass it on as
+   * the shape's `scale` prop.
+   */
+  getResizeScaleFactor(): number {
+    return this.user.getIsDynamicSizeMode() ? 1 / this.getZoomLevel() : 1
   }
 
   getViewportScreenBounds(): Box {
@@ -1666,75 +2057,111 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this
   }
 
-  /** Screen (container-relative) → page. */
-  screenToPage(point: VecLike): Vec {
-    const { x, y, z } = this.getCamera()
-    return new Vec(point.x / z - x, point.y / z - y)
-  }
+  // Two screen-ish spaces, and the difference between them matters:
+  //
+  //   VIEWPORT space is CONTAINER-relative: (0,0) is the top-left of the
+  //     element the canvas is mounted in. Anything drawn INSIDE the container
+  //     (overlays, handles, pins) is positioned in it.
+  //   SCREEN space is WINDOW-relative: viewport space plus the container's own
+  //     offset in the window. Anything positioned `fixed` in the host page
+  //     (a popover, a composer rendered outside the container) needs it.
+  //
+  // They differ by exactly the container offset, which is zero on a full-window
+  // canvas — so a value-only test passes against the wrong one. Pick by where
+  // the thing being positioned lives, not by which number looks right.
 
-  /** Page → screen (container-relative). */
-  pageToScreen(point: VecLike): Vec {
+  /** Page -> viewport (container-relative pixels). */
+  pageToViewport(point: VecLike): Vec {
     const { x, y, z } = this.getCamera()
     return new Vec((point.x + x) * z, (point.y + y) * z)
   }
 
-  /** Zoom keeping the given screen point fixed. */
-  zoomToPointAt(screenPoint: VecLike, nextZoom: number): this {
+  /** Viewport (container-relative) -> page. The inverse of `pageToViewport`. */
+  viewportToPage(point: VecLike): Vec {
+    const { x, y, z } = this.getCamera()
+    return new Vec(point.x / z - x, point.y / z - y)
+  }
+
+  /** Page -> screen (window-relative pixels, for `position: fixed` callers). */
+  pageToScreen(point: VecLike): Vec {
+    const origin = this.getViewportScreenBounds()
+    const viewport = this.pageToViewport(point)
+    return new Vec(viewport.x + origin.x, viewport.y + origin.y)
+  }
+
+  /** Screen (window-relative) -> page. The inverse of `pageToScreen`. */
+  screenToPage(point: VecLike): Vec {
+    const origin = this.getViewportScreenBounds()
+    return this.viewportToPage({ x: point.x - origin.x, y: point.y - origin.y })
+  }
+
+  /** Zoom keeping the given VIEWPORT point (container-relative) fixed. */
+  zoomToPointAt(viewportPoint: VecLike, nextZoom: number, opts: TLCameraMoveOptions = {}): this {
     const cam = this.getCamera()
     const z = Math.min(this.options.zoomMax, Math.max(this.options.zoomMin, nextZoom))
-    const px = screenPoint.x / cam.z - cam.x
-    const py = screenPoint.y / cam.z - cam.y
-    return this.setCamera({ x: screenPoint.x / z - px, y: screenPoint.y / z - py, z })
+    const px = viewportPoint.x / cam.z - cam.x
+    const py = viewportPoint.y / cam.z - cam.y
+    return this.setCamera({ x: viewportPoint.x / z - px, y: viewportPoint.y / z - py, z }, opts)
   }
 
-  zoomIn(point: VecLike = this.getViewportScreenCenter()): this {
+  zoomIn(point: VecLike = this.getViewportScreenCenter(), opts: TLCameraMoveOptions = {}): this {
     const z = this.getZoomLevel()
     const next = this.options.zoomSteps.find((s) => s > z + 1e-6) ?? this.options.zoomMax
-    return this.zoomToPointAt(point, next)
+    return this.zoomToPointAt(point, next, opts)
   }
 
-  zoomOut(point: VecLike = this.getViewportScreenCenter()): this {
+  zoomOut(point: VecLike = this.getViewportScreenCenter(), opts: TLCameraMoveOptions = {}): this {
     const z = this.getZoomLevel()
     const next = [...this.options.zoomSteps].reverse().find((s) => s < z - 1e-6) ?? this.options.zoomMin
-    return this.zoomToPointAt(point, next)
+    return this.zoomToPointAt(point, next, opts)
   }
 
-  resetZoom(point: VecLike = this.getViewportScreenCenter()): this {
-    return this.zoomToPointAt(point, 1)
+  resetZoom(point: VecLike = this.getViewportScreenCenter(), opts: TLCameraMoveOptions = {}): this {
+    return this.zoomToPointAt(point, 1, opts)
   }
 
-  zoomToBounds(bounds: BoxLike, opts: { inset?: number; targetZoom?: number } = {}): this {
+  /**
+   * Frame `bounds` in the viewport. `inset` is the screen-space margin left
+   * around it and `targetZoom` a CEILING on the resulting zoom, so a tiny
+   * target does not fill the screen.
+   */
+  zoomToBounds(bounds: BoxLike, opts: TLCameraMoveOptions & { inset?: number; targetZoom?: number } = {}): this {
     const vp = this.getViewportScreenBounds()
     const inset = opts.inset ?? Math.min(256, vp.w * 0.28)
     let z = Math.min((vp.w - inset) / bounds.w, (vp.h - inset) / bounds.h)
     if (opts.targetZoom !== undefined) z = Math.min(z, opts.targetZoom)
     z = Math.min(this.options.zoomMax, Math.max(this.options.zoomMin, z))
-    return this.setCamera({
-      x: -bounds.x + (vp.w / z - bounds.w) / 2,
-      y: -bounds.y + (vp.h / z - bounds.h) / 2,
-      z,
-    })
+    return this.setCamera(
+      {
+        x: -bounds.x + (vp.w / z - bounds.w) / 2,
+        y: -bounds.y + (vp.h / z - bounds.h) / 2,
+        z,
+      },
+      opts,
+    )
   }
 
-  zoomToFit(): this {
+  zoomToFit(opts: TLCameraMoveOptions & { inset?: number; targetZoom?: number } = {}): this {
     const b = this.getCurrentPageBounds()
-    return b && b.w > 0 && b.h > 0 ? this.zoomToBounds(b) : this
+    return b && b.w > 0 && b.h > 0 ? this.zoomToBounds(b, opts) : this
   }
 
-  zoomToSelection(): this {
+  zoomToSelection(opts: TLCameraMoveOptions & { inset?: number; targetZoom?: number } = {}): this {
     const b = this.getSelectionPageBounds()
-    return b && b.w > 0 && b.h > 0 ? this.zoomToBounds(b, { targetZoom: Math.max(1, this.getZoomLevel()) }) : this
+    if (!b || b.w <= 0 || b.h <= 0) return this
+    return this.zoomToBounds(b, { targetZoom: Math.max(1, this.getZoomLevel()), ...opts })
   }
 
-  centerOnPoint(point: VecLike): this {
+  centerOnPoint(point: VecLike, opts: TLCameraMoveOptions = {}): this {
     const vp = this.getViewportScreenBounds()
     const z = this.getZoomLevel()
-    return this.setCamera({ x: -point.x + vp.w / 2 / z, y: -point.y + vp.h / 2 / z })
+    return this.setCamera({ x: -point.x + vp.w / 2 / z, y: -point.y + vp.h / 2 / z }, opts)
   }
 
-  pan(offsetScreen: VecLike): this {
+  /** Pan by a VIEWPORT-space offset (container-relative pixels). */
+  pan(offsetScreen: VecLike, opts: TLCameraMoveOptions = {}): this {
     const cam = this.getCamera()
-    return this.setCamera({ x: cam.x + offsetScreen.x / cam.z, y: cam.y + offsetScreen.y / cam.z })
+    return this.setCamera({ x: cam.x + offsetScreen.x / cam.z, y: cam.y + offsetScreen.y / cam.z }, opts)
   }
 
   // ---- tools -------------------------------------------------------------
@@ -1748,8 +2175,12 @@ export class Editor extends EventEmitter<EditorEvents> {
     return tool?.id ?? ""
   }
 
+  /** Switch tools. `id` may be a dotted path, e.g. `"select.idle"`. */
   setCurrentTool(id: string, info: Record<string, unknown> = {}): this {
-    if (this.getCurrentToolId() === id && !info["force"]) return this
+    if (this.getCurrentToolId() === (id.includes(".") ? id.slice(0, id.indexOf(".")) : id) && !info["force"]) {
+      // Already in this tool, but a dotted path also names a state within it.
+      if (!id.includes(".")) return this
+    }
     this.root.transition(id, info)
     return this
   }
@@ -1810,9 +2241,10 @@ export class Editor extends EventEmitter<EditorEvents> {
         break
       }
       case "click": {
+        // `info.point` is container-relative; see the note above `pageToViewport`.
         const screen = new Vec(info.point.x, info.point.y)
         inputs.currentScreenPoint = screen
-        inputs.currentPagePoint = this.screenToPage(screen)
+        inputs.currentPagePoint = this.viewportToPage(screen)
         break
       }
       case "keyboard": {
@@ -1836,8 +2268,9 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   private updatePointer(info: PointerEventInfo): void {
     const inputs = this.inputs
+    // Pointer events arrive in container-relative (viewport) coordinates.
     const screen = new Vec(info.point.x, info.point.y)
-    const page = this.screenToPage(screen)
+    const page = this.viewportToPage(screen)
     inputs.previousScreenPoint = inputs.currentScreenPoint
     inputs.previousPagePoint = inputs.currentPagePoint
     inputs.currentScreenPoint = screen
@@ -2062,6 +2495,7 @@ export class Editor extends EventEmitter<EditorEvents> {
       const ms = performance.now() - t0
       this._lastFrame.set({ drawn: frame.drawn, culled: frame.culled, ms })
       this.emit("frame", { drawn: frame.drawn, culled: frame.culled, ms })
+      this.performance.emit("frame", { drawn: frame.drawn, culled: frame.culled, ms })
     })
     return frame
   }
@@ -2255,10 +2689,11 @@ export class Editor extends EventEmitter<EditorEvents> {
   // one block so the collaboration layer (`@mocanvas/sync`) has a single seam.
 
   /**
-   * The local person's identity: a random id for this session plus a name and
-   * a colour that can be changed at any time. Session-only, never persisted.
+   * The local person's preferences: identity (id, name, colour) plus the
+   * behaviour flags that change how the editor treats their input, such as
+   * dynamic-size mode. Session-only, never persisted with the document.
    */
-  readonly user: UserPreferences = createUserPreferences()
+  readonly user: UserPreferencesManager = new UserPreferencesManager(createCurrentUser())
 
   /** Presence records of everyone else in the room, in arrival order. */
   getCollaborators(): InstancePresence[] {
@@ -2271,6 +2706,60 @@ export class Editor extends EventEmitter<EditorEvents> {
   getCollaboratorsOnCurrentPage(): InstancePresence[] {
     const pageId = this.getCurrentPageId()
     return this.getCollaborators().filter((p) => p.currentPageId === pageId)
+  }
+
+  /**
+   * Collaborators on this page who are actually THERE: the ones whose presence
+   * record was refreshed within {@link COLLABORATOR_INACTIVE_TIMEOUT}.
+   *
+   * A tab left open overnight keeps writing presence but stops being a person
+   * to draw a cursor for, so anything that renders collaborators uses this and
+   * not `getCollaboratorsOnCurrentPage()`. The flip side is that a long-running
+   * participant (an agent working through a tool call) must keep its
+   * `lastActivityTimestamp` fresh or it will vanish mid-turn.
+   */
+  getVisibleCollaboratorsOnCurrentPage(): InstancePresence[] {
+    const cutoff = Date.now() - COLLABORATOR_INACTIVE_TIMEOUT
+    return this.getCollaboratorsOnCurrentPage().filter((p) => p.lastActivityTimestamp > cutoff)
+  }
+
+  /**
+   * Follow another person's camera. Their viewport is mirrored into ours until
+   * {@link stopFollowingUser} or a camera move of our own.
+   *
+   * The id is a USER id (`InstancePresence.userId`), not a presence record id:
+   * one person with several tabs is still one person to follow.
+   */
+  startFollowingUser(userId: string): this {
+    if (userId === this.user.getId()) return this
+    return this.updateInstanceState({ followingUserId: userId })
+  }
+
+  /** Stop mirroring anyone's camera. A no-op when not following. */
+  stopFollowingUser(): this {
+    if (this.getInstanceState().followingUserId === null) return this
+    return this.updateInstanceState({ followingUserId: null })
+  }
+
+  /** The user id being followed, or `null`. */
+  getFollowingUserId(): string | null {
+    return this.getInstanceState().followingUserId
+  }
+
+  // ---- theme -------------------------------------------------------------
+  // Colours live in the theme, never in a shape util or a UI snapshot: a
+  // hard-coded palette shows light values on a dark board and cannot know about
+  // a host's own tuning. `editor.theme` is the manager; these two are the
+  // shorthands everything reaches for.
+
+  /** The live theme: ramps, roles and per-mode colour tables. */
+  getCurrentTheme(): TLTheme {
+    return this.theme.getCurrentTheme()
+  }
+
+  /** Which half of the theme's colours applies right now. */
+  getColorMode(): TLColorMode {
+    return this.theme.getColorMode()
   }
 
   // ---- resizing ----------------------------------------------------------
@@ -2441,6 +2930,84 @@ function sameClips(a: readonly (ClipRect | undefined)[], b: readonly (ClipRect |
   return true
 }
 
+/**
+ * The native event behind a possibly-synthetic one. Returns `undefined` for
+ * anything that is not an object, so a stray `null` never lands in the set.
+ */
+function nativeEventOf(event: { nativeEvent?: unknown } | Event | null | undefined): object | undefined {
+  if (event === null || typeof event !== "object") return undefined
+  const native = (event as { nativeEvent?: unknown }).nativeEvent
+  if (native !== null && typeof native === "object") return native
+  return event
+}
+
+/** A monotonic clock for animations; wall clock where `performance` is absent. */
+function timeNow(): number {
+  return typeof globalThis.performance === "undefined" ? Date.now() : globalThis.performance.now()
+}
+
+/**
+ * Clip `subject` against every edge of `clip` (Sutherland–Hodgman).
+ *
+ * Both polygons must be convex and wound the same way, which is true of the
+ * only thing that produces them here: a shape's rotated bounds rectangle. The
+ * result is the convex intersection, empty when they do not overlap.
+ */
+function intersectConvexPolygons(subject: VecLike[], clip: VecLike[]): VecLike[] {
+  if (subject.length === 0 || clip.length === 0) return []
+  // Which side is "inside" depends on the winding, so take it from the clip
+  // polygon itself rather than assuming clockwise.
+  const inside = signedArea(clip) >= 0 ? 1 : -1
+  const isInside = (p: VecLike, a: VecLike, b: VecLike): boolean =>
+    inside * ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) >= 0
+
+  let output = subject
+  for (let i = 0; i < clip.length; i++) {
+    if (output.length === 0) return []
+    const a = clip[i]!
+    const b = clip[(i + 1) % clip.length]!
+    const input = output
+    output = []
+    for (let j = 0; j < input.length; j++) {
+      const current = input[j]!
+      const previous = input[(j + input.length - 1) % input.length]!
+      const currentIn = isInside(current, a, b)
+      const previousIn = isInside(previous, a, b)
+      if (currentIn) {
+        if (!previousIn) {
+          const crossing = lineIntersection(previous, current, a, b)
+          if (crossing) output.push(crossing)
+        }
+        output.push(current)
+      } else if (previousIn) {
+        const crossing = lineIntersection(previous, current, a, b)
+        if (crossing) output.push(crossing)
+      }
+    }
+  }
+  return output
+}
+
+/** Twice the signed area of a polygon; its sign is the winding direction. */
+function signedArea(poly: VecLike[]): number {
+  let total = 0
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]!
+    const b = poly[(i + 1) % poly.length]!
+    total += a.x * b.y - b.x * a.y
+  }
+  return total
+}
+
+/** Where the infinite lines `p1p2` and `p3p4` cross; `undefined` if parallel. */
+function lineIntersection(p1: VecLike, p2: VecLike, p3: VecLike, p4: VecLike): VecLike | undefined {
+  const d = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x)
+  if (d === 0) return undefined
+  const a = p1.x * p2.y - p1.y * p2.x
+  const b = p3.x * p4.y - p3.y * p4.x
+  return { x: (a * (p3.x - p4.x) - (p1.x - p2.x) * b) / d, y: (a * (p3.y - p4.y) - (p1.y - p2.y) * b) / d }
+}
+
 // ---- resize options ---------------------------------------------------------
 
 export interface ResizeShapeOptions {
@@ -2542,8 +3109,77 @@ export interface EditorTextMeasurement {
   lineCount: number
 }
 
+/**
+ * Options for measuring a block of HTML. Distinct from
+ * {@link EditorTextMeasureOptions}: `padding` is a CSS string here because the
+ * measurer sets it on a real element, and `otherStyles` is applied verbatim.
+ */
+export interface EditorTextMeasureHtmlOptions {
+  fontFamily: string
+  fontSize: number
+  fontWeight?: string | number
+  fontStyle?: string
+  /** Unitless line height (multiplier of the font size). */
+  lineHeight: number
+  /** Wrap width in CSS px. Omit for a single unwrapped run. */
+  maxWidth?: number
+  /** CSS padding shorthand, e.g. `"0px"` — included in the returned `w`/`h`. */
+  padding?: string
+  /** Also report the unwrapped content width as `scrollWidth`. */
+  measureScrollWidth?: boolean
+  /** Extra CSS declarations set on the probe element. */
+  otherStyles?: Record<string, string>
+}
+
+export interface EditorTextHtmlMeasurement {
+  w: number
+  h: number
+  /** Unwrapped content width; only meaningful with `measureScrollWidth`. */
+  scrollWidth?: number
+}
+
 export interface EditorTextMeasure {
   measureText(text: string, opts: EditorTextMeasureOptions): EditorTextMeasurement
+  /** Measure one block of HTML, as a rich-text label is laid out. */
+  measureHtml(html: string, opts: EditorTextMeasureHtmlOptions): EditorTextHtmlMeasurement
+  /** Measure many blocks in one layout pass — one reflow instead of N. */
+  measureHtmlBatch(
+    items: readonly { html: string; opts: EditorTextMeasureHtmlOptions }[],
+  ): EditorTextHtmlMeasurement[]
+}
+
+/** Supplies an engine to editors constructed without an explicit one. */
+export type EditorEngineProvider = () => EngineBridge | null
+
+let engineProvider: EditorEngineProvider | null = null
+
+/**
+ * Install the fallback behind `new Editor({ ... })` with no `engine`.
+ *
+ * `mocanvas` registers one at import time that hands back the engine
+ * `loadEngine()` last produced. Returns a function that removes the provider
+ * again (only if it is still the registered one).
+ */
+export function registerEngineProvider(provider: EditorEngineProvider | null): () => void {
+  engineProvider = provider
+  return () => {
+    if (engineProvider === provider) engineProvider = null
+  }
+}
+
+export function getEngineProvider(): EditorEngineProvider | null {
+  return engineProvider
+}
+
+/** The engine for an editor that was not given one, or a message saying how to get one. */
+function requireEngine(): EngineBridge {
+  const engine = engineProvider?.() ?? null
+  if (engine) return engine
+  throw new Error(
+    "mocanvas: no WebAssembly engine. Either pass `engine` to `new Editor({ ... })`, " +
+      "or `await loadEngine()` once before constructing an editor — importing `@mocanvas/mocanvas` " +
+      "registers a provider that picks the loaded engine up automatically.",
+  )
 }
 
 export type EditorTextMeasureProvider = (editor: Editor) => EditorTextMeasure

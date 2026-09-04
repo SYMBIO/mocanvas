@@ -148,10 +148,42 @@ describe("defaultShapeUtils", () => {
       expectWellFormedPath(geometry.toPathWords())
       // component/indicator must not throw on default props
       util.component(shape)
-      expect(util.indicator(shape)).not.toBeNull()
+      // Every built-in util is on the v5 canvas hook, not the deprecated one.
+      expect(typeof util.getIndicatorPath).toBe("function")
+      expect(util.indicator).toBeUndefined()
+      expect(util.getIndicatorPath!(shape)).toBeDefined()
     }
   })
 })
+
+/**
+ * `Path2D` does not exist in Node, and shape indicators are canvas paths now.
+ * A recording double is enough to prove a util builds the path it says it does
+ * without dragging a whole canvas implementation into a unit test.
+ */
+class TestPath2D {
+  readonly ops: string[] = []
+  constructor(readonly d?: string) {
+    if (d !== undefined) this.ops.push(`d(${d})`)
+  }
+  rect(x: number, y: number, w: number, h: number): void {
+    this.ops.push(`rect(${x},${y},${w},${h})`)
+  }
+  roundRect(x: number, y: number, w: number, h: number, r: number): void {
+    this.ops.push(`roundRect(${x},${y},${w},${h},${r})`)
+  }
+  moveTo(x: number, y: number): void {
+    this.ops.push(`moveTo(${x},${y})`)
+  }
+  lineTo(x: number, y: number): void {
+    this.ops.push(`lineTo(${x},${y})`)
+  }
+  closePath(): void {
+    this.ops.push("closePath")
+  }
+}
+;(globalThis as { Path2D?: unknown }).Path2D ??= TestPath2D
+
 
 describe("GeoShapeUtil", () => {
   const util = new GeoShapeUtil(editor)
@@ -579,7 +611,27 @@ describe("FrameShapeUtil", () => {
     expect(util.canReceiveNewChildrenOfType(shape, "geo")).toBe(true)
     expect(util.canDropShapes(shape, [])).toBe(true)
     expect(util.component(shape)).not.toBeNull()
-    expect(util.indicator(shape)).not.toBeNull()
+    expect((util.getIndicatorPath(shape) as unknown as TestPath2D).ops).toEqual(["rect(0,0,160,90)"])
+  })
+
+  it("is frame-like and clips its children to its own box", () => {
+    const shape = makeShape<FrameShape>("frame", util.getDefaultProps())
+    expect(util.isFrameLike(shape)).toBe(true)
+    expect(util.providesBackgroundForChildren(shape)).toBe(true)
+    expect(util.isClipShape(shape)).toBe(true)
+    expect(util.getClipPath(shape)).toEqual([
+      { x: 0, y: 0 },
+      { x: 160, y: 0 },
+      { x: 160, y: 90 },
+      { x: 0, y: 90 },
+    ])
+  })
+
+  it("closes admission and removal while locked", () => {
+    const shape = { ...makeShape<FrameShape>("frame", util.getDefaultProps()), isLocked: true }
+    expect(util.canReceiveNewChildrenOfType(shape, "geo")).toBe(false)
+    expect(util.canRemoveChildrenOfType(shape, "geo")).toBe(false)
+    expect(util.canDropShapes(shape, [])).toBe(false)
   })
 })
 

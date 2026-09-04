@@ -12,6 +12,7 @@ import {
   DefaultLabelColorStyle,
   DefaultSizeStyle,
   type BaseShape,
+  type BindingCanBindOptions,
   type Geometry2d,
   type ShapeHandle,
   type StyleWords,
@@ -47,6 +48,7 @@ import { ELBOW_CORNER_STROKES, getElbowMidPointFromPoint, getElbowRoute, type El
 import { propsOf, readEnum, readNumber, readPoint, readStyle, readText } from "./prop-access"
 import { getDashId, getStrokeRgba, getTextCssColor } from "./shape-theme"
 import { pathWordsToSvgD } from "./svg-path"
+import { svgPath } from "./indicator-paths"
 
 export type { ArrowheadKind } from "./arrow-helpers"
 
@@ -250,8 +252,8 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
     )
   }
 
-  indicator(shape: ArrowShape): ReactNode {
-    return <path d={pathWordsToSvgD(this.getGeometry(shape).toPathWords())} />
+  override getIndicatorPath(shape: ArrowShape): Path2D {
+    return svgPath(pathWordsToSvgD(this.getGeometry(shape).toPathWords()))
   }
 
   /** The GPU keeps drawing the arrow while its label is edited. */
@@ -268,7 +270,7 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
   }
 
   /** Nothing binds to an arrow (no arrow-to-arrow bindings). */
-  override canBind(_opts: { fromShapeType: string; toShapeType: string; bindingType: string }): boolean {
+  override canBind(_opts: BindingCanBindOptions): boolean {
     return false
   }
 

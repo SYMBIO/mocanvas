@@ -328,7 +328,8 @@ frame; `docs/BENCHMARK.md` measures a 7-50% cost in the drag redraw path
 against a plain stroke. Turning it off is a per-shape style change
 (`dash: "solid"`), not a build flag.
 
-Open: a CRDT in place of last-writer-wins for concurrent edits, elbow arrows,
-bookmark/embed/video shapes, freehand pressure taper, and routing the default
-indicators layer through `ShapeUtil.indicator` instead of drawing geometry
-bounds.
+Open: elbow arrows, bookmark/embed/video shapes, freehand pressure taper, and
+routing the default indicators layer through `ShapeUtil.indicator` instead of
+drawing geometry bounds. Concurrent edits are merged by a per-field CRDT
+(`packages/sync/src/crdt.ts`); what it does and does not promise is in
+`packages/sync/README.md`.

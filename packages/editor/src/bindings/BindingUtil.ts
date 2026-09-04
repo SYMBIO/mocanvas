@@ -9,6 +9,23 @@ export interface BindingUtilConstructor<B extends UnknownBinding = UnknownBindin
   migrations?: unknown
 }
 
+/**
+ * What a shape is asked before a binding is made between it and another shape.
+ *
+ * v5 hands over the **records**, not their type names: a util that used to
+ * branch on `toShapeType` now reads `toShape.type`, and one that needs more
+ * than the type — a locked target, a prop, the parent — has it without a second
+ * lookup through the editor.
+ */
+export interface BindingCanBindOptions<From extends UnknownShape = UnknownShape, To extends UnknownShape = UnknownShape> {
+  /** The shape the binding starts at (`binding.fromId`). */
+  fromShape: From
+  /** The shape the binding ends at (`binding.toId`). */
+  toShape: To
+  /** The binding type about to be created. */
+  bindingType: string
+}
+
 export interface BindingOnCreateOptions<B extends UnknownBinding> {
   binding: B
 }
@@ -49,6 +66,14 @@ export abstract class BindingUtil<B extends UnknownBinding = UnknownBinding> {
   }
 
   abstract getDefaultProps(): Partial<B["props"]>
+
+  /**
+   * Whether this binding type may connect these two shapes.
+   *
+   * Consulted alongside `ShapeUtil.canBind`, which asks the same question from
+   * the shape's side; both must say yes.
+   */
+  canBind?(options: BindingCanBindOptions): boolean
 
   onBeforeCreate?(options: BindingOnCreateOptions<B>): B | void
   onAfterCreate?(options: BindingOnCreateOptions<B>): void
