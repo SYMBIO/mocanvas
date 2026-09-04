@@ -350,12 +350,19 @@ mod dash_tests {
 // outlines (more than `DRAW_SINGLE_PASS_ANCHORS` anchors across all subpaths) drop
 // to a single full-width pass; that test is a property of the geometry alone, so
 // it can never flip with zoom or shape count and make a shape shimmer.
+//
+// Cost, measured over a mixed page of rect / ellipse / hexagon / star / rounded
+// rect / polyline at a stroke width of 3.5: 2.3x the triangles and 2.3x the time
+// of the same page stroked plain — 8.6 us a shape against 3.8 us — so a full
+// `DEFAULT_TESS_BUDGET` of 256 shapes costs about 2.2 ms, and 5,000 draw-styled
+// shapes about 43 ms spread over the twenty frames the budget takes to work
+// through them.
 
 /// Flattening tolerance for the sketched outline. Coarser than [`TOLERANCE`]:
 /// the line is deliberately imprecise, so paying for exact curves is waste.
 const DRAW_TOLERANCE: f32 = 0.5;
 /// Target number of wobble pieces around one subpath.
-const DRAW_WOBBLE_PERIODS: f32 = 5.0;
+const DRAW_WOBBLE_PERIODS: f32 = 6.0;
 /// Most pieces one corner-to-corner run is split into.
 const DRAW_MAX_RUN_PIECES: usize = 8;
 /// Turn (radians) above which a flattened vertex counts as a corner.
@@ -492,6 +499,11 @@ struct Anchors {
     pts: Vec<mocanvas_geo::Vec2>,
     /// One per span, so `pts.len() - 1` entries.
     mids: Vec<mocanvas_geo::Vec2>,
+    /// Whether each anchor is a real corner of the outline rather than a point the
+    /// resampling happened to drop on a smooth run. Only real corners are rounded
+    /// generously and pushed out past the true vertex; treating a resampled point
+    /// as a corner would turn a smooth curve into a polygon with bulging joints.
+    corner: Vec<bool>,
     closed: bool,
 }
 
@@ -518,7 +530,8 @@ fn draw_anchors(sp: &SubPath, width: f32) -> Anchors {
     }
 
     // Unroll into a plain open polyline plus the cut indices along it.
-    let (pts, cuts) = if sp.closed {
+    let had_corners = !corners.is_empty();
+    let (pts, cuts, real) = if sp.closed {
         let start = corners.first().copied().unwrap_or(0);
         let mut pts = Vec::with_capacity(n + 1);
         pts.extend_from_slice(&sp.pts[start..]);
@@ -531,11 +544,17 @@ fn draw_anchors(sp: &SubPath, width: f32) -> Anchors {
         }
         cuts.push(n);
         cuts.dedup();
-        (pts, cuts)
+        // Index 0 and the seam at n are the same vertex, a real corner only when the
+        // subpath had any; every other cut came from the corner scan.
+        let real: Vec<bool> = cuts.iter().map(|&c| if c == 0 || c == n { had_corners } else { true }).collect();
+        (pts, cuts, real)
     } else {
         let mut cuts = corners;
         cuts.dedup();
-        (sp.pts.clone(), cuts)
+        // The two ends of an open subpath are where the pen starts and stops, not corners.
+        let last = cuts.len() - 1;
+        let real: Vec<bool> = (0..cuts.len()).map(|i| i != 0 && i != last).collect();
+        (sp.pts.clone(), cuts, real)
     };
 
     let mut cum = vec![0.0f32; pts.len()];
@@ -544,13 +563,14 @@ fn draw_anchors(sp: &SubPath, width: f32) -> Anchors {
     }
     let total = cum[pts.len() - 1];
     if !total.is_finite() || total <= 0.0 {
-        return Anchors { pts: Vec::new(), mids: Vec::new(), closed: sp.closed };
+        return Anchors { pts: Vec::new(), mids: Vec::new(), corner: Vec::new(), closed: sp.closed };
     }
     let step = (total / DRAW_WOBBLE_PERIODS).max(2.0 * width);
 
     let mut anchors = Vec::with_capacity(cuts.len() * 2);
     let mut mids = Vec::with_capacity(cuts.len() * 2);
-    for w in cuts.windows(2) {
+    let mut corner = Vec::with_capacity(cuts.len() * 2);
+    for (c, w) in cuts.windows(2).enumerate() {
         let (a, b) = (w[0], w[1]);
         let run = cum[b] - cum[a];
         let k = ((run / step).round().max(1.0) as usize).min(DRAW_MAX_RUN_PIECES);
@@ -559,10 +579,12 @@ fn draw_anchors(sp: &SubPath, width: f32) -> Anchors {
             let s1 = cum[a] + run * ((j + 1) as f32 / k as f32);
             anchors.push(point_at_arc(&pts, &cum, s0));
             mids.push(point_at_arc(&pts, &cum, 0.5 * (s0 + s1)));
+            corner.push(j == 0 && real[c]);
         }
     }
     anchors.push(pts[*cuts.last().unwrap()]);
-    Anchors { pts: anchors, mids, closed: sp.closed }
+    corner.push(*real.last().unwrap());
+    Anchors { pts: anchors, mids, corner, closed: sp.closed }
 }
 
 /// Append one sketched pass over `anchors` to `out`.
@@ -583,8 +605,13 @@ fn sketch_into(out: &mut Path, anchors: &Anchors, width: f32, seed: u32, pass: u
     let mut base = Rng::new(mix_seed(seed, 0));
     let mut own = Rng::new(mix_seed(seed, pass + 1));
     let shared = 1.0 - DRAW_PASS_JITTER;
+    let jitter = |base: &mut Rng, own: &mut Rng| base.signed() * shared + own.signed() * DRAW_PASS_JITTER;
 
-    // 1. nudge each anchor perpendicular to its local direction.
+    // 1. Nudge each anchor perpendicular to the local direction, and push the ones
+    //    that are real corners out along their bisector: the corner then sits a
+    //    little past the true vertex, which is what makes the silhouette read as
+    //    overshot rather than machined. Doing it here, before anything downstream,
+    //    keeps the rest of the construction consistent with it.
     let mut a = Vec::with_capacity(m);
     let mut off = Vec::with_capacity(m);
     for i in 0..m {
@@ -595,13 +622,24 @@ fn sketch_into(out: &mut Path, anchors: &Anchors, width: f32, seed: u32, pass: u
         };
         let cur = pts[i];
         let amp = (DRAW_VERTEX_AMP * width).min(DRAW_VERTEX_MAX_FRACTION * prev.dist(cur).min(cur.dist(next)));
-        let j = base.signed() * shared + own.signed() * DRAW_PASS_JITTER;
-        let d = (next - prev).normalize().perp() * (amp * j);
+        let mut d = (next - prev).normalize().perp() * (amp * jitter(&mut base, &mut own));
+        if anchors.corner[i] {
+            let (u_in, u_out) = ((cur - prev).normalize(), (next - cur).normalize());
+            let over = DRAW_OVERSHOOT * width * (0.4 + 0.6 * (base.unit() * shared + own.unit() * DRAW_PASS_JITTER));
+            d += (u_in - u_out).normalize() * over;
+        }
         a.push(cur + d);
         off.push(d);
     }
+    if closed {
+        // The seam's two anchors are the same vertex. Perturbing them apart would
+        // fork the outline there; instead they coincide and the overshoot below runs
+        // back over the start, which is what a pen closing a loop actually leaves.
+        a[m - 1] = a[0];
+        off[m - 1] = off[0];
+    }
 
-    // 2. segment directions and lengths, then corner radii (never at the seam).
+    // 2. Segment directions and lengths, then corner radii (never at the seam).
     let seg: Vec<(Vec2, f32)> = (0..m - 1)
         .map(|i| {
             let d = a[i + 1] - a[i];
@@ -610,38 +648,69 @@ fn sketch_into(out: &mut Path, anchors: &Anchors, width: f32, seed: u32, pass: u
         .collect();
     let mut radius = vec![0.0f32; m];
     for i in 1..m - 1 {
-        let jitter = 0.7 + 0.6 * (base.unit() * shared + own.unit() * DRAW_PASS_JITTER);
-        radius[i] = corner_radius(width, seg[i - 1].1, seg[i].1, jitter);
+        let j = 0.7 + 0.6 * (base.unit() * shared + own.unit() * DRAW_PASS_JITTER);
+        radius[i] = corner_radius(width, seg[i - 1].1, seg[i].1, j);
     }
 
-    // 3. emit: bowed span, rounded-and-overshot corner, repeat.
-    //
-    // Each span is a quadratic aimed through the outline's own mid-point (carried
-    // along by the average of its two anchors' offsets, then bowed sideways), so a
-    // curve reduced to a few anchors is followed rather than cut across.
-    out.move_to(a[0]);
+    // 3. One quadratic per span, cut back by the corner radii at both ends and aimed
+    //    through the outline's own mid-point (carried along by the average of the two
+    //    anchors' offsets, then bowed sideways) — so a curve reduced to a few anchors
+    //    is followed rather than cut across by its chords.
+    let mut spans: Vec<(Vec2, Vec2, Vec2)> = Vec::with_capacity(m - 1);
     for i in 0..m - 1 {
         let (u, len) = seg[i];
-        if len <= 0.0 {
+        if len <= 1e-6 {
+            spans.push((a[i], a[i], a[i]));
             continue;
         }
         let start = a[i] + u * radius[i];
         let end = a[i + 1] - u * radius[i + 1];
-        let bow = (DRAW_BOW_AMP * width).min(DRAW_BOW_MAX_FRACTION * len) * (base.signed() * shared + own.signed() * DRAW_PASS_JITTER);
+        let bow = (DRAW_BOW_AMP * width).min(DRAW_BOW_MAX_FRACTION * len) * jitter(&mut base, &mut own);
         let target = anchors.mids[i] + (off[i] + off[i + 1]) * 0.5 + u.perp() * bow;
-        out.quad_to(target * 2.0 - start.lerp(end, 0.5), end);
-        if i + 2 < m {
-            let corner = a[i + 1];
-            let u2 = seg[i + 1].0;
-            let over = DRAW_OVERSHOOT * width * (0.4 + 0.6 * (base.unit() * shared + own.unit() * DRAW_PASS_JITTER));
-            out.quad_to(corner + (u - u2).normalize() * over, corner + u2 * radius[i + 1]);
+        spans.push((start, target * 2.0 - start.lerp(end, 0.5), end));
+    }
+
+    // 4. Emit, bridging each cut-back corner with a quadratic whose control point is
+    //    where the two spans' tangents meet. That keeps the tangent continuous across
+    //    the join: aiming the bridge at the corner itself instead would leave a
+    //    visible kink at every anchor of a curved outline.
+    out.move_to(spans[0].0);
+    for (i, &(_, ctrl, end)) in spans.iter().enumerate() {
+        out.quad_to(ctrl, end);
+        if let Some(&(next_start, next_ctrl, _)) = spans.get(i + 1) {
+            out.quad_to(fillet_control(end, end - ctrl, next_start, next_ctrl - next_start), next_start);
         }
     }
     if closed {
-        let (u, _) = seg[m - 2];
-        let over = DRAW_OVERSHOOT * width * (0.8 + 0.8 * base.unit());
-        out.line_to(a[m - 1] + u * over);
+        // Carry on past the seam the way the outline was going, so the end runs back
+        // over the start instead of stopping exactly on it.
+        let over = DRAW_OVERSHOOT * width * (0.9 + 0.9 * base.unit());
+        let (_, last_ctrl, last_end) = spans[spans.len() - 1];
+        let t_in = (last_end - last_ctrl).normalize();
+        let t_out = (spans[0].1 - spans[0].0).normalize();
+        out.quad_to(last_end + t_in * (over * 0.5), last_end + t_out * over);
     }
+}
+
+/// Control point for a quadratic bridging `p`→`q` that leaves `p` along `t_p` and
+/// arrives at `q` along `t_q`: where the two tangent lines meet, or the midpoint
+/// when they are parallel or meet behind either end.
+fn fillet_control(p: mocanvas_geo::Vec2, t_p: mocanvas_geo::Vec2, q: mocanvas_geo::Vec2, t_q: mocanvas_geo::Vec2) -> mocanvas_geo::Vec2 {
+    let (tp, tq) = (t_p.normalize(), t_q.normalize());
+    let denom = tp.cross(tq);
+    let span = p.dist(q);
+    if denom.abs() < 1e-3 || span <= 0.0 {
+        return p.lerp(q, 0.5);
+    }
+    // The control has to sit forward of `p` along `t_p` *and* behind `q` along
+    // `t_q`; if either runs the wrong way the bridge would double back into a cusp.
+    let k = (q - p).cross(tq) / denom;
+    let j = -(q - p).cross(tp) / denom;
+    let limit = 0.0..=2.0 * span;
+    if !limit.contains(&k) || !limit.contains(&j) {
+        return p.lerp(q, 0.5);
+    }
+    p + tp * k
 }
 
 /// Build the hand-drawn replacement for `path`'s stroke: one or two passes, each a
@@ -848,6 +917,32 @@ mod draw_tests {
         }
         let ratio = draw_tris as f32 / plain_tris as f32;
         assert!(ratio <= 2.6, "draw strokes cost {ratio:.2}x the plain ones ({draw_tris} vs {plain_tris} indices)");
+    }
+
+    /// A quadratic bridge whose control point lands behind either end doubles back
+    /// into a cusp; `fillet_control` rejects those, and this is what would catch a
+    /// regression. Sampled far finer than the outline is drawn, so that a genuinely
+    /// tight corner — a star's point, rounded — reads as curvature and not a fold.
+    #[test]
+    fn the_sketched_outline_never_doubles_back() {
+        for p in [
+            Path::rect(&Box2d::from_xywh(0.0, 0.0, 220.0, 140.0)),
+            Path::ellipse(&Box2d::from_xywh(0.0, 0.0, 260.0, 160.0)),
+            star(0.0, 0.0, 100.0, 42.0, 5),
+            polygon(0.0, 0.0, 90.0, 6),
+            Path::rounded_rect(&Box2d::from_xywh(0.0, 0.0, 220.0, 140.0), 20.0),
+        ] {
+            for seed in 0..32u32 {
+                for (sketch, _) in draw_passes(&p, &draw_style(seed)) {
+                    let mut v = Vec::new();
+                    sketch.flatten(0.002, |q, _| v.push(q));
+                    for w in v.windows(3) {
+                        let turn = turn_at(w[0], w[1], w[2]).to_degrees();
+                        assert!(turn < 90.0, "outline reverses by {turn:.0} deg at {:?} (seed {seed})", w[1]);
+                    }
+                }
+            }
+        }
     }
 
     #[test]
