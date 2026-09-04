@@ -32,6 +32,7 @@ import {
   gpuInfo,
   memoryMB,
   nextFrame,
+  pageBoxToScreen,
   panZoomCamera,
   parseTldrJson,
   runFrames,
@@ -41,6 +42,7 @@ import {
   type CameraLike,
   type Kind,
   type LoadResult,
+  type ShapeBox,
   type ShapeSpec,
 } from "../bench-api"
 
@@ -219,6 +221,19 @@ function install(editor: Editor): BenchApi {
     shapeCount: () => editor.getCurrentPageShapeIds().size,
     gpuInfo,
     fitCamera,
+
+    shapeBoxes(): ShapeBox[] {
+      const cam = editor.getCamera()
+      const out: ShapeBox[] = []
+      for (const shape of editor.getCurrentPageShapesSorted()) {
+        const b = editor.getShapePageBounds(shape)
+        if (!b) continue
+        const s = pageBoxToScreen({ x: b.x, y: b.y, w: b.w, h: b.h }, { x: cam.x, y: cam.y, z: cam.z })
+        const geo = (shape.props as { geo?: string }).geo
+        out.push({ id: String(shape.id), type: shape.type, ...(geo ? { geo } : {}), ...s })
+      }
+      return out
+    },
 
     async create(n: number, kind: Kind = "geo") {
       const creates = buildSpecs(n, kind).map(toCreate)

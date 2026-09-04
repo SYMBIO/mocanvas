@@ -1,10 +1,5 @@
 {
-  "date": "2026-09-04 11:13:17 UTC",
-  "mixedRun": true,
-  "perfRun": {
-    "date": "2026-09-04 09:26:29 UTC",
-    "git": "15b670a-dirty"
-  },
+  "date": "2026-09-04 11:33:01 UTC",
   "machine": {
     "os": "Darwin 25.5.0 (arm64)",
     "cpu": "Apple M3 Pro",
@@ -38,7 +33,7 @@
     "tldraw": "5.4.0",
     "playwright": "1.62.1",
     "mocanvas": "0.0.1",
-    "git": "b89287c-dirty"
+    "git": "83ff957-dirty"
   },
   "ns": [
     1000,
@@ -378,1665 +373,951 @@
       "inkOverlapPercent": 78.18013508954978,
       "tolerance": 24
     },
+    "boxes": {
+      "mocanvas": [
+        {
+          "id": "shape:fx-rect",
+          "type": "geo",
+          "geo": "rectangle",
+          "x": 33.86929948283978,
+          "y": 48.17113305124591,
+          "w": 213.63422661024916,
+          "h": 128.1805359661495
+        },
+        {
+          "id": "shape:fx-arrow-bent",
+          "type": "arrow",
+          "x": 247.50352609308894,
+          "y": 160.448516751485,
+          "w": 192.27080394922424,
+          "h": 229.53737887615958
+        },
+        {
+          "id": "shape:fx-ellipse",
+          "type": "geo",
+          "geo": "ellipse",
+          "x": 332.9572167371886,
+          "y": 48.17113305124591,
+          "w": 170.90738128819933,
+          "h": 170.90738128819933
+        },
+        {
+          "id": "shape:fx-star",
+          "type": "geo",
+          "geo": "star",
+          "x": 589.3182886694876,
+          "y": 48.17113305124591,
+          "w": 149.54395862717442,
+          "h": 149.54395862717442
+        },
+        {
+          "id": "shape:fx-triangle",
+          "type": "geo",
+          "geo": "triangle",
+          "x": 802.9525152797368,
+          "y": 48.17113305124591,
+          "w": 149.54395862717442,
+          "h": 128.1805359661495
+        },
+        {
+          "id": "shape:fx-hexagon",
+          "type": "geo",
+          "geo": "hexagon",
+          "x": 1016.5867418899859,
+          "y": 48.17113305124591,
+          "w": 149.54395862717442,
+          "h": 149.54395862717442
+        },
+        {
+          "id": "shape:fx-draw",
+          "type": "draw",
+          "x": 33.86929948283978,
+          "y": 294.54417900799245,
+          "w": 277.7787376586742,
+          "h": 62.70289727315467
+        },
+        {
+          "id": "shape:fx-arrow-straight",
+          "type": "arrow",
+          "x": 589.3182886694876,
+          "y": 283.16878232252,
+          "w": 213.63422661024916,
+          "h": 87.91616507785093
+        },
+        {
+          "id": "shape:fx-line",
+          "type": "line",
+          "x": 867.0427832628114,
+          "y": 283.16878232252,
+          "w": 256.361071932299,
+          "h": 96.13540197461212
+        },
+        {
+          "id": "shape:fx-note",
+          "type": "note",
+          "x": 33.86929948283978,
+          "y": 496.80300893276916,
+          "w": 213.63422661024916,
+          "h": 213.63422661024916
+        },
+        {
+          "id": "shape:fx-text",
+          "type": "text",
+          "x": 332.9572167371886,
+          "y": 539.5298542548189,
+          "w": 320.45133991537375,
+          "h": 33.31625763986841
+        },
+        {
+          "id": "shape:fx-frame",
+          "type": "frame",
+          "x": 674.7719793135873,
+          "y": 475.43958627174425,
+          "w": 427.2684532204983,
+          "h": 277.7244945933239
+        },
+        {
+          "id": "shape:fx-frame-child-1",
+          "type": "geo",
+          "geo": "rectangle",
+          "x": 706.8171133051246,
+          "y": 518.1664315937941,
+          "w": 128.1805359661495,
+          "h": 85.45369064409967
+        },
+        {
+          "id": "shape:fx-frame-child-2",
+          "type": "geo",
+          "geo": "ellipse",
+          "x": 909.7696285848613,
+          "y": 539.8809474487056,
+          "w": 128.1805359661495,
+          "h": 127.47834957837621
+        }
+      ],
+      "tldraw": [
+        {
+          "id": "shape:fx-rect",
+          "type": "geo",
+          "geo": "rectangle",
+          "x": 32.00000000000001,
+          "y": 46.33962264150946,
+          "w": 214.33962264150944,
+          "h": 128.60377358490567
+        },
+        {
+          "id": "shape:fx-arrow-bent",
+          "type": "arrow",
+          "x": 258.4109460719845,
+          "y": 170.73017691058894,
+          "w": 180.8343369468835,
+          "h": 218.5528419573356
+        },
+        {
+          "id": "shape:fx-ellipse",
+          "type": "geo",
+          "geo": "ellipse",
+          "x": 332.07547169811323,
+          "y": 46.33962264150946,
+          "w": 171.47169811320754,
+          "h": 171.47169811320754
+        },
+        {
+          "id": "shape:fx-star",
+          "type": "geo",
+          "geo": "star",
+          "x": 589.4627239101573,
+          "y": 46.33962264150946,
+          "w": 149.6783257645911,
+          "h": 148.66959768351117
+        },
+        {
+          "id": "shape:fx-triangle",
+          "type": "geo",
+          "geo": "triangle",
+          "x": 803.622641509434,
+          "y": 46.33962264150946,
+          "w": 150.0377358490566,
+          "h": 128.60377358490567
+        },
+        {
+          "id": "shape:fx-hexagon",
+          "type": "geo",
+          "geo": "hexagon",
+          "x": 1017.9622641509434,
+          "y": 46.33962264150946,
+          "w": 150.0377358490566,
+          "h": 150.0377358490566
+        },
+        {
+          "id": "shape:fx-draw",
+          "type": "draw",
+          "x": 32.00000000000001,
+          "y": 295.15482214587183,
+          "w": 278.6959316037736,
+          "h": 59.664268195191646
+        },
+        {
+          "id": "shape:fx-arrow-straight",
+          "type": "arrow",
+          "x": 589.2830188679245,
+          "y": 282.11320754716985,
+          "w": 214.33962264150944,
+          "h": 85.73584905660377
+        },
+        {
+          "id": "shape:fx-line",
+          "type": "line",
+          "x": 867.9245283018868,
+          "y": 282.11320754716985,
+          "w": 257.20754716981133,
+          "h": 96.45283018867924
+        },
+        {
+          "id": "shape:fx-note",
+          "type": "note",
+          "x": 32.00000000000001,
+          "y": 496.4528301886793,
+          "w": 214.33962264150944,
+          "h": 214.33962264150944
+        },
+        {
+          "id": "shape:fx-text",
+          "type": "text",
+          "x": 332.07547169811323,
+          "y": 539.3207547169811,
+          "w": 321.50943396226415,
+          "h": 34.29433962264151
+        },
+        {
+          "id": "shape:fx-frame",
+          "type": "frame",
+          "x": 675.0188679245283,
+          "y": 475.0188679245283,
+          "w": 428.6792452830189,
+          "h": 278.64150943396226
+        },
+        {
+          "id": "shape:fx-frame-child-1",
+          "type": "geo",
+          "geo": "rectangle",
+          "x": 707.1698113207547,
+          "y": 517.8867924528302,
+          "w": 128.60377358490567,
+          "h": 85.73584905660377
+        },
+        {
+          "id": "shape:fx-frame-child-2",
+          "type": "geo",
+          "geo": "ellipse",
+          "x": 910.7924528301887,
+          "y": 539.3207547169811,
+          "w": 128.60377358490567,
+          "h": 128.60377358490567
+        }
+      ]
+    },
+    "regions": {
+      "interior": {
+        "erosion": 6,
+        "pad": 12,
+        "minInterior": 1000,
+        "minAreaFraction": 0.08,
+        "tolerance": 24,
+        "perShape": [
+          {
+            "id": "shape:fx-rect",
+            "type": "geo",
+            "geo": "rectangle",
+            "x": 32.00000000000001,
+            "y": 46.33962264150946,
+            "w": 214.33962264150944,
+            "h": 128.60377358490567,
+            "interior": {
+              "pixelsMocanvas": 25810,
+              "pixelsTldraw": 26009,
+              "iouPercent": 96.75361658503246,
+              "colourAgreementPercent": 94.81594851267562
+            }
+          },
+          {
+            "id": "shape:fx-arrow-bent",
+            "type": "arrow",
+            "x": 258.4109460719845,
+            "y": 170.73017691058894,
+            "w": 180.8343369468835,
+            "h": 218.5528419573356,
+            "interior": null,
+            "reason": "open shape — no interior"
+          },
+          {
+            "id": "shape:fx-ellipse",
+            "type": "geo",
+            "geo": "ellipse",
+            "x": 332.07547169811323,
+            "y": 46.33962264150946,
+            "w": 171.47169811320754,
+            "h": 171.47169811320754,
+            "interior": {
+              "pixelsMocanvas": 21520,
+              "pixelsTldraw": 21828,
+              "iouPercent": 96.76804357694053,
+              "colourAgreementPercent": 99.81236513744254
+            }
+          },
+          {
+            "id": "shape:fx-star",
+            "type": "geo",
+            "geo": "star",
+            "x": 589.4627239101573,
+            "y": 46.33962264150946,
+            "w": 149.6783257645911,
+            "h": 148.66959768351117,
+            "interior": {
+              "pixelsMocanvas": 6064,
+              "pixelsTldraw": 8666,
+              "iouPercent": 69.91579190218017,
+              "colourAgreementPercent": 99.5875268107573
+            }
+          },
+          {
+            "id": "shape:fx-triangle",
+            "type": "geo",
+            "geo": "triangle",
+            "x": 803.622641509434,
+            "y": 46.33962264150946,
+            "w": 150.0377358490566,
+            "h": 128.60377358490567,
+            "interior": {
+              "pixelsMocanvas": 8528,
+              "pixelsTldraw": 8897,
+              "iouPercent": 92.77574952981524,
+              "colourAgreementPercent": 99.28452182208443
+            }
+          },
+          {
+            "id": "shape:fx-hexagon",
+            "type": "geo",
+            "geo": "hexagon",
+            "x": 1017.9622641509434,
+            "y": 46.33962264150946,
+            "w": 150.0377358490566,
+            "h": 150.0377358490566,
+            "interior": {
+              "pixelsMocanvas": 16053,
+              "pixelsTldraw": 15915,
+              "iouPercent": 80.0811176205498,
+              "colourAgreementPercent": 99.29656724817107
+            }
+          },
+          {
+            "id": "shape:fx-draw",
+            "type": "draw",
+            "x": 32.00000000000001,
+            "y": 295.15482214587183,
+            "w": 278.6959316037736,
+            "h": 59.664268195191646,
+            "interior": null,
+            "reason": "open shape — no interior"
+          },
+          {
+            "id": "shape:fx-arrow-straight",
+            "type": "arrow",
+            "x": 589.2830188679245,
+            "y": 282.11320754716985,
+            "w": 214.33962264150944,
+            "h": 85.73584905660377,
+            "interior": null,
+            "reason": "open shape — no interior"
+          },
+          {
+            "id": "shape:fx-line",
+            "type": "line",
+            "x": 867.9245283018868,
+            "y": 282.11320754716985,
+            "w": 257.20754716981133,
+            "h": 96.45283018867924,
+            "interior": null,
+            "reason": "open shape — no interior"
+          },
+          {
+            "id": "shape:fx-note",
+            "type": "note",
+            "x": 32.00000000000001,
+            "y": 496.4528301886793,
+            "w": 214.33962264150944,
+            "h": 214.33962264150944,
+            "interior": {
+              "pixelsMocanvas": 49144,
+              "pixelsTldraw": 44358,
+              "iouPercent": 90.2612729936513,
+              "colourAgreementPercent": 95.88800216420938
+            }
+          },
+          {
+            "id": "shape:fx-text",
+            "type": "text",
+            "x": 332.07547169811323,
+            "y": 539.3207547169811,
+            "w": 321.50943396226415,
+            "h": 34.29433962264151,
+            "interior": null,
+            "reason": "open shape — no interior"
+          },
+          {
+            "id": "shape:fx-frame",
+            "type": "frame",
+            "x": 675.0188679245283,
+            "y": 475.0188679245283,
+            "w": 428.6792452830189,
+            "h": 278.64150943396226,
+            "interior": {
+              "pixelsMocanvas": 112711,
+              "pixelsTldraw": 114091,
+              "iouPercent": 98.79043921080542,
+              "colourAgreementPercent": 97.50512372350525
+            }
+          },
+          {
+            "id": "shape:fx-frame-child-1",
+            "type": "geo",
+            "geo": "rectangle",
+            "x": 707.1698113207547,
+            "y": 517.8867924528302,
+            "w": 128.60377358490567,
+            "h": 85.73584905660377,
+            "interior": {
+              "pixelsMocanvas": 9932,
+              "pixelsTldraw": 10067,
+              "iouPercent": 98.38309691498858,
+              "colourAgreementPercent": 99.8185117967332
+            }
+          },
+          {
+            "id": "shape:fx-frame-child-2",
+            "type": "geo",
+            "geo": "ellipse",
+            "x": 910.7924528301887,
+            "y": 539.3207547169811,
+            "w": 128.60377358490567,
+            "h": 128.60377358490567,
+            "interior": {
+              "pixelsMocanvas": 11809,
+              "pixelsTldraw": 12390,
+              "iouPercent": 94.65090090090091,
+              "colourAgreementPercent": 99.54958783037307
+            }
+          }
+        ],
+        "overall": {
+          "pixelsMocanvas": 239830,
+          "pixelsTldraw": 239764,
+          "iouPercent": 94.11888513814345,
+          "colourAgreementPercent": 97.34144117798841
+        }
+      },
+      "stroke": {
+        "excluded": {
+          "x0": 1100,
+          "y0": 764,
+          "x1": 1192,
+          "y1": 794,
+          "note": "tldraw watermark badge; mocanvas paints nothing here"
+        },
+        "minRegionPixels": 150,
+        "colors": [
+          {
+            "hex": "#1d1d1d",
+            "pixels": 5220,
+            "halfWidthP90": 2
+          },
+          {
+            "hex": "#4ba1f1",
+            "pixels": 2835,
+            "halfWidthP90": 2
+          },
+          {
+            "hex": "#4465e9",
+            "pixels": 2466,
+            "halfWidthP90": 2
+          },
+          {
+            "hex": "#f1ac4b",
+            "pixels": 2031,
+            "halfWidthP90": 2
+          },
+          {
+            "hex": "#e03131",
+            "pixels": 1819,
+            "halfWidthP90": 2
+          },
+          {
+            "hex": "#ae3ec9",
+            "pixels": 1774,
+            "halfWidthP90": 2
+          },
+          {
+            "hex": "#099268",
+            "pixels": 1660,
+            "halfWidthP90": 2
+          },
+          {
+            "hex": "#f87777",
+            "pixels": 2111,
+            "halfWidthP90": 2
+          },
+          {
+            "hex": "#e16919",
+            "pixels": 787,
+            "halfWidthP90": 2
+          },
+          {
+            "hex": "#939394",
+            "pixels": 2479,
+            "halfWidthP90": 1
+          }
+        ],
+        "strokeWidthEstimatePx": 4,
+        "perShape": [
+          {
+            "id": "shape:fx-rect",
+            "type": "geo",
+            "geo": "rectangle",
+            "x": 32.00000000000001,
+            "y": 46.33962264150946,
+            "w": 214.33962264150944,
+            "h": 128.60377358490567,
+            "band": {
+              "referenceStrokePixels": 3102,
+              "forward": {
+                "samples": 3102,
+                "medianPx": 1,
+                "p95Px": 3,
+                "maxPx": 4.47213595499958
+              },
+              "reverse": {
+                "samples": 2493,
+                "medianPx": 0,
+                "p95Px": 4.123105625617661,
+                "maxPx": 12.206555615733702
+              },
+              "symmetric": {
+                "samples": 5595,
+                "medianPx": 1,
+                "p95Px": 3,
+                "maxPx": 12.206555615733702
+              }
+            }
+          },
+          {
+            "id": "shape:fx-arrow-bent",
+            "type": "arrow",
+            "x": 258.4109460719845,
+            "y": 170.73017691058894,
+            "w": 180.8343369468835,
+            "h": 218.5528419573356,
+            "band": {
+              "referenceStrokePixels": 1918,
+              "forward": {
+                "samples": 1918,
+                "medianPx": 5,
+                "p95Px": 20.12461179749811,
+                "maxPx": 22.360679774997898
+              },
+              "reverse": {
+                "samples": 1915,
+                "medianPx": 4,
+                "p95Px": 19.79898987322333,
+                "maxPx": 21.93171219946131
+              },
+              "symmetric": {
+                "samples": 3833,
+                "medianPx": 4.123105625617661,
+                "p95Px": 19.849433241279208,
+                "maxPx": 22.360679774997898
+              }
+            }
+          },
+          {
+            "id": "shape:fx-ellipse",
+            "type": "geo",
+            "geo": "ellipse",
+            "x": 332.07547169811323,
+            "y": 46.33962264150946,
+            "w": 171.47169811320754,
+            "h": 171.47169811320754,
+            "band": {
+              "referenceStrokePixels": 2235,
+              "forward": {
+                "samples": 2235,
+                "medianPx": 1,
+                "p95Px": 2.8284271247461903,
+                "maxPx": 4.123105625617661
+              },
+              "reverse": {
+                "samples": 1912,
+                "medianPx": 1,
+                "p95Px": 2.23606797749979,
+                "maxPx": 5.385164807134504
+              },
+              "symmetric": {
+                "samples": 4147,
+                "medianPx": 1,
+                "p95Px": 2.23606797749979,
+                "maxPx": 5.385164807134504
+              }
+            }
+          },
+          {
+            "id": "shape:fx-star",
+            "type": "geo",
+            "geo": "star",
+            "x": 589.4627239101573,
+            "y": 46.33962264150946,
+            "w": 149.6783257645911,
+            "h": 148.66959768351117,
+            "band": {
+              "referenceStrokePixels": 1949,
+              "forward": {
+                "samples": 1949,
+                "medianPx": 2.8284271247461903,
+                "p95Px": 8,
+                "maxPx": 11
+              },
+              "reverse": {
+                "samples": 1361,
+                "medianPx": 2.8284271247461903,
+                "p95Px": 8.06225774829855,
+                "maxPx": 10.295630140987
+              },
+              "symmetric": {
+                "samples": 3310,
+                "medianPx": 2.8284271247461903,
+                "p95Px": 8.06225774829855,
+                "maxPx": 11
+              }
+            }
+          },
+          {
+            "id": "shape:fx-triangle",
+            "type": "geo",
+            "geo": "triangle",
+            "x": 803.622641509434,
+            "y": 46.33962264150946,
+            "w": 150.0377358490566,
+            "h": 128.60377358490567,
+            "band": {
+              "referenceStrokePixels": 1660,
+              "forward": {
+                "samples": 1660,
+                "medianPx": 1,
+                "p95Px": 2.8284271247461903,
+                "maxPx": 5.385164807134504
+              },
+              "reverse": {
+                "samples": 1088,
+                "medianPx": 0,
+                "p95Px": 2,
+                "maxPx": 2.8284271247461903
+              },
+              "symmetric": {
+                "samples": 2748,
+                "medianPx": 1,
+                "p95Px": 2.23606797749979,
+                "maxPx": 5.385164807134504
+              }
+            }
+          },
+          {
+            "id": "shape:fx-hexagon",
+            "type": "geo",
+            "geo": "hexagon",
+            "x": 1017.9622641509434,
+            "y": 46.33962264150946,
+            "w": 150.0377358490566,
+            "h": 150.0377358490566,
+            "band": {
+              "referenceStrokePixels": 1774,
+              "forward": {
+                "samples": 1774,
+                "medianPx": 6.708203932499369,
+                "p95Px": 14.7648230602334,
+                "maxPx": 18.35755975068582
+              },
+              "reverse": {
+                "samples": 1177,
+                "medianPx": 6.324555320336759,
+                "p95Px": 14.317821063276353,
+                "maxPx": 17.46424919657298
+              },
+              "symmetric": {
+                "samples": 2951,
+                "medianPx": 6.708203932499369,
+                "p95Px": 14.422205101855956,
+                "maxPx": 18.35755975068582
+              }
+            }
+          },
+          {
+            "id": "shape:fx-draw",
+            "type": "draw",
+            "x": 32.00000000000001,
+            "y": 295.15482214587183,
+            "w": 278.6959316037736,
+            "h": 59.664268195191646,
+            "band": {
+              "referenceStrokePixels": 1334,
+              "forward": {
+                "samples": 1334,
+                "medianPx": 1,
+                "p95Px": 3,
+                "maxPx": 8.06225774829855
+              },
+              "reverse": {
+                "samples": 1315,
+                "medianPx": 1,
+                "p95Px": 3,
+                "maxPx": 9.219544457292887
+              },
+              "symmetric": {
+                "samples": 2649,
+                "medianPx": 1,
+                "p95Px": 3,
+                "maxPx": 9.219544457292887
+              }
+            }
+          },
+          {
+            "id": "shape:fx-arrow-straight",
+            "type": "arrow",
+            "x": 589.2830188679245,
+            "y": 282.11320754716985,
+            "w": 214.33962264150944,
+            "h": 85.73584905660377,
+            "band": {
+              "referenceStrokePixels": 787,
+              "forward": {
+                "samples": 787,
+                "medianPx": 0,
+                "p95Px": 1,
+                "maxPx": 2.23606797749979
+              },
+              "reverse": {
+                "samples": 841,
+                "medianPx": 0,
+                "p95Px": 2.23606797749979,
+                "maxPx": 14.866068747318506
+              },
+              "symmetric": {
+                "samples": 1628,
+                "medianPx": 0,
+                "p95Px": 2.23606797749979,
+                "maxPx": 14.866068747318506
+              }
+            }
+          },
+          {
+            "id": "shape:fx-line",
+            "type": "line",
+            "x": 867.9245283018868,
+            "y": 282.11320754716985,
+            "w": 257.20754716981133,
+            "h": 96.45283018867924,
+            "band": {
+              "referenceStrokePixels": 1251,
+              "forward": {
+                "samples": 1251,
+                "medianPx": 1,
+                "p95Px": 3.605551275463989,
+                "maxPx": 5
+              },
+              "reverse": {
+                "samples": 813,
+                "medianPx": 0,
+                "p95Px": 2.23606797749979,
+                "maxPx": 3.1622776601683795
+              },
+              "symmetric": {
+                "samples": 2064,
+                "medianPx": 1,
+                "p95Px": 3.1622776601683795,
+                "maxPx": 5
+              }
+            }
+          },
+          {
+            "id": "shape:fx-note",
+            "type": "note",
+            "x": 32.00000000000001,
+            "y": 496.4528301886793,
+            "w": 214.33962264150944,
+            "h": 214.33962264150944,
+            "band": {
+              "referenceStrokePixels": 826,
+              "forward": {
+                "samples": 826,
+                "medianPx": 1.4142135623730951,
+                "p95Px": 4,
+                "maxPx": 6
+              },
+              "reverse": {
+                "samples": 703,
+                "medianPx": 1,
+                "p95Px": 3.605551275463989,
+                "maxPx": 6
+              },
+              "symmetric": {
+                "samples": 1529,
+                "medianPx": 1.4142135623730951,
+                "p95Px": 4,
+                "maxPx": 6
+              }
+            }
+          },
+          {
+            "id": "shape:fx-text",
+            "type": "text",
+            "x": 332.07547169811323,
+            "y": 539.3207547169811,
+            "w": 321.50943396226415,
+            "h": 34.29433962264151,
+            "band": {
+              "referenceStrokePixels": 1640,
+              "forward": {
+                "samples": 1640,
+                "medianPx": 2,
+                "p95Px": 18.973665961010276,
+                "maxPx": 26.1725046566048
+              },
+              "reverse": {
+                "samples": 1221,
+                "medianPx": 1.4142135623730951,
+                "p95Px": 6.324555320336759,
+                "maxPx": 10.816653826391969
+              },
+              "symmetric": {
+                "samples": 2861,
+                "medianPx": 2,
+                "p95Px": 12.041594578792296,
+                "maxPx": 26.1725046566048
+              }
+            }
+          },
+          {
+            "id": "shape:fx-frame",
+            "type": "frame",
+            "x": 675.0188679245283,
+            "y": 475.0188679245283,
+            "w": 428.6792452830189,
+            "h": 278.64150943396226,
+            "band": {
+              "referenceStrokePixels": 4556,
+              "forward": {
+                "samples": 4556,
+                "medianPx": 1,
+                "p95Px": 2,
+                "maxPx": 4.123105625617661
+              },
+              "reverse": {
+                "samples": 3601,
+                "medianPx": 0,
+                "p95Px": 2,
+                "maxPx": 4.47213595499958
+              },
+              "symmetric": {
+                "samples": 8157,
+                "medianPx": 1,
+                "p95Px": 2,
+                "maxPx": 4.47213595499958
+              }
+            }
+          },
+          {
+            "id": "shape:fx-frame-child-1",
+            "type": "geo",
+            "geo": "rectangle",
+            "x": 707.1698113207547,
+            "y": 517.8867924528302,
+            "w": 128.60377358490567,
+            "h": 85.73584905660377,
+            "band": {
+              "referenceStrokePixels": 1484,
+              "forward": {
+                "samples": 1484,
+                "medianPx": 0,
+                "p95Px": 1,
+                "maxPx": 3
+              },
+              "reverse": {
+                "samples": 1004,
+                "medianPx": 0,
+                "p95Px": 1,
+                "maxPx": 2.23606797749979
+              },
+              "symmetric": {
+                "samples": 2488,
+                "medianPx": 0,
+                "p95Px": 1,
+                "maxPx": 3
+              }
+            }
+          },
+          {
+            "id": "shape:fx-frame-child-2",
+            "type": "geo",
+            "geo": "ellipse",
+            "x": 910.7924528301887,
+            "y": 539.3207547169811,
+            "w": 128.60377358490567,
+            "h": 128.60377358490567,
+            "band": {
+              "referenceStrokePixels": 1652,
+              "forward": {
+                "samples": 1652,
+                "medianPx": 1,
+                "p95Px": 3,
+                "maxPx": 4.123105625617661
+              },
+              "reverse": {
+                "samples": 1175,
+                "medianPx": 0,
+                "p95Px": 2,
+                "maxPx": 3.605551275463989
+              },
+              "symmetric": {
+                "samples": 2827,
+                "medianPx": 0,
+                "p95Px": 2.8284271247461903,
+                "maxPx": 4.123105625617661
+              }
+            }
+          }
+        ],
+        "overall": {
+          "forward": {
+            "samples": 26168,
+            "medianPx": 1,
+            "p95Px": 10.295630140987,
+            "maxPx": 26.1725046566048
+          },
+          "reverse": {
+            "samples": 20619,
+            "medianPx": 1,
+            "p95Px": 9.848857801796104,
+            "maxPx": 21.93171219946131
+          },
+          "symmetric": {
+            "samples": 46787,
+            "medianPx": 1,
+            "p95Px": 10.04987562112089,
+            "maxPx": 26.1725046566048
+          }
+        }
+      }
+    },
     "fixtureRecords": 18
   },
-  "raw": [
-    {
-      "lib": "mocanvas",
-      "n": 1000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 15.099999994039536,
-        "firstFrameMs": 94.59999999403954,
-        "count": 1000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 13.541666666666666,
-        "p50": 16.5,
-        "p95": 25,
-        "maxMs": 33.399999999999864,
-        "fps": 73.84615384615385,
-        "totalMs": 1625,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.15970838477251406
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 29.56833333333333,
-        "p50": 32.5,
-        "p95": 33.5,
-        "maxMs": 50,
-        "fps": 33.819965052702784,
-        "totalMs": 1774.1,
-        "longTasks": 0,
-        "longTaskMs": 0
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 2.5999999940395355,
-        "hits": 437
-      },
-      "memoryMB": 9.5367431640625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 1000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 15.099999994039536,
-        "firstFrameMs": 97.5,
-        "count": 1000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 12.569166666666666,
-        "p50": 9.099999999999909,
-        "p95": 17.399999999999977,
-        "maxMs": 25.800000000000182,
-        "fps": 79.5597692766691,
-        "totalMs": 1508.3,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.15970838477251406
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 30.148333333333326,
-        "p50": 33,
-        "p95": 34.19999999999982,
-        "maxMs": 57.69999999999982,
-        "fps": 33.16932942672343,
-        "totalMs": 1808.8999999999996,
-        "longTasks": 1,
-        "longTaskMs": 55
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 1.7999999821186066,
-        "hits": 437
-      },
-      "memoryMB": 9.5367431640625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 1000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 13,
-        "firstFrameMs": 72.70000000298023,
-        "count": 1000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 12.916666666666664,
-        "p50": 8.900000000000091,
-        "p95": 24.5,
-        "maxMs": 25.700000000000045,
-        "fps": 77.4193548387097,
-        "totalMs": 1549.9999999999998,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.15970838477251406
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 33.89166666666667,
-        "p50": 33.20000000000027,
-        "p95": 50.19999999999982,
-        "maxMs": 158.5999999999999,
-        "fps": 29.505778214900413,
-        "totalMs": 2033.5000000000005,
-        "longTasks": 3,
-        "longTaskMs": 333
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 2,
-        "hits": 437
-      },
-      "memoryMB": 9.5367431640625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 1000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 32.599999994039536,
-        "firstFrameMs": 106.09999999403954,
-        "count": 1000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 8.3325,
-        "p50": 8.300000000000068,
-        "p95": 9.100000000000023,
-        "maxMs": 9.399999999999864,
-        "fps": 120.01200120012003,
-        "totalMs": 999.8999999999999,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.16047215819216304
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 27.778333333333332,
-        "p50": 25.09999999999991,
-        "p95": 33.69999999999982,
-        "maxMs": 41.799999999999955,
-        "fps": 35.999280014399716,
-        "totalMs": 1666.7,
-        "longTasks": 0,
-        "longTaskMs": 0
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 28.799999982118607,
-        "hits": 160
-      },
-      "memoryMB": 51.021575927734375,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 1000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 37.79999999701977,
-        "firstFrameMs": 125.70000000298023,
-        "count": 1000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 8.333333333333332,
-        "p50": 8.299999999999955,
-        "p95": 9.199999999999932,
-        "maxMs": 9.400000000000091,
-        "fps": 120.00000000000001,
-        "totalMs": 999.9999999999999,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.16047215819216304
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 27.776666666666667,
-        "p50": 25,
-        "p95": 33.90000000000009,
-        "maxMs": 41.69999999999982,
-        "fps": 36.0014400576023,
-        "totalMs": 1666.6000000000001,
-        "longTasks": 0,
-        "longTaskMs": 0
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 32,
-        "hits": 160
-      },
-      "memoryMB": 51.021575927734375,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 1000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 38.70000000298023,
-        "firstFrameMs": 129.40000000596046,
-        "count": 1000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 8.334166666666668,
-        "p50": 8.299999999999955,
-        "p95": 9.099999999999909,
-        "maxMs": 9.300000000000068,
-        "fps": 119.98800119987999,
-        "totalMs": 1000.1000000000001,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.16047215819216304
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 30.001666666666665,
-        "p50": 33.09999999999991,
-        "p95": 41.69999999999982,
-        "maxMs": 41.799999999999955,
-        "fps": 33.331481584356425,
-        "totalMs": 1800.1,
-        "longTasks": 0,
-        "longTaskMs": 0
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 34.80000001192093,
-        "hits": 160
-      },
-      "memoryMB": 51.021575927734375,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 5000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 40.099999994039536,
-        "firstFrameMs": 161.09999999403954,
-        "count": 5000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 28.816666666666666,
-        "p50": 25,
-        "p95": 66.60000000000002,
-        "maxMs": 75.00000000000045,
-        "fps": 34.70213996529786,
-        "totalMs": 3458,
-        "longTasks": 17,
-        "longTaskMs": 1079,
-        "zoomFit": 0.07304527443996053
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 115.69333333333333,
-        "p50": 108.80000000000018,
-        "p95": 125,
-        "maxMs": 266.7000000000007,
-        "fps": 8.643540394145443,
-        "totalMs": 6941.599999999999,
-        "longTasks": 62,
-        "longTaskMs": 7046
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 3,
-        "hits": 496
-      },
-      "memoryMB": 9.5367431640625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 5000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 40.70000000298023,
-        "firstFrameMs": 121.5,
-        "count": 5000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 28.194166666666664,
-        "p50": 25,
-        "p95": 58.40000000000009,
-        "maxMs": 83.29999999999973,
-        "fps": 35.4683297372388,
-        "totalMs": 3383.2999999999997,
-        "longTasks": 12,
-        "longTaskMs": 774,
-        "zoomFit": 0.07304527443996053
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 122.64833333333333,
-        "p50": 116.60000000000036,
-        "p95": 140.69999999999982,
-        "maxMs": 408.7999999999993,
-        "fps": 8.153392490725517,
-        "totalMs": 7358.9,
-        "longTasks": 62,
-        "longTaskMs": 7460
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 3.199999988079071,
-        "hits": 496
-      },
-      "memoryMB": 9.5367431640625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 5000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 39.70000000298023,
-        "firstFrameMs": 108.40000000596046,
-        "count": 5000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 30.278333333333332,
-        "p50": 25,
-        "p95": 74.40000000000009,
-        "maxMs": 91.59999999999991,
-        "fps": 33.0269169373039,
-        "totalMs": 3633.4,
-        "longTasks": 15,
-        "longTaskMs": 1018,
-        "zoomFit": 0.07304527443996053
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 153.04833333333332,
-        "p50": 117.10000000000036,
-        "p95": 275.90000000000055,
-        "maxMs": 841.7000000000007,
-        "fps": 6.5338836315325235,
-        "totalMs": 9182.9,
-        "longTasks": 63,
-        "longTaskMs": 9359
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 3,
-        "hits": 496
-      },
-      "memoryMB": 9.5367431640625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 5000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 120,
-        "firstFrameMs": 469.8999999910593,
-        "count": 5000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 12.846666666666666,
-        "p50": 8.400000000000091,
-        "p95": 25,
-        "maxMs": 33.500000000000114,
-        "fps": 77.84120394395434,
-        "totalMs": 1541.6,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.07321017555660342
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 162.77666666666667,
-        "p50": 158.39999999999964,
-        "p95": 199.90000000000055,
-        "maxMs": 225.19999999999982,
-        "fps": 6.143386644277435,
-        "totalMs": 9766.6,
-        "longTasks": 61,
-        "longTaskMs": 9818
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 111.7999999821186,
-        "hits": 171
-      },
-      "memoryMB": 202.178955078125,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 5000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 120.6000000089407,
-        "firstFrameMs": 491.29999999701977,
-        "count": 5000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 12.223333333333334,
-        "p50": 8.400000000000091,
-        "p95": 25.09999999999991,
-        "maxMs": 33.299999999999955,
-        "fps": 81.81074447777473,
-        "totalMs": 1466.8000000000002,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.07321017555660342
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 148.47166666666666,
-        "p50": 150,
-        "p95": 159.10000000000036,
-        "maxMs": 166.80000000000018,
-        "fps": 6.735291806517518,
-        "totalMs": 8908.3,
-        "longTasks": 61,
-        "longTaskMs": 8942
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 116,
-        "hits": 171
-      },
-      "memoryMB": 202.178955078125,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 5000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 116.6000000089407,
-        "firstFrameMs": 439.79999999701977,
-        "count": 5000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 12.430833333333334,
-        "p50": 8.400000000000091,
-        "p95": 25,
-        "maxMs": 33.39999999999998,
-        "fps": 80.44512971777166,
-        "totalMs": 1491.7,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.07321017555660342
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 150.83,
-        "p50": 150,
-        "p95": 166.6999999999989,
-        "maxMs": 174.89999999999964,
-        "fps": 6.629980773055758,
-        "totalMs": 9049.800000000001,
-        "longTasks": 61,
-        "longTaskMs": 9090
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 109.39999997615814,
-        "hits": 171
-      },
-      "memoryMB": 202.178955078125,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 20000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 134.20000000298023,
-        "firstFrameMs": 213.09999999403954,
-        "count": 20000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 40.76416666666667,
-        "p50": 33.19999999999982,
-        "p95": 116.69999999999982,
-        "maxMs": 166.69999999999982,
-        "fps": 24.53134901976818,
-        "totalMs": 4891.7,
-        "longTasks": 20,
-        "longTaskMs": 1924,
-        "zoomFit": 0.05
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 407.9133333333333,
-        "p50": 400,
-        "p95": 441.59999999999854,
-        "maxMs": 675,
-        "fps": 2.451501135862193,
-        "totalMs": 24474.8,
-        "longTasks": 63,
-        "longTaskMs": 25341
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 5.5999999940395355,
-        "hits": 500
-      },
-      "memoryMB": 20.694732666015625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 20000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 139.90000000596046,
-        "firstFrameMs": 219.09999999403954,
-        "count": 20000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 50.06833333333334,
-        "p50": 41.59999999999991,
-        "p95": 141,
-        "maxMs": 174.89999999999964,
-        "fps": 19.9727039712393,
-        "totalMs": 6008.200000000001,
-        "longTasks": 32,
-        "longTaskMs": 3022,
-        "zoomFit": 0.05
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 409.0383333333333,
-        "p50": 400,
-        "p95": 449.8999999999978,
-        "maxMs": 766.7000000000007,
-        "fps": 2.4447586412031472,
-        "totalMs": 24542.3,
-        "longTasks": 62,
-        "longTaskMs": 25731
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 5.399999976158142,
-        "hits": 500
-      },
-      "memoryMB": 20.694732666015625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 20000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 131.40000000596046,
-        "firstFrameMs": 209.70000000298023,
-        "count": 20000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 41.59083333333333,
-        "p50": 33.299999999999955,
-        "p95": 116.69999999999982,
-        "maxMs": 158.30000000000018,
-        "fps": 24.043759642549443,
-        "totalMs": 4990.9,
-        "longTasks": 20,
-        "longTaskMs": 1951,
-        "zoomFit": 0.05
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 407.49666666666667,
-        "p50": 400,
-        "p95": 441.59999999999854,
-        "maxMs": 683.0999999999985,
-        "fps": 2.454007803744816,
-        "totalMs": 24449.8,
-        "longTasks": 62,
-        "longTaskMs": 25107
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 5,
-        "hits": 500
-      },
-      "memoryMB": 20.694732666015625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 20000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 433.19999998807907,
-        "firstFrameMs": 2226.3999999910593,
-        "count": 20000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 134.6575,
-        "p50": 125,
-        "p95": 258.7999999999993,
-        "maxMs": 308.39999999999964,
-        "fps": 7.426248073816906,
-        "totalMs": 16158.9,
-        "longTasks": 120,
-        "longTaskMs": 15943,
-        "zoomFit": 0.05
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 854.5683333333334,
-        "p50": 850,
-        "p95": 983.1999999999971,
-        "maxMs": 1467.300000000003,
-        "fps": 1.1701814366317498,
-        "totalMs": 51274.100000000006,
-        "longTasks": 62,
-        "longTaskMs": 51383
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 524.5999999940395,
-        "hits": 165
-      },
-      "memoryMB": 802.9937744140625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 20000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 467.20000000298023,
-        "firstFrameMs": 2407.5,
-        "count": 20000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 136.17916666666667,
-        "p50": 124.20000000000073,
-        "p95": 266.90000000000146,
-        "maxMs": 350.60000000000036,
-        "fps": 7.343267141939234,
-        "totalMs": 16341.500000000002,
-        "longTasks": 119,
-        "longTaskMs": 16002,
-        "zoomFit": 0.05
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 883.6033333333332,
-        "p50": 858.4000000000015,
-        "p95": 1058.199999999997,
-        "maxMs": 1291.699999999997,
-        "fps": 1.1317295468177653,
-        "totalMs": 53016.2,
-        "longTasks": 62,
-        "longTaskMs": 53151
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 518.8000000119209,
-        "hits": 165
-      },
-      "memoryMB": 802.9937744140625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 20000,
-      "kind": "geo",
-      "errors": [],
-      "create": {
-        "ms": 429.90000000596046,
-        "firstFrameMs": 2185.9000000059605,
-        "count": 20000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 131.59833333333333,
-        "p50": 116.70000000000073,
-        "p95": 250,
-        "maxMs": 308.3000000000002,
-        "fps": 7.598880431616409,
-        "totalMs": 15791.8,
-        "longTasks": 120,
-        "longTaskMs": 15365,
-        "zoomFit": 0.05
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 1008.4933333333335,
-        "p50": 991.6000000000058,
-        "p95": 1258.2000000000044,
-        "maxMs": 1824.800000000003,
-        "fps": 0.9915781958565252,
-        "totalMs": 60509.600000000006,
-        "longTasks": 62,
-        "longTaskMs": 60634
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 608.1999999880791,
-        "hits": 165
-      },
-      "memoryMB": 802.9937744140625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 1000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 31.799999997019768,
-        "firstFrameMs": 194.79999999701977,
-        "count": 1000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 26.9475,
-        "p50": 24.90000000000009,
-        "p95": 42.299999999999955,
-        "maxMs": 199.30000000000018,
-        "fps": 37.10919380276463,
-        "totalMs": 3233.7000000000003,
-        "longTasks": 5,
-        "longTaskMs": 442,
-        "zoomFit": 0.16089012062595573
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 51.525,
-        "p50": 50,
-        "p95": 66.80000000000018,
-        "maxMs": 100,
-        "fps": 19.40805434255216,
-        "totalMs": 3091.5,
-        "longTasks": 23,
-        "longTaskMs": 1353
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 2.4000000059604645,
-        "hits": 434
-      },
-      "memoryMB": 9.5367431640625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 1000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 25.700000002980232,
-        "firstFrameMs": 111.20000000298023,
-        "count": 1000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 21.879999999999995,
-        "p50": 16.799999999999727,
-        "p95": 41.39999999999998,
-        "maxMs": 50.10000000000002,
-        "fps": 45.7038391224863,
-        "totalMs": 2625.5999999999995,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.16089012062595573
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 66.39,
-        "p50": 58.399999999999636,
-        "p95": 108.5,
-        "maxMs": 149.70000000000073,
-        "fps": 15.062509414068384,
-        "totalMs": 3983.4,
-        "longTasks": 54,
-        "longTaskMs": 3783
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 2.4000000059604645,
-        "hits": 434
-      },
-      "memoryMB": 9.5367431640625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 1000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 24,
-        "firstFrameMs": 129.8999999910593,
-        "count": 1000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 26.800833333333333,
-        "p50": 25,
-        "p95": 49.70000000000027,
-        "maxMs": 58.59999999999991,
-        "fps": 37.31227262833867,
-        "totalMs": 3216.1,
-        "longTasks": 5,
-        "longTaskMs": 277,
-        "zoomFit": 0.16089012062595573
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 50.419999999999995,
-        "p50": 50,
-        "p95": 58.80000000000018,
-        "maxMs": 83.80000000000018,
-        "fps": 19.833399444664817,
-        "totalMs": 3025.2,
-        "longTasks": 27,
-        "longTaskMs": 1517
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 2.4000000059604645,
-        "hits": 434
-      },
-      "memoryMB": 9.5367431640625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 1000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 66.20000000298023,
-        "firstFrameMs": 171,
-        "count": 1000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 8.334999999999999,
-        "p50": 8.299999999999955,
-        "p95": 9.100000000000136,
-        "maxMs": 9.299999999999955,
-        "fps": 119.97600479904021,
-        "totalMs": 1000.1999999999999,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.16108215522500516
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 44.44666666666667,
-        "p50": 41.79999999999973,
-        "p95": 58.5,
-        "maxMs": 67.40000000000009,
-        "fps": 22.498875056247186,
-        "totalMs": 2666.8,
-        "longTasks": 14,
-        "longTaskMs": 800
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 43.400000005960464,
-        "hits": 138
-      },
-      "memoryMB": 51.021575927734375,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 1000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 76,
-        "firstFrameMs": 201.30000001192093,
-        "count": 1000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 8.333333333333334,
-        "p50": 8.299999999999955,
-        "p95": 9,
-        "maxMs": 9.200000000000045,
-        "fps": 119.99999999999999,
-        "totalMs": 1000,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.16108215522500516
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 41.94833333333334,
-        "p50": 41.69999999999982,
-        "p95": 50.200000000000045,
-        "maxMs": 66.59999999999991,
-        "fps": 23.838849378203342,
-        "totalMs": 2516.9,
-        "longTasks": 2,
-        "longTaskMs": 119
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 46.79999998211861,
-        "hits": 138
-      },
-      "memoryMB": 51.021575927734375,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 1000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 79.79999999701977,
-        "firstFrameMs": 196.3999999910593,
-        "count": 1000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 8.335833333333333,
-        "p50": 8.300000000000182,
-        "p95": 9,
-        "maxMs": 9.299999999999955,
-        "fps": 119.96401079676097,
-        "totalMs": 1000.3,
-        "longTasks": 0,
-        "longTaskMs": 0,
-        "zoomFit": 0.16108215522500516
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 39.58333333333334,
-        "p50": 41.59999999999991,
-        "p95": 49.09999999999991,
-        "maxMs": 58.30000000000018,
-        "fps": 25.263157894736835,
-        "totalMs": 2375.0000000000005,
-        "longTasks": 2,
-        "longTaskMs": 116
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 47,
-        "hits": 138
-      },
-      "memoryMB": 51.021575927734375,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 5000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 67.79999999701977,
-        "firstFrameMs": 173.79999999701977,
-        "count": 5000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 47.707499999999996,
-        "p50": 41.600000000000364,
-        "p95": 107.80000000000018,
-        "maxMs": 150,
-        "fps": 20.961064822092965,
-        "totalMs": 5724.9,
-        "longTasks": 40,
-        "longTaskMs": 3139,
-        "zoomFit": 0.07264896314959529
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 190.1316666666667,
-        "p50": 183.5,
-        "p95": 233.5,
-        "maxMs": 291.7999999999993,
-        "fps": 5.259513144399933,
-        "totalMs": 11407.900000000001,
-        "longTasks": 63,
-        "longTaskMs": 11679
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 4,
-        "hits": 496
-      },
-      "memoryMB": 12.111663818359375,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 5000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 69.1000000089407,
-        "firstFrameMs": 174.20000000298023,
-        "count": 5000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 44.241666666666674,
-        "p50": 33.30000000000018,
-        "p95": 108.30000000000018,
-        "maxMs": 133.29999999999927,
-        "fps": 22.603126765869273,
-        "totalMs": 5309.000000000001,
-        "longTasks": 37,
-        "longTaskMs": 2855,
-        "zoomFit": 0.07264896314959529
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 200.13666666666666,
-        "p50": 183.60000000000036,
-        "p95": 258.2999999999993,
-        "maxMs": 591.5999999999985,
-        "fps": 4.996585666461252,
-        "totalMs": 12008.199999999999,
-        "longTasks": 62,
-        "longTaskMs": 12151
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 4,
-        "hits": 496
-      },
-      "memoryMB": 12.111663818359375,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 5000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 66,
-        "firstFrameMs": 165.70000000298023,
-        "count": 5000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 50.35,
-        "p50": 41.90000000000009,
-        "p95": 108.30000000000018,
-        "maxMs": 133.30000000000018,
-        "fps": 19.860973187686195,
-        "totalMs": 6042,
-        "longTasks": 47,
-        "longTaskMs": 3568,
-        "zoomFit": 0.07264896314959529
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 196.39333333333335,
-        "p50": 183.40000000000146,
-        "p95": 250,
-        "maxMs": 425,
-        "fps": 5.091822533011983,
-        "totalMs": 11783.6,
-        "longTasks": 63,
-        "longTaskMs": 12043
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 4.199999988079071,
-        "hits": 496
-      },
-      "memoryMB": 12.111663818359375,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 5000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 241.5,
-        "firstFrameMs": 742.3999999910593,
-        "count": 5000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 19.097500000000004,
-        "p50": 16.700000000000045,
-        "p95": 41.600000000000364,
-        "maxMs": 57.799999999999955,
-        "fps": 52.362874721822216,
-        "totalMs": 2291.7000000000003,
-        "longTasks": 1,
-        "longTaskMs": 59,
-        "zoomFit": 0.07266669050158968
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 236.53666666666666,
-        "p50": 225.90000000000055,
-        "p95": 266.7000000000007,
-        "maxMs": 358.3000000000011,
-        "fps": 4.227674356336579,
-        "totalMs": 14192.199999999999,
-        "longTasks": 61,
-        "longTaskMs": 14304
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 184,
-        "hits": 169
-      },
-      "memoryMB": 214.57672119140625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 5000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 241.59999999403954,
-        "firstFrameMs": 727.2000000029802,
-        "count": 5000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 20.06833333333333,
-        "p50": 16.699999999999818,
-        "p95": 41.700000000000045,
-        "maxMs": 58.200000000000045,
-        "fps": 49.82974835977079,
-        "totalMs": 2408.2,
-        "longTasks": 1,
-        "longTaskMs": 58,
-        "zoomFit": 0.07266669050158968
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 230.83166666666668,
-        "p50": 232.70000000000073,
-        "p95": 258.39999999999964,
-        "maxMs": 274.89999999999964,
-        "fps": 4.332161243041466,
-        "totalMs": 13849.900000000001,
-        "longTasks": 61,
-        "longTaskMs": 13958
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 201,
-        "hits": 169
-      },
-      "memoryMB": 214.57672119140625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 5000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 218.79999999701977,
-        "firstFrameMs": 684.9000000059605,
-        "count": 5000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 18.264166666666664,
-        "p50": 16.700000000000045,
-        "p95": 33.5,
-        "maxMs": 50.09999999999991,
-        "fps": 54.75201898069992,
-        "totalMs": 2191.7,
-        "longTasks": 1,
-        "longTaskMs": 50,
-        "zoomFit": 0.07266669050158968
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 217.9116666666667,
-        "p50": 208.89999999999964,
-        "p95": 241.20000000000073,
-        "maxMs": 341.5,
-        "fps": 4.589015426740192,
-        "totalMs": 13074.7,
-        "longTasks": 61,
-        "longTaskMs": 13138
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 179.2000000178814,
-        "hits": 169
-      },
-      "memoryMB": 214.57672119140625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 20000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 242,
-        "firstFrameMs": 406,
-        "count": 20000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 70.48583333333333,
-        "p50": 50,
-        "p95": 208.29999999999927,
-        "maxMs": 291.60000000000036,
-        "fps": 14.18724802856366,
-        "totalMs": 8458.3,
-        "longTasks": 59,
-        "longTaskMs": 6123,
-        "zoomFit": 0.05
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 844.9766666666667,
-        "p50": 841.5999999999985,
-        "p95": 958.3999999999942,
-        "maxMs": 1124.9000000000015,
-        "fps": 1.183464632159468,
-        "totalMs": 50698.6,
-        "longTasks": 62,
-        "longTaskMs": 51838
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 5.200000017881393,
-        "hits": 499
-      },
-      "memoryMB": 33.473968505859375,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 20000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 249.5,
-        "firstFrameMs": 401,
-        "count": 20000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 69.37416666666667,
-        "p50": 50,
-        "p95": 208.39999999999964,
-        "maxMs": 325.40000000000146,
-        "fps": 14.414587562613365,
-        "totalMs": 8324.9,
-        "longTasks": 60,
-        "longTaskMs": 6197,
-        "zoomFit": 0.05
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 829.575,
-        "p50": 817.5,
-        "p95": 909.2000000000044,
-        "maxMs": 1274.9000000000015,
-        "fps": 1.2054365186993339,
-        "totalMs": 49774.5,
-        "longTasks": 62,
-        "longTaskMs": 50860
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 8.400000005960464,
-        "hits": 499
-      },
-      "memoryMB": 33.473968505859375,
-      "consoleErrors": []
-    },
-    {
-      "lib": "mocanvas",
-      "n": 20000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 249.3999999910593,
-        "firstFrameMs": 417.29999999701977,
-        "count": 20000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 71.4575,
-        "p50": 50,
-        "p95": 208.30000000000018,
-        "maxMs": 300.39999999999964,
-        "fps": 13.994332295420355,
-        "totalMs": 8574.9,
-        "longTasks": 57,
-        "longTaskMs": 5865,
-        "zoomFit": 0.05
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 848.6016666666667,
-        "p50": 841.5999999999985,
-        "p95": 925,
-        "maxMs": 1299.9000000000015,
-        "fps": 1.1784091868780209,
-        "totalMs": 50916.1,
-        "longTasks": 62,
-        "longTaskMs": 52317
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 5.200000017881393,
-        "hits": 499
-      },
-      "memoryMB": 33.473968505859375,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 20000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 753.7000000029802,
-        "firstFrameMs": 2923.300000011921,
-        "count": 20000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 175.27666666666667,
-        "p50": 157.89999999999782,
-        "p95": 350.09999999999854,
-        "maxMs": 433.90000000000146,
-        "fps": 5.705265960481524,
-        "totalMs": 21033.2,
-        "longTasks": 119,
-        "longTaskMs": 20925,
-        "zoomFit": 0.05
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 1117.0283333333332,
-        "p50": 1091.5,
-        "p95": 1291,
-        "maxMs": 1558.699999999997,
-        "fps": 0.895232439642683,
-        "totalMs": 67021.7,
-        "longTasks": 61,
-        "longTaskMs": 67062
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 583.8000000119209,
-        "hits": 170
-      },
-      "memoryMB": 802.9937744140625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 20000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 749.4000000059605,
-        "firstFrameMs": 2864.1000000089407,
-        "count": 20000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 173.26666666666668,
-        "p50": 150,
-        "p95": 333.6000000000022,
-        "maxMs": 391.59999999999945,
-        "fps": 5.771450557906887,
-        "totalMs": 20792,
-        "longTasks": 120,
-        "longTaskMs": 20696,
-        "zoomFit": 0.05
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 1151.3783333333333,
-        "p50": 1124.8999999999942,
-        "p95": 1375,
-        "maxMs": 1557.5,
-        "fps": 0.8685242470256663,
-        "totalMs": 69082.7,
-        "longTasks": 61,
-        "longTaskMs": 69287
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 656,
-        "hits": 170
-      },
-      "memoryMB": 802.9937744140625,
-      "consoleErrors": []
-    },
-    {
-      "lib": "tldraw",
-      "n": 20000,
-      "kind": "mixed",
-      "errors": [],
-      "create": {
-        "ms": 803.7999999970198,
-        "firstFrameMs": 3055,
-        "count": 20000
-      },
-      "gpu": {
-        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-        "vendor": "Google Inc. (Google)",
-        "webgl2": true
-      },
-      "panZoom": {
-        "frames": 120,
-        "avgMs": 194.51666666666668,
-        "p50": 166.60000000000036,
-        "p95": 383.2000000000007,
-        "maxMs": 429.1999999999998,
-        "fps": 5.140947648016451,
-        "totalMs": 23342,
-        "longTasks": 121,
-        "longTaskMs": 23310,
-        "zoomFit": 0.05
-      },
-      "drag": {
-        "frames": 60,
-        "avgMs": 1199.7783333333334,
-        "p50": 1158.2000000000044,
-        "p95": 1516.4000000000015,
-        "maxMs": 1817.1000000000058,
-        "fps": 0.8334872969590216,
-        "totalMs": 71986.70000000001,
-        "longTasks": 61,
-        "longTaskMs": 72101
-      },
-      "hit": {
-        "samples": 500,
-        "avgUs": 710.8000000119209,
-        "hits": 170
-      },
-      "memoryMB": 802.9937744140625,
-      "consoleErrors": []
-    }
-  ],
-  "visibleDifferences": "Comparing `compare-tldraw.png` with `compare-mocanvas.png`. Both are the same unmodified fixture\nrendered by each library. This list was re-measured on `ef4d079`, after the fill-ramp fix; the\nentry that used to head it — \"fill strength\", ~85% of the diff — is gone, and the list below is\nre-ordered accordingly.\n\nThe percentages are measured, not guessed: differing pixels inside a box drawn around each shape,\nat the same tolerance as the headline number (any channel differing by more than 24/255), as a\nshare of all differing pixels in the image (36,368). The boxes overlap where the shapes do — the\nbent arrow crosses both the rectangle and the ellipse — so the shares add up to slightly more than\n100%. They are shares of a diff that is now a third of its previous size, so a share that went *up*\ndoes not mean that difference got worse: every remaining cause grew as a fraction of a much smaller\nwhole.\n\n1. **Hand-drawn outline geometry — now the largest cause, roughly half the diff.** tldraw's default\n   `dash: \"draw\"` wobbles the outline, overshoots at corners, varies the stroke width, and rounds\n   every corner generously. mocanvas draws the exact polygon with a uniform stroke and sharp\n   vertices. Now that the fills agree, this is *all* that is left inside most of the filled shapes:\n   two rings of stroke that do not sit on the same pixels, around interiors that match exactly.\n   - Share of the diff: hexagon 15.8%, rectangle 11.6%, star 10.3%, ellipse 5.8%,\n     triangle 4.8%, line 3.0%, straight arrow 2.4%.\n   - The hexagon is the clearest case and the single largest region in the diff. The star is the\n     most extreme in relative terms: its box scores a region IoU of only 20.0%, because a `semi`\n     star is nothing but outline and tldraw rounds every one of its ten points.\n   - The rectangle's 11.6% is not all outline — about 3.5 points of it is the \"Hello box\" label\n     (see 5) and the bent arrow crosses the box (see 4). Its outline band alone is about 2.9%.\n   - Stroke *colours* match exactly: scanning across the ellipse, both libraries put the same\n     `#e03131` ring in the same place; the star's is `#f1ac4b` on both sides.\n\n2. **Frame chrome. 14.6% of the diff, region IoU 47.8%.** tldraw's frame border is `#717171`;\n   mocanvas's is a lighter, bluer `#9fa8b2`, one pixel lower (the top edge lands on y=475 against\n   tldraw's y=474). The \"Frame A\" label is lighter in mocanvas and sits 2 px right and 3 px down of\n   tldraw's. The frame's two children contribute about 6.0% between them, and that is outline\n   geometry (cause 1), not fill: both children's interiors are `#fcfffe` in both renders.\n\n3. **Note chrome. 11.1% of the diff at a region IoU of 95.9%**, on the largest single shape in the\n   fixture — the high IoU says the note is in the right place at the right size, and the 11.1% is\n   almost entirely colour. What is missing in mocanvas is the trim: tldraw draws a soft drop shadow\n   below the note (about 3.7% of the diff on its own; the strip below the body fades to `#e6e7e9`)\n   and a subtle top-to-bottom gradient on the body (`#f7dc99` at the top → `#fce19c` at the\n   bottom). mocanvas's body is a flat `#fce19c` — matching tldraw's *bottom* — with nothing beneath\n   it. The \"Sticky note\" label matches in position and size, and is marginally lighter.\n\n4. **The bound arrow terminates differently. 9.0%, region IoU 48.1%.** tldraw stops the bent arrow\n   short of the rectangle it is bound to, leaving a visible gap; mocanvas runs it to the shape's\n   edge, so its arrowhead overlaps the border. The arrowhead is also slightly larger and at a\n   slightly different angle. The bent-arrow box overlaps the rectangle and the ellipse, so part of\n   that 9.0% is their outlines.\n\n5. **Font weight. Text shape region: 6.9% of the diff, region IoU 25.5%** (low because a glyph\n   either lands on a pixel or does not). Size, baseline and position agree — \"Hello box\", \"Sticky\n   note\", \"Plain text shape\" and the frame label all sit where tldraw puts them, at the same size.\n   What differs is the face: tldraw's is heavier and slightly wider, so \"Plain text shape\" ends at\n   x=523 in mocanvas against x=548 in tldraw — about 25 px earlier — and inks 1,237 dark pixels\n   against tldraw's 1,683.\n\n6. **Freehand stroke taper. 4.3% of the diff, region IoU 48.8%.** Both draw the same wave along the\n   same curve. tldraw's stroke varies in width and tapers to a point at both ends (pressure\n   simulation); mocanvas's is uniform width, blunt at both ends, and marginally thinner overall.\n\n7. **tldraw watermark. 1.9%, region IoU 0.0%.** tldraw paints a \"Get a license for production\" badge\n   in the bottom-right corner; mocanvas has nothing there. Not a rendering difference at all — and\n   it is a larger share of the diff than it used to be only because the diff shrank around it.\n\n8. **Framing.** Zoom-to-fit lands slightly differently: ignoring the watermark, mocanvas's ink\n   bounding box is 1136×708 px starting at (32, 46), against tldraw's 1142×712 starting at (29, 43)\n   — 3 px right, 3 px down, and 0.5% smaller. Every shape carries that offset, which widens every\n   edge in the diff a little. Part of the size difference is tldraw's hand-drawn overshoot spilling\n   past the true geometry.\n\n**Retired from this list** — these were real in earlier runs and are not differences any more:\n\n- **Fill strength (was #1, ~85% of the diff).** `getFillRgba`\n  (`packages/mocanvas/src/shapes/shape-theme.ts`, commit `ef4d079`) now maps `semi` to the paper\n  colour, `solid` to the hue's pale tint, and `fill` to the hue itself. Measured over the eroded\n  interior of each filled shape — well inside the outline, so no stroke pixels are counted — the\n  two renders are now byte-identical: the red ellipse is `#f4dadb` on both sides (9,374 px, 0.0%\n  differing), the violet hexagon `#ecdcf2` on both (7,448 px, 0.0%), the blue rectangle `#fcfffe`\n  on both (7,503 px, 0.0%), the star `#fcfffe` on both (1,672 px, 0.6% — that residue is the\n  hand-drawn outline of a point intruding into the sample box, not fill), and both of the frame's\n  children `#fcfffe` on both (0.0%). The ellipse's box, which the old list put at 20.0% of the\n  diff on a fill disagreement, is down to 5.8% at a region IoU of 96.7%. This single change took\n  the whole-image diff from 12.14% to 3.79% and the painted-pixel IoU from 56.4% to 79.1%.\n- mocanvas rendered *nothing* from the unmodified file (it threw on `props.richText`). It loads and\n  draws all 14 shapes.\n- The sticky note's \"Sticky note\" label was missing. It renders, at the right size and position.\n- The text shape's and the freehand stroke's content were only present in a shimmed render. Both\n  come from the raw file now.\n\nEverything else lines up: the page background (`#f9fafb` on both, exactly), the note body colour,\nevery fill colour, every stroke colour, shape positions and sizes, the geo shape set, the bent\narrow's binding to the rectangle, the straight arrow, the line's spline, the frame and both of its\nchildren, and the text shape's position."
+  "raw": [],
+  "visibleDifferences": "Comparing `compare-tldraw.png` with `compare-mocanvas.png`. Both are the same unmodified fixture\nrendered by each library. Re-measured on `83ff957`, in the same run that produced the numbers above.\n\n**Interior IoU 94.1%** at 97.3% colour agreement, **stroke band distance 1.00 px median / 10.05 px\np95** against a ~4 px stroke, whole-image diff 3.82% at 78.2% painted-pixel IoU. Both libraries draw\nthe default `dash: \"draw\"` style as a genuinely hand-drawn outline — seeded wobble, rounded corners,\novershoot past the vertex — from *different* random numbers, and a pixel diff charges for that twice,\nonce in each direction. So the list below is ordered by what the first two numbers say; each shape's\nshare of the whole-image diff is quoted second, so the older version of this list is still comparable.\n\n#### Where the two renders genuinely differ\n\n1. **The star's inner radius. Interior IoU 69.9% — the lowest in the fixture; 9.9% of the diff.**\n   mocanvas draws a five-pointed star with a smaller inner radius than tldraw, so its arms are\n   visibly thinner and its points longer. The stroke band agrees with that reading: 2.83 px median,\n   8.06 px p95, roughly twice the fixture median. Colour over the shared interior is 99.6%, so this\n   is geometry, not fill. Invisible in the whole-image number, where it is buried under stroke\n   wobble.\n\n2. **The hexagon's proportions. Interior IoU 80.1%; 15.4% of the diff, the second-largest region.**\n   mocanvas's hexagon is narrower across the flats than tldraw's — its vertical edges sit further\n   in — so the two outlines diverge by 6.71 px at the median and 14.42 px at the 95th percentile,\n   the second-worst band in the fixture. Again 99.3% colour agreement inside: geometry only.\n\n3. **The bound arrow terminates differently. Band 4.12 px median, 19.85 px p95 — the worst in the\n   fixture; 10.1% of the diff.** tldraw stops the bent arrow short of the rectangle it is bound to,\n   leaving a visible gap; mocanvas runs it to the shape's edge, so its arrowhead overlaps the\n   border. The arrowhead is also slightly larger and at a slightly different angle. A binding\n   difference, not a stroke one.\n\n4. **Font weight. Text-shape band 2.00 px median, 12.04 px p95; 6.9% of the diff.** Size, baseline\n   and position agree — \"Hello box\", \"Sticky note\", \"Plain text shape\" and the frame label all sit\n   where tldraw puts them, at the same size. The face differs: tldraw's is heavier and slightly\n   wider, so \"Plain text shape\" ends at x=523 in mocanvas against x=548 in tldraw — about 25 px\n   earlier — and inks 1,206 dark pixels against tldraw's 1,638. This is also what the rectangle's\n   94.8% interior colour agreement is (its \"Hello box\" label), and most of the note's 95.9%.\n\n5. **tldraw watermark. 1.8% of the diff.** tldraw paints a \"Get a license for production\" badge in\n   the bottom-right corner; mocanvas has nothing there. Not a rendering difference. Both region\n   metrics exclude it — found automatically as the one place in the corner where the reference\n   painted and mocanvas painted nothing at all.\n\n6. **Framing.** Zoom-to-fit still lands a little differently: ignoring the watermark, mocanvas's ink\n   bounding box is 1141×709 px starting at (29, 45), against tldraw's 1142×712 starting at (29, 43)\n   — same left edge, 2 px lower, 3 px shorter. Every shape carries that offset, which costs each\n   interior-IoU row a point or two and costs the small shapes more.\n\n#### Where a large diff share is *not* a difference worth fixing\n\n- **The frame. 16.7% of the diff — the largest single region — at an interior IoU of 98.8% and a\n  band of 1.00 px median / 2.00 px p95.** Almost all of it is one thing: the frame's border is a\n  hairline, and it lands one pixel lower in mocanvas than in tldraw. Rows y=474/475 and y=752/753/754\n  contribute 431 differing pixels each — about 4.7% of the whole image diff for a one-pixel offset\n  of a 1 px line. Border colour matches exactly (`#717171` on both sides), and the frame's two\n  children score 98.4% and 94.7% interior IoU at 99.8% / 99.5% colour agreement.\n\n- **The outlines of the rectangle, ellipse and triangle. 11.5%, 6.7% and 5.3% of the diff.** All\n  three sit at a 1.00 px median band distance and a p95 of 2.24–3.00 px, and at 96.8%, 96.8% and\n  92.8% interior IoU with ≥99.3% colour agreement inside. This is the case the whole-image number\n  cannot score: two hand-drawn rings that never coincide, around interiors that agree. The\n  rectangle's share is also inflated by the \"Hello box\" label and by the bent arrow crossing its box.\n\n- **The freehand stroke. 4.3% of the diff, band 1.00 px median / 3.00 px p95.** Both draw the same\n  wave along the same curve, within a stroke width the whole way. Widths now agree closely too —\n  column-summed dark pixels are 1,316 for tldraw against 1,421 for mocanvas — so the earlier note\n  that mocanvas's stroke was uniform-width, blunt and thinner no longer holds; only the very start\n  of the stroke is still noticeably thicker in tldraw.\n\n- **The line and the straight arrow. 4.1% and 1.7%, band medians 1.00 px and 0.00 px.** The straight\n  arrow is the closest match in the fixture.\n\n#### Retired from this list\n\nThese were real in earlier runs and are not differences any more:\n\n- **The note's trim (was cause #3, 11.1% of the diff).** mocanvas draws the note's top-to-bottom\n  gradient and its drop shadow now. At the note's centre column the body reads `#f7dc99` (tldraw)\n  against `#f8dd9a` (mocanvas) at the top and `#fce19c` against `#fbe09c` at the bottom, and the\n  shadow below the body fades through the same greys on both sides — every one of those pairs is\n  inside the comparison's 24/255 tolerance. What is left of the note's 9.0% diff share is the label's\n  font weight and a one-pixel offset of its bottom edge.\n- **The frame's border colour (was part of cause #2).** mocanvas drew `#9fa8b2`; it now draws\n  `#717171`, the same as tldraw.\n- **Fill strength (was #1, ~85% of the diff).** `getFillRgba`\n  (`packages/mocanvas/src/shapes/shape-theme.ts`, commit `ef4d079`) maps `semi` to the paper colour,\n  `solid` to the hue's pale tint, and `fill` to the hue. Interior colour agreement is now ≥99.3% on\n  every shape that is only fill.\n- **Exact, uniform outlines (was cause #1 at `ef4d079`).** mocanvas drew the exact polygon with a\n  uniform stroke and sharp vertices where tldraw wobbled, overshot and rounded. It now draws a\n  hand-drawn outline of its own. This *raised* the whole-image diff slightly, which is why that\n  number is reported last.\n- mocanvas rendered *nothing* from the unmodified file (it threw on `props.richText`). It loads and\n  draws all 14 shapes.\n- The sticky note's \"Sticky note\" label was missing, and the text shape's and freehand stroke's\n  content were only present in a shimmed render. All three come from the raw file now.\n\nEverything else lines up: the page background (`#f9fafb` on both, exactly), every fill colour, every\nstroke colour, shape positions and sizes, the geo shape set, the bent arrow's binding to the\nrectangle, the line's spline, the frame and both of its children, and the text shape's position.",
+  "mixedRun": true
 }

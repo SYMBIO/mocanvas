@@ -63,6 +63,18 @@ export interface LoadResult {
   warnings: string[]
 }
 
+/** A shape's axis-aligned bounding box in *screen* (viewport) pixels, after `fitCamera()`. */
+export interface ShapeBox {
+  id: string
+  type: string
+  /** `props.geo` for geo shapes, so the report can say "hexagon" rather than "geo". */
+  geo?: string
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export interface GpuInfo {
   renderer: string
   vendor: string
@@ -82,6 +94,14 @@ export interface BenchApi {
   screenshotReady(): Promise<boolean>
   fitCamera(): CameraLike | null
   shapeCount(): number
+  /**
+   * Every shape on the page as a screen-space box, using the *current* camera.
+   * The rendering comparison uses these to cut per-shape regions out of the two
+   * screenshots. Both pages compute it the same way — page bounds through the
+   * shared `screen = (page + camera) * z` mapping — so neither library gets to
+   * define the regions differently.
+   */
+  shapeBoxes(): ShapeBox[]
   gpuInfo(): GpuInfo
   /** tldraw page only: build the rendering-comparison fixture and return it as a `.tldr` document. */
   makeFixture?(): Promise<unknown>
@@ -227,6 +247,11 @@ export function buildSpecs(n: number, kind: Kind): ShapeSpec[] {
 /** Camera such that `pagePoint` sits at the viewport centre at zoom `z` (screen = (page + cam) * z). */
 export function cameraAt(pagePoint: Vec, z: number, vp: BoxLike): CameraLike {
   return { x: -pagePoint.x + vp.w / (2 * z), y: -pagePoint.y + vp.h / (2 * z), z }
+}
+
+/** Page-space box → screen-space box under `cam`, the inverse of `cameraAt`'s mapping. */
+export function pageBoxToScreen(b: BoxLike, cam: CameraLike): BoxLike {
+  return { x: (b.x + cam.x) * cam.z, y: (b.y + cam.y) * cam.z, w: b.w * cam.z, h: b.h * cam.z }
 }
 
 /** Zoom-to-fit with a fixed 64px inset; identical framing in both libraries. */

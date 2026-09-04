@@ -23,6 +23,7 @@ import { existsSync, readFileSync } from "node:fs"
 import os from "node:os"
 import { resolve } from "node:path"
 import { REPO_ROOT, ROOT, VIEWPORT, buildApp, launchBrowser, median, openBenchPage, startPreview, withTimeout } from "./lib.mjs"
+import { regionMetrics } from "./compare-metrics.mjs"
 
 const LIBS = ["mocanvas", "tldraw"]
 const RESULTS_DIR = resolve(ROOT, "results")
@@ -43,7 +44,7 @@ const FIXTURE = resolve(ROOT, "public/compare.tldr")
  * check it still says something true before publishing a new report, and drop
  * it if every run behind the report was made from a clean tree.
  */
-const RUN_NOTE = "Why the performance tables' revision is marked dirty: the tree was checked clean at `15b670a` immediately before that run started, and the bundle is built once, before the first measurement — so a clean `15b670a` is what was measured. The `-dirty` marker comes from edits made after that build: to this report generator, and to UI code (selection handles, style panel, icons) committed by a concurrent session. Neither is in the bundle those numbers come from."
+const RUN_NOTE = "Why both revisions are marked dirty. **The rendering comparison** ran at `83ff957` with `packages/` and `crates/` untouched — the only uncommitted changes were under `apps/bench`, and they are the measurement code that produced the interior-IoU and stroke-band numbers, not anything mocanvas renders. **The performance tables** were measured at a tree that was checked clean at `15b670a` immediately before that run started, and the bundle is built once, before the first measurement, so a clean `15b670a` is what those numbers come from; their `-dirty` marker is from edits made after that build, to this report generator and to UI code (selection handles, style panel, icons) committed by a concurrent session."
 
 const PREVIOUS = {
   date: "2026-09-04 08:30:07 UTC",
@@ -54,19 +55,37 @@ const PREVIOUS = {
 }
 
 /**
- * The rendering comparison as it stood at `15b670a` — after the `.tldr` load fix
- * (so mocanvas drew the whole document) but before the fill-ramp fix in
- * `ef4d079`. Kept so the comparison table can show all three points: nothing
- * drawn → drawn with the wrong fills → drawn with the right ones. Hand-copied
- * from the `docs/BENCHMARK.md` generated at 2026-09-04 09:26:29 UTC (git `15b670a-dirty`).
+ * How the rendering comparison has moved, kept so the report can show the
+ * trend rather than one number. Hand-copied from the `docs/BENCHMARK.md`
+ * generated at each of those revisions; the current run supplies the last
+ * column. `interiorIoU` and `bandMedianPx` are blank before this run because
+ * the metrics did not exist yet — nothing is being back-filled or guessed.
+ *
+ * Drop a column once it stops being the interesting comparison.
  */
-const PREVIOUS_COMPARE = {
-  git: "15b670a-dirty",
-  loaded: true,
-  diffPercent: 12.14,
-  inkPixelsMocanvas: 163726,
-  inkOverlapPercent: 56.4,
-}
+const HISTORY = [
+  {
+    git: "32ac776-dirty",
+    what: "before the `.tldr` load fix",
+    loaded: "no — threw on `props.richText`",
+    diffPercent: 11.84,
+    inkOverlapPercent: 0,
+  },
+  {
+    git: "15b670a-dirty",
+    what: "drawn, wrong fill ramp",
+    loaded: "yes",
+    diffPercent: 12.14,
+    inkOverlapPercent: 56.4,
+  },
+  {
+    git: "ef4d079",
+    what: "correct fills, exact outlines",
+    loaded: "yes",
+    diffPercent: 3.79,
+    inkOverlapPercent: 79.1,
+  },
+]
 
 /**
  * Where the performance matrix in `latest.json` came from, for the case where
@@ -76,7 +95,7 @@ const PREVIOUS_COMPARE = {
  * to turn the provenance note on; drop both once a full run supersedes it.
  */
 const PERF_RUN = { date: "2026-09-04 09:26:29 UTC", git: "15b670a-dirty" }
-const MIXED_RUN_NOTE = "**The two halves of this report were measured at different times.** The rendering comparison was re-measured after the fill-ramp fix; the performance tables were **not** re-run — they are unchanged from the earlier run listed under Environment, and nothing below claims they were."
+const MIXED_RUN_NOTE = "**The two halves of this report were measured at different times.** The rendering comparison was re-measured after the hand-drawn stroke style landed, and with two region metrics that did not exist before; the performance tables were **not** re-run — they are unchanged from the earlier run listed under Environment, and nothing below claims they were."
 
 // ---------------------------------------------------------------------------
 // args
@@ -169,17 +188,25 @@ async function compareRendering(browser, url) {
     await withTimeout(page, 60_000, () => window.bench.screenshotReady())
     const file = resolve(RESULTS_DIR, `${name}.png`)
     await page.screenshot({ path: file, clip: { x: 0, y: 0, ...VIEWPORT } })
+    const boxes = await withTimeout(page, 60_000, () => window.bench.shapeBoxes())
     await page.close()
-    return { load, file }
+    return { load, file, boxes }
   }
 
   // Pass A — both libraries get the raw, unmodified tldraw-authored file.
+  const boxes = {}
   for (const lib of LIBS) {
-    const { load, file } = await shoot(lib, fixture, `compare-${lib}`)
-    loads[lib] = load
-    shots[lib] = file
+    const shot = await shoot(lib, fixture, `compare-${lib}`)
+    loads[lib] = shot.load
+    shots[lib] = shot.file
+    boxes[lib] = shot.boxes
   }
   const diff = await pixelDiff(shots.mocanvas, shots.tldraw, 24, "compare-diff")
+
+  // Per-shape regions come from tldraw's own layout — it is the reference
+  // render, and using one side's boxes for both keeps the regions from being
+  // defined differently for each library.
+  const regions = await regionMetrics({ mocanvasPath: shots.mocanvas, tldrawPath: shots.tldraw, boxes: boxes.tldraw ?? [] })
 
   // There used to be a pass B here: mocanvas got a bench-side down-converted
   // copy of the document (richText → text, packed draw path → point array)
@@ -189,7 +216,7 @@ async function compareRendering(browser, url) {
   // `window.bench.downconvert` helper is still there if a future format gap
   // ever needs the same treatment.
 
-  return { ok: true, shots, loads, diff, fixtureRecords: fixture.records.length }
+  return { ok: true, shots, loads, diff, boxes, regions, fixtureRecords: fixture.records.length }
 }
 
 /**
@@ -309,6 +336,217 @@ function pkgVersion(name) {
   }
 }
 
+/**
+ * A shape's display name for the comparison tables: "hexagon", not "geo", and
+ * "bent arrow" rather than two rows both called "arrow". Keyed on the fixture's
+ * stable ids (`scripts/make-fixture.mjs`), with the shape's own type as the
+ * fallback for anything the fixture grows later.
+ */
+const SHAPE_LABELS = {
+  "fx-arrow-bent": "bent arrow",
+  "fx-arrow-straight": "straight arrow",
+  "fx-draw": "freehand stroke",
+  "fx-text": "text shape",
+  "fx-frame-child-1": "rectangle (in frame)",
+  "fx-frame-child-2": "ellipse (in frame)",
+}
+const shapeLabel = (s) => SHAPE_LABELS[String(s.id).replace(/^shape:/, "")] ?? s.geo ?? s.type
+
+const px = (v) => (v == null || !Number.isFinite(v) ? "—" : `${v.toFixed(2)} px`)
+
+/**
+ * The rendering comparison, built around three numbers in decreasing order of
+ * how much a pixel comparison can be trusted to mean what it looks like it
+ * means. See `scripts/compare-metrics.mjs` for how the first two are computed.
+ */
+function comparisonSection(compare, versions) {
+  const md = []
+  const d = compare.diff
+  const r = compare.regions
+  const interior = r?.interior
+  const band = r?.stroke
+  /** Look a shape's row up by the stable fixture id, so prose quotes measured values. */
+  const byId = (rows, suffix) => rows?.find((v) => v.id.endsWith(suffix))
+
+  if (!interior || !band) {
+    md.push(`Region metrics unavailable: ${r?.error ?? "not computed"}. Only the whole-image diff is reported below.`)
+    md.push("")
+  } else {
+    md.push("Three numbers, in decreasing order of how much a pixel comparison can be trusted to mean what it")
+    md.push("looks like it means.")
+    md.push("")
+    md.push("| | | what it measures |")
+    md.push("| :--- | ---: | :--- |")
+    md.push(`| Interior IoU | **${fmt(interior.overall.iouPercent, 1)}%** | fills, positions and sizes — exact geometry on both sides |`)
+    md.push(`| Stroke band distance | **${px(band.overall.symmetric.medianPx)} median, ${px(band.overall.symmetric.p95Px)} p95** | how far apart the two outlines actually run |`)
+    md.push(`| Whole-image pixel diff | **${fmt(d.diffPercent, 2)}% differing, ${fmt(d.inkOverlapPercent, 1)}% painted-pixel IoU** | everything at once, stroke randomness included |`)
+    md.push("")
+    md.push("Both libraries draw the default `dash: \"draw\"` style as a genuinely hand-drawn outline — seeded wobble,")
+    md.push("rounded corners, overshoot past the vertex — and neither is trying to reproduce the other's random")
+    md.push("numbers. Two outlines that both look right therefore miss each other by roughly a stroke width, and a")
+    md.push("pixel diff charges for that twice: once where mocanvas painted and tldraw did not, and once the other way")
+    md.push("round. That is measured, not assumed — making mocanvas draw exact polygons instead *improved* the")
+    const exact = HISTORY[HISTORY.length - 1]
+    md.push(`whole-image figures (${fmt(exact.inkOverlapPercent, 1)}% painted-pixel IoU at \`${exact.git}\`, against this run's ${fmt(d.inkOverlapPercent, 1)}%) while making the`)
+    md.push("render look wrong. So the whole-image row is reported last, and the two above it are the ones to quote.")
+    md.push("")
+
+    // ---- 1. interior IoU --------------------------------------------------
+    md.push(`### 1. Interior IoU — ${fmt(interior.overall.iouPercent, 1)}%`)
+    md.push("")
+    md.push("Per shape, the region is cut out of both screenshots and the silhouette of whatever was drawn there is")
+    md.push("recovered — paint, plus everything the paint encloses, so a fill the colour of the paper still has an")
+    md.push(`interior. Both silhouettes are then eroded ${interior.erosion} px inward, past the widest stroke either library draws`)
+    md.push("(hand-drawn overshoot included), leaving interior only: no stroke pixel is counted on either side. `IoU`")
+    md.push("is the intersection of the two eroded interiors over their union — position and size, with the outline")
+    md.push(`taken out. \`colour\` is how much of the shared interior agrees on colour at the same ${interior.tolerance}/255 tolerance the`)
+    md.push("pixel diff uses — the fills.")
+    md.push("")
+    md.push("| shape | interior px (tldraw) | IoU | colour |")
+    md.push("| :--- | ---: | ---: | ---: |")
+    for (const s of interior.perShape) {
+      if (!s.interior) continue
+      md.push(`| ${shapeLabel(s)} | ${int(s.interior.pixelsTldraw)} | ${fmt(s.interior.iouPercent, 1)}% | ${fmt(s.interior.colourAgreementPercent, 1)}% |`)
+    }
+    md.push(`| **whole fixture** | **${int(interior.overall.pixelsTldraw)}** | **${fmt(interior.overall.iouPercent, 1)}%** | **${fmt(interior.overall.colourAgreementPercent, 1)}%** |`)
+    md.push("")
+    md.push("The fixture-wide row is one union over every shape's interior, not an average of the rows, so the boxes")
+    md.push("that overlap — the frame and its two children — are not counted twice.")
+    md.push("")
+    const rectCol = byId(interior.perShape, "fx-rect")?.interior?.colourAgreementPercent
+    const noteCol = byId(interior.perShape, "fx-note")?.interior?.colourAgreementPercent
+    md.push("**Fills are essentially exact.** Every shape that is only fill agrees on colour over 99% of its shared")
+    md.push(`interior. The two that do not are the two carrying something else: the rectangle's ${fmt(rectCol, 1)}% is its "Hello box"`)
+    md.push(`label (a font-weight difference, not a fill one) and the note's ${fmt(noteCol, 1)}% is tldraw's top-to-bottom gradient`)
+    md.push("and drop shadow against mocanvas's flat body.")
+    md.push("")
+    const starIoU = byId(interior.perShape, "fx-star")?.interior?.iouPercent
+    const hexIoU = byId(interior.perShape, "fx-hexagon")?.interior?.iouPercent
+    md.push("**The two low IoU rows are real geometry differences, which is what this metric is for.** mocanvas's star")
+    md.push(`uses a smaller inner radius than tldraw's, so its arms are visibly thinner — that is the ${fmt(starIoU, 1)}% — and its`)
+    md.push(`hexagon is narrower across the flats, which is the ${fmt(hexIoU, 1)}%. Neither is visible in the whole-image number,`)
+    md.push("where they are buried under stroke wobble; both are obvious once the interiors are compared directly.")
+    md.push("")
+    const skipped = interior.perShape.filter((s) => !s.interior).map((s) => shapeLabel(s))
+    md.push(`Not scored here: the ${skipped.slice(0, -1).join(", the ")} and the ${skipped[skipped.length - 1]}. An open shape encloses nothing, and its box overlaps shapes that`)
+    md.push("do — measuring \"its interior\" would silently be measuring theirs. The stroke band distance below is the")
+    md.push("metric that covers them.")
+    md.push("")
+
+    // ---- 2. stroke band ---------------------------------------------------
+    md.push(`### 2. Stroke band distance — ${px(band.overall.symmetric.medianPx)} median, ${px(band.overall.symmetric.p95Px)} at the 95th percentile`)
+    md.push("")
+    md.push("The question a hand-drawn outline can fairly be asked is not \"do your stroke pixels land on the")
+    md.push("reference's?\" but \"how far away are they?\". For every stroke colour in the reference render, an exact")
+    md.push("Euclidean distance transform gives the distance from any pixel to the nearest stroke pixel of that colour")
+    md.push("in each image. Sampling those at the *other* render's stroke pixels of the same colour, in both directions")
+    md.push("so that a stroke which is merely shorter cannot score well, gives a distance in pixels per shape.")
+    md.push("")
+    md.push(`Stroke width in these screenshots is about ${fmt(band.strokeWidthEstimatePx, 0)} px, so a hand-drawn pair that looks right should land`)
+    md.push("within a few pixels; a genuinely misplaced outline would not.")
+    md.push("")
+    md.push("| shape | reference stroke px | median | p95 | max |")
+    md.push("| :--- | ---: | ---: | ---: | ---: |")
+    for (const s of band.perShape) {
+      if (!s.band) continue
+      const q = s.band.symmetric
+      md.push(`| ${shapeLabel(s)} | ${int(s.band.referenceStrokePixels)} | ${px(q.medianPx)} | ${px(q.p95Px)} | ${px(q.maxPx)} |`)
+    }
+    md.push(`| **whole fixture** | — | **${px(band.overall.symmetric.medianPx)}** | **${px(band.overall.symmetric.p95Px)}** | **${px(band.overall.symmetric.maxPx)}** |`)
+    md.push("")
+    const scored = band.perShape.filter((v) => v.band)
+    const sw = band.strokeWidthEstimatePx ?? 4
+    const tight = scored.filter((v) => v.band.symmetric.medianPx <= sw / 2).length
+    const quote = (suffix) => {
+      const q = byId(scored, suffix)?.band?.symmetric
+      return q ? `${px(q.medianPx)} median / ${px(q.p95Px)} p95` : "—"
+    }
+    md.push("**This is the number that says the hand-drawn stroke is working.** Half of mocanvas's stroke pixels are")
+    md.push(`within ${px(band.overall.symmetric.medianPx)} of a reference stroke pixel of the same colour, and the worst pixel anywhere in the fixture is`)
+    md.push(`${px(band.overall.symmetric.maxPx)} out — about ${fmt(band.overall.symmetric.maxPx / sw, 1)} stroke widths, on a glyph. ${tight} of the ${scored.length} scored regions sit at a median of`)
+    md.push(`half a stroke width or better. Two outlines that a pixel diff scores as largely disjoint are, measured as a`)
+    md.push("distance, running within a stroke width of each other nearly everywhere.")
+    md.push("")
+    md.push("The rows that are not within a stroke width are the differences worth having a name for, and none of them")
+    md.push("is stroke randomness:")
+    md.push("")
+    md.push(`- **bent arrow, ${quote("fx-arrow-bent")}** — tldraw stops the arrow short of the rectangle it is bound`)
+    md.push("  to; mocanvas runs it to the shape's edge. A binding difference, and the largest one in the fixture.")
+    md.push(`- **hexagon, ${quote("fx-hexagon")}** — the same narrower hexagon the interior IoU row catches.`)
+    md.push(`- **text shape, ${quote("fx-text")}** — font weight: tldraw's face is heavier and slightly wider, so the`)
+    md.push("  glyphs drift apart along the line even though the baseline and size agree.")
+    md.push(`- **star, ${quote("fx-star")}** — the inner-radius difference again.`)
+    md.push("")
+    md.push("Two exclusions, both documented in `scripts/compare-metrics.mjs`. tldraw's \"Get a license for production\"")
+    md.push(`badge (found automatically at ${band.excluded ? `${band.excluded.x0},${band.excluded.y0}–${band.excluded.x1},${band.excluded.y1}` : "the bottom-right corner"}, and only excluded because mocanvas paints nothing at all inside it) sits`)
+    md.push("inside the frame's box and is not a rendering difference. And a colour class with fewer than")
+    md.push(`${band.minRegionPixels} pixels in a region is the antialiased skirt of a neighbouring colour rather than a stroke of its own,`)
+    md.push("so it is skipped rather than allowed to set that region's 95th percentile.")
+    md.push("")
+
+    // ---- 3. whole image ---------------------------------------------------
+    md.push(`### 3. Whole-image pixel diff — ${fmt(d.diffPercent, 2)}% differing, ${fmt(d.inkOverlapPercent, 1)}% painted-pixel IoU`)
+    md.push("")
+  }
+
+  md.push("| | |")
+  md.push("| :--- | ---: |")
+  md.push(`| Differing pixels | **${d.diffPercent.toFixed(2)}%** (${int(d.differentPixels)} of ${int(d.totalPixels)}) |`)
+  md.push(`| Tolerance | any channel differing by more than ${d.tolerance}/255 |`)
+  md.push(`| Painted (non-white) pixels, mocanvas | ${int(d.inkPixelsMocanvas)} |`)
+  md.push(`| Painted (non-white) pixels, tldraw | ${int(d.inkPixelsTldraw)} |`)
+  md.push(`| Painted-pixel overlap (IoU) | **${d.inkOverlapPercent.toFixed(1)}%** |`)
+  md.push("")
+  md.push("**Both rows understate the agreement, and the differing-pixels row is the worse of the two.** tldraw inks")
+  md.push("only about 12% of the canvas, so a render that draws too little scores well on it: mocanvas painted")
+  md.push("*nothing* in the first run below and scored 11.84% differing, then drew the whole document with the wrong")
+  md.push("fills and scored 12.14%. Two renders that could hardly be less alike landed within 0.3 points of each")
+  md.push("other. Painted-pixel IoU separates those two properly (0.0% against 56.4%), but it is an *overlap*, and an")
+  md.push("overlap is exactly the wrong shape of question to ask about two independently wobbled outlines: it counts")
+  md.push("a stroke that is one stroke width away identically to one that is on the other side of the canvas.")
+  md.push("")
+  md.push("Quote it as an upper bound on how much of the render is pixel-identical, not as a similarity score.")
+  md.push("")
+
+  // ---- history -------------------------------------------------------------
+  md.push("### How the comparison has moved")
+  md.push("")
+  const cols = [...HISTORY, {
+    git: versions.git,
+    what: "hand-drawn outlines (this run)",
+    loaded: compare.loads.mocanvas.ok ? "yes" : `no — ${compare.loads.mocanvas.error}`,
+    diffPercent: d.diffPercent,
+    inkOverlapPercent: d.inkOverlapPercent,
+    interiorIoU: r?.interior?.overall?.iouPercent,
+    bandMedian: r?.stroke?.overall?.symmetric?.medianPx,
+  }]
+  md.push(`| | ${cols.map((c) => `\`${c.git}\``).join(" | ")} |`)
+  md.push(`| :--- | ${cols.map(() => ":---").join(" | ")} |`)
+  md.push(`| | ${cols.map((c) => c.what).join(" | ")} |`)
+  md.push(`| mocanvas loaded the file | ${cols.map((c) => c.loaded).join(" | ")} |`)
+  md.push(`| Interior IoU | ${cols.map((c) => (c.interiorIoU == null ? "not measured yet" : `**${fmt(c.interiorIoU, 1)}%**`)).join(" | ")} |`)
+  md.push(`| Stroke band, median | ${cols.map((c) => (c.bandMedian == null ? "not measured yet" : `**${px(c.bandMedian)}**`)).join(" | ")} |`)
+  md.push(`| Painted-pixel IoU | ${cols.map((c) => `${fmt(c.inkOverlapPercent, 1)}%`).join(" | ")} |`)
+  md.push(`| Differing pixels | ${cols.map((c) => `${fmt(c.diffPercent, 2)}%`).join(" | ")} |`)
+  md.push("")
+  md.push("The first two columns are why the whole-image rows are reported last: they barely move across the change")
+  md.push("that took mocanvas from drawing nothing at all to drawing the entire document. The fill-ramp fix in")
+  md.push("`ef4d079` is the one change both of them register properly.")
+  md.push("")
+  const exact = HISTORY[HISTORY.length - 1]
+  md.push("**The last step is the point of this section.** `ef4d079` drew exact polygons with a uniform stroke;")
+  md.push("`182bf43` and `83ff957` replaced that with the seeded, wobbling, corner-overshooting outline the default")
+  md.push("`dash: \"draw\"` style actually calls for, which is unambiguously the more faithful render. The whole-image")
+  md.push(`numbers got *worse* for it (${fmt(exact.inkOverlapPercent, 1)}% → ${fmt(d.inkOverlapPercent, 1)}% painted-pixel IoU, ${fmt(exact.diffPercent, 2)}% → ${fmt(d.diffPercent, 2)}% differing). The two rows above`)
+  md.push("them are the ones that can tell the difference between a stroke in the wrong place and a stroke drawn with")
+  md.push("different random numbers, and only those two are worth optimising against.")
+  md.push("")
+  md.push("The last two columns were measured on different revisions but with the same fixture, viewport, browser and")
+  md.push("tolerance; the interior and band rows exist only from this run, and nothing has been back-filled.")
+  md.push("")
+  return md
+}
+
 function renderDoc(data) {
   const { machine, browser, matrix, ns, kinds, repeats, compare, versions, date } = data
   const md = []
@@ -376,34 +614,9 @@ function renderDoc(data) {
     md.push("within a single browser session: it puts the p95 improvement at 16–31% between 5,000 and 20,000 shapes.")
     md.push("")
     if (compare?.ok && !compare.diff?.error) {
-      const first = PREVIOUS.compare
-      const mid = PREVIOUS_COMPARE
-      md.push("Rendering comparison against the same `.tldr` fixture. It has three points now, and only the last")
-      md.push("column was measured by the run at the top of this file — see the note above about the two halves of")
-      md.push("this report:")
-      md.push("")
-      md.push(`| | \`${PREVIOUS.git}\` (before the .tldr fix) | \`${mid.git}\` (before the fill fix) | \`${versions.git}\` (now) |`)
-      md.push("| :--- | :--- | :--- | :--- |")
-      md.push(`| mocanvas loaded the file | ${first.loaded ? "yes" : "no — threw on `props.richText`"} | ${mid.loaded ? "yes" : "no"} | ${compare.loads.mocanvas.ok ? "yes" : `no — ${compare.loads.mocanvas.error}`} |`)
-      md.push(`| Painted pixels, mocanvas | ${int(first.inkPixelsMocanvas)} | ${int(mid.inkPixelsMocanvas)} | ${int(compare.diff.inkPixelsMocanvas)} |`)
-      md.push(`| Painted-pixel overlap (IoU) | ${fmt(first.inkOverlapPercent, 1)}% | ${fmt(mid.inkOverlapPercent, 1)}% | **${fmt(compare.diff.inkOverlapPercent, 1)}%** |`)
-      md.push(`| Differing pixels | ${fmt(first.diffPercent, 2)}% | ${fmt(mid.diffPercent, 2)}% | **${fmt(compare.diff.diffPercent, 2)}%** |`)
-      md.push("")
-      md.push("**The fill fix helped, and by a lot.** `getFillRgba` (`packages/mocanvas/src/shapes/shape-theme.ts`)")
-      md.push("was mapping `fill: \"solid\"` onto the palette hue itself and `fill: \"semi\"` onto a tint of it — one step")
-      md.push("stronger than tldraw at both levels. It now maps `semi` to the paper colour, `solid` to the hue's pale")
-      md.push("tint, and `fill` to the hue. Measured over the eroded interior of each filled shape, the two renders")
-      md.push("are now identical pixel for pixel: the red ellipse is `#f4dadb` on both sides, the violet hexagon")
-      md.push("`#ecdcf2`, and the blue rectangle, the star and both of the frame's children `#fcfffe`.")
-      md.push("")
-      md.push(`The painted-pixel count falling (${int(mid.inkPixelsMocanvas)} → ${int(compare.diff.inkPixelsMocanvas)}, against tldraw's ${int(compare.diff.inkPixelsTldraw)}) is that fix working, not a`)
-      md.push("regression: a `semi` fill is *supposed* to leave the paper alone, so those pixels correctly stop")
-      md.push("counting as ink. mocanvas now inks slightly less than tldraw rather than substantially more.")
-      md.push("")
-      md.push("The differing-pixel row is still the one that reads backwards, and it is worth understanding before")
-      md.push("quoting either number — see [the note under the comparison](#rendering-comparison). Note in particular")
-      md.push(`that it barely moved between the first two columns (${fmt(first.diffPercent, 2)}% → ${fmt(mid.diffPercent, 2)}%) across the change that took`)
-      md.push("mocanvas from drawing nothing at all to drawing the whole document.")
+      md.push("The rendering comparison has moved a long way over the same span, but it is measured and discussed")
+      md.push("in [its own section](#rendering-comparison) rather than here, because what changed there is what is")
+      md.push("being *measured*, not only what is being rendered.")
       md.push("")
     }
   }
@@ -532,28 +745,7 @@ function renderDoc(data) {
       md.push(`Diff failed: ${compare.diff.error}`)
       md.push("")
     } else {
-      md.push("| | |")
-      md.push("| :--- | ---: |")
-      md.push(`| Differing pixels | **${compare.diff.diffPercent.toFixed(2)}%** (${int(compare.diff.differentPixels)} of ${int(compare.diff.totalPixels)}) |`)
-      md.push(`| Tolerance | any channel differing by more than ${compare.diff.tolerance}/255 |`)
-      md.push(`| Painted (non-white) pixels, mocanvas | ${int(compare.diff.inkPixelsMocanvas)} |`)
-      md.push(`| Painted (non-white) pixels, tldraw | ${int(compare.diff.inkPixelsTldraw)} |`)
-      md.push(`| Painted-pixel overlap (IoU) | **${compare.diff.inkOverlapPercent.toFixed(1)}%** |`)
-      md.push("")
-      md.push("**Read the overlap row, not the differing-pixels row.** \"Differing pixels\" is still a poor headline for")
-      md.push("this comparison, even now that it has fallen: tldraw inks only about 12% of the canvas, so a render that")
-      md.push("draws too little scores well on it. The two earlier runs are the proof — mocanvas painted *nothing* in the")
-      md.push("first and scored 11.84% differing pixels, then drew the whole document with the wrong fills and scored")
-      md.push("12.14%. Two renders that could hardly be less alike landed within 0.3 points of each other, because a")
-      md.push("blank canvas disagrees only where tldraw drew something. The painted-pixel overlap (intersection over")
-      md.push("union) separated them properly at the time (0.0% against 56.4%) and is still the metric to read here:")
-      md.push(`of every pixel either side inked, ${compare.diff.inkOverlapPercent.toFixed(1)}% were inked by both.`)
-      md.push("")
-      md.push(`This run is the first where both rows agree: ${compare.diff.diffPercent.toFixed(2)}% differing at ${compare.diff.inkOverlapPercent.toFixed(1)}% overlap. The fill ramp was`)
-      md.push("corrected between the two runs, which removed the large flat areas of disagreement inside every filled")
-      md.push("shape; what is left is mostly outline geometry, where mocanvas paints in nearly the same places as tldraw")
-      md.push("but with a different stroke and font. See the visible-differences list below for the breakdown.")
-      md.push("")
+      md.push(...comparisonSection(compare, versions))
     }
     md.push("### Load result")
     md.push("")
@@ -674,6 +866,12 @@ function renderDoc(data) {
   md.push("  its own hand-drawn stroke style and font stack; mocanvas rasterises through WebGL2. Antialiasing, stroke")
   md.push("  geometry and text layout will never match pixel-for-pixel, and a nonzero diff percentage is expected even")
   md.push("  where both are \"correct\".")
+  md.push("- **The whole-image numbers cannot score a hand-drawn stroke, and this is measured rather than argued.**")
+  md.push("  Both libraries wobble the default `dash: \"draw\"` outline from their own seed, so two outlines that both")
+  md.push("  look right miss each other by about a stroke width and every one of those pixels is charged twice. Drawing")
+  md.push("  exact polygons instead scored *better* on both whole-image rows while looking wrong. Read the interior IoU")
+  md.push("  and the stroke band distance first; the whole-image rows are an upper bound on pixel-identical area, not a")
+  md.push("  similarity score.")
   md.push("- **The pan/zoom numbers do not measure the same work in both libraries, and this favours tldraw.** A")
   md.push("  `requestAnimationFrame` delta captures main-thread time. tldraw moves the camera by setting a CSS transform")
   md.push("  on a container, so the pan/zoom sweep costs it almost no main-thread work — the compositor does the moving,")

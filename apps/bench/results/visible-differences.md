@@ -1,92 +1,99 @@
 Comparing `compare-tldraw.png` with `compare-mocanvas.png`. Both are the same unmodified fixture
-rendered by each library. This list was re-measured on `ef4d079`, after the fill-ramp fix; the
-entry that used to head it — "fill strength", ~85% of the diff — is gone, and the list below is
-re-ordered accordingly.
+rendered by each library. Re-measured on `83ff957`, in the same run that produced the numbers above.
 
-The percentages are measured, not guessed: differing pixels inside a box drawn around each shape,
-at the same tolerance as the headline number (any channel differing by more than 24/255), as a
-share of all differing pixels in the image (36,368). The boxes overlap where the shapes do — the
-bent arrow crosses both the rectangle and the ellipse — so the shares add up to slightly more than
-100%. They are shares of a diff that is now a third of its previous size, so a share that went *up*
-does not mean that difference got worse: every remaining cause grew as a fraction of a much smaller
-whole.
+**Interior IoU 94.1%** at 97.3% colour agreement, **stroke band distance 1.00 px median / 10.05 px
+p95** against a ~4 px stroke, whole-image diff 3.82% at 78.2% painted-pixel IoU. Both libraries draw
+the default `dash: "draw"` style as a genuinely hand-drawn outline — seeded wobble, rounded corners,
+overshoot past the vertex — from *different* random numbers, and a pixel diff charges for that twice,
+once in each direction. So the list below is ordered by what the first two numbers say; each shape's
+share of the whole-image diff is quoted second, so the older version of this list is still comparable.
 
-1. **Hand-drawn outline geometry — now the largest cause, roughly half the diff.** tldraw's default
-   `dash: "draw"` wobbles the outline, overshoots at corners, varies the stroke width, and rounds
-   every corner generously. mocanvas draws the exact polygon with a uniform stroke and sharp
-   vertices. Now that the fills agree, this is *all* that is left inside most of the filled shapes:
-   two rings of stroke that do not sit on the same pixels, around interiors that match exactly.
-   - Share of the diff: hexagon 15.8%, rectangle 11.6%, star 10.3%, ellipse 5.8%,
-     triangle 4.8%, line 3.0%, straight arrow 2.4%.
-   - The hexagon is the clearest case and the single largest region in the diff. The star is the
-     most extreme in relative terms: its box scores a region IoU of only 20.0%, because a `semi`
-     star is nothing but outline and tldraw rounds every one of its ten points.
-   - The rectangle's 11.6% is not all outline — about 3.5 points of it is the "Hello box" label
-     (see 5) and the bent arrow crosses the box (see 4). Its outline band alone is about 2.9%.
-   - Stroke *colours* match exactly: scanning across the ellipse, both libraries put the same
-     `#e03131` ring in the same place; the star's is `#f1ac4b` on both sides.
+#### Where the two renders genuinely differ
 
-2. **Frame chrome. 14.6% of the diff, region IoU 47.8%.** tldraw's frame border is `#717171`;
-   mocanvas's is a lighter, bluer `#9fa8b2`, one pixel lower (the top edge lands on y=475 against
-   tldraw's y=474). The "Frame A" label is lighter in mocanvas and sits 2 px right and 3 px down of
-   tldraw's. The frame's two children contribute about 6.0% between them, and that is outline
-   geometry (cause 1), not fill: both children's interiors are `#fcfffe` in both renders.
+1. **The star's inner radius. Interior IoU 69.9% — the lowest in the fixture; 9.9% of the diff.**
+   mocanvas draws a five-pointed star with a smaller inner radius than tldraw, so its arms are
+   visibly thinner and its points longer. The stroke band agrees with that reading: 2.83 px median,
+   8.06 px p95, roughly twice the fixture median. Colour over the shared interior is 99.6%, so this
+   is geometry, not fill. Invisible in the whole-image number, where it is buried under stroke
+   wobble.
 
-3. **Note chrome. 11.1% of the diff at a region IoU of 95.9%**, on the largest single shape in the
-   fixture — the high IoU says the note is in the right place at the right size, and the 11.1% is
-   almost entirely colour. What is missing in mocanvas is the trim: tldraw draws a soft drop shadow
-   below the note (about 3.7% of the diff on its own; the strip below the body fades to `#e6e7e9`)
-   and a subtle top-to-bottom gradient on the body (`#f7dc99` at the top → `#fce19c` at the
-   bottom). mocanvas's body is a flat `#fce19c` — matching tldraw's *bottom* — with nothing beneath
-   it. The "Sticky note" label matches in position and size, and is marginally lighter.
+2. **The hexagon's proportions. Interior IoU 80.1%; 15.4% of the diff, the second-largest region.**
+   mocanvas's hexagon is narrower across the flats than tldraw's — its vertical edges sit further
+   in — so the two outlines diverge by 6.71 px at the median and 14.42 px at the 95th percentile,
+   the second-worst band in the fixture. Again 99.3% colour agreement inside: geometry only.
 
-4. **The bound arrow terminates differently. 9.0%, region IoU 48.1%.** tldraw stops the bent arrow
-   short of the rectangle it is bound to, leaving a visible gap; mocanvas runs it to the shape's
-   edge, so its arrowhead overlaps the border. The arrowhead is also slightly larger and at a
-   slightly different angle. The bent-arrow box overlaps the rectangle and the ellipse, so part of
-   that 9.0% is their outlines.
+3. **The bound arrow terminates differently. Band 4.12 px median, 19.85 px p95 — the worst in the
+   fixture; 10.1% of the diff.** tldraw stops the bent arrow short of the rectangle it is bound to,
+   leaving a visible gap; mocanvas runs it to the shape's edge, so its arrowhead overlaps the
+   border. The arrowhead is also slightly larger and at a slightly different angle. A binding
+   difference, not a stroke one.
 
-5. **Font weight. Text shape region: 6.9% of the diff, region IoU 25.5%** (low because a glyph
-   either lands on a pixel or does not). Size, baseline and position agree — "Hello box", "Sticky
-   note", "Plain text shape" and the frame label all sit where tldraw puts them, at the same size.
-   What differs is the face: tldraw's is heavier and slightly wider, so "Plain text shape" ends at
-   x=523 in mocanvas against x=548 in tldraw — about 25 px earlier — and inks 1,237 dark pixels
-   against tldraw's 1,683.
+4. **Font weight. Text-shape band 2.00 px median, 12.04 px p95; 6.9% of the diff.** Size, baseline
+   and position agree — "Hello box", "Sticky note", "Plain text shape" and the frame label all sit
+   where tldraw puts them, at the same size. The face differs: tldraw's is heavier and slightly
+   wider, so "Plain text shape" ends at x=523 in mocanvas against x=548 in tldraw — about 25 px
+   earlier — and inks 1,206 dark pixels against tldraw's 1,638. This is also what the rectangle's
+   94.8% interior colour agreement is (its "Hello box" label), and most of the note's 95.9%.
 
-6. **Freehand stroke taper. 4.3% of the diff, region IoU 48.8%.** Both draw the same wave along the
-   same curve. tldraw's stroke varies in width and tapers to a point at both ends (pressure
-   simulation); mocanvas's is uniform width, blunt at both ends, and marginally thinner overall.
+5. **tldraw watermark. 1.8% of the diff.** tldraw paints a "Get a license for production" badge in
+   the bottom-right corner; mocanvas has nothing there. Not a rendering difference. Both region
+   metrics exclude it — found automatically as the one place in the corner where the reference
+   painted and mocanvas painted nothing at all.
 
-7. **tldraw watermark. 1.9%, region IoU 0.0%.** tldraw paints a "Get a license for production" badge
-   in the bottom-right corner; mocanvas has nothing there. Not a rendering difference at all — and
-   it is a larger share of the diff than it used to be only because the diff shrank around it.
+6. **Framing.** Zoom-to-fit still lands a little differently: ignoring the watermark, mocanvas's ink
+   bounding box is 1141×709 px starting at (29, 45), against tldraw's 1142×712 starting at (29, 43)
+   — same left edge, 2 px lower, 3 px shorter. Every shape carries that offset, which costs each
+   interior-IoU row a point or two and costs the small shapes more.
 
-8. **Framing.** Zoom-to-fit lands slightly differently: ignoring the watermark, mocanvas's ink
-   bounding box is 1136×708 px starting at (32, 46), against tldraw's 1142×712 starting at (29, 43)
-   — 3 px right, 3 px down, and 0.5% smaller. Every shape carries that offset, which widens every
-   edge in the diff a little. Part of the size difference is tldraw's hand-drawn overshoot spilling
-   past the true geometry.
+#### Where a large diff share is *not* a difference worth fixing
 
-**Retired from this list** — these were real in earlier runs and are not differences any more:
+- **The frame. 16.7% of the diff — the largest single region — at an interior IoU of 98.8% and a
+  band of 1.00 px median / 2.00 px p95.** Almost all of it is one thing: the frame's border is a
+  hairline, and it lands one pixel lower in mocanvas than in tldraw. Rows y=474/475 and y=752/753/754
+  contribute 431 differing pixels each — about 4.7% of the whole image diff for a one-pixel offset
+  of a 1 px line. Border colour matches exactly (`#717171` on both sides), and the frame's two
+  children score 98.4% and 94.7% interior IoU at 99.8% / 99.5% colour agreement.
 
+- **The outlines of the rectangle, ellipse and triangle. 11.5%, 6.7% and 5.3% of the diff.** All
+  three sit at a 1.00 px median band distance and a p95 of 2.24–3.00 px, and at 96.8%, 96.8% and
+  92.8% interior IoU with ≥99.3% colour agreement inside. This is the case the whole-image number
+  cannot score: two hand-drawn rings that never coincide, around interiors that agree. The
+  rectangle's share is also inflated by the "Hello box" label and by the bent arrow crossing its box.
+
+- **The freehand stroke. 4.3% of the diff, band 1.00 px median / 3.00 px p95.** Both draw the same
+  wave along the same curve, within a stroke width the whole way. Widths now agree closely too —
+  column-summed dark pixels are 1,316 for tldraw against 1,421 for mocanvas — so the earlier note
+  that mocanvas's stroke was uniform-width, blunt and thinner no longer holds; only the very start
+  of the stroke is still noticeably thicker in tldraw.
+
+- **The line and the straight arrow. 4.1% and 1.7%, band medians 1.00 px and 0.00 px.** The straight
+  arrow is the closest match in the fixture.
+
+#### Retired from this list
+
+These were real in earlier runs and are not differences any more:
+
+- **The note's trim (was cause #3, 11.1% of the diff).** mocanvas draws the note's top-to-bottom
+  gradient and its drop shadow now. At the note's centre column the body reads `#f7dc99` (tldraw)
+  against `#f8dd9a` (mocanvas) at the top and `#fce19c` against `#fbe09c` at the bottom, and the
+  shadow below the body fades through the same greys on both sides — every one of those pairs is
+  inside the comparison's 24/255 tolerance. What is left of the note's 9.0% diff share is the label's
+  font weight and a one-pixel offset of its bottom edge.
+- **The frame's border colour (was part of cause #2).** mocanvas drew `#9fa8b2`; it now draws
+  `#717171`, the same as tldraw.
 - **Fill strength (was #1, ~85% of the diff).** `getFillRgba`
-  (`packages/mocanvas/src/shapes/shape-theme.ts`, commit `ef4d079`) now maps `semi` to the paper
-  colour, `solid` to the hue's pale tint, and `fill` to the hue itself. Measured over the eroded
-  interior of each filled shape — well inside the outline, so no stroke pixels are counted — the
-  two renders are now byte-identical: the red ellipse is `#f4dadb` on both sides (9,374 px, 0.0%
-  differing), the violet hexagon `#ecdcf2` on both (7,448 px, 0.0%), the blue rectangle `#fcfffe`
-  on both (7,503 px, 0.0%), the star `#fcfffe` on both (1,672 px, 0.6% — that residue is the
-  hand-drawn outline of a point intruding into the sample box, not fill), and both of the frame's
-  children `#fcfffe` on both (0.0%). The ellipse's box, which the old list put at 20.0% of the
-  diff on a fill disagreement, is down to 5.8% at a region IoU of 96.7%. This single change took
-  the whole-image diff from 12.14% to 3.79% and the painted-pixel IoU from 56.4% to 79.1%.
+  (`packages/mocanvas/src/shapes/shape-theme.ts`, commit `ef4d079`) maps `semi` to the paper colour,
+  `solid` to the hue's pale tint, and `fill` to the hue. Interior colour agreement is now ≥99.3% on
+  every shape that is only fill.
+- **Exact, uniform outlines (was cause #1 at `ef4d079`).** mocanvas drew the exact polygon with a
+  uniform stroke and sharp vertices where tldraw wobbled, overshot and rounded. It now draws a
+  hand-drawn outline of its own. This *raised* the whole-image diff slightly, which is why that
+  number is reported last.
 - mocanvas rendered *nothing* from the unmodified file (it threw on `props.richText`). It loads and
   draws all 14 shapes.
-- The sticky note's "Sticky note" label was missing. It renders, at the right size and position.
-- The text shape's and the freehand stroke's content were only present in a shimmed render. Both
-  come from the raw file now.
+- The sticky note's "Sticky note" label was missing, and the text shape's and freehand stroke's
+  content were only present in a shimmed render. All three come from the raw file now.
 
-Everything else lines up: the page background (`#f9fafb` on both, exactly), the note body colour,
-every fill colour, every stroke colour, shape positions and sizes, the geo shape set, the bent
-arrow's binding to the rectangle, the straight arrow, the line's spline, the frame and both of its
-children, and the text shape's position.
+Everything else lines up: the page background (`#f9fafb` on both, exactly), every fill colour, every
+stroke colour, shape positions and sizes, the geo shape set, the bent arrow's binding to the
+rectangle, the line's spline, the frame and both of its children, and the text shape's position.
