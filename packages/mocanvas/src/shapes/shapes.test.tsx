@@ -49,6 +49,7 @@ import {
   type NoteShape,
   type TextShape,
 } from "./index"
+import { getDashId } from "./shape-theme"
 
 const editor = {
   getSortedChildIdsForParent: () => [],
@@ -272,6 +273,24 @@ describe("DrawShapeUtil", () => {
     expect(util.component(shape)).toBeNull()
     expect(util.canResize(shape)).toBe(true)
     expect(util.hideResizeHandles(shape)).toBe(false)
+  })
+
+  it("keeps props.dash but strokes a draw shape solid", () => {
+    // A recorded pen stroke is already hand-drawn; asking the engine to sketch it
+    // again only adds bulges. The record has to stay untouched so the style panel
+    // and a .tldr round trip still see "draw".
+    const drawn = makeShape<DrawShape>("draw", { ...util.getDefaultProps(), dash: "draw", segments: [{ type: "free", points: zig }] })
+    expect(drawn.props.dash).toBe("draw")
+    expect(util.getRenderStyle(drawn).dash).toBe(getDashId("solid"))
+
+    for (const dash of ["solid", "dashed", "dotted"] as const) {
+      const shape = makeShape<DrawShape>("draw", { ...util.getDefaultProps(), dash, segments: [{ type: "free", points: zig }] })
+      expect(util.getRenderStyle(shape).dash).toBe(getDashId(dash))
+    }
+    // …and only draw shapes are exempt: a geo shape styled `draw` still sketches.
+    const geo = new GeoShapeUtil(editor)
+    const box = makeShape("geo", { ...geo.getDefaultProps(), dash: "draw" })
+    expect(geo.getRenderStyle(box as never).dash).toBe(getDashId("draw"))
   })
 
   it("onResize scales every point", () => {

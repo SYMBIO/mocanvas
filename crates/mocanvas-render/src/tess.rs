@@ -322,16 +322,27 @@ mod dash_tests {
 // integer hash seeded from `Style::seed`:
 //
 // 1. **Resample.** The path is flattened, split into subpaths, and each subpath is
-//    reduced to a handful of *anchors*: every detected corner is kept, and the
-//    smooth runs between corners are re-sampled at roughly `DRAW_WOBBLE_PERIODS`
-//    pieces per subpath perimeter. This fixes the wobble's wavelength relative to
-//    the shape while its amplitude stays tied to the stroke width, and it keeps
-//    the vertex count low no matter how finely the original curve was flattened.
+//    reduced to *anchors*: every detected corner is kept, and the smooth runs
+//    between corners are walked, dropping an anchor whenever the arc covered
+//    reaches a sixth of the subpath *or* the chord since the last anchor has bowed
+//    away from the outline by more than `DRAW_SAGITTA_FRACTION` of the local
+//    radius of curvature. Spacing by arc length alone — a fixed number of pieces
+//    per subpath — turns a circle into a hexagon however gently it is then
+//    perturbed; the sagitta bound is what buys roundness back, and it costs
+//    nothing on the straight runs, where the chord never leaves the outline at all.
 // 2. **Perturb.** Each anchor is nudged perpendicular to the local direction, and
 //    each segment between anchors is bowed by routing it through a quadratic whose
 //    mid-point is displaced sideways. Both amplitudes scale with the stroke width
-//    and are capped by a fraction of the adjacent segment lengths, so a short
-//    segment is never swamped and a long one never wanders.
+//    and are capped by a fraction of the adjacent segment lengths *and*, on a
+//    smooth run, by `DRAW_CURVATURE_FRACTION` of the local radius of curvature —
+//    so a long straight edge still gets a visible bow while a small circle, which
+//    a bow of the same size would flatten into a polygon, is barely touched.
+//
+//    The offsets themselves come from `Wobble`, a smooth field indexed by arc
+//    length and periodic around the subpath, not from one draw per anchor. That is
+//    what lets the two jobs come apart: the anchors are as dense as roundness
+//    needs, while the wobble keeps the same long wavelength it had at six anchors
+//    and so reads as a shaky hand rather than as fur.
 // 3. **Round and overshoot.** Every interior anchor is cut back by a radius drawn
 //    from the stroke width plus a little of the shorter adjacent segment, clamped
 //    to `DRAW_CORNER_MAX_FRACTION` of that shorter segment, and the cut is bridged
@@ -351,26 +362,54 @@ mod dash_tests {
 // to a single full-width pass; that test is a property of the geometry alone, so
 // it can never flip with zoom or shape count and make a shape shimmer.
 //
+// A `draw` *shape* — a recorded freehand stroke — is exempt: its points are
+// already a hand movement, and perturbing them a second time only adds lumps the
+// hand did not make. The host decides that, by handing this tessellator
+// `dash::SOLID` for such a shape while leaving its `dash` prop alone; the engine
+// has no notion of which shape a path came from.
+//
 // Cost, measured over a mixed page of rect / ellipse / hexagon / star / rounded
-// rect / polyline at a stroke width of 3.5: 2.3x the triangles and 2.3x the time
-// of the same page stroked plain — 8.6 us a shape against 3.8 us — so a full
-// `DEFAULT_TESS_BUDGET` of 256 shapes costs about 2.2 ms, and 5,000 draw-styled
-// shapes about 43 ms spread over the twenty frames the budget takes to work
-// through them.
+// rect / polyline at a stroke width of 3.5: 2.5x the triangles of the same page
+// stroked plain — the extra over the old fixed six-anchor rule is what roundness
+// costs — so a full `DEFAULT_TESS_BUDGET` of 256 shapes stays in the low
+// milliseconds, and 5,000 draw-styled shapes spread over the twenty frames the
+// budget takes to work through them.
 
 /// Flattening tolerance for the sketched outline. Coarser than [`TOLERANCE`]:
 /// the line is deliberately imprecise, so paying for exact curves is waste.
 const DRAW_TOLERANCE: f32 = 0.5;
-/// Target number of wobble pieces around one subpath.
+/// Wobble lobes around one subpath. This is the *wavelength* of the wobble, not
+/// the anchor count: the offsets are sampled from a field indexed by arc length
+/// (see [`Wobble`]), so anchors can be as dense as roundness needs without the
+/// wobble turning into high-frequency fur.
 const DRAW_WOBBLE_PERIODS: f32 = 6.0;
-/// Most pieces one corner-to-corner run is split into.
-const DRAW_MAX_RUN_PIECES: usize = 8;
+/// Chord-to-arc sagitta allowed between consecutive anchors, as a fraction of the
+/// local radius of curvature. A chord subtending `θ` on a circle of radius `r`
+/// misses the arc by about `r·θ²/8` and is about `r·θ` long, so bounding the miss
+/// by `ε·r` is the same as bounding it by `√(ε/8)` of the chord's own length —
+/// which needs no radius estimate at all, only the flattened outline the anchors
+/// are being picked from. At `ε = 1.5%` that is a chord bowing no more than one
+/// part in twenty-three of its length, or about eighteen anchors around a circle.
+const DRAW_SAGITTA_FRACTION: f32 = 0.015;
+/// Shortest piece the sagitta rule may ask for, × stroke width. Below this the
+/// chord error is hidden under the stroke itself, so a tiny shape is not paved
+/// with anchors it cannot show.
+const DRAW_MIN_PIECE: f32 = 1.0;
+/// …but never so long that a subpath is left with fewer pieces than this, which
+/// is what keeps a stroke wider than its own shape from drawing a pentagon.
+const DRAW_MIN_PIECES: f32 = 8.0;
+/// Most pieces one corner-to-corner run is split into. Only a bound on
+/// pathological input: a full circle asks for about twenty-five.
+const DRAW_MAX_RUN_PIECES: usize = 64;
 /// Turn (radians) above which a flattened vertex counts as a corner.
 const DRAW_CORNER_TURN: f32 = 0.35;
 /// Perpendicular anchor offset, × stroke width…
 const DRAW_VERTEX_AMP: f32 = 0.5;
-/// …capped at this fraction of the shorter adjacent segment.
+/// …capped at this fraction of the shorter adjacent segment…
 const DRAW_VERTEX_MAX_FRACTION: f32 = 0.25;
+/// …and, on a smooth run, at this fraction of the local radius of curvature, so
+/// the wobble can never be a large part of what it is wobbling.
+const DRAW_CURVATURE_FRACTION: f32 = 0.06;
 /// Sideways bow at a segment's mid-point, × stroke width…
 const DRAW_BOW_AMP: f32 = 0.45;
 /// …capped at this fraction of the segment's length.
@@ -381,6 +420,12 @@ const DRAW_CORNER_RADIUS: f32 = 1.3;
 const DRAW_CORNER_LEN_FRACTION: f32 = 0.06;
 /// …and never more than this fraction of that shorter segment.
 const DRAW_CORNER_MAX_FRACTION: f32 = 0.35;
+/// Cut-back at an anchor that is *not* a real corner, as a fraction of the shorter
+/// adjacent span (and never more than the corner radius would have been). A smooth
+/// run needs only enough of a bridge to hide the tangent step between two spans;
+/// the generous width-based radius is for corners, and on the short spans that
+/// roundness now asks for it would swallow the span whole.
+const DRAW_SMOOTH_RADIUS_FRACTION: f32 = 0.12;
 /// How far a corner's control point is pushed past the true vertex, × stroke width.
 const DRAW_OVERSHOOT: f32 = 0.55;
 /// Line widths of the two sketch passes, × stroke width.
@@ -413,23 +458,46 @@ fn mix_seed(a: u32, b: u32) -> u32 {
     splitmix32(&mut s)
 }
 
-/// Deterministic pseudo-random stream. Same seed, same numbers, every run.
-struct Rng(u32);
+/// Deterministic value in `[0, 1)` for one `(seed, stream, index)` triple. Indexed
+/// rather than sequential: a value depends only on where it is wanted, never on
+/// how many were drawn before it, so adding a draw somewhere cannot shift every
+/// value after it.
+#[inline]
+fn rand_at(seed: u32, stream: u32, index: u32) -> f32 {
+    let mut s = mix_seed(seed, stream.wrapping_mul(0x9e37_79b9) ^ index.wrapping_mul(0x85eb_ca6b));
+    (splitmix32(&mut s) >> 8) as f32 * (1.0 / 16_777_216.0)
+}
 
-impl Rng {
+/// A wobble along a subpath: one random value per cell of arc length,
+/// smoothstep-interpolated between neighbours and wrapped at `periods` so a
+/// closed outline's wobble meets itself at the seam.
+///
+/// Sampling by arc length rather than by anchor index is what decouples the two
+/// jobs the anchors used to do at once. The anchors are spaced by whatever
+/// roundness demands (see [`draw_anchors`]); the wobble keeps its long
+/// wavelength regardless, so a finely sampled circle wobbles gently rather than
+/// growing fur.
+struct Wobble {
+    seed: u32,
+    stream: u32,
+    periods: u32,
+}
+
+impl Wobble {
+    /// The value at lattice cell `k`, in `[-1, 1)`.
     #[inline]
-    fn new(seed: u32) -> Self {
-        Rng(seed)
+    fn cell(&self, k: i32) -> f32 {
+        let i = k.rem_euclid(self.periods.max(1) as i32) as u32;
+        rand_at(self.seed, self.stream, i) * 2.0 - 1.0
     }
-    /// Uniform in `[0, 1)`.
+    /// The interpolated value at cell coordinate `u`, in `[-1, 1)`.
     #[inline]
-    fn unit(&mut self) -> f32 {
-        (splitmix32(&mut self.0) >> 8) as f32 * (1.0 / 16_777_216.0)
-    }
-    /// Uniform in `[-1, 1)`.
-    #[inline]
-    fn signed(&mut self) -> f32 {
-        self.unit() * 2.0 - 1.0
+    fn at(&self, u: f32) -> f32 {
+        let k = u.floor();
+        let t = u - k;
+        let t = t * t * (3.0 - 2.0 * t);
+        let (a, b) = (self.cell(k as i32), self.cell(k as i32 + 1));
+        a + (b - a) * t
     }
 }
 
@@ -483,6 +551,35 @@ fn point_at_arc(pts: &[mocanvas_geo::Vec2], cum: &[f32], s: f32) -> mocanvas_geo
     pts[i].lerp(pts[i + 1], ((s - cum[i]) / seg).clamp(0.0, 1.0))
 }
 
+/// Radius of the circle the outline is locally following, estimated from the turn
+/// across two spans of the given lengths: a circle of radius `r` sampled at chords
+/// of length `l` turns by about `l / r` at each sample, so `r ≈ l / turn`. Returns
+/// infinity where the outline is straight, which leaves the caller's other caps to
+/// do the work.
+#[inline]
+fn local_radius(turn: f32, l_prev: f32, l_next: f32) -> f32 {
+    let l = 0.5 * (l_prev + l_next);
+    if turn <= 1e-4 || l <= 0.0 {
+        return f32::INFINITY;
+    }
+    l / turn
+}
+
+/// Turn at anchor `i` of a perturbed anchor list, wrapping at the seam of a closed
+/// subpath (whose first and last anchors are the same point) and zero at the free
+/// ends of an open one.
+#[inline]
+fn turn_of(a: &[mocanvas_geo::Vec2], i: usize, m: usize, closed: bool) -> f32 {
+    let (prev, next) = if closed {
+        (a[if i == 0 { m - 2 } else { i - 1 }], a[if i == m - 1 { 1 } else { i + 1 }])
+    } else if i == 0 || i == m - 1 {
+        return 0.0;
+    } else {
+        (a[i - 1], a[i + 1])
+    };
+    turn_at(prev, a[i], next)
+}
+
 /// Corner radius at a vertex with adjacent segment lengths `l_prev`/`l_next`.
 /// Never more than [`DRAW_CORNER_MAX_FRACTION`] of the shorter of the two.
 #[inline]
@@ -504,12 +601,54 @@ struct Anchors {
     /// generously and pushed out past the true vertex; treating a resampled point
     /// as a corner would turn a smooth curve into a polygon with bulging joints.
     corner: Vec<bool>,
+    /// Each anchor's arc position, in [`Wobble`] cells.
+    cell: Vec<f32>,
+    /// Each span mid-point's arc position, in [`Wobble`] cells.
+    mid_cell: Vec<f32>,
+    /// Cells around the whole subpath — the wobble's period, so a closed outline
+    /// wraps onto itself.
+    periods: u32,
     closed: bool,
 }
 
-/// Reduce a subpath to its wobble anchors: every corner, plus resampled points
-/// along the runs between them. A closed subpath is rotated to start at its first
-/// corner and its start point repeated at the end, so callers handle one case.
+/// Sagitta allowed between consecutive anchors as a fraction of the chord itself:
+/// `√(ε/8)`, the chord-relative form of [`DRAW_SAGITTA_FRACTION`].
+#[inline]
+fn draw_sagitta_of_chord() -> f32 {
+    (DRAW_SAGITTA_FRACTION / 8.0).sqrt()
+}
+
+/// How far the outline between vertices `a` and `b` leaves the chord joining them
+/// — the chord's actual sagitta, measured rather than inferred from a turn angle,
+/// which under-counts it by a factor of `k/(k-1)` over `k` flattened segments.
+fn chord_sagitta(pts: &[mocanvas_geo::Vec2], a: usize, b: usize) -> f32 {
+    let (p, q) = (pts[a], pts[b]);
+    let d = q - p;
+    let l = d.len();
+    let mut worst = 0.0f32;
+    for &v in &pts[a + 1..b] {
+        let w = v - p;
+        worst = worst.max(if l <= 0.0 { w.len() } else { w.cross(d).abs() / l });
+    }
+    worst
+}
+
+/// Reduce a subpath to its wobble anchors: every corner, plus enough points along
+/// the runs between them that the outline never cuts a corner off a curve. A
+/// closed subpath is rotated to start at its first corner and its start point
+/// repeated at the end, so callers handle one case.
+///
+/// Spacing follows arc length *and* curvature: an anchor goes down once the walk
+/// has covered `step` of arc — a sixth of the subpath, never less than two stroke
+/// widths — or once the chord since the last anchor has bowed away from the
+/// outline by more than [`DRAW_SAGITTA_FRACTION`] of the local radius, whichever
+/// comes first, and never sooner than [`DRAW_MIN_PIECE`] stroke widths.
+///
+/// The sagitta rule is what keeps a circle a circle. A fixed piece count per
+/// subpath makes one a hexagon no matter how gentle the perturbation is; bounding
+/// the chord error instead puts anchors wherever the outline actually bends and
+/// leaves the straight runs alone — a circle picks up twenty-odd of them, a
+/// rectangle still four.
 fn draw_anchors(sp: &SubPath, width: f32) -> Anchors {
     let n = sp.pts.len();
     let mut corners: Vec<usize> = Vec::new();
@@ -563,28 +702,79 @@ fn draw_anchors(sp: &SubPath, width: f32) -> Anchors {
     }
     let total = cum[pts.len() - 1];
     if !total.is_finite() || total <= 0.0 {
-        return Anchors { pts: Vec::new(), mids: Vec::new(), corner: Vec::new(), closed: sp.closed };
+        return Anchors {
+            pts: Vec::new(),
+            mids: Vec::new(),
+            corner: Vec::new(),
+            cell: Vec::new(),
+            mid_cell: Vec::new(),
+            periods: 1,
+            closed: sp.closed,
+        };
     }
     let step = (total / DRAW_WOBBLE_PERIODS).max(2.0 * width);
+    // A stroke wider than the shape it is drawing would otherwise leave a circle
+    // with four or five anchors, so the floor also yields to the subpath's length.
+    let min_piece = (DRAW_MIN_PIECE * width).min(total / DRAW_MIN_PIECES).max(1e-4);
+    let sag_of_chord = draw_sagitta_of_chord();
+    // The wobble's lattice is fixed by the subpath's own length, independent of how
+    // many anchors the curvature rule ends up asking for.
+    let periods = (total / step).round().max(3.0) as u32;
+    let to_cell = periods as f32 / total;
 
     let mut anchors = Vec::with_capacity(cuts.len() * 2);
     let mut mids = Vec::with_capacity(cuts.len() * 2);
     let mut corner = Vec::with_capacity(cuts.len() * 2);
+    let mut cell = Vec::with_capacity(cuts.len() * 2);
+    let mut mid_cell = Vec::with_capacity(cuts.len() * 2);
     for (c, w) in cuts.windows(2).enumerate() {
         let (a, b) = (w[0], w[1]);
-        let run = cum[b] - cum[a];
-        let k = ((run / step).round().max(1.0) as usize).min(DRAW_MAX_RUN_PIECES);
-        for j in 0..k {
-            let s0 = cum[a] + run * (j as f32 / k as f32);
-            let s1 = cum[a] + run * ((j + 1) as f32 / k as f32);
-            anchors.push(point_at_arc(&pts, &cum, s0));
+        // Walk the run, splitting at a flattened vertex as soon as either budget is
+        // spent. Splitting at real vertices rather than at resampled arc positions
+        // puts every anchor exactly on the true outline.
+        let mut splits: Vec<usize> = vec![a];
+        let mut last = a;
+        // Up to and including `b`: the run's own end is the last chord that can be
+        // measured, and without checking it the final piece keeps whatever error was
+        // left over when the walk ran out of vertices.
+        for i in a + 1..=b {
+            let run = cum[i] - cum[last];
+            // Arc length spends its budget at `i`; the sagitta rule instead spends it
+            // *before* `i`, because by the time a chord is measured to bow too far it
+            // is already too long — so the anchor goes on the vertex before it, the
+            // last one that was still inside the bound.
+            let long = run >= step;
+            // The flattened polyline is itself only within `TOLERANCE` of the true
+            // curve, so that much of the budget is already spent before the chord is
+            // measured — without it a small circle, whose flattening is coarse
+            // relative to its radius, passes a bound it does not actually meet.
+            let bent = i > last + 1
+                && chord_sagitta(&pts, last, i) + TOLERANCE > sag_of_chord * pts[last].dist(pts[i]);
+            let cut = if long { i } else { i - 1 };
+            // Never leave a runt behind or ahead: a piece shorter than the stroke
+            // width is swamped by the cut-backs at its two ends, and the chord error
+            // it would have saved hides under the stroke anyway.
+            let room = cum[cut] - cum[last] >= min_piece && cum[b] - cum[cut] >= min_piece;
+            if (long || bent) && cut > last && cut < b && room && splits.len() < DRAW_MAX_RUN_PIECES {
+                splits.push(cut);
+                last = cut;
+            }
+        }
+        for (j, &i) in splits.iter().enumerate() {
+            let s0 = cum[i];
+            let s1 = if j + 1 < splits.len() { cum[splits[j + 1]] } else { cum[b] };
+            anchors.push(pts[i]);
             mids.push(point_at_arc(&pts, &cum, 0.5 * (s0 + s1)));
             corner.push(j == 0 && real[c]);
+            cell.push(s0 * to_cell);
+            mid_cell.push(0.5 * (s0 + s1) * to_cell);
         }
     }
-    anchors.push(pts[*cuts.last().unwrap()]);
+    let last = *cuts.last().unwrap();
+    anchors.push(pts[last]);
     corner.push(*real.last().unwrap());
-    Anchors { pts: anchors, mids, corner, closed: sp.closed }
+    cell.push(cum[last] * to_cell);
+    Anchors { pts: anchors, mids, corner, cell, mid_cell, periods, closed: sp.closed }
 }
 
 /// Append one sketched pass over `anchors` to `out`.
@@ -600,18 +790,32 @@ fn sketch_into(out: &mut Path, anchors: &Anchors, width: f32, seed: u32, pass: u
     if m < 2 {
         return;
     }
-    // The base stream depends on the seed only, so both passes share most of their
+    // The base fields depend on the seed only, so both passes share most of their
     // jitter and never drift far enough apart to leave a gap between them.
-    let mut base = Rng::new(mix_seed(seed, 0));
-    let mut own = Rng::new(mix_seed(seed, pass + 1));
     let shared = 1.0 - DRAW_PASS_JITTER;
-    let jitter = |base: &mut Rng, own: &mut Rng| base.signed() * shared + own.signed() * DRAW_PASS_JITTER;
+    let own_seed = mix_seed(seed, pass + 1);
+    let periods = anchors.periods;
+    let field = |stream: u32| (Wobble { seed, stream, periods }, Wobble { seed: own_seed, stream, periods });
+    let (vert_base, vert_own) = field(0);
+    let (bow_base, bow_own) = field(1);
+    let wobble = |b: &Wobble, o: &Wobble, u: f32| b.at(u) * shared + o.at(u) * DRAW_PASS_JITTER;
+    // Indexed draws for the things that belong to one anchor rather than to a place
+    // along the outline: corner overshoot, corner radius, the closing flourish.
+    let unit = |stream: u32, i: usize| {
+        rand_at(seed, stream, i as u32) * shared + rand_at(own_seed, stream, i as u32) * DRAW_PASS_JITTER
+    };
 
     // 1. Nudge each anchor perpendicular to the local direction, and push the ones
     //    that are real corners out along their bisector: the corner then sits a
     //    little past the true vertex, which is what makes the silhouette read as
     //    overshot rather than machined. Doing it here, before anything downstream,
     //    keeps the rest of the construction consistent with it.
+    //
+    //    On a smooth run the nudge is also capped by the local radius of curvature,
+    //    estimated as `span / turn`: an offset that is a large fraction of what the
+    //    outline is curving through does not read as a wobble, it reads as a
+    //    different, lumpier shape. A detected corner is exempt — its turn is a real
+    //    kink in the geometry, not curvature to be preserved.
     let mut a = Vec::with_capacity(m);
     let mut off = Vec::with_capacity(m);
     for i in 0..m {
@@ -621,11 +825,15 @@ fn sketch_into(out: &mut Path, anchors: &Anchors, width: f32, seed: u32, pass: u
             (pts[i.saturating_sub(1)], pts[(i + 1).min(m - 1)])
         };
         let cur = pts[i];
-        let amp = (DRAW_VERTEX_AMP * width).min(DRAW_VERTEX_MAX_FRACTION * prev.dist(cur).min(cur.dist(next)));
-        let mut d = (next - prev).normalize().perp() * (amp * jitter(&mut base, &mut own));
+        let (l_prev, l_next) = (prev.dist(cur), cur.dist(next));
+        let mut amp = (DRAW_VERTEX_AMP * width).min(DRAW_VERTEX_MAX_FRACTION * l_prev.min(l_next));
+        if !anchors.corner[i] {
+            amp = amp.min(DRAW_CURVATURE_FRACTION * local_radius(turn_at(prev, cur, next), l_prev, l_next));
+        }
+        let mut d = (next - prev).normalize().perp() * (amp * wobble(&vert_base, &vert_own, anchors.cell[i]));
         if anchors.corner[i] {
             let (u_in, u_out) = ((cur - prev).normalize(), (next - cur).normalize());
-            let over = DRAW_OVERSHOOT * width * (0.4 + 0.6 * (base.unit() * shared + own.unit() * DRAW_PASS_JITTER));
+            let over = DRAW_OVERSHOOT * width * (0.4 + 0.6 * unit(2, i));
             d += (u_in - u_out).normalize() * over;
         }
         a.push(cur + d);
@@ -648,8 +856,9 @@ fn sketch_into(out: &mut Path, anchors: &Anchors, width: f32, seed: u32, pass: u
         .collect();
     let mut radius = vec![0.0f32; m];
     for i in 1..m - 1 {
-        let j = 0.7 + 0.6 * (base.unit() * shared + own.unit() * DRAW_PASS_JITTER);
-        radius[i] = corner_radius(width, seg[i - 1].1, seg[i].1, j);
+        let (l_prev, l_next) = (seg[i - 1].1, seg[i].1);
+        let r = corner_radius(width, l_prev, l_next, 0.7 + 0.6 * unit(3, i));
+        radius[i] = if anchors.corner[i] { r } else { r.min(DRAW_SMOOTH_RADIUS_FRACTION * l_prev.min(l_next)) };
     }
 
     // 3. One quadratic per span, cut back by the corner radii at both ends and aimed
@@ -665,9 +874,25 @@ fn sketch_into(out: &mut Path, anchors: &Anchors, width: f32, seed: u32, pass: u
         }
         let start = a[i] + u * radius[i];
         let end = a[i + 1] - u * radius[i + 1];
-        let bow = (DRAW_BOW_AMP * width).min(DRAW_BOW_MAX_FRACTION * len) * jitter(&mut base, &mut own);
+        // The bow is capped the same way as the anchor nudge: over a span that turns
+        // sharply there is very little room between the chord and the arc, and a bow
+        // that fills it flattens the curve into a facet.
+        let turn = 0.5 * (turn_of(&a, i, m, closed) + turn_of(&a, i + 1, m, closed));
+        let bow = (DRAW_BOW_AMP * width)
+            .min(DRAW_BOW_MAX_FRACTION * len)
+            .min(DRAW_CURVATURE_FRACTION * local_radius(turn, len, len))
+            * wobble(&bow_base, &bow_own, anchors.mid_cell[i]);
         let target = anchors.mids[i] + (off[i] + off[i + 1]) * 0.5 + u.perp() * bow;
-        spans.push((start, target * 2.0 - start.lerp(end, 0.5), end));
+        // Aim the quadratic through `target`. The mid-point belongs to the whole
+        // span while the quadratic only covers what the cut-backs left of it, so on
+        // a short span the control can land behind `start` — which folds the curve
+        // into a cusp. Slide it back along the chord until it lies between the two
+        // ends; the sideways part, which is the whole point of aiming at the
+        // mid-point, is left alone.
+        let mut ctrl = target * 2.0 - start.lerp(end, 0.5);
+        let along = (ctrl - start).dot(u);
+        ctrl += u * (along.clamp(0.0, (end - start).dot(u).max(0.0)) - along);
+        spans.push((start, ctrl, end));
     }
 
     // 4. Emit, bridging each cut-back corner with a quadratic whose control point is
@@ -684,7 +909,7 @@ fn sketch_into(out: &mut Path, anchors: &Anchors, width: f32, seed: u32, pass: u
     if closed {
         // Carry on past the seam the way the outline was going, so the end runs back
         // over the start instead of stopping exactly on it.
-        let over = DRAW_OVERSHOOT * width * (0.9 + 0.9 * base.unit());
+        let over = DRAW_OVERSHOOT * width * (0.9 + 0.9 * unit(4, m));
         let (_, last_ctrl, last_end) = spans[spans.len() - 1];
         let t_in = (last_end - last_ctrl).normalize();
         let t_out = (spans[0].1 - spans[0].0).normalize();
@@ -851,6 +1076,86 @@ mod draw_tests {
         }
     }
 
+    /// Chord error of the anchor polygon against the circle it was taken from.
+    fn worst_circle_sagitta(r: f32, width: f32) -> (usize, f32) {
+        let p = Path::ellipse(&Box2d::from_xywh(0.0, 0.0, 2.0 * r, 2.0 * r));
+        let subs = flatten_subpaths(&p, TOLERANCE);
+        assert_eq!(subs.len(), 1);
+        let a = draw_anchors(&subs[0], width);
+        let c = Vec2::new(r, r);
+        let mut worst = 0.0f32;
+        for w in a.pts.windows(2) {
+            worst = worst.max(r - (w[0].lerp(w[1], 0.5) - c).len());
+        }
+        (a.pts.len(), worst)
+    }
+
+    /// The anchor rule's whole point: a circle keeps its roundness. The chord
+    /// between consecutive anchors never leaves the true circle by more than
+    /// `DRAW_SAGITTA_FRACTION` of the radius — or half a stroke width where that is
+    /// looser, which is the escape [`DRAW_MIN_PIECE`] and [`DRAW_MIN_PIECES`] open
+    /// for a shape drawn with a pen nearly as wide as itself, and is invisible
+    /// under the stroke anyway.
+    #[test]
+    fn a_circle_stays_round_within_the_sagitta_bound() {
+        for i in 0..40 {
+            let r = 4.0 + i as f32 * 5.0;
+            for j in 0..12 {
+                let width = 0.5 + j as f32;
+                let (anchors, sagitta) = worst_circle_sagitta(r, width);
+                let limit = (DRAW_SAGITTA_FRACTION * r).max(0.5 * width);
+                assert!(sagitta <= limit, "r={r} w={width}: chord missed the circle by {sagitta} (limit {limit}, {anchors} anchors)");
+            }
+        }
+        // And concretely: a page-sized circle is not a hexagon. Six anchors would
+        // leave a chord 13% of the radius short of the arc.
+        let (anchors, sagitta) = worst_circle_sagitta(85.0, 3.5);
+        assert!(anchors >= 16, "a circle got only {anchors} anchors");
+        assert!(sagitta < 0.015 * 85.0, "sagitta {sagitta}");
+    }
+
+    /// A straight run costs nothing extra: the sagitta rule only fires where the
+    /// outline actually bends, so a rectangle still comes out with a handful of
+    /// anchors and not one per flattened vertex.
+    #[test]
+    fn straight_runs_are_not_paved_with_anchors() {
+        let p = Path::rect(&Box2d::from_xywh(0.0, 0.0, 400.0, 260.0));
+        let n: usize = flatten_subpaths(&p, TOLERANCE).iter().map(|s| draw_anchors(s, 4.0).pts.len()).sum();
+        assert!((5..=12).contains(&n), "a rectangle took {n} anchors");
+    }
+
+    /// Amplitude follows curvature. Two things have to hold at once: shrinking a
+    /// circle never makes the sketch wander *further* in absolute terms — the
+    /// curvature clamp takes over from the stroke-width cap as the radius drops —
+    /// and the wander as a share of the radius falls away steeply, which is what
+    /// stops a small circle from being wobbled into a blob.
+    #[test]
+    fn tight_curvature_damps_the_wobble() {
+        let width = 4.0;
+        let mut prev_dev = 0.0f32;
+        let mut shares = Vec::new();
+        for r in [8.0f32, 16.0, 32.0, 64.0, 128.0] {
+            let p = Path::ellipse(&Box2d::from_xywh(0.0, 0.0, 2.0 * r, 2.0 * r));
+            let c = Vec2::new(r, r);
+            let mut dev = 0.0f32;
+            for seed in 0..16u32 {
+                let style = Style { stroke_width: width, ..draw_style(seed) };
+                for (sketch, _) in draw_passes(&p, &style) {
+                    for q in sample_points(&sketch) {
+                        dev = dev.max(((q - c).len() - r).abs());
+                    }
+                }
+            }
+            assert!(dev / r <= 0.14, "a circle of radius {r} wandered {} of its radius", dev / r);
+            assert!(dev + 1e-3 >= prev_dev, "the smaller circle at radius {r} wandered further ({dev} vs {prev_dev})");
+            assert!(dev <= DRAW_MAX_DEVIATION * width);
+            prev_dev = dev;
+            shares.push(dev / r);
+        }
+        let (small, large) = (shares[0], *shares.last().unwrap());
+        assert!(small >= 3.0 * large, "the wobble did not thin out with the radius ({small} vs {large})");
+    }
+
     #[test]
     fn corner_radius_never_exceeds_half_the_shorter_segment() {
         for &(l_prev, l_next) in &[(1.0f32, 40.0f32), (0.2, 0.5), (100.0, 100.0), (3.0, 1.0), (0.0, 10.0)] {
@@ -916,7 +1221,7 @@ mod draw_tests {
             draw_tris += tessellate(p, &drawn, 1).stroke.indices.len();
         }
         let ratio = draw_tris as f32 / plain_tris as f32;
-        assert!(ratio <= 2.6, "draw strokes cost {ratio:.2}x the plain ones ({draw_tris} vs {plain_tris} indices)");
+        assert!(ratio <= 2.7, "draw strokes cost {ratio:.2}x the plain ones ({draw_tris} vs {plain_tris} indices)");
     }
 
     /// A quadratic bridge whose control point lands behind either end doubles back

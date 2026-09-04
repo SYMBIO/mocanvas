@@ -1,5 +1,5 @@
 {
-  "date": "2026-09-04 09:47:15 UTC",
+  "date": "2026-09-04 11:13:17 UTC",
   "mixedRun": true,
   "perfRun": {
     "date": "2026-09-04 09:26:29 UTC",
@@ -38,7 +38,7 @@
     "tldraw": "5.4.0",
     "playwright": "1.62.1",
     "mocanvas": "0.0.1",
-    "git": "ef4d079"
+    "git": "b89287c-dirty"
   },
   "ns": [
     1000,
@@ -371,11 +371,11 @@
       "width": 1200,
       "height": 800,
       "totalPixels": 960000,
-      "differentPixels": 36368,
-      "diffPercent": 3.788333333333333,
-      "inkPixelsMocanvas": 110289,
+      "differentPixels": 36686,
+      "diffPercent": 3.8214583333333336,
+      "inkPixelsMocanvas": 112658,
       "inkPixelsTldraw": 114470,
-      "inkOverlapPercent": 79.07656760417497,
+      "inkOverlapPercent": 78.18013508954978,
       "tolerance": 24
     },
     "fixtureRecords": 18

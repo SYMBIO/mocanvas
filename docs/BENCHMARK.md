@@ -1,6 +1,6 @@
 # Benchmark: mocanvas vs tldraw
 
-_Generated 2026-09-04 09:47:15 UTC by `apps/bench/scripts/bench.mjs`. Re-run with `pnpm --filter bench bench`._
+_Generated 2026-09-04 11:13:17 UTC by `apps/bench/scripts/bench.mjs`. Re-run with `pnpm --filter bench bench`._
 
 Both libraries are driven through an identical `window.bench` API (`apps/bench/src/bench-api.ts`)
 with byte-identical workloads: same grid, same shape sizes, colours and fills, the same scripted
@@ -9,7 +9,7 @@ deltas recorded while a camera animation runs (zoom to fit → zoom in 4× → h
 
 > **The two halves of this report were measured at different times.** The rendering comparison was re-measured after the fill-ramp fix; the performance tables were **not** re-run — they are unchanged from the earlier run listed under Environment, and nothing below claims they were.
 >
-> Rendering comparison: measured 2026-09-04 09:47:15 UTC, git `ef4d079`.
+> Rendering comparison: measured 2026-09-04 11:13:17 UTC, git `b89287c-dirty`.
 > Performance tables: measured 2026-09-04 09:26:29 UTC, git `15b670a-dirty`.
 
 ## What changed since the previous run
@@ -54,12 +54,12 @@ Rendering comparison against the same `.tldr` fixture. It has three points now, 
 column was measured by the run at the top of this file — see the note above about the two halves of
 this report:
 
-| | `32ac776-dirty` (before the .tldr fix) | `15b670a-dirty` (before the fill fix) | `ef4d079` (now) |
+| | `32ac776-dirty` (before the .tldr fix) | `15b670a-dirty` (before the fill fix) | `b89287c-dirty` (now) |
 | :--- | :--- | :--- | :--- |
 | mocanvas loaded the file | no — threw on `props.richText` | yes | yes |
-| Painted pixels, mocanvas | 0 | 163,726 | 110,289 |
-| Painted-pixel overlap (IoU) | 0.0% | 56.4% | **79.1%** |
-| Differing pixels | 11.84% | 12.14% | **3.79%** |
+| Painted pixels, mocanvas | 0 | 163,726 | 112,658 |
+| Painted-pixel overlap (IoU) | 0.0% | 56.4% | **78.2%** |
+| Differing pixels | 11.84% | 12.14% | **3.82%** |
 
 **The fill fix helped, and by a lot.** `getFillRgba` (`packages/mocanvas/src/shapes/shape-theme.ts`)
 was mapping `fill: "solid"` onto the palette hue itself and `fill: "semi"` onto a tint of it — one step
@@ -68,7 +68,7 @@ tint, and `fill` to the hue. Measured over the eroded interior of each filled sh
 are now identical pixel for pixel: the red ellipse is `#f4dadb` on both sides, the violet hexagon
 `#ecdcf2`, and the blue rectangle, the star and both of the frame's children `#fcfffe`.
 
-The painted-pixel count falling (163,726 → 110,289, against tldraw's 114,470) is that fix working, not a
+The painted-pixel count falling (163,726 → 112,658, against tldraw's 114,470) is that fix working, not a
 regression: a `semi` fill is *supposed* to leave the paper alone, so those pixels correctly stop
 counting as ink. mocanvas now inks slightly less than tldraw rather than substantially more.
 
@@ -81,7 +81,7 @@ mocanvas from drawing nothing at all to drawing the whole document.
 
 | | |
 | :--- | :--- |
-| Date | 2026-09-04 09:47:15 UTC (rendering comparison; performance tables measured 2026-09-04 09:26:29 UTC) |
+| Date | 2026-09-04 11:13:17 UTC (rendering comparison; performance tables measured 2026-09-04 09:26:29 UTC) |
 | Machine | Apple M3 Pro, 11 cores, 36 GB |
 | OS | Darwin 25.5.0 (arm64) |
 | Node | v25.9.0 |
@@ -91,7 +91,7 @@ mocanvas from drawing nothing at all to drawing the whole document.
 | WebGL2 renderer | ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver) |
 | Rasterisation | **software (SwiftShader)** — no hardware GPU in this environment |
 | tldraw | 5.4.0 |
-| mocanvas | 0.0.1 (this repo, ef4d079; performance tables measured at 15b670a-dirty) |
+| mocanvas | 0.0.1 (this repo, b89287c-dirty; performance tables measured at 15b670a-dirty) |
 | Builds | production (`vite build`, minified, `NODE_ENV=production`) for both |
 | Viewport | 1200×800 CSS px, device scale 1 |
 | Matrix | N ∈ {1000, 5000, 20000} × kind ∈ {geo, mixed}, 3 repeats, medians reported |
@@ -239,11 +239,11 @@ with two children. Both pages load that same file, zoom to fit at 1200×800 and 
 
 | | |
 | :--- | ---: |
-| Differing pixels | **3.79%** (36,368 of 960,000) |
+| Differing pixels | **3.82%** (36,686 of 960,000) |
 | Tolerance | any channel differing by more than 24/255 |
-| Painted (non-white) pixels, mocanvas | 110,289 |
+| Painted (non-white) pixels, mocanvas | 112,658 |
 | Painted (non-white) pixels, tldraw | 114,470 |
-| Painted-pixel overlap (IoU) | **79.1%** |
+| Painted-pixel overlap (IoU) | **78.2%** |
 
 **Read the overlap row, not the differing-pixels row.** "Differing pixels" is still a poor headline for
 this comparison, even now that it has fallen: tldraw inks only about 12% of the canvas, so a render that
@@ -252,9 +252,9 @@ first and scored 11.84% differing pixels, then drew the whole document with the 
 12.14%. Two renders that could hardly be less alike landed within 0.3 points of each other, because a
 blank canvas disagrees only where tldraw drew something. The painted-pixel overlap (intersection over
 union) separated them properly at the time (0.0% against 56.4%) and is still the metric to read here:
-of every pixel either side inked, 79.1% were inked by both.
+of every pixel either side inked, 78.2% were inked by both.
 
-This run is the first where both rows agree: 3.79% differing at 79.1% overlap. The fill ramp was
+This run is the first where both rows agree: 3.82% differing at 78.2% overlap. The fill ramp was
 corrected between the two runs, which removed the large flat areas of disagreement inside every filled
 shape; what is left is mostly outline geometry, where mocanvas paints in nearly the same places as tldraw
 but with a different stroke and font. See the visible-differences list below for the breakdown.

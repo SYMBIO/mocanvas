@@ -110,11 +110,19 @@ export class DrawShapeUtil extends ShapeUtil<DrawShape> {
     const size = readStyle(p, "size", DefaultSizeStyle)
     const scale = readNumber(p, "scale", 1)
     const isClosed = readBoolean(p, "isClosed", false)
+    const dash = readStyle(p, "dash", DefaultDashStyle)
     return {
       stroke: getStrokeRgba(color),
       strokeWidth: STROKE_SIZES[size] * scale,
       fill: isClosed && fill !== "none" ? getFillRgba(color, fill) : 0,
-      dash: getDashId(readStyle(p, "dash", DefaultDashStyle)),
+      // `draw` asks the engine to replace an outline with a hand-drawn version of
+      // it. A draw shape's points *are* a hand-drawn version already — a recorded
+      // pen movement, smoothed — so putting them through it a second time only
+      // adds bulges the hand never made. Ask for the solid stroke instead. The
+      // record keeps `props.dash` exactly as it was, so the style panel still
+      // shows "draw", a `.tldr` round trip is unaffected, and `dashed`/`dotted`
+      // reach the engine untouched.
+      dash: getDashId(dash === "draw" ? "solid" : dash),
       opacity: 1,
     }
   }

@@ -191,17 +191,38 @@ retessellation while zooming. Dash patterns (`dash` style word: 0 solid,
 `dotted` split the flattened outline into open dash subpaths before stroking.
 
 `draw` — the default for every shape — replaces the outline with a hand-drawn
-one. The flattened path is reduced to a few *anchors*: every detected corner,
-plus the smooth runs between them resampled at about six pieces per subpath,
-which fixes the wobble's wavelength relative to the shape while its amplitude
-stays tied to the stroke width. Each anchor is then nudged perpendicular to the
-local direction, and each span between anchors is bowed sideways through a
-quadratic aimed at the outline's own mid-point — so a curve reduced to a few
-anchors is followed rather than cut across by its chords. Anchors that are real
-corners (not points the resampling dropped on a smooth run) are additionally
-pushed out along their bisector, past the true vertex, and every interior anchor
-is cut back by a radius taken from the stroke width plus a little of the shorter
-adjacent span, clamped to 0.35 of it. The cut is bridged by a quadratic whose
+one. The flattened path is reduced to *anchors*: every detected corner, plus the
+smooth runs between them walked and split whenever the arc covered reaches a
+sixth of the subpath **or** the chord since the last anchor has bowed away from
+the outline by more than 1.5% of the local radius of curvature. Bounding that
+sagitta rather than fixing a piece count is what keeps a circle a circle — six
+anchors make a hexagon however gently it is then perturbed, whereas the sagitta
+rule spends anchors only where the outline actually bends and leaves straight
+runs alone (a page-sized circle takes about twenty-five, a rectangle four). The
+bound yields only to a floor of one stroke width per piece, where the chord error
+hides under the stroke anyway; measured over circles of radius 4–200 and stroke
+widths 0.5–11.5, the chord never misses by more than 1.5% of the radius or half a
+stroke width, whichever is larger.
+
+Each anchor is then nudged perpendicular to the local direction, and each span
+between anchors is bowed sideways through a quadratic aimed at the outline's own
+mid-point — so a curve reduced to a few anchors is followed rather than cut
+across by its chords. Both amplitudes are capped by a fraction of the adjacent
+span lengths and, on a smooth run, by 6% of the local radius of curvature
+(estimated as span over turn), so a long straight edge still gets a visible bow
+while a small circle is barely touched. The offsets come from a smooth field
+indexed by *arc length* and periodic around the subpath rather than one draw per
+anchor: that keeps the wobble's wavelength at about six lobes however densely
+roundness asks the anchors to be placed, so a finely sampled circle reads as a
+shaky hand and not as fur.
+
+Anchors that are real corners (not points the resampling dropped on a smooth run)
+are additionally pushed out along their bisector, past the true vertex, and every
+interior anchor is cut back by a radius taken from the stroke width plus a little
+of the shorter adjacent span, clamped to 0.35 of it — or, at a smooth anchor,
+0.12 of it, since there the bridge only has to hide the tangent step between two
+spans and the wider corner radius would swallow the short spans roundness now
+asks for. The cut is bridged by a quadratic whose
 control point is where the two spans' tangents meet, which keeps the tangent
 continuous across the join: aiming it at the vertex instead leaves a visible kink
 at every anchor of a curved outline, and a control point that lands behind either
@@ -211,6 +232,14 @@ little past it, so the outline overshoots where the pen came back around. Every
 amplitude scales with the stroke width, not the shape, and the whole outline
 stays within `DRAW_MAX_DEVIATION` (3) stroke widths of the true geometry — which
 is itself untouched, and is what fills, bounds and hit-testing keep using.
+
+A `draw` *shape* is exempt. Its points are a recorded pen movement already, so
+sketching them a second time only adds bulges the hand never made;
+`DrawShapeUtil.getRenderStyle` hands the engine the solid dash id while leaving
+`props.dash` alone, so the style panel and a `.tldr` round trip still see `draw`,
+and the shape's own `dashed`/`dotted` styles are unaffected. The engine sees only
+paths and has no notion of which shape one came from, so the choice belongs to
+the host.
 
 Width variation is approximated by stroking that outline twice, at 0.85× and
 0.6× the nominal width over slightly different perturbations of the same anchors
