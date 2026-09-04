@@ -183,9 +183,14 @@ describe("GeoShapeUtil", () => {
     expectWellFormedStyle(style)
     expect(style.strokeWidth).toBe(10)
     expect(style.stroke).toBe(0x4465e9ff)
-    expect(style.fill).toBe(0x4465e9ff)
+    // The fill ramp sits one step below the stroke: `solid` is the hue's pale
+    // tint, `semi` is the paper colour, and only `fill` is the hue itself.
+    expect(style.fill).toBe(0xdce1f8ff)
     expect(util.getRenderStyle(makeShape<GeoShape>("geo", util.getDefaultProps())).fill).toBe(0)
-    expect(util.getRenderStyle(makeShape<GeoShape>("geo", { ...util.getDefaultProps(), fill: "semi" })).fill).toBe(0xe8e8e8ff)
+    expect(util.getRenderStyle(makeShape<GeoShape>("geo", { ...util.getDefaultProps(), fill: "semi" })).fill).toBe(0xfcfffeff)
+    expect(util.getRenderStyle(makeShape<GeoShape>("geo", { ...util.getDefaultProps(), color: "blue", fill: "fill" })).fill).toBe(
+      0x4465e9ff,
+    )
   })
 
   it("can edit and resizes through the box base class", () => {

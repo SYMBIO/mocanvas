@@ -83,7 +83,7 @@ function compatWarnings(editor: Editor, records: ReturnType<typeof parseTldrJson
         const segs = props["segments"]
         if (Array.isArray(segs)) {
           for (const s of segs as Record<string, unknown>[]) {
-            if (!Array.isArray(s["points"])) out.push(`draw: segment has no "points" array (encoded "path" is not decoded)`)
+            if (!Array.isArray(s["points"])) out.push(`draw: segment uses the packed "path" form (decoded to "points" on load)`)
           }
         }
       }

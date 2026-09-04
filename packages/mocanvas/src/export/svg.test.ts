@@ -223,7 +223,7 @@ describe("getSvgString", () => {
   it("converts render styles to #rrggbb colours", () => {
     const geo = getSvgString(editor, [geoId])!.svg
     expect(geo).toContain('stroke="#4465e9"') // blue solid
-    expect(geo).toContain('fill="#dce1f8"') // blue semi
+    expect(geo).toContain('fill="#fcfffe"') // a `semi` fill is the paper colour
     expect(rgbaToHex(0xff000080)).toBe("#ff000080")
     expect(rgbaToHex(0x11223300)).toBeUndefined()
     expect(dashArray(0, 3)).toBeUndefined()

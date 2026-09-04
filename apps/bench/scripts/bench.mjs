@@ -38,10 +38,18 @@ const FIXTURE = resolve(ROOT, "public/compare.tldr")
  * together with the "What changed" section — once it is no longer the
  * interesting comparison.
  */
+/**
+ * Why the revision below is marked dirty. Hand-written per run, like PREVIOUS —
+ * check it still says something true before publishing a new report, and drop
+ * it if the run was made from a clean tree.
+ */
+const RUN_NOTE = "The tree was checked clean at `15b670a` immediately before this run started, and the bundle is built once, before the first measurement — so a clean `15b670a` is what was measured. The `-dirty` marker comes from edits made after that build: to this report generator, and to UI code (selection handles, style panel, icons) committed by a concurrent session. Neither is in the bundle these numbers come from."
+
 const PREVIOUS = {
   date: "2026-09-04 08:30:07 UTC",
   git: "32ac776-dirty",
   panP95: { "1000:geo": 41.6, "5000:geo": 84.2, "20000:geo": 193.1, "1000:mixed": 33.3, "5000:mixed": 107.6, "20000:mixed": 266.1 },
+  tldrawPanP95: { "1000:geo": 9.0, "5000:geo": 33.3, "20000:geo": 291.2, "1000:mixed": 9.2, "5000:mixed": 33.4, "20000:mixed": 283.3 },
   compare: { loaded: false, diffPercent: 11.84, inkPixelsMocanvas: 0, inkOverlapPercent: 0 },
 }
 
@@ -303,27 +311,37 @@ function renderDoc(data) {
     md.push("  bucket + viewport containment, and LOD hysteresis. All three target the same thing: the long frames")
     md.push("  where the camera moves but the scene did not.")
     md.push("")
-    md.push("95th-percentile pan/zoom frame, mocanvas only (the metric those renderer changes target):")
+    md.push("95th-percentile pan/zoom frame — the metric those renderer changes target. tldraw's column is the")
+    md.push("control: its code did not change between the two runs, so whatever it moved by is what this environment")
+    md.push("does on its own.")
     md.push("")
-    md.push("| N | kind | before | after | change |")
-    md.push("| ---: | :--- | ---: | ---: | ---: |")
+    md.push("| N | kind | mocanvas before → after | Δ | tldraw before → after (unchanged) | Δ |")
+    md.push("| ---: | :--- | ---: | ---: | ---: | ---: |")
+    const pct = (before, after) => (before != null && Number.isFinite(after) && before > 0
+      ? `${after < before ? "" : "+"}${(((after - before) / before) * 100).toFixed(0)}%`
+      : "—")
     for (const kind of kinds) {
       for (const n of ns) {
         const key = `${n}:${kind}`
-        const after = matrix.mocanvas[key]?.panP95
-        const before = PREVIOUS.panP95[key]
-        const delta = before != null && Number.isFinite(after) && before > 0
-          ? `${after < before ? "" : "+"}${(((after - before) / before) * 100).toFixed(0)}%`
-          : "—"
-        md.push(`| ${int(n)} | ${kind} | ${before == null ? "—" : `${fmt(before, 2)} ms`} | ${fmt(after, 2)} ms | ${delta} |`)
+        const mo = matrix.mocanvas[key]?.panP95
+        const tl = matrix.tldraw?.[key]?.panP95
+        const moWas = PREVIOUS.panP95[key]
+        const tlWas = PREVIOUS.tldrawPanP95[key]
+        md.push(`| ${int(n)} | ${kind} | ${fmt(moWas, 1)} → ${fmt(mo, 1)} ms | ${pct(moWas, mo)} | ${fmt(tlWas, 1)} → ${fmt(tl, 1)} ms | ${pct(tlWas, tl)} |`)
       }
     }
     md.push("")
-    md.push("Both columns are whole-matrix runs in the same environment (three repeats, median), not an isolated")
-    md.push("A/B, so read the direction and not the last digit — single-digit percentage moves here are noise.")
-    md.push("An interleaved A/B of just those renderer changes, in one browser session with the old behaviour")
-    md.push("toggled off and on, is in `apps/bench/results/panzoom-after.json`; it put the p95 improvement at")
-    md.push("16–31% between 5,000 and 20,000 shapes, which is the same story this table tells.")
+    md.push("**Read the control column before reading the first one.** tldraw ran the same code in both runs and still")
+    md.push("moved by -25% to +42%: this environment was faster on `geo` and slower on `mixed` than it was two hours")
+    md.push("earlier. mocanvas's column has the same shape — large gains on `geo` and at 20,000 `mixed`, nothing or a")
+    md.push("small loss on the two small `mixed` cases — so a fair reading is that the renderer changes helped where")
+    md.push("there is real work to skip, and that everything else here is the machine, not the code. Frame deltas are")
+    md.push("also quantised to the browser's frame cadence (most values land on multiples of ~8.3 ms), which turns a")
+    md.push("small real change into a whole bucket or into nothing at all.")
+    md.push("")
+    md.push("The clean measurement of those renderer changes is not this table but the interleaved A/B in")
+    md.push("`apps/bench/results/panzoom-after.json`, which toggles frame reuse and the tessellation budget off and on")
+    md.push("within a single browser session: it puts the p95 improvement at 16–31% between 5,000 and 20,000 shapes.")
     md.push("")
     if (compare?.ok && !compare.diff?.error) {
       const before = PREVIOUS.compare
@@ -361,6 +379,10 @@ function renderDoc(data) {
   md.push(`| Viewport | ${VIEWPORT.width}×${VIEWPORT.height} CSS px, device scale 1 |`)
   md.push(`| Matrix | N ∈ {${ns.join(", ")}} × kind ∈ {${kinds.join(", ")}}, ${repeats} repeats, medians reported |`)
   md.push("")
+  if (String(versions.git).endsWith("-dirty") && RUN_NOTE) {
+    md.push(`_${RUN_NOTE}_`)
+    md.push("")
+  }
 
   if (matrix) {
     md.push("## Results")
@@ -473,7 +495,7 @@ function renderDoc(data) {
       md.push("**Read the overlap row, not the differing-pixels row.** \"Differing pixels\" is a poor headline for this")
       md.push("comparison and moves in misleading ways: tldraw inks only about 12% of the canvas, so a render that draws")
       md.push("too little scores well on it. The previous run is the proof — mocanvas painted *nothing* there and still")
-      md.push(`scored 11.84% differing pixels, against ${compare.diff.diffPercent.toFixed(2)}% for the real render below it, because a blank canvas`)
+      md.push(`scored 11.84% differing pixels, against ${compare.diff.diffPercent.toFixed(2)}% for the render that now draws the whole document — because a blank canvas`)
       md.push("disagrees only where tldraw drew something. mocanvas now paints in nearly the same places but with a")
       md.push("different stroke, fill and font, so the union of disagreeing pixels stays about as large while the picture")
       md.push("is enormously closer. The painted-pixel overlap (intersection over union) is the metric that reflects")
@@ -512,17 +534,22 @@ function renderDoc(data) {
         md.push("  that genuinely needs migrating.")
       }
       md.push("")
-      md.push("Two of these are not cosmetic — they are why the raw-file screenshot above is blank:")
+      md.push("These compare the file *as authored* against what this build declares: `compatWarnings` in the bench")
+      md.push("page reads each record's raw props and diffs them against the props the matching shape util declares,")
+      md.push("before mocanvas normalises anything. So they describe the tldraw file's shape, not something mocanvas")
+      md.push("failed to read. Two of these entries are worth spelling out, because in the previous run they meant exactly that:")
       md.push("")
-      md.push("1. **`richText` is not read.** tldraw 5.x stores label text as a ProseMirror/TipTap `richText` document and")
-      md.push("   no longer writes `props.text`. mocanvas's `GeoShapeUtil`, `TextShapeUtil` and `ArrowShapeUtil` read")
-      md.push("   `shape.props.text` unconditionally, so loading a current tldraw file throws")
-      md.push("   `TypeError: Cannot read properties of undefined (reading 'trim')` and the page renders nothing.")
-      md.push("   Note that `docs/COMPAT.md` already claims *\"phase 1 uses `richText` if present, else `text`\"* — that is")
-      md.push("   not what the code does today, so either the docs or the shape utils need to catch up.")
-      md.push("2. **Encoded draw segments are not decoded.** tldraw stores freehand strokes as `segments[].path`, a")
-      md.push("   base64-packed point buffer, rather than the older `segments[].points` array that mocanvas expects, so")
-      md.push("   draw shapes carry no geometry.")
+      md.push("1. **`geo/text/note/arrow: unknown prop \"richText\"` and the matching `missing prop \"text\"`.** tldraw 5.x")
+      md.push("   stores label text as a ProseMirror/TipTap `richText` document and no longer writes `props.text`, which")
+      md.push("   mocanvas's shape utils declare — hence one warning for the prop the file has and one for the prop it")
+      md.push("   lacks. `normalizeLoadedRecords` (`packages/editor/src/records/normalize.ts`) now flattens `richText`")
+      md.push("   into `text` while the records load. Before it did, this file threw")
+      md.push("   `TypeError: Cannot read properties of undefined (reading 'trim')` and the page rendered nothing.")
+      md.push("2. **`draw: segment has no \"points\" array (encoded \"path\" is not decoded)`.** tldraw stores freehand")
+      md.push("   strokes as `segments[].path`, a base64-packed point buffer, rather than the older `segments[].points`")
+      md.push("   array. The same normalisation pass decodes it, which is why the freehand wave renders above — the")
+      md.push("   parenthetical in that message describes the old behaviour and is simply wrong now. The check has been")
+      md.push("   reworded in the bench page since this run; the line above is the wording that was recorded during it.")
       md.push("")
       md.push("The remaining warnings are benign: extra props mocanvas does not model")
       md.push("(`flipX`/`flipY`, `scaleX`/`scaleY`, `kind`, `elbowMidPoint`, `textLastEditedBy`, `frame.color`,")
@@ -569,7 +596,14 @@ function renderDoc(data) {
     md.push(`  Uploading the buffers costs ${fmt(probe.uploadOnlyMs, 2)} ms and clearing costs ${fmt(probe.clearOnlyMs, 2)} ms, but clear-plus-draw costs`)
     md.push(`  **${fmt(probe.clearAndDrawMs, 1)} ms with \`antialias: true\` against ${fmt(probe.clearAndDrawMs_antialiasOff, 1)} ms with it off** — roughly`)
     md.push(`  ${fmt(((probe.clearAndDrawMs - probe.clearAndDrawMs_antialiasOff) / probe.clearAndDrawMs) * 100, 0)}% of the frame is multisample resolve on the CPU. On a real GPU MSAA is close to free, so the`)
-    md.push("  absolute mocanvas frame times below are largely a property of this rasteriser rather than of the scene.")
+    md.push("  absolute mocanvas frame times above are largely a property of this rasteriser rather than of the scene.")
+  }
+  if (matrix?.tldraw && PREVIOUS?.tldrawPanP95) {
+    md.push("- **Run-to-run spread is wide here, so do not read small differences.** tldraw's code did not change")
+    md.push("  between this run and the previous one, and its 95th-percentile pan/zoom frame still moved by -25% to")
+    md.push("  +42% across the matrix (see \"What changed since the previous run\"). Anything smaller than that on a")
+    md.push("  single metric is this machine, not either library. Comparisons made inside one browser session — the")
+    md.push("  mocanvas/tldraw pairs here, or the A/B in `panzoom-after.json` — are the ones worth quoting.")
   }
   md.push("- **Default settings on both sides.** No tuning, no custom shape utils, no culling or LOD flags flipped, no")
   md.push("  tldraw performance options enabled. Both libraries are used the way the docs show. Either could likely be")
