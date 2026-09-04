@@ -14,7 +14,7 @@ linear memory.
 ## Install
 
 ```bash
-npm install mocanvas react react-dom
+npm install @mocanvas/mocanvas react react-dom
 ```
 
 `react` and `react-dom` (>= 18) are peer dependencies.
@@ -23,7 +23,7 @@ npm install mocanvas react react-dom
 
 ```tsx
 import { createRoot } from "react-dom/client"
-import { Mocanvas, createShapeId, type Editor } from "mocanvas"
+import { Mocanvas, createShapeId, type Editor } from "@mocanvas/mocanvas"
 
 function App() {
   function onMount(editor: Editor) {
@@ -101,7 +101,7 @@ Two optional notes:
 
 | Package            | What                                                       |
 | ------------------ | ---------------------------------------------------------- |
-| `mocanvas`         | `<Mocanvas />`, default shapes, tools, UI                   |
+| `@mocanvas/mocanvas`         | `<Mocanvas />`, default shapes, tools, UI                   |
 | `@mocanvas/editor` | `Editor`, `ShapeUtil`, `StateNode`, geometry, `<Canvas />`  |
 | `@mocanvas/store`  | records, `Store`, schema, migrations, `.tldr` IO            |
 | `@mocanvas/state`  | signals                                                     |

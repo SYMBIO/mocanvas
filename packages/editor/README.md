@@ -6,7 +6,7 @@ default shapes, tools and UI: the `Editor` facade, `ShapeUtil` and
 textures, and the `<Canvas />` React renderer with its WebGL2 backend.
 
 Use this package when you want to build your own shape set and UI. If you want
-a canvas that works out of the box, use `mocanvas`.
+a canvas that works out of the box, use `@mocanvas/mocanvas`.
 
 ## Install
 

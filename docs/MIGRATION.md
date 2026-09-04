@@ -37,7 +37,7 @@ interface BaseShape<Type extends string, Props extends object> {
 
 Ids keep their prefixes and their format: `shape:`, `page:`, `binding:`,
 `asset:`. `createShapeId()`, `isShapeId()`, `isShape()` are exported from
-`@mocanvas/editor` (and re-exported from `mocanvas`). `page`, `document`,
+`@mocanvas/editor` (and re-exported from `@mocanvas/mocanvas`). `page`, `document`,
 `camera`, `instance`, `instance_page_state`, `binding` and `asset` records keep
 their names and their fields.
 
@@ -89,7 +89,7 @@ handlers, `onCancel`, `onComplete`, `onInterrupt`, `onTick`, `transition`,
 ### Step 0 — the zero-rename step
 
 Point every import at `@mocanvas/compat` and change nothing else. That package
-is pure re-exports (no runtime code): it re-exports everything from `mocanvas`
+is pure re-exports (no runtime code): it re-exports everything from `@mocanvas/mocanvas`
 and adds back the `TL`-prefixed names.
 
 ```ts
@@ -136,13 +136,13 @@ The aliases `@mocanvas/compat` actually exports:
 | `TLStateNodeConstructor` | `StateNodeConstructor` | | `TLBindingUtilConstructor` | `BindingUtilConstructor` |
 
 Anything not in that list has the same name in both worlds and comes through
-the `export * from "mocanvas"` at the top of the package.
+the `export * from "@mocanvas/mocanvas"` at the top of the package.
 
 ### Step 1 — package map
 
 | Old import                      | New import                | Note |
 | ------------------------------- | ------------------------- | ---- |
-| `tldraw`                        | `mocanvas`                | `<Mocanvas />`, default shapes, tools, UI, `.tldr` helpers, export helpers |
+| `tldraw`                        | `@mocanvas/mocanvas`                | `<Mocanvas />`, default shapes, tools, UI, `.tldr` helpers, export helpers |
 | `@tldraw/editor`                | `@mocanvas/editor`        | `Editor`, `ShapeUtil`, `StateNode`, `BindingUtil`, geometry, `<Canvas />` |
 | `@tldraw/store`                 | `@mocanvas/store`         | records, `Store`, `StoreSchema`, migrations, `.tldr` IO |
 | `@tldraw/state`                 | `@mocanvas/state`         | `atom`, `computed`, `react`, `transact` |
@@ -150,13 +150,13 @@ the `export * from "mocanvas"` at the top of the package.
 | `@tldraw/tlschema`              | `@mocanvas/editor`        | record and prop types live with the editor |
 | any of the above (first pass)   | `@mocanvas/compat`        | keeps the `TL*` names |
 
-Everything `@mocanvas/editor` exports is re-exported by `mocanvas`, so in app
-code you can import from `mocanvas` alone.
+Everything `@mocanvas/editor` exports is re-exported by `@mocanvas/mocanvas`, so in app
+code you can import from `@mocanvas/mocanvas` alone.
 
 ### Step 2 — drop the prefixes
 
 Once the app builds and runs against `@mocanvas/compat`, rename `TLFoo` →
-`Foo` file by file and move imports to `mocanvas` / `@mocanvas/editor`. Nothing
+`Foo` file by file and move imports to `@mocanvas/mocanvas` / `@mocanvas/editor`. Nothing
 forces you to finish this in one pass.
 
 ---
@@ -427,7 +427,7 @@ What you have:
 - `useEditor()` inside any descendant of `<Canvas>` / `<EditorProvider>`
   returns the `Editor` (`useMaybeEditor()` returns `Editor | null`).
 - `track(Component)` and `useValue` from `@mocanvas/state/react` — re-exported
-  from `@mocanvas/editor` and `mocanvas` — make a component re-render when the
+  from `@mocanvas/editor` and `@mocanvas/mocanvas` — make a component re-render when the
   signals it reads change.
 
 The practical migration is: `hideUi`, then rebuild your chrome as ordinary
@@ -440,7 +440,7 @@ components.
 
 ## 8. Files
 
-Two helpers, both from `mocanvas`:
+Two helpers, both from `@mocanvas/mocanvas`:
 
 ```ts
 function serializeMocanvasFile(editor: Editor): string
@@ -548,7 +548,7 @@ the code confirms today.
 | Gap | Status |
 | --- | ------ |
 | `editor.resizeShape`, `editor.stretchShapes` | phase 3. Interactive resize lives in the select tool; `ShapeUtil.onResize` and `BaseBoxShapeUtil` work, but there is no imperative resize entry point on `Editor`. |
-| `editor.getSvgString`, `editor.toImage` | Not `Editor` methods. Export is a set of free functions in `mocanvas`: `getSvgString(editor, ids?, opts?)`, `exportToBlob(editor, opts)`, `downloadBlob(blob, filename)`, `copyBlobToClipboard(blob)`. |
+| `editor.getSvgString`, `editor.toImage` | Not `Editor` methods. Export is a set of free functions in `@mocanvas/mocanvas`: `getSvgString(editor, ids?, opts?)`, `exportToBlob(editor, opts)`, `downloadBlob(blob, filename)`, `copyBlobToClipboard(blob)`. |
 | `ShapeUtil.toSvg`, `ShapeUtil.toBackgroundSvg` | Not `ShapeUtil` members. Custom shapes contribute to SVG export through `registerShapeSvgRenderer(type, renderer)`; without one they fall back to `geometryFallbackSvg`. |
 | `pointer` and `instance_presence` records | later — collaboration. No presence records, and no `mergeRemoteChanges` transport yet. |
 | Sync protocol | Explicit v1 non-goal. Wire compatibility with tldraw's sync protocol is not planned for v1. |

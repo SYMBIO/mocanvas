@@ -26,7 +26,7 @@ importers:
       '@mocanvas/editor':
         specifier: workspace:*
         version: link:../../packages/editor
-      mocanvas:
+      '@mocanvas/mocanvas':
         specifier: workspace:*
         version: link:../../packages/mocanvas
       react:
@@ -63,6 +63,9 @@ importers:
       '@mocanvas/editor':
         specifier: workspace:*
         version: link:../../packages/editor
+      '@mocanvas/mocanvas':
+        specifier: workspace:*
+        version: link:../../packages/mocanvas
       '@mocanvas/state':
         specifier: workspace:*
         version: link:../../packages/state
@@ -72,9 +75,6 @@ importers:
       '@mocanvas/sync':
         specifier: workspace:*
         version: link:../../packages/sync
-      mocanvas:
-        specifier: workspace:*
-        version: link:../../packages/mocanvas
       react:
         specifier: ^19.1.0
         version: 19.2.8
@@ -100,15 +100,15 @@ importers:
       '@mocanvas/editor':
         specifier: workspace:*
         version: link:../editor
+      '@mocanvas/mocanvas':
+        specifier: workspace:*
+        version: link:../mocanvas
       '@mocanvas/state':
         specifier: workspace:*
         version: link:../state
       '@mocanvas/store':
         specifier: workspace:*
         version: link:../store
-      mocanvas:
-        specifier: workspace:*
-        version: link:../mocanvas
     devDependencies:
       '@types/react':
         specifier: ^19.1.0

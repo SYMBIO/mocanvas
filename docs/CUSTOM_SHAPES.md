@@ -4,7 +4,7 @@ A from-scratch tutorial. We build a **callout**: a rounded-ish body with a
 pointed tail, a text label, a draggable handle for the tail tip, resize
 behaviour, two style props, and a tool that creates it by dragging.
 
-Everything here uses public API from `mocanvas` / `@mocanvas/editor`. Read
+Everything here uses public API from `@mocanvas/mocanvas` / `@mocanvas/editor`. Read
 [ARCHITECTURE.md](ARCHITECTURE.md) first if you want to know why the rendering
 split looks the way it does.
 
@@ -207,7 +207,7 @@ Also required. Return SVG in shape-local space; the convention among the
 built-ins is a single `<path>` over the geometry:
 
 ```tsx
-import { pathWordsToSvgD } from "mocanvas"
+import { pathWordsToSvgD } from "@mocanvas/mocanvas"
 
 indicator(shape: CalloutShape): ReactNode {
   return <path d={pathWordsToSvgD(this.getGeometry(shape).toPathWords())} />
@@ -649,7 +649,7 @@ to the built-in `defaultShapeUtils` and `defaultTools`, so do not re-list the
 built-ins:
 
 ```tsx
-import { Mocanvas } from "mocanvas"
+import { Mocanvas } from "@mocanvas/mocanvas"
 import { CalloutShapeUtil } from "./CalloutShapeUtil"
 import { CalloutTool } from "./CalloutTool"
 
@@ -676,10 +676,10 @@ drive it from your own chrome rendered as `children` of `<Mocanvas>`:
 ```
 
 …where `MyToolbar` uses `useEditor()` to get the editor and `track()` (both
-re-exported from `mocanvas`) so it re-renders when the active tool changes:
+re-exported from `@mocanvas/mocanvas`) so it re-renders when the active tool changes:
 
 ```tsx
-import { track, useEditor } from "mocanvas"
+import { track, useEditor } from "@mocanvas/mocanvas"
 
 const MyToolbar = track(function MyToolbar() {
   const editor = useEditor()
@@ -719,7 +719,7 @@ import {
   type ShapeHandle,
   type StyleWords,
 } from "@mocanvas/editor"
-import { pathWordsToSvgD } from "mocanvas"
+import { pathWordsToSvgD } from "@mocanvas/mocanvas"
 import type { ReactNode } from "react"
 
 // `DefaultColorStyle` / `DefaultSizeStyle` are imported once, in the value

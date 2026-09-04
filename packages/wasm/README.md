@@ -6,7 +6,7 @@ maintains a spatial index, hit-tests, culls to the viewport, tessellates and
 batches, and writes vertex/index/batch buffers into linear memory that the host
 uploads to the GPU by pointer — no per-frame copying.
 
-Most applications use `mocanvas` or `@mocanvas/editor` instead of this package
+Most applications use `@mocanvas/mocanvas` or `@mocanvas/editor` instead of this package
 directly. No React, no other dependencies.
 
 ## Install

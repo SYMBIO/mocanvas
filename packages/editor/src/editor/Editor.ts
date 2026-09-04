@@ -2570,7 +2570,7 @@ export function getTextMeasureProvider(): EditorTextMeasureProvider | null {
 function missingImplementation(member: string, register: string): string {
   return (
     `Editor.${member} has no implementation registered. Importing \`mocanvas\` installs it — ` +
-    `import { Mocanvas } from "mocanvas" (or "mocanvas" for its side effect) anywhere in your app. ` +
+    `import { Mocanvas } from "@mocanvas/mocanvas" (or "@mocanvas/mocanvas" for its side effect) anywhere in your app. ` +
     `To install your own, call ${register}(...) from "@mocanvas/editor".`
   )
 }

@@ -4,7 +4,7 @@
  *
  * Every alias here is a pure re-export; there is no runtime code.
  */
-export * from "mocanvas"
+export * from "@mocanvas/mocanvas"
 
 import type {
   ArrowBinding,
@@ -53,8 +53,8 @@ import type {
   DefaultHorizontalAlignStyle as DefaultHorizontalAlignStyleValue,
   DefaultVerticalAlignStyle as DefaultVerticalAlignStyleValue,
   GeoShapeKind,
-} from "mocanvas"
-import { Mocanvas, createSchema, createStore, Canvas, Editor } from "mocanvas"
+} from "@mocanvas/mocanvas"
+import { Mocanvas, createSchema, createStore, Canvas, Editor } from "@mocanvas/mocanvas"
 
 // ---- records ----------------------------------------------------------------
 export type TLRecord = EditorRecord

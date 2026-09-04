@@ -18,7 +18,7 @@ import type { TLShape, TLShapeId, TLGeoShape } from "@mocanvas/compat"
 import { Tldraw } from "@mocanvas/compat" // alias of <Mocanvas />
 ```
 
-The package also re-exports everything from `mocanvas`, so a single import
+The package also re-exports everything from `@mocanvas/mocanvas`, so a single import
 source works during a migration.
 
 What does and does not carry over is listed in

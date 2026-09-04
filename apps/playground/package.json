@@ -9,13 +9,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "mocanvas": "workspace:*",
     "@mocanvas/editor": "workspace:*",
-    "@mocanvas/store": "workspace:*",
+    "@mocanvas/mocanvas": "workspace:*",
     "@mocanvas/state": "workspace:*",
+    "@mocanvas/store": "workspace:*",
+    "@mocanvas/sync": "workspace:*",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "@mocanvas/sync": "workspace:*"
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@types/react": "^19.1.0",

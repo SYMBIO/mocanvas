@@ -1,4 +1,4 @@
-import { createShapeId, downloadBlob, exportToBlob, loadMocanvasFile, Mocanvas, serializeMocanvasFile, type Editor, type GeoShape, type GeoShapeKind, type ShapeCreate } from "mocanvas"
+import { createShapeId, downloadBlob, exportToBlob, loadMocanvasFile, Mocanvas, serializeMocanvasFile, type Editor, type GeoShape, type GeoShapeKind, type ShapeCreate } from "@mocanvas/mocanvas"
 import { CollaboratorCursors, createBroadcastChannelTransport, useSync } from "@mocanvas/sync"
 import { useCallback, useRef, useState } from "react"
 

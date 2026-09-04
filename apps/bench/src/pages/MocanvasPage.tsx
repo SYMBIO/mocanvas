@@ -1,4 +1,4 @@
-import { createShapeId, loadMocanvasFile, Mocanvas, type Editor, type ShapeCreate } from "mocanvas"
+import { createShapeId, loadMocanvasFile, Mocanvas, type Editor, type ShapeCreate } from "@mocanvas/mocanvas"
 import {
   buildSpecs,
   cameraAt,

@@ -15,11 +15,11 @@ An infinite-canvas SDK for the web with a familiar `Editor` / `ShapeUtil` /
 ## Install
 
 ```bash
-npm install mocanvas react react-dom
+npm install @mocanvas/mocanvas react react-dom
 ```
 
 ```tsx
-import { Mocanvas } from "mocanvas"
+import { Mocanvas } from "@mocanvas/mocanvas"
 
 export const App = () => (
   <div style={{ position: "absolute", inset: 0 }}>
@@ -38,7 +38,7 @@ bundler that does not understand `new URL(..., import.meta.url)`.
 
 | Package            | What                                                        |
 | ------------------ | ----------------------------------------------------------- |
-| `mocanvas`         | `<Mocanvas />`, default shapes, tools, UI                    |
+| `@mocanvas/mocanvas`         | `<Mocanvas />`, default shapes, tools, UI                    |
 | `@mocanvas/editor` | `Editor`, `ShapeUtil`, `StateNode`, geometry, `<Canvas />`   |
 | `@mocanvas/store`  | records, `Store`, schema, migrations, `.tldr` IO             |
 | `@mocanvas/state`  | signals                                                      |

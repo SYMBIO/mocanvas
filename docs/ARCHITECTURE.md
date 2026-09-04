@@ -286,7 +286,7 @@ See `docs/COMPAT.md` for the method-by-method map. Highlights:
 - Records: `typeName`, `id`, `type`, `x`, `y`, `rotation`, `index`,
   `parentId`, `isLocked`, `opacity`, `props`, `meta`.
 - `.tldr`: `{ tldrawFileFormatVersion, schema, records }` is read and written.
-  The `mocanvas` file writer emits the same envelope so files round-trip.
+  The mocanvas file writer emits the same envelope so files round-trip.
 
 ## Repository layout
 

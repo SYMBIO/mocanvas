@@ -54,8 +54,8 @@
     "prepack": "pnpm run build"
   },
   "dependencies": {
-    "mocanvas": "workspace:*",
     "@mocanvas/editor": "workspace:*",
+    "@mocanvas/mocanvas": "workspace:*",
     "@mocanvas/state": "workspace:*",
     "@mocanvas/store": "workspace:*"
   },
