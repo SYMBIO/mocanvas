@@ -4,8 +4,27 @@
     {
       "name": "playground",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "playground", "dev", "--", "--host", "127.0.0.1"],
+      "runtimeArgs": [
+        "--filter",
+        "playground",
+        "dev",
+        "--",
+        "--host",
+        "127.0.0.1"
+      ],
       "port": 5180
+    },
+    {
+      "name": "consumer-check",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "/private/tmp/claude-1025/-Users-martin-cajthaml-Sites-symbio-mocanvas/70e339e9-4225-4e1d-b2fc-958924a4a049/scratchpad/consumer",
+        "--port",
+        "5190",
+        "--strictPort"
+      ],
+      "port": 5190
     }
   ]
 }
