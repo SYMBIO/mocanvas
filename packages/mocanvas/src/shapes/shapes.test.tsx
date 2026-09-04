@@ -49,7 +49,11 @@ import {
   type NoteShape,
   type TextShape,
 } from "./index"
-import { getDashId } from "./shape-theme"
+import {
+  NOTE_SHADOW_SPREAD,
+  getDashId,
+  getNoteShadowSvgRect,
+} from "./shape-theme"
 
 const editor = {
   getSortedChildIdsForParent: () => [],
@@ -607,9 +611,30 @@ describe("shape chrome constants", () => {
   })
 
   it("builds a note shadow that scales with the note", () => {
-    expect(getNoteShadowCss()).toBe(`0 ${NOTE_SHADOW_OFFSET_Y}px ${NOTE_SHADOW_BLUR}px rgba(21, 34, 35, ${NOTE_SHADOW_OPACITY})`)
+    expect(getNoteShadowCss()).toBe(
+      `0 ${NOTE_SHADOW_OFFSET_Y}px ${NOTE_SHADOW_BLUR}px ${NOTE_SHADOW_SPREAD}px rgba(21, 34, 35, ${NOTE_SHADOW_OPACITY})`,
+    )
     expect(NOTE_SHADOW_COLOR).toBe("#152223")
-    expect(getNoteShadowCss(2)).toContain(`0 ${NOTE_SHADOW_OFFSET_Y * 2}px ${NOTE_SHADOW_BLUR * 2}px`)
+    expect(getNoteShadowCss(2)).toContain(`0 ${NOTE_SHADOW_OFFSET_Y * 2}px ${NOTE_SHADOW_BLUR * 2}px ${NOTE_SHADOW_SPREAD * 2}px`)
+  })
+
+  it("keeps the note shadow under the note rather than around it", () => {
+    // A wide blur with no spread haloes the note on every side. The negative
+    // spread pulls the shadow rect in, so it reaches much further below the
+    // body than beside it.
+    expect(NOTE_SHADOW_SPREAD).toBeLessThan(0)
+    const beside = NOTE_SHADOW_BLUR + NOTE_SHADOW_SPREAD
+    const below = NOTE_SHADOW_BLUR + NOTE_SHADOW_SPREAD + NOTE_SHADOW_OFFSET_Y
+    expect(beside).toBeGreaterThan(0)
+    expect(below).toBeGreaterThan(beside * 3)
+    // ...and never above it.
+    expect(NOTE_SHADOW_BLUR + NOTE_SHADOW_SPREAD - NOTE_SHADOW_OFFSET_Y).toBeLessThanOrEqual(0)
+
+    const rect = getNoteShadowSvgRect(200, 200)
+    expect(rect.w).toBe(200 + NOTE_SHADOW_SPREAD * 2)
+    expect(rect.h).toBe(200 + NOTE_SHADOW_SPREAD * 2)
+    expect(rect.y - rect.x).toBe(NOTE_SHADOW_OFFSET_Y)
+    expect(rect.stdDeviation).toBe(NOTE_SHADOW_BLUR / 2)
   })
 })
 

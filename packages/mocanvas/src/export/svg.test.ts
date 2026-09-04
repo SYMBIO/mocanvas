@@ -239,11 +239,11 @@ describe("getSvgString", () => {
 
   it("carries the note's trim and the frame's border colour", () => {
     const note = getSvgString(editor, [noteId])!.svg
-    // A drop-shadow filter, referenced by the body rect and defined once.
-    expect(note).toContain("<feDropShadow ")
-    expect(note).toContain(`flood-color="${NOTE_SHADOW_COLOR}"`)
-    expect(note).toContain(`flood-opacity="${NOTE_SHADOW_OPACITY}"`)
-    expect(note).toMatch(/<rect [^>]*filter="url\(#mc-note-shadow-[^"]+\)"/)
+    // The shadow is its own blurred rect behind the body: `feDropShadow` has
+    // no spread, and the shadow needs a negative one to stay under the note.
+    expect(note).toContain("<feGaussianBlur ")
+    expect(note).toMatch(new RegExp(`<rect [^>]*fill="${NOTE_SHADOW_COLOR}"[^>]*filter="url\\(#mc-note-shadow-[^"]+\\)"`))
+    expect(note).toContain(`fill-opacity="${NOTE_SHADOW_OPACITY}"`)
     expect(tagBalance(note, "defs")).toEqual({ open: 1, close: 1 })
     expect(tagBalance(note, "linearGradient")).toEqual({ open: 1, close: 1 })
 

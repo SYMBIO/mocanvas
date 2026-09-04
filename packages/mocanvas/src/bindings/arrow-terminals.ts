@@ -6,7 +6,18 @@
  * A bound terminal is derived from the bound shape every time it is read, so
  * the arrow follows the shape without anyone copying coordinates around.
  */
-import { Box, Group2d, Vec, type Editor, type Geometry2d, type ShapeId, type UnknownShape, type VecLike } from "@mocanvas/editor"
+import {
+  Box,
+  Group2d,
+  STROKE_SIZES,
+  Vec,
+  type DefaultSizeStyle,
+  type Editor,
+  type Geometry2d,
+  type ShapeId,
+  type UnknownShape,
+  type VecLike,
+} from "@mocanvas/editor"
 import type { ArrowShape } from "../shapes/ArrowShapeUtil"
 import { getArrowBody, getPointOnBody } from "../shapes/arrow-helpers"
 import type { ArrowBinding, ArrowTerminal } from "./ArrowBindingUtil"
@@ -156,6 +167,25 @@ export interface ArrowTerminals {
 }
 
 /**
+ * How far a bound arrow stops short of the shape it points at, as a multiple
+ * of its stroke width. An arrowhead resting on a shape's border reads as part
+ * of that border; a small gap reads as pointing at it.
+ */
+export const ARROW_TERMINAL_GAP_STROKES = 2.7
+
+/** The gap in page units for an arrow of a given size style. */
+export function getArrowTerminalGap(size: DefaultSizeStyle, scale = 1): number {
+  return STROKE_SIZES[size] * scale * ARROW_TERMINAL_GAP_STROKES
+}
+
+/** Move `point` back along the line toward `from` by `distance`, never past `from`. */
+function pullBack(point: Vec, from: Vec, distance: number): Vec {
+  const d = Vec.Dist(point, from)
+  if (d <= 1e-6) return point
+  return Vec.Lrp(point, from, Math.min(distance, d) / d)
+}
+
+/**
  * Resolve both terminals of an arrow in arrow-local space.
  *
  * Unbound terminals come straight from `props`. A bound terminal starts at
@@ -189,7 +219,11 @@ export function getArrowTerminalsInArrowSpace(editor: Editor, arrow: ArrowShape)
     if (!binding || !shape || binding.props.isExact) return anchor
     if (Vec.Dist2(anchor, other) < 1e-12) return anchor
     const path = sampleBody(other, anchor, arrow.props.bend, terminal === "start")
-    return firstCrossing(path, outlineInArrowSpace(shape)) ?? anchor
+    const crossing = firstCrossing(path, outlineInArrowSpace(shape))
+    if (!crossing) return anchor
+    // Stop short of the outline rather than on it. `isExact` opts out above,
+    // which is what an exact binding means.
+    return pullBack(crossing, other, getArrowTerminalGap(arrow.props.size, arrow.props.scale))
   }
 
   return {

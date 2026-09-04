@@ -12,7 +12,13 @@ import {
 } from "@mocanvas/editor"
 import { defaultShapeUtils, type ArrowShape, type ArrowShapeUtil, type GeoShape } from "../shapes"
 import { ArrowBindingUtil, defaultBindingUtils, type ArrowBinding } from "./index"
-import { applyTransform, getArrowTerminalsInArrowSpace, intersectSegments } from "./arrow-terminals"
+import { applyTransform, getArrowTerminalGap, getArrowTerminalsInArrowSpace, intersectSegments } from "./arrow-terminals"
+
+/**
+ * A bound terminal stops short of the outline by `getArrowTerminalGap`. Every
+ * fixture here uses the default size at scale 1, so the gap is one constant.
+ */
+const GAP = getArrowTerminalGap("m")
 
 const wasmPath = fileURLToPath(new URL("../../../wasm/pkg/mocanvas_bg.wasm", import.meta.url))
 
@@ -106,19 +112,22 @@ describe("ArrowBindingUtil", () => {
     let terminals = getArrowTerminalsInArrowSpace(editor, editor.getShape<ArrowShape>(arrow.id)!)
     expect(terminals.start.toJson()).toEqual({ x: 0, y: 50 })
     // Anchor is the geo center (350, 50); the arrow enters through the left edge at x=300.
-    expect(terminals.end.x).toBeCloseTo(300, 6)
+    expect(terminals.end.x).toBeCloseTo(300 - GAP, 6)
     expect(terminals.end.y).toBeCloseTo(50, 6)
 
     editor.updateShape<GeoShape>({ id: geo.id, type: "geo", x: 500, y: 100 })
 
     const moved = editor.getShape<ArrowShape>(arrow.id)!
     terminals = getArrowTerminalsInArrowSpace(editor, moved)
-    // Ray from (0,50) toward the new center (550,150) meets the left edge x=500 at y=140.9...
-    expect(terminals.end.x).toBeCloseTo(500, 6)
-    expect(terminals.end.y).toBeCloseTo(50 + (100 / 550) * 500, 6)
+    // Ray from (0,50) toward the new center (550,150) meets the left edge x=500
+    // at y=140.9..., then the terminal is pulled GAP back *along the ray*, so
+    // both components come in a little.
+    const dir = Vec.Uni(new Vec(500, 50 + (100 / 550) * 500 - 50))
+    expect(terminals.end.x).toBeCloseTo(500 - dir.x * GAP, 4)
+    expect(terminals.end.y).toBeCloseTo(50 + (100 / 550) * 500 - dir.y * GAP, 4)
     // The arrow record itself was refreshed so the engine re-derives its geometry.
-    expect(moved.props.end.x).toBeCloseTo(500, 6)
-    expect(editor.getShapeGeometry(moved).bounds.maxX).toBeCloseTo(500, 6)
+    expect(moved.props.end.x).toBeCloseTo(500 - GAP, 0)
+    expect(editor.getShapeGeometry(moved).bounds.maxX).toBeCloseTo(500 - GAP, 0)
     expect(arrowBindings(editor, arrow)).toHaveLength(1)
   })
 
@@ -141,7 +150,7 @@ describe("ArrowBindingUtil", () => {
     expect(editor.getShape(geo.id)).toBeUndefined()
     expect(arrowBindings(editor, arrow)).toHaveLength(0)
     const after = editor.getShape<ArrowShape>(arrow.id)!
-    expect(after.props.end.x).toBeCloseTo(600, 6)
+    expect(after.props.end.x).toBeCloseTo(600 - GAP, 6)
     expect(after.props.end.y).toBeCloseTo(50, 6)
     expect(getArrowTerminalsInArrowSpace(editor, after).end.toJson()).toEqual(after.props.end)
   })
@@ -160,7 +169,7 @@ describe("ArrowBindingUtil", () => {
     // The static fallback tracks the handle.
     expect(current.props.end).toEqual({ x: 330, y: 70 })
     // While bound the geometry ends on the geo outline, not at the raw handle.
-    expect(getArrowTerminalsInArrowSpace(editor, current).end.x).toBeCloseTo(300, 6)
+    expect(getArrowTerminalsInArrowSpace(editor, current).end.x).toBeCloseTo(300 - GAP, 6)
 
     // A precise drag records the exact anchor and updates the same binding.
     current = dragHandle(editor, arrow.id, "end", 320, 30, true)
@@ -205,10 +214,10 @@ describe("ArrowBindingUtil", () => {
     const bindings = arrowBindings(editor, arrow)
     expect(bindings.map((x) => x.props.terminal).sort()).toEqual(["end", "start"])
     const { start, end } = getArrowTerminalsInArrowSpace(editor, editor.getShape<ArrowShape>(arrow.id)!)
-    expect(start.x).toBeCloseTo(100, 6)
-    expect(end.x).toBeCloseTo(400, 6)
-    expect(distanceToOutline(editor, arrow, a, start)).toBeLessThan(1)
-    expect(distanceToOutline(editor, arrow, b, end)).toBeLessThan(1)
+    expect(start.x).toBeCloseTo(100 + GAP, 6)
+    expect(end.x).toBeCloseTo(400 - GAP, 6)
+    expect(distanceToOutline(editor, arrow, a, start)).toBeCloseTo(GAP, 0)
+    expect(distanceToOutline(editor, arrow, b, end)).toBeCloseTo(GAP, 0)
   })
 
   it("puts a non-exact terminal on the target outline for rotated and curved targets", () => {
@@ -217,13 +226,19 @@ describe("ArrowBindingUtil", () => {
     bind(editor, arrow, ellipse)
     const shape = editor.getShape<ArrowShape>(arrow.id)!
     const { end } = getArrowTerminalsInArrowSpace(editor, shape)
-    expect(distanceToOutline(editor, shape, ellipse, end)).toBeLessThan(1)
+    // Measured perpendicular to a curved outline, a pull-back along the body
+    // reads shorter than the gap itself; it must still clear the outline.
+    const curvedGap = distanceToOutline(editor, shape, ellipse, end)
+    expect(curvedGap).toBeGreaterThan(GAP / 3)
+    expect(curvedGap).toBeLessThanOrEqual(GAP + 0.5)
 
     // The bent body approaches from a different angle but still lands on the outline.
     editor.updateShape<ArrowShape>({ id: arrow.id, type: "arrow", props: { bend: 60 } })
     const bent = editor.getShape<ArrowShape>(arrow.id)!
     const bentEnd = getArrowTerminalsInArrowSpace(editor, bent).end
-    expect(distanceToOutline(editor, bent, ellipse, bentEnd)).toBeLessThan(1)
+    const bentGap = distanceToOutline(editor, bent, ellipse, bentEnd)
+    expect(bentGap).toBeGreaterThan(GAP / 3)
+    expect(bentGap).toBeLessThanOrEqual(GAP + 0.5)
     expect(Vec.Dist(bentEnd, end)).toBeGreaterThan(1)
   })
 
@@ -244,8 +259,12 @@ describe("ArrowBindingUtil", () => {
     const util = editor.getShapeUtil<ArrowShape>(shape) as ArrowShapeUtil
     const handles = util.getHandles(shape)
     expect(handles.map((h) => h.id)).toEqual(["start", "bend", "end"])
-    expect(handles[2]!.x).toBeCloseTo(300, 6)
-    expect(handles[1]!.x).toBeCloseTo(150, 6)
+    expect(handles[2]!.x).toBeCloseTo(300 - GAP, 6)
+    // The bend handle rides the middle of the *bowed* body, so it does not
+    // simply halve the chord: it only has to sit between the two terminals.
+    const terminals = getArrowTerminalsInArrowSpace(editor, shape)
+    expect(handles[1]!.x).toBeGreaterThan(terminals.start.x)
+    expect(handles[1]!.x).toBeLessThan(terminals.end.x)
     expect(util.canBind({ fromShapeType: "arrow", toShapeType: "arrow", bindingType: "arrow" })).toBe(false)
     expect(util.hideSelectionBoundsBg(shape)).toBe(true)
     expect(util.hideSelectionBoundsFg(shape)).toBe(true)
@@ -262,7 +281,7 @@ describe("ArrowBindingUtil", () => {
     util.onTranslateStart(editor.getShape<ArrowShape>(arrow.id)!)
     expect(arrowBindings(editor, arrow)).toHaveLength(0)
     const frozen = editor.getShape<ArrowShape>(arrow.id)!
-    expect(frozen.props.end.x).toBeCloseTo(300, 6)
+    expect(frozen.props.end.x).toBeCloseTo(300 - GAP, 6)
     expect(frozen.props.end.y).toBeCloseTo(50, 6)
 
     // Moving the arrow together with its target keeps the binding.
@@ -278,7 +297,7 @@ describe("ArrowBindingUtil", () => {
     const binding = bind(editor, arrow, geo)
     editor.deleteBinding(binding.id, { isolateShapes: true })
     const after = editor.getShape<ArrowShape>(arrow.id)!
-    expect(after.props.end.x).toBeCloseTo(300, 6)
+    expect(after.props.end.x).toBeCloseTo(300 - GAP, 6)
     expect(arrowBindings(editor, arrow)).toHaveLength(0)
   })
 

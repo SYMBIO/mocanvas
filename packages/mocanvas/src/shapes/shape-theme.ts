@@ -144,8 +144,15 @@ export const NOTE_GRADIENT_TOP_SCALE = 0.9785
  */
 export const NOTE_SHADOW_COLOR = "#152223"
 export const NOTE_SHADOW_OPACITY = 0.36
-export const NOTE_SHADOW_OFFSET_Y = 3
-export const NOTE_SHADOW_BLUR = 12
+/**
+ * A note's shadow falls almost entirely *below* it. A wide blur with no spread
+ * haloes the note on every side, which reads as a glow rather than as paper
+ * lifted off the page; the negative spread pulls the shadow rect in so the
+ * sides stay tight while the offset keeps the soft falloff underneath.
+ */
+export const NOTE_SHADOW_OFFSET_Y = 12
+export const NOTE_SHADOW_BLUR = 13
+export const NOTE_SHADOW_SPREAD = -9
 
 /** `#rrggbb` with every channel scaled by `factor`, clamped to the byte range. */
 function scaleHexColor(hex: string, factor: number): string {
@@ -189,5 +196,24 @@ export function getNoteBodyGradientCss(color: DefaultColorStyle): string {
 export function getNoteShadowCss(scale = 1): string {
   const dy = NOTE_SHADOW_OFFSET_Y * scale
   const blur = NOTE_SHADOW_BLUR * scale
-  return `0 ${dy}px ${blur}px ${hexToCssRgba(NOTE_SHADOW_COLOR, NOTE_SHADOW_OPACITY)}`
+  const spread = NOTE_SHADOW_SPREAD * scale
+  return `0 ${dy}px ${blur}px ${spread}px ${hexToCssRgba(NOTE_SHADOW_COLOR, NOTE_SHADOW_OPACITY)}`
+}
+
+/**
+ * The note shadow's geometry for an SVG export, in shape-local units.
+ * `feDropShadow` has no spread, so the exporter draws the shadow as its own
+ * rect — the body inset by the spread and offset down — behind the body, and
+ * blurs just that rect.
+ */
+export function getNoteShadowSvgRect(w: number, h: number, scale = 1): { x: number; y: number; w: number; h: number; stdDeviation: number } {
+  const inset = -NOTE_SHADOW_SPREAD * scale
+  return {
+    x: inset,
+    y: NOTE_SHADOW_OFFSET_Y * scale + inset,
+    w: Math.max(0, w - inset * 2),
+    h: Math.max(0, h - inset * 2),
+    // CSS blur radius is twice the Gaussian standard deviation.
+    stdDeviation: (NOTE_SHADOW_BLUR * scale) / 2,
+  }
 }

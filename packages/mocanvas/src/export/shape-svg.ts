@@ -24,15 +24,14 @@ import {
   FRAME_NAME_OFFSET,
   FRAME_STROKE,
   FRAME_STROKE_WIDTH,
+  NOTE_SHADOW_COLOR,
+  NOTE_SHADOW_OPACITY,
   getFontFamily,
   getNoteFillCssColor,
   getNoteGradientTopFrom,
+  getNoteShadowSvgRect,
   getNoteTextCssColor,
   getTextCssColor,
-  NOTE_SHADOW_BLUR,
-  NOTE_SHADOW_COLOR,
-  NOTE_SHADOW_OFFSET_Y,
-  NOTE_SHADOW_OPACITY,
 } from "../shapes/shape-theme"
 import { type TextShape } from "../shapes/TextShapeUtil"
 import { attrs, geometryLabels, geometryToSvgPaths, rgbaToHex } from "./svg-utils"
@@ -144,15 +143,11 @@ function noteTrimDefs(shape: NoteShape, bottom: string, ids: { gradient: string;
     `<stop ${attrs({ offset: 1, "stop-color": bottom })}/>` +
     `</linearGradient>`
   // A generous filter region: the default -10%/120% box clips a soft shadow.
+  // `feDropShadow` has no spread, so the shadow is its own inset, offset rect
+  // (see `getNoteShadowSvgRect`) and the filter only blurs it.
   const filter =
     `<filter ${attrs({ id: ids.shadow, x: "-50%", y: "-50%", width: "200%", height: "200%" })}>` +
-    `<feDropShadow ${attrs({
-      dx: 0,
-      dy: NOTE_SHADOW_OFFSET_Y * scale,
-      stdDeviation: (NOTE_SHADOW_BLUR * scale) / 2,
-      "flood-color": NOTE_SHADOW_COLOR,
-      "flood-opacity": NOTE_SHADOW_OPACITY,
-    })}/>` +
+    `<feGaussianBlur ${attrs({ stdDeviation: getNoteShadowSvgRect(0, 0, scale).stdDeviation })}/>` +
     `</filter>`
   return `<defs>${gradient}${filter}</defs>`
 }
@@ -168,7 +163,21 @@ const noteSvg: ShapeSvgRenderer<NoteShape> = (editor, shape) => {
   const suffix = svgId(shape.id)
   const ids = { gradient: `mc-note-fill-${suffix}`, shadow: `mc-note-shadow-${suffix}` }
   let out = noteTrimDefs(shape, bottom, ids)
-  out += `<rect ${attrs({ x: 0, y: 0, width: w, height: h, fill: `url(#${ids.gradient})`, filter: `url(#${ids.shadow})` })}/>`
+  // The shadow first, as its own blurred rect behind the body: the body inset
+  // by the spread and pushed down, which is what CSS `box-shadow` draws.
+  const sh = getNoteShadowSvgRect(w, h, scale)
+  if (sh.w > 0 && sh.h > 0) {
+    out += `<rect ${attrs({
+      x: sh.x,
+      y: sh.y,
+      width: sh.w,
+      height: sh.h,
+      fill: NOTE_SHADOW_COLOR,
+      "fill-opacity": NOTE_SHADOW_OPACITY,
+      filter: `url(#${ids.shadow})`,
+    })}/>`
+  }
+  out += `<rect ${attrs({ x: 0, y: 0, width: w, height: h, fill: `url(#${ids.gradient})` })}/>`
   if (!text) return out
   const textColor = labelColor === "black" ? getNoteTextCssColor(color) : LIGHT_THEME[labelColor].solid
   out += textToSvg(text, { x: 0, y: 0, w, h }, {
