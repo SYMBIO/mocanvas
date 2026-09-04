@@ -20,7 +20,7 @@ pub mod op {
     pub const REMOVE_SHAPE: u32 = 2;
     /// `handle nwords [f32 path words...]` (3 + n words).
     pub const SET_GEOMETRY: u32 = 3;
-    /// `handle fill stroke stroke_w(f32) dash opacity(f32)` (7 words). Keeps the texture.
+    /// `handle fill stroke stroke_w(f32) dash opacity(f32) seed` (8 words). Keeps the texture.
     pub const SET_STYLE: u32 = 4;
     /// Remove everything (1 word).
     pub const CLEAR: u32 = 5;
@@ -135,10 +135,10 @@ impl Engine {
                     i += 3 + n;
                 }
                 op::SET_STYLE => {
-                    if i + 7 > len {
+                    if i + 8 > len {
                         return self.fail(count, "truncated SET_STYLE");
                     }
-                    let c = &self.cmd[i..i + 7];
+                    let c = &self.cmd[i..i + 8];
                     let texture = self.scene.get(c[1]).map_or(0, |s| s.style.texture);
                     let style = Style {
                         fill: c[2],
@@ -147,9 +147,10 @@ impl Engine {
                         dash: c[5],
                         opacity: f32::from_bits(c[6]),
                         texture,
+                        seed: c[7],
                     };
                     self.scene.set_style(c[1], style);
-                    i += 7;
+                    i += 8;
                 }
                 op::SET_TEXTURE => {
                     if i + 3 > len {

@@ -11,6 +11,15 @@ import {
 import type { ReactNode } from "react"
 import { TextLabel } from "../text/TextEditor"
 import { propsOf, readNumber, readString } from "./prop-access"
+import {
+  FRAME_FILL,
+  FRAME_NAME_COLOR,
+  FRAME_NAME_FONT_SIZE,
+  FRAME_NAME_HEIGHT,
+  FRAME_NAME_OFFSET,
+  FRAME_STROKE,
+  FRAME_STROKE_WIDTH,
+} from "./shape-theme"
 
 export interface FrameShapeProps {
   w: number
@@ -20,12 +29,6 @@ export interface FrameShapeProps {
 }
 
 export type FrameShape = BaseShape<"frame", FrameShapeProps>
-
-export const FRAME_FILL = "#ffffff"
-export const FRAME_STROKE = "#9fa8b2"
-const FRAME_NAME_COLOR = "#5c6470"
-const FRAME_NAME_FONT_SIZE = 12
-const FRAME_NAME_OFFSET = 24
 
 export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
   static override type = "frame" as const
@@ -40,7 +43,7 @@ export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
   }
 
   override getRenderStyle(_shape: FrameShape): StyleWords {
-    return { fill: hexToRgba(FRAME_FILL), stroke: hexToRgba(FRAME_STROKE), strokeWidth: 1, dash: 0, opacity: 1 }
+    return { fill: hexToRgba(FRAME_FILL), stroke: hexToRgba(FRAME_STROKE), strokeWidth: FRAME_STROKE_WIDTH, dash: 0, opacity: 1 }
   }
 
   component(shape: FrameShape): ReactNode {
@@ -54,7 +57,7 @@ export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
           top: -FRAME_NAME_OFFSET,
           left: 0,
           width: w,
-          height: FRAME_NAME_OFFSET - 4,
+          height: FRAME_NAME_HEIGHT,
           overflow: "hidden",
           textOverflow: "ellipsis",
           pointerEvents: "none",
@@ -71,7 +74,7 @@ export class FrameShapeUtil extends BaseBoxShapeUtil<FrameShape> {
           verticalAlign="end"
           wrap={false}
           width={w}
-          height={FRAME_NAME_OFFSET - 4}
+          height={FRAME_NAME_HEIGHT}
           placeholder="Frame"
           singleLine
           onChange={(next) => this.editor.updateShape<FrameShape>({ id: shape.id, type: "frame", props: { name: next } })}

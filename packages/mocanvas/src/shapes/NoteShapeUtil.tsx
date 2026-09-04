@@ -17,7 +17,7 @@ import type { ReactNode } from "react"
 import { TextLabel } from "../text/TextEditor"
 import { computeGrowY, measureLabel, trimTrailingWhitespace } from "../text/text-layout"
 import { propsOf, readNumber, readString, readStyle, readText } from "./prop-access"
-import { getNoteFillRgba, getNoteTextCssColor } from "./shape-theme"
+import { getNoteBodyGradientCss, getNoteFillRgba, getNoteShadowCss, getNoteTextCssColor } from "./shape-theme"
 
 export interface NoteShapeProps {
   color: DefaultColorStyle
@@ -127,22 +127,46 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape> {
   component(shape: NoteShape): ReactNode {
     const { text, font, color, labelColor, align, verticalAlign, scale, growY } = readNoteProps(shape)
     const textColor = labelColor === "black" ? getNoteTextCssColor(color) : LIGHT_THEME[labelColor].solid
+    const w = NOTE_SIZE * scale
+    const h = NOTE_SIZE * scale + growY
     return (
-      <TextLabel
-        shape={shape}
-        text={text}
-        isEditing={this.editor.getEditingShapeId() === shape.id}
-        font={font}
-        fontSize={getNoteFontSize(shape)}
-        color={textColor}
-        align={align}
-        verticalAlign={verticalAlign}
-        wrap
-        width={NOTE_SIZE * scale}
-        height={NOTE_SIZE * scale + growY}
-        padding={NOTE_PADDING * scale}
-        onChange={(next) => this.editor.updateShape<NoteShape>({ id: shape.id, type: "note", props: { text: next } })}
-      />
+      <>
+        {/*
+          The note's trim: a vertical gradient over the body and a soft shadow
+          under it. The GPU quad below this covers exactly the shape's bounds
+          and can carry neither, so both are drawn here, beneath the label. The
+          shadow falls outside the body and is decoration only — the geometry,
+          bounds and hit-testing are the flat rectangle either way.
+        */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: w,
+            height: h,
+            background: getNoteBodyGradientCss(color),
+            boxShadow: getNoteShadowCss(scale),
+            pointerEvents: "none",
+          }}
+        />
+        <TextLabel
+          shape={shape}
+          text={text}
+          isEditing={this.editor.getEditingShapeId() === shape.id}
+          font={font}
+          fontSize={getNoteFontSize(shape)}
+          color={textColor}
+          align={align}
+          verticalAlign={verticalAlign}
+          wrap
+          width={w}
+          height={h}
+          padding={NOTE_PADDING * scale}
+          onChange={(next) => this.editor.updateShape<NoteShape>({ id: shape.id, type: "note", props: { text: next } })}
+        />
+      </>
     )
   }
 
@@ -151,7 +175,10 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape> {
     return <rect width={NOTE_SIZE * scale} height={NOTE_SIZE * scale + growY} />
   }
 
-  /** The GPU draws the sticky background even while editing. */
+  /**
+   * The GPU draws the sticky background even while editing; the overlay adds
+   * the gradient and the shadow over it (see `component`).
+   */
   override needsOverlay(_shape: NoteShape): boolean {
     return false
   }

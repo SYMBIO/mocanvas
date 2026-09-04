@@ -13,10 +13,27 @@ import {
   type UnknownShape,
 } from "@mocanvas/editor"
 import { ARROW_LABEL_PADDING, type ArrowShape } from "../shapes/ArrowShapeUtil"
-import { FRAME_FILL, FRAME_STROKE, type FrameShape } from "../shapes/FrameShapeUtil"
+import { type FrameShape } from "../shapes/FrameShapeUtil"
 import { GEO_LABEL_PADDING, type GeoShape } from "../shapes/GeoShapeUtil"
 import { getNoteFontSize, NOTE_PADDING, NOTE_SIZE, type NoteShape } from "../shapes/NoteShapeUtil"
-import { getFontFamily, getNoteTextCssColor, getTextCssColor } from "../shapes/shape-theme"
+import {
+  FRAME_FILL,
+  FRAME_NAME_COLOR,
+  FRAME_NAME_FONT_SIZE,
+  FRAME_NAME_HEIGHT,
+  FRAME_NAME_OFFSET,
+  FRAME_STROKE,
+  FRAME_STROKE_WIDTH,
+  getFontFamily,
+  getNoteFillCssColor,
+  getNoteGradientTopFrom,
+  getNoteTextCssColor,
+  getTextCssColor,
+  NOTE_SHADOW_BLUR,
+  NOTE_SHADOW_COLOR,
+  NOTE_SHADOW_OFFSET_Y,
+  NOTE_SHADOW_OPACITY,
+} from "../shapes/shape-theme"
 import { type TextShape } from "../shapes/TextShapeUtil"
 import { attrs, geometryLabels, geometryToSvgPaths, rgbaToHex } from "./svg-utils"
 import { textToSvg } from "./text-svg"
@@ -47,9 +64,10 @@ export function geometryFallbackSvg(editor: Editor, shape: UnknownShape): string
 /** Fallback renderer applied to shape types without a registry entry. */
 export const defaultShapeSvgRenderer: ShapeSvgRenderer = (editor, shape) => geometryFallbackSvg(editor, shape)
 
-const FRAME_NAME_COLOR = "#5c6470"
-const FRAME_NAME_FONT_SIZE = 12
-const FRAME_NAME_OFFSET = 24
+/** A shape id reduced to characters that are safe inside an SVG `id`. */
+function svgId(id: string): string {
+  return id.replace(/[^a-zA-Z0-9_-]/g, "-")
+}
 
 function labelBox(editor: Editor, shape: UnknownShape): { x: number; y: number; w: number; h: number } | undefined {
   const label = geometryLabels(editor.getShapeGeometry(shape))[0]
@@ -112,13 +130,45 @@ const textSvg: ShapeSvgRenderer<TextShape> = (editor, shape) => {
   })
 }
 
+/**
+ * A note's trim as SVG: a `<linearGradient>` for the body and an
+ * `feDropShadow` under it, so an export carries the same trim the DOM overlay
+ * paints over the GPU quad. Ids are namespaced by the shape id so several
+ * notes in one document do not collide.
+ */
+function noteTrimDefs(shape: NoteShape, bottom: string, ids: { gradient: string; shadow: string }): string {
+  const scale = shape.props.scale
+  const gradient =
+    `<linearGradient ${attrs({ id: ids.gradient, x1: 0, y1: 0, x2: 0, y2: 1 })}>` +
+    `<stop ${attrs({ offset: 0, "stop-color": getNoteGradientTopFrom(bottom) })}/>` +
+    `<stop ${attrs({ offset: 1, "stop-color": bottom })}/>` +
+    `</linearGradient>`
+  // A generous filter region: the default -10%/120% box clips a soft shadow.
+  const filter =
+    `<filter ${attrs({ id: ids.shadow, x: "-50%", y: "-50%", width: "200%", height: "200%" })}>` +
+    `<feDropShadow ${attrs({
+      dx: 0,
+      dy: NOTE_SHADOW_OFFSET_Y * scale,
+      stdDeviation: (NOTE_SHADOW_BLUR * scale) / 2,
+      "flood-color": NOTE_SHADOW_COLOR,
+      "flood-opacity": NOTE_SHADOW_OPACITY,
+    })}/>` +
+    `</filter>`
+  return `<defs>${gradient}${filter}</defs>`
+}
+
 const noteSvg: ShapeSvgRenderer<NoteShape> = (editor, shape) => {
   const { text, font, color, labelColor, align, verticalAlign, scale, growY } = shape.props
   const w = NOTE_SIZE * scale
   const h = NOTE_SIZE * scale + growY
   const style = editor.getShapeUtil(shape).getRenderStyle(shape)
-  const fill = (style && rgbaToHex(style.fill)) ?? LIGHT_THEME[color].note.fill
-  let out = `<rect ${attrs({ x: 0, y: 0, width: w, height: h, fill })}/>`
+  // The engine's flat quad is the gradient's *bottom* colour; the top stop is
+  // derived from it, so a custom fill still gradates.
+  const bottom = (style && rgbaToHex(style.fill)) ?? getNoteFillCssColor(color)
+  const suffix = svgId(shape.id)
+  const ids = { gradient: `mc-note-fill-${suffix}`, shadow: `mc-note-shadow-${suffix}` }
+  let out = noteTrimDefs(shape, bottom, ids)
+  out += `<rect ${attrs({ x: 0, y: 0, width: w, height: h, fill: `url(#${ids.gradient})`, filter: `url(#${ids.shadow})` })}/>`
   if (!text) return out
   const textColor = labelColor === "black" ? getNoteTextCssColor(color) : LIGHT_THEME[labelColor].solid
   out += textToSvg(text, { x: 0, y: 0, w, h }, {
@@ -135,11 +185,11 @@ const noteSvg: ShapeSvgRenderer<NoteShape> = (editor, shape) => {
 
 const frameSvg: ShapeSvgRenderer<FrameShape> = (_editor, shape) => {
   const { w, h, name } = shape.props
-  let out = `<rect ${attrs({ x: 0, y: 0, width: w, height: h, fill: FRAME_FILL, stroke: FRAME_STROKE, "stroke-width": 1 })}/>`
+  let out = `<rect ${attrs({ x: 0, y: 0, width: w, height: h, fill: FRAME_FILL, stroke: FRAME_STROKE, "stroke-width": FRAME_STROKE_WIDTH })}/>`
   if (name) {
     // The single-line name sits in a strip just above the frame, like the DOM label.
     const [firstLine = ""] = name.split("\n")
-    out += textToSvg(firstLine, { x: 0, y: -FRAME_NAME_OFFSET, w, h: FRAME_NAME_OFFSET - 4 }, {
+    out += textToSvg(firstLine, { x: 0, y: -FRAME_NAME_OFFSET, w, h: FRAME_NAME_HEIGHT }, {
       fontFamily: getFontFamily("sans"),
       fontSize: FRAME_NAME_FONT_SIZE,
       color: FRAME_NAME_COLOR,

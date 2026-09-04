@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 import {
   Box,
@@ -23,7 +25,21 @@ import {
   NoteShapeUtil,
   TextShapeUtil,
   getNoteFontSize,
+  getNoteBodyGradientCss,
+  getNoteFillCssColor,
+  getNoteGradientTopCssColor,
+  getNoteShadowCss,
   defaultShapeUtils,
+  FRAME_NAME_COLOR,
+  FRAME_NAME_GAP,
+  FRAME_NAME_HEIGHT,
+  FRAME_NAME_OFFSET,
+  FRAME_STROKE,
+  FRAME_STROKE_WIDTH,
+  NOTE_SHADOW_BLUR,
+  NOTE_SHADOW_COLOR,
+  NOTE_SHADOW_OFFSET_Y,
+  NOTE_SHADOW_OPACITY,
   type ArrowShape,
   type ArrowheadKind,
   type DrawShape,
@@ -519,11 +535,85 @@ describe("FrameShapeUtil", () => {
     const style = util.getRenderStyle(shape)
     expectWellFormedStyle(style)
     expect(style.fill).toBe(0xffffffff)
-    expect(style.stroke).toBe(0x9fa8b2ff)
-    expect(style.strokeWidth).toBe(1)
+    // The measured reference border: a neutral grey, not a blue-grey.
+    expect(FRAME_STROKE).toBe("#717171")
+    expect(style.stroke).toBe(0x717171ff)
+    expect(style.strokeWidth).toBe(FRAME_STROKE_WIDTH)
+    expect(FRAME_STROKE_WIDTH).toBe(1)
     expect(util.canReceiveNewChildrenOfType(shape, "geo")).toBe(true)
     expect(util.canDropShapes(shape, [])).toBe(true)
     expect(util.component(shape)).not.toBeNull()
     expect(util.indicator(shape)).not.toBeNull()
+  })
+})
+
+describe("shape chrome constants", () => {
+  const read = (name: string): string => readFileSync(fileURLToPath(new URL(name, import.meta.url)), "utf8")
+
+  /** Any `#rgb`/`#rrggbb`/`rgb()`/`rgba()` literal outside a comment. */
+  function colorLiterals(source: string): string[] {
+    const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+    return withoutComments.match(/#[0-9a-fA-F]{3,8}\b|\brgba?\(/g) ?? []
+  }
+
+  it("leaves no colour literals in the note and frame components", () => {
+    expect(colorLiterals(read("./NoteShapeUtil.tsx"))).toEqual([])
+    expect(colorLiterals(read("./FrameShapeUtil.tsx"))).toEqual([])
+  })
+
+  it("names the frame chrome in the theme", () => {
+    expect(FRAME_STROKE).toBe("#717171")
+    expect(FRAME_NAME_COLOR).toBe("#5f5f5f")
+    // Darker than the border it labels, and darker than it used to be (#5c6470).
+    const luma = (hex: string): number => {
+      const n = Number.parseInt(hex.slice(1), 16)
+      return 0.2126 * ((n >> 16) & 0xff) + 0.7152 * ((n >> 8) & 0xff) + 0.0722 * (n & 0xff)
+    }
+    expect(luma(FRAME_NAME_COLOR)).toBeLessThan(luma("#5c6470"))
+    // The name sits two pixels higher than the four-pixel gap it used to have.
+    expect(FRAME_NAME_GAP).toBe(6)
+    expect(FRAME_NAME_HEIGHT).toBe(FRAME_NAME_OFFSET - FRAME_NAME_GAP)
+  })
+
+  it("gradates a note body from a deeper top to the palette's note fill", () => {
+    // Measured off the reference render for the default (black) note.
+    expect(getNoteFillCssColor("black")).toBe("#fce19c")
+    expect(getNoteGradientTopCssColor("black")).toBe("#f7dc99")
+    const css = getNoteBodyGradientCss("black")
+    expect(css).toBe("linear-gradient(to bottom, #f7dc99 0%, #fce19c 100%)")
+    // Every hue gradates, never inverts.
+    for (const color of ["yellow", "blue", "red", "white"] as const) {
+      expect(getNoteGradientTopCssColor(color) < getNoteFillCssColor(color)).toBe(true)
+    }
+  })
+
+  it("builds a note shadow that scales with the note", () => {
+    expect(getNoteShadowCss()).toBe(`0 ${NOTE_SHADOW_OFFSET_Y}px ${NOTE_SHADOW_BLUR}px rgba(21, 34, 35, ${NOTE_SHADOW_OPACITY})`)
+    expect(NOTE_SHADOW_COLOR).toBe("#152223")
+    expect(getNoteShadowCss(2)).toContain(`0 ${NOTE_SHADOW_OFFSET_Y * 2}px ${NOTE_SHADOW_BLUR * 2}px`)
+  })
+})
+
+describe("note shadow is decoration only", () => {
+  const util = new NoteShapeUtil(editor)
+
+  it("leaves geometry, bounds and hit-testing untouched", () => {
+    const shape = makeShape<NoteShape>("note", { ...util.getDefaultProps(), growY: 40 })
+    const g = util.getGeometry(shape)
+    // The body is exactly the note's box: nothing is added below it for the shadow.
+    expect(g.bounds).toEqual(new Box(0, 0, 200, 240))
+    expect(g.isFilled).toBe(true)
+    // A point inside the shadow strip below the note is outside the shape.
+    expect(g.hitTestPoint({ x: 100, y: 240 + NOTE_SHADOW_OFFSET_Y }, 0, true)).toBe(false)
+    expect(g.hitTestPoint({ x: 100, y: 239 }, 0, true)).toBe(true)
+  })
+
+  it("keeps the engine quad a flat fill with no stroke", () => {
+    const shape = makeShape<NoteShape>("note", { ...util.getDefaultProps(), color: "yellow" })
+    const style = util.getRenderStyle(shape)
+    expectWellFormedStyle(style)
+    // The flat quad is the gradient's bottom stop; the trim rides on top of it.
+    expect(style.fill).toBe(0xfbe9c9ff)
+    expect(style.stroke).toBe(0)
   })
 })

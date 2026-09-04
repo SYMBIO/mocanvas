@@ -17,11 +17,17 @@ pub struct Style {
     /// Host texture id (0 = none). When set, the fill mesh is replaced by one
     /// textured quad over the shape's local geometry bounds, tinted white × `opacity`.
     pub texture: u32,
+    /// Host-supplied per-shape random seed. Only the hand-drawn dash style
+    /// (`dash == 3`) reads it: it selects that shape's wobble, so the same seed
+    /// with the same geometry always produces the same outline. The host derives
+    /// it from the shape's stable id, not from its slot or handle, so a shape that
+    /// is removed and re-added under the same id keeps the outline it had.
+    pub seed: u32,
 }
 
 impl Default for Style {
     fn default() -> Self {
-        Self { fill: 0, stroke: 0x1d1d1dff, stroke_width: 2.0, dash: 0, opacity: 1.0, texture: 0 }
+        Self { fill: 0, stroke: 0x1d1d1dff, stroke_width: 2.0, dash: 0, opacity: 1.0, texture: 0, seed: 0 }
     }
 }
 

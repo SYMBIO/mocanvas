@@ -2010,7 +2010,13 @@ export class Editor extends EventEmitter<EditorEvents> {
     if (withGeometry && geometry) {
       this.engine.cmd.setGeometry(h, geometry.toPathWords())
       if (style) {
-        this.engine.cmd.setStyle(h, { ...style, opacity: style.opacity * shape.opacity })
+        // The hand-drawn dash style picks a shape's wobble from this seed, so it is
+        // hashed (FNV-1a) from the shape's own id rather than taken from its engine
+        // handle: handles are recycled, and a shape that was deleted and restored
+        // would otherwise come back looking like a different shape.
+        let seed = 0x811c9dc5
+        for (let k = 0; k < shape.id.length; k++) seed = Math.imul(seed ^ shape.id.charCodeAt(k), 0x01000193)
+        this.engine.cmd.setStyle(h, { ...style, opacity: style.opacity * shape.opacity, seed: style.seed ?? seed >>> 0 })
         this.engine.cmd.setTexture(h, style.texture ?? 0)
       }
     }

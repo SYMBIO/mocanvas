@@ -13,6 +13,7 @@ import {
   type StyleWords,
 } from "@mocanvas/editor"
 import { defaultBindingUtils } from "../bindings"
+import { FRAME_NAME_COLOR, FRAME_STROKE, NOTE_SHADOW_COLOR, NOTE_SHADOW_OPACITY } from "../shapes/shape-theme"
 import {
   defaultShapeUtils,
   type ArrowShape,
@@ -194,7 +195,12 @@ describe("getSvgString", () => {
     expect(note).toContain(">sticky</tspan>")
     expect(note).toContain(">note</tspan>")
     expect(note).toContain('text-anchor="middle"')
-    expect(note).toContain(`fill="#fbe9c9"`) // yellow note fill
+    // The body is a gradient now, not a flat fill: the engine's flat colour is
+    // its bottom stop.
+    expect(note).toContain("<linearGradient ")
+    expect(note).toContain(`stop-color="#fbe9c9"`) // yellow note fill, at the bottom
+    expect(note).toContain(`stop-color="#f6e4c5"`) // a shade deeper, at the top
+    expect(note).toMatch(/<rect [^>]*fill="url\(#mc-note-fill-[^"]+\)"/)
 
     const text = getSvgString(editor, [textId])!.svg
     expect(text).toContain(">plain text</tspan>")
@@ -204,6 +210,7 @@ describe("getSvgString", () => {
 
     const frame = getSvgString(editor, [frameId])!.svg
     expect(frame).toContain(">My Frame</tspan>")
+    expect(frame).toContain(`fill="${FRAME_NAME_COLOR}"`)
 
     const arrow = getSvgString(editor, [arrowId])!.svg
     expect(arrow).toContain(">label</tspan>")
@@ -228,6 +235,32 @@ describe("getSvgString", () => {
     expect(rgbaToHex(0x11223300)).toBeUndefined()
     expect(dashArray(0, 3)).toBeUndefined()
     expect(dashArray(1, 3)).toBe("6 6")
+  })
+
+  it("carries the note's trim and the frame's border colour", () => {
+    const note = getSvgString(editor, [noteId])!.svg
+    // A drop-shadow filter, referenced by the body rect and defined once.
+    expect(note).toContain("<feDropShadow ")
+    expect(note).toContain(`flood-color="${NOTE_SHADOW_COLOR}"`)
+    expect(note).toContain(`flood-opacity="${NOTE_SHADOW_OPACITY}"`)
+    expect(note).toMatch(/<rect [^>]*filter="url\(#mc-note-shadow-[^"]+\)"/)
+    expect(tagBalance(note, "defs")).toEqual({ open: 1, close: 1 })
+    expect(tagBalance(note, "linearGradient")).toEqual({ open: 1, close: 1 })
+
+    const frame = getSvgString(editor, [frameId])!.svg
+    expect(frame).toContain(`stroke="${FRAME_STROKE}"`)
+    expect(frame).toContain(`stroke="#717171"`)
+    expect(frame).not.toContain("#9fa8b2")
+  })
+
+  it("gives every note its own gradient and filter ids", () => {
+    editor.createShape<NoteShape>({ type: "note", x: 0, y: 0, props: { text: "second", color: "blue" } })
+    const second = lastId(editor)
+    const { svg } = getSvgString(editor, [noteId, second])!
+    const ids = [...svg.matchAll(/id="(mc-note-[^"]+)"/g)].map((m) => m[1]!)
+    expect(ids.length).toBe(4)
+    expect(new Set(ids).size).toBe(4)
+    editor.deleteShapes([second])
   })
 
   it("frames clip their children and children are included with their parent", () => {

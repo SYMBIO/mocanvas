@@ -134,6 +134,13 @@ export interface StyleWords {
    * over the shape's local bounds (uv 0..1), tinted white × opacity.
    */
   texture?: number
+  /**
+   * Per-shape random seed (0 or undefined = 0). Only `dash: 3` (hand-drawn) reads
+   * it: it picks that shape's wobble, so the same seed always redraws the same
+   * outline. Derive it from the shape's stable id, never from its handle or its
+   * position in the scene, or a shape will change shape when it is re-added.
+   */
+  seed?: number
 }
 
 const scratchF32 = new Float32Array(1)
@@ -246,7 +253,7 @@ export class CommandWriter {
   }
 
   setStyle(handle: Handle, s: StyleWords): void {
-    this.ensure(7)
+    this.ensure(8)
     const v = this.view
     let i = this.len
     v[i++] = OP.SET_STYLE
@@ -256,6 +263,7 @@ export class CommandWriter {
     v[i++] = f32bits(s.strokeWidth)
     v[i++] = s.dash >>> 0
     v[i++] = f32bits(s.opacity)
+    v[i++] = (s.seed ?? 0) >>> 0
     this.len = i
   }
 

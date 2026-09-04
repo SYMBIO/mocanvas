@@ -86,7 +86,7 @@ layout (`u32` words; floats are bit-cast):
 UPSERT_SHAPE   op=1  handle kind parent zkey_lo zkey_hi flags x y rot w h   (12 words)
 REMOVE_SHAPE   op=2  handle                                                 (2 words)
 SET_GEOMETRY   op=3  handle nwords [path command words...]                  (3+n words)
-SET_STYLE      op=4  handle fill_rgba stroke_rgba stroke_w_f32 dash opacity (7 words)
+SET_STYLE      op=4  handle fill stroke stroke_w_f32 dash opacity_f32 seed (8 words)
 CLEAR          op=5                                                         (1 word)
 SET_TEXTURE    op=6  handle texture                                         (3 words)
 
@@ -187,8 +187,39 @@ engine.selection_bounds(ptr_handles, len) -> ptr to 4 f32
 
 Stroke widths are in page units and scale with zoom, so meshes never need
 retessellation while zooming. Dash patterns (`dash` style word: 0 solid,
-1 dashed, 2 dotted, 3 draw) are applied in the tessellator by splitting the
-flattened outline into open dash subpaths before stroking.
+1 dashed, 2 dotted, 3 draw) are applied in the tessellator. `dashed` and
+`dotted` split the flattened outline into open dash subpaths before stroking.
+
+`draw` — the default for every shape — replaces the outline with a hand-drawn
+one. The flattened path is reduced to a few *anchors* (every detected corner,
+plus the smooth runs between them resampled at about five pieces per subpath,
+which fixes the wobble's wavelength relative to the shape); each anchor is
+nudged perpendicular to the local direction and each span between anchors is
+bowed sideways through a quadratic aimed at the outline's own mid-point, so a
+curve reduced to a few anchors is still followed; and every interior anchor is
+cut back by a radius taken from the stroke width plus a little of the shorter
+adjacent span — clamped to 0.35 of it — and bridged by a quadratic whose control
+point sits *past* the true vertex, so corners bulge instead of turning exactly.
+A closed subpath is emitted open, starting at its first corner and running a
+little past it, so the outline overshoots where the pen came back around. Every
+amplitude scales with the stroke width, not the shape, and the whole outline
+stays within `DRAW_MAX_DEVIATION` (3) stroke widths of the true geometry, which
+is untouched for fills, bounds and hit-testing.
+
+Width variation is approximated by stroking that outline twice, at 0.85× and
+0.6× the nominal width over slightly different perturbations of the same anchors
+(they share most of their jitter, so the two passes never drift apart far enough
+to open a gap). Outlines with more than 64 anchors drop to a single full-width
+pass; that test reads only the geometry, so it can never flip with zoom or shape
+count. Over a mixed page the draw style costs about 2.5× the triangles and 2.4×
+the tessellation time of plain strokes (8.3 µs vs 3.5 µs per shape, so a full
+256-shape tessellation budget is ~2.1 ms).
+
+The wobble is deterministic: it comes from a `splitmix32` stream seeded by the
+`seed` style word, which the host hashes from the shape's stable id (not its
+handle, which is recycled). The mesh cache keys on the geometry version alone,
+so the same shape has to perturb identically on every rebuild or it would
+shimmer whenever it was re-tessellated.
 
 Shapes flagged `LABEL` are drawn on the GPU *and* reported in the overlay
 list, so a filled shape can carry a DOM text label.
