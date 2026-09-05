@@ -49,6 +49,18 @@ export interface BindingOnShapeDeleteOptions<B extends UnknownBinding> {
   binding: B
   shape: UnknownShape
 }
+/**
+ * What the binding's own delete callbacks are told.
+ *
+ * Deliberately just the binding: `onBeforeDelete` fires because the *binding*
+ * record is going away, which happens for reasons that have nothing to do with
+ * either shape — an explicit `deleteBinding`, a store reset, a peer's edit
+ * arriving. When a *shape* is what is being deleted, the callback is
+ * `onBeforeDeleteFromShape` / `onBeforeDeleteToShape`, and it is told which.
+ */
+export interface BindingOnDeleteOptions<B extends UnknownBinding> {
+  binding: B
+}
 
 /**
  * Describes how a binding type behaves. One instance per binding type per editor.
@@ -79,8 +91,8 @@ export abstract class BindingUtil<B extends UnknownBinding = UnknownBinding> {
   onAfterCreate?(options: BindingOnCreateOptions<B>): void
   onBeforeChange?(options: BindingOnChangeOptions<B>): B | void
   onAfterChange?(options: BindingOnChangeOptions<B>): void
-  onBeforeDelete?(options: { binding: B }): void
-  onAfterDelete?(options: { binding: B }): void
+  onBeforeDelete?(options: BindingOnDeleteOptions<B>): void
+  onAfterDelete?(options: BindingOnDeleteOptions<B>): void
   /** The `from` shape changed (moved, resized, ...). */
   onAfterChangeFromShape?(options: BindingOnShapeChangeOptions<B>): void
   /** The `to` shape changed. */

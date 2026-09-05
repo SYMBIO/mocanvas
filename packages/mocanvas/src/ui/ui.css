@@ -548,3 +548,388 @@
   display: inline-flex;
   flex: 0 0 auto;
 }
+
+/* ==========================================================================
+ * The tldraw-shaped UI layer
+ * --------------------------------------------------------------------------
+ * Everything below styles the components in `ui-*.tsx`, `menu-items.tsx` and
+ * `panel-*.tsx`. They use the same custom properties as the panels above, so
+ * a host that has restyled the editor by setting `--mocanvas-ui-*` on the
+ * container gets these for free.
+ * ========================================================================== */
+
+/* --- screen-reader-only text -------------------------------------------- */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- menus --------------------------------------------------------------- */
+
+.mocanvas-menu {
+  position: fixed;
+  z-index: 400;
+  min-width: 180px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: var(--mocanvas-ui-pad);
+  background: var(--mocanvas-ui-panel);
+  border: 1px solid var(--mocanvas-ui-panel-border);
+  border-radius: var(--mocanvas-ui-radius-sm);
+  box-shadow: var(--mocanvas-ui-shadow);
+  color: var(--mocanvas-ui-text);
+  font-family: var(--mocanvas-ui-font);
+  font-size: 13px;
+}
+
+.mocanvas-menu--icons .mocanvas-menu-icon-group {
+  display: grid;
+  grid-template-columns: repeat(3, var(--mocanvas-ui-btn));
+  gap: var(--mocanvas-ui-gap);
+}
+
+.mocanvas-menu-group + .mocanvas-menu-group {
+  margin-top: var(--mocanvas-ui-pad);
+  padding-top: var(--mocanvas-ui-pad);
+  border-top: 1px solid var(--mocanvas-ui-panel-border);
+}
+
+.mocanvas-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  background: none;
+  border: 0;
+  border-radius: var(--mocanvas-ui-radius-sm);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.mocanvas-menu-item:hover:not(:disabled) {
+  background: var(--mocanvas-ui-hover);
+}
+
+.mocanvas-menu-item:focus-visible {
+  outline: 2px solid var(--mocanvas-ui-accent);
+  outline-offset: -2px;
+}
+
+.mocanvas-menu-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.mocanvas-menu-item-label {
+  flex: 1 1 auto;
+}
+
+.mocanvas-menu-item-note,
+.mocanvas-shortcut-label {
+  color: var(--mocanvas-ui-muted);
+}
+
+.mocanvas-menu-item--sub::after {
+  content: "";
+}
+
+/* --- keyboard shortcuts -------------------------------------------------- */
+
+.mocanvas-kbd {
+  display: inline-flex;
+  gap: 2px;
+  color: var(--mocanvas-ui-muted);
+}
+
+.mocanvas-kbd kbd {
+  min-width: 16px;
+  padding: 1px 4px;
+  background: var(--mocanvas-ui-control);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 11px;
+  text-align: center;
+}
+
+.mocanvas-shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 26px;
+}
+
+.mocanvas-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.mocanvas-shortcut-section h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--mocanvas-ui-muted);
+}
+
+/* --- dialogs ------------------------------------------------------------- */
+
+.mocanvas-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 18, 25, 0.35);
+}
+
+.mocanvas-dialog {
+  position: relative;
+  max-width: min(560px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+}
+
+.mocanvas-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 12px 8px;
+}
+
+.mocanvas-dialog-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mocanvas-dialog-body {
+  overflow-y: auto;
+  padding: 0 12px 12px;
+}
+
+.mocanvas-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px 12px;
+}
+
+.mocanvas-dialog-checkbox {
+  margin-inline-end: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mocanvas-ui-muted);
+}
+
+/* --- toasts -------------------------------------------------------------- */
+
+.mocanvas-toasts {
+  position: absolute;
+  right: var(--mocanvas-ui-inset);
+  bottom: var(--mocanvas-ui-inset);
+  z-index: 450;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(360px, calc(100% - 2 * var(--mocanvas-ui-inset)));
+}
+
+.mocanvas-toast {
+  position: relative;
+  gap: 8px;
+  padding: 10px;
+}
+
+.mocanvas-toast-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+}
+
+.mocanvas-toast-desc {
+  color: var(--mocanvas-ui-muted);
+}
+
+/* --- inputs and sliders --------------------------------------------------- */
+
+.mocanvas-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  background: var(--mocanvas-ui-control);
+  border-radius: var(--mocanvas-ui-radius-sm);
+}
+
+.mocanvas-input input,
+.mocanvas-textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.mocanvas-input input:focus-visible,
+.mocanvas-textarea:focus-visible {
+  outline: 2px solid var(--mocanvas-ui-accent);
+  outline-offset: 1px;
+}
+
+/* --- panels --------------------------------------------------------------- */
+
+.mocanvas-menu-panel {
+  left: var(--mocanvas-ui-inset);
+  top: var(--mocanvas-ui-inset);
+}
+
+.mocanvas-navigation-panel {
+  left: var(--mocanvas-ui-inset);
+  bottom: var(--mocanvas-ui-inset);
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 140px;
+}
+
+.mocanvas-navigation-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mocanvas-ui-gap);
+}
+
+.mocanvas-share-panel {
+  right: var(--mocanvas-ui-inset);
+  top: var(--mocanvas-ui-inset);
+}
+
+.mocanvas-quick-actions,
+.mocanvas-helper-buttons {
+  position: absolute;
+  left: 50%;
+  bottom: calc(2 * var(--mocanvas-ui-inset) + var(--mocanvas-ui-btn));
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--mocanvas-ui-gap);
+  z-index: 10;
+}
+
+.mocanvas-contextual-toolbar .mocanvas-toolbar {
+  position: relative;
+  inset: auto;
+  margin: 0;
+  max-width: none;
+}
+
+.mocanvas-following-indicator {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  border: 3px solid var(--mocanvas-selection);
+  border-radius: 4px;
+}
+
+.mocanvas-following-indicator > * {
+  pointer-events: auto;
+}
+
+.mocanvas-offline {
+  left: 50%;
+  top: var(--mocanvas-ui-inset);
+  transform: translateX(-50%);
+  padding: 4px 10px;
+}
+
+/* --- pickers -------------------------------------------------------------- */
+
+.mocanvas-style-row + .mocanvas-style-row {
+  margin-top: var(--mocanvas-ui-pad-lg);
+}
+
+.mocanvas-popover-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--mocanvas-popover-cols, 5), var(--mocanvas-ui-btn));
+  gap: var(--mocanvas-ui-gap);
+}
+
+.mocanvas-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- people --------------------------------------------------------------- */
+
+.mocanvas-people-list,
+.mocanvas-page-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.mocanvas-page-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mocanvas-presence-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: var(--mocanvas-ui-pad);
+  border-bottom: 1px solid var(--mocanvas-ui-panel-border);
+}
+
+.mocanvas-face-pile-more {
+  align-self: center;
+  margin-left: 4px;
+  color: var(--mocanvas-ui-muted);
+}
+
+/* --- debug ---------------------------------------------------------------- */
+
+.mocanvas-debug-flags {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--mocanvas-ui-mono);
+  font-size: 11px;
+}
+
+.mocanvas-debug-flag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* --- images --------------------------------------------------------------- */
+
+.mocanvas-image,
+.mocanvas-image > svg {
+  max-width: 100%;
+  height: auto;
+}

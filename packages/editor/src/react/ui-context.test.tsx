@@ -4,6 +4,7 @@ import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { Editor } from "../editor/Editor"
+import { EditorProvider, useEditor } from "./EditorContext"
 import type { ShapeId } from "../records/base"
 import {
   MocanvasUiProvider,
@@ -13,7 +14,7 @@ import {
   useIsToolSelected,
   useTools,
 } from "./ui-context"
-import type { TLUiToolItem, TLUiToolsContextType } from "./ui-types"
+import type { TLUiOverrideHelpers, TLUiOverrides, TLUiToolItem, TLUiToolsContextType } from "./ui-types"
 
 // React only flushes `act()` synchronously when it is told it is under test.
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -292,5 +293,71 @@ describe("useGlobalMenuIsOpen", () => {
     })
     root = null
     expect(h.openMenus.get()).toEqual([])
+  })
+})
+
+describe("the `msg` helper", () => {
+  /** Run an override just to capture the helpers it is handed. */
+  function capture(editor: Editor, overrides: TLUiOverrides): TLUiOverrideHelpers {
+    let helpers: TLUiOverrideHelpers | null = null
+    render(
+      <MocanvasUiProvider
+        editor={editor}
+        defaultTools={() => ({})}
+        overrides={{
+          ...overrides,
+          tools: (_e, tools, h) => {
+            helpers = h
+            return overrides.tools ? overrides.tools(_e, tools, h) : tools
+          },
+        }}
+      >
+        <div />
+      </MocanvasUiProvider>,
+    )
+    return helpers!
+  }
+
+  it("resolves through the overrides' own translations", () => {
+    const { editor } = makeEditor()
+    const helpers = capture(editor, { translations: { en: { "tool.comment": "Comment" } } })
+    expect(helpers.msg("tool.comment")).toBe("Comment")
+  })
+
+  it("uses the editor's locale, falling back to the base language", () => {
+    const { editor } = makeEditor()
+    ;(editor as unknown as { user: { getLocale(): string } }).user = { getLocale: () => "cs-CZ" }
+    const helpers = capture(editor, { translations: { cs: { "tool.comment": "Komentář" }, en: { "tool.comment": "Comment" } } })
+    expect(helpers.msg("tool.comment")).toBe("Komentář")
+  })
+
+  it("passes an unknown id through, and survives an editor with no preferences", () => {
+    const { editor } = makeEditor()
+    expect(capture(editor, {}).msg("Zavřít")).toBe("Zavřít")
+  })
+})
+
+describe("EditorProvider", () => {
+  it("publishes the editor by an `editor` prop, so a caller never sees the context", () => {
+    const { editor } = makeEditor()
+    let seen: Editor | null = null
+    function Probe() {
+      seen = useEditor()
+      return null
+    }
+    render(
+      <EditorProvider editor={editor}>
+        <Probe />
+      </EditorProvider>,
+    )
+    expect(seen).toBe(editor)
+  })
+
+  it("still throws below no provider at all", () => {
+    function Probe() {
+      useEditor()
+      return null
+    }
+    expect(() => render(<Probe />)).toThrow(/useEditor/)
   })
 })

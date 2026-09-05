@@ -1,8 +1,10 @@
 import {
-  FONT_SIZES,
+  DEFAULT_THEME,
   Rectangle2d,
   ShapeUtil,
-  LIGHT_THEME,
+  getColorValue,
+  getDefaultDisplayValues,
+  getDisplayValues,
   DefaultColorStyle,
   DefaultFontStyle,
   DefaultHorizontalAlignStyle,
@@ -11,13 +13,28 @@ import {
   DefaultVerticalAlignStyle,
   type BaseShape,
   type Geometry2d,
+  type ShapeUtilOptions,
   type StyleWords,
+  type TLColorMode,
+  type TLDefaultDisplayValues,
+  type TLFontFace,
+  type TLStyledShape,
+  type TLTheme,
 } from "@mocanvas/editor"
 import type { ReactNode } from "react"
 import { TextLabel } from "../text/TextEditor"
+import { applyPlainTextToRichText, richTextToText, toRichText, type RichText } from "../text/rich-text"
 import { computeGrowY, measureLabel, trimTrailingWhitespace } from "../text/text-layout"
-import { propsOf, readNumber, readString, readStyle, readText } from "./prop-access"
-import { getNoteBodyGradientCss, getNoteFillRgba, getNoteShadowCss, getNoteTextCssColor } from "./shape-theme"
+import { noteShapeProps } from "./shape-props"
+import { noteShapeMigrations } from "./shape-migrations"
+import { propsOf, readNumber, readRichText, readString, readStyle, readText } from "./prop-access"
+import {
+  getLabelFontFaces,
+  getNoteBodyGradientCss,
+  getNoteFillRgba,
+  getNoteShadowCss,
+  getThemeColors,
+} from "./shape-theme"
 import { rectPath } from "./indicator-paths"
 
 export interface NoteShapeProps {
@@ -30,7 +47,32 @@ export interface NoteShapeProps {
   verticalAlign: DefaultVerticalAlignStyle
   growY: number
   url: string
-  text: string
+  /**
+   * The label as a rich-text document — the v5 spelling, and the one the store
+   * keeps. {@link NoteShapeProps.text} stays alongside it as the flattened
+   * form, derived on load, so plain-text consumers need no conversion.
+   */
+  richText: RichText
+  /**
+   * The label as plain text.
+   *
+   * Optional, and *derived*: v5 replaced it with
+   * {@link NoteShapeProps.richText}, and a record written by a v5 client has no
+   * `text` at all. mocanvas keeps deriving it on load, because a plain-text
+   * consumer (search, export, an agent reading the board) should not have to
+   * walk a document — but nothing may require it to be present, and
+   * `readRichText` is what reconciles the two when they disagree.
+   */
+  text?: string
+  /**
+   * Who first edited the label by hand, or `null` while nobody has.
+   *
+   * The seam attribution hangs off: a note whose text is still exactly what a
+   * generator wrote can be regenerated freely, and one a person has touched
+   * cannot. mocanvas stores and round-trips it; it never writes it itself,
+   * because only the host knows who "a person" is.
+   */
+  textFirstEditedBy?: string | null | undefined
   scale: number
 }
 
@@ -43,7 +85,16 @@ export const NOTE_PADDING = 16
  * `shape.props` with every declared prop present and of the declared type, so
  * geometry and rendering survive a record that arrived without one.
  */
-export function readNoteProps(shape: { props?: unknown }): NoteShapeProps {
+/**
+ * {@link NoteShapeProps} with the *derived* label filled in as well.
+ *
+ * `props.text` is optional on the record — a v5 writer only sets `richText` —
+ * but a util that has run it through {@link readNoteProps} always has both, so
+ * everything downstream can take a plain `string`.
+ */
+export type ResolvedNoteProps = NoteShapeProps & { text: string; richText: RichText }
+
+export function readNoteProps(shape: { props?: unknown }): ResolvedNoteProps {
   const p = propsOf(shape)
   return {
     color: readStyle(p, "color", DefaultColorStyle),
@@ -55,7 +106,9 @@ export function readNoteProps(shape: { props?: unknown }): NoteShapeProps {
     verticalAlign: readStyle(p, "verticalAlign", DefaultVerticalAlignStyle),
     growY: readNumber(p, "growY", 0),
     url: readString(p, "url", ""),
+    richText: readRichText(p),
     text: readText(p),
+    textFirstEditedBy: readString(p, "textFirstEditedBy", "") || null,
     scale: readNumber(p, "scale", 1),
   }
 }
@@ -73,32 +126,133 @@ const MIN_NOTE_FONT_SIZE = 4
  * label at one pixel, so anything too small to be a font size is also read as
  * unset and the size style takes over.
  */
-export function getNoteFontSize(shape: NoteShape): number {
+export function getNoteFontSize(shape: { props?: unknown }, theme: TLTheme = DEFAULT_THEME): number {
   const { size, scale, fontSizeAdjustment } = readNoteProps(shape)
-  return (fontSizeAdjustment >= MIN_NOTE_FONT_SIZE ? fontSizeAdjustment : FONT_SIZES[size]) * scale
+  const styled = theme.fontSize[size] ?? DEFAULT_THEME.fontSize[size]
+  return (fontSizeAdjustment >= MIN_NOTE_FONT_SIZE ? fontSizeAdjustment : styled) * scale
+}
+
+/**
+ * What a note paints with, once its style props have been resolved.
+ *
+ * Wider than the shared set because a note is not a filled rectangle with a
+ * label on it: its body colour comes from the palette's *note* tokens rather
+ * than from a fill style, and its label has a padding and a typography of its
+ * own that anything measuring the note has to agree with. Callers read them
+ * through `getDisplayValues(util, note)`, which is the only place the live
+ * theme and colour mode are consulted.
+ *
+ * `noteWidth` and `noteHeight` are the note's **logical square**, before
+ * `growY`. That is deliberate: the square is the note's identity, and a caller
+ * fitting text into it wants the box the text has to fit, not the box the text
+ * already grew.
+ */
+export interface NoteShapeUtilDisplayValues extends TLDefaultDisplayValues {
+  /** The body's width in page units, `scale` applied. */
+  noteWidth: number
+  /** The body's height in page units before `growY`; equal to `noteWidth`. */
+  noteHeight: number
+  /** Padding on every side between the body edge and its label, in page units. */
+  labelPadding: number
+  /** The label's font size in page units, after any `fontSizeAdjustment`. */
+  labelFontSize: number
+  /** The label's CSS font stack. */
+  labelFontFamily: string
+  /** The label's CSS `font-style`. */
+  labelFontStyle: string
+  /** The label's CSS `font-weight`. */
+  labelFontWeight: string
+  /** The label's CSS `font-variant`. */
+  labelFontVariant: string
+  /** The label's CSS `line-height`, as a unitless multiple of the font size. */
+  labelLineHeight: number
+}
+
+/** `NoteShapeUtil`'s settings; see {@link ShapeUtil.configure}. */
+export interface NoteShapeOptions extends ShapeUtilOptions<NoteShape, NoteShapeUtilDisplayValues> {
+  /** The note's logical square side in page units, before `scale`. */
+  noteSize?: number
+  /** Padding between the body edge and its label, before `scale`. */
+  labelPadding?: number
+}
+
+/**
+ * Resolve a note's display values against a theme.
+ *
+ * Tolerant of a bare `{ props }` bag rather than a whole record: a placement
+ * ghost asks what a note the user has not created yet would look like, and it
+ * has only the util's default props to ask with.
+ */
+export function getNoteDisplayValues(
+  editor: unknown,
+  shape: { props?: unknown },
+  theme: TLTheme,
+  colorMode: TLColorMode,
+  options: NoteShapeOptions = {},
+): NoteShapeUtilDisplayValues {
+  const base = getDefaultDisplayValues(editor, shape as TLStyledShape, theme, colorMode)
+  const props = readNoteProps(shape)
+  const colors = theme.colors[colorMode] ?? theme.colors.light
+  const side = (options.noteSize ?? NOTE_SIZE) * props.scale
+  const fontSize = getNoteFontSize(shape, theme)
+  // A note's ink is the palette's note text unless the label carries a colour
+  // of its own; `black` is the "unset" value the style panel writes.
+  const labelColor =
+    props.labelColor === "black"
+      ? getColorValue(colors, props.color, "noteText")
+      : getColorValue(colors, props.labelColor, "solid")
+  return {
+    ...base,
+    labelColor,
+    fill: getColorValue(colors, props.color, "noteFill"),
+    fontSize,
+    lineHeight: fontSize * theme.lineHeight,
+    noteWidth: side,
+    noteHeight: side,
+    labelPadding: (options.labelPadding ?? NOTE_PADDING) * props.scale,
+    labelFontSize: fontSize,
+    labelFontFamily: theme.fonts[props.font] ?? theme.fonts.draw,
+    // SEMANTICS-ASSUMED: a note's label is upright, regular and unshaped. Rich
+    // text carries its own bold/italic runs as marks, so the shape-level
+    // typography is the base every run is measured relative to.
+    labelFontStyle: "normal",
+    labelFontWeight: "normal",
+    labelFontVariant: "normal",
+    labelLineHeight: theme.lineHeight,
+  }
 }
 
 /** `growY` a note needs so its (centered) text fits; the note keeps its square width. */
-export function getNoteGrowY(shape: NoteShape): number {
-  const { text, font, scale } = readNoteProps(shape)
+export function getNoteGrowY(shape: NoteShape, editor?: { getCurrentTheme?(): TLTheme } | null): number {
+  const { richText, text, font, scale } = readNoteProps(shape)
   if (!text) return 0
   const side = NOTE_SIZE * scale
-  const m = measureLabel(text, { font, fontSize: getNoteFontSize(shape), maxWidth: side, padding: NOTE_PADDING * scale })
+  const m = measureLabel(richText, {
+    fontFamily: font,
+    fontSize: getNoteFontSize(shape),
+    maxWidth: side,
+    padding: NOTE_PADDING * scale,
+    editor: (editor ?? null) as never,
+  })
   return computeGrowY(m.h, side)
 }
 
-const LABEL_KEYS: readonly (keyof NoteShapeProps)[] = ["text", "font", "size", "scale", "fontSizeAdjustment"]
+const LABEL_KEYS: readonly (keyof NoteShapeProps)[] = ["richText", "text", "font", "size", "scale", "fontSizeAdjustment"]
 
-export class NoteShapeUtil extends ShapeUtil<NoteShape> {
+export class NoteShapeUtil extends ShapeUtil<NoteShape, NoteShapeUtilDisplayValues> {
   static override type = "note" as const
-  static override props = {
-    color: DefaultColorStyle,
-    labelColor: DefaultLabelColorStyle,
-    size: DefaultSizeStyle,
-    font: DefaultFontStyle,
-    align: DefaultHorizontalAlignStyle,
-    verticalAlign: DefaultVerticalAlignStyle,
+  // A method, not an arrow: `getDisplayValues` calls it on the options bag, so
+  // `this` is the bag a `configure()` copy actually carries. Closing over
+  // `NoteShapeUtil.options` instead would make every configured copy resolve
+  // against the unconfigured defaults.
+  static override options: NoteShapeOptions = {
+    getDefaultDisplayValues(editor, shape, theme, colorMode) {
+      return getNoteDisplayValues(editor, shape, theme, colorMode, this)
+    },
   }
+  declare readonly options: NoteShapeOptions
+  static override props = noteShapeProps
+  static override migrations = noteShapeMigrations
 
   getDefaultProps(): NoteShapeProps {
     return {
@@ -111,7 +265,12 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape> {
       verticalAlign: "middle",
       growY: 0,
       url: "",
+      richText: toRichText(""),
       text: "",
+      // Deliberately absent: `textFirstEditedBy` is read and round-tripped but
+      // never written by mocanvas (only the host knows who "a person" is), and
+      // defaulting it would make every file that predates attribution warn on
+      // load about a prop nothing here ever sets.
       scale: 1,
     }
   }
@@ -122,12 +281,20 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape> {
   }
 
   override getRenderStyle(shape: NoteShape): StyleWords {
-    return { fill: getNoteFillRgba(readNoteProps(shape).color), stroke: 0, strokeWidth: 0, dash: 0, opacity: 1 }
+    const colors = getThemeColors(this.editor)
+    return { fill: getNoteFillRgba(readNoteProps(shape).color, colors), stroke: 0, strokeWidth: 0, dash: 0, opacity: 1 }
+  }
+
+  /** A note is nothing but a label, so it needs its family's faces. */
+  override getFontFaces(shape: NoteShape): TLFontFace[] {
+    return getLabelFontFaces(readNoteProps(shape).font)
   }
 
   component(shape: NoteShape): ReactNode {
-    const { text, font, color, labelColor, align, verticalAlign, scale, growY } = readNoteProps(shape)
-    const textColor = labelColor === "black" ? getNoteTextCssColor(color) : LIGHT_THEME[labelColor].solid
+    const { richText, text, font, color, align, verticalAlign, scale, growY } = readNoteProps(shape)
+    const display = getDisplayValues<NoteShape, NoteShapeUtilDisplayValues>(this, shape)
+    const colors = getThemeColors(this.editor)
+    const textColor = display.labelColor
     const w = NOTE_SIZE * scale
     const h = NOTE_SIZE * scale + growY
     return (
@@ -147,7 +314,7 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape> {
             top: 0,
             width: w,
             height: h,
-            background: getNoteBodyGradientCss(color),
+            background: getNoteBodyGradientCss(color, colors),
             boxShadow: getNoteShadowCss(scale),
             pointerEvents: "none",
           }}
@@ -155,17 +322,31 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape> {
         <TextLabel
           shape={shape}
           text={text}
+          richText={richText}
           isEditing={this.editor.getEditingShapeId() === shape.id}
-          font={font}
-          fontSize={getNoteFontSize(shape)}
+          fontFamily={font}
+          fontSize={display.labelFontSize}
           color={textColor}
-          align={align}
+          textAlign={align}
           verticalAlign={verticalAlign}
           wrap
           width={w}
           height={h}
-          padding={NOTE_PADDING * scale}
-          onChange={(next) => this.editor.updateShape<NoteShape>({ id: shape.id, type: "note", props: { text: next } })}
+          padding={display.labelPadding}
+          onChange={(next) =>
+            this.editor.updateShape<NoteShape>({
+              id: shape.id,
+              type: "note",
+              props: { text: next, richText: applyPlainTextToRichText(richText, next) },
+            })
+          }
+          onChangeRichText={(next) =>
+            this.editor.updateShape<NoteShape>({
+              id: shape.id,
+              type: "note",
+              props: { richText: next, text: richTextToText(next) },
+            })
+          }
         />
       </>
     )
@@ -201,19 +382,24 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape> {
   }
 
   override onBeforeCreate(next: NoteShape): NoteShape | void {
-    const growY = getNoteGrowY(next)
+    const growY = getNoteGrowY(next, this.editor)
     if (growY !== next.props.growY) return { ...next, props: { ...next.props, growY } }
   }
 
   override onBeforeUpdate(prev: NoteShape, next: NoteShape): NoteShape | void {
     if (!LABEL_KEYS.some((k) => propsOf(prev)[k] !== propsOf(next)[k])) return
-    const growY = getNoteGrowY(next)
+    const growY = getNoteGrowY(next, this.editor)
     if (growY !== next.props.growY) return { ...next, props: { ...next.props, growY } }
   }
 
   override onEditEnd(shape: NoteShape): void {
     const text = readText(shape.props)
     const trimmed = trimTrailingWhitespace(text)
-    if (trimmed !== text) this.editor.updateShape<NoteShape>({ id: shape.id, type: "note", props: { text: trimmed } })
+    if (trimmed === text) return
+    this.editor.updateShape<NoteShape>({
+      id: shape.id,
+      type: "note",
+      props: { text: trimmed, richText: applyPlainTextToRichText(readRichText(shape.props), trimmed) },
+    })
   }
 }

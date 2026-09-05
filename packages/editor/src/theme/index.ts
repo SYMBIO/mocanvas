@@ -35,3 +35,12 @@ export {
 export { ThemeManager, type ThemeManagerOptions, type TLColorSchemeWindow } from "./ThemeManager"
 export { getDisplayValues, getDefaultDisplayValues, DEFAULT_FILL_TOKENS } from "./displayValues"
 export { useColorMode, useCurrentTheme, useThemeColors } from "./useColorMode"
+export {
+  DefaultFontFamilies,
+  getFontNamesFromThemes,
+  registerFontsFromThemes,
+  type TLFontFaceSource,
+  type TLRemovedDefaultThemeColors,
+  type TLThemeFont,
+  type TLThemeUiColorKeys,
+} from "./fontFaces"

@@ -4,9 +4,18 @@ import {
   Rectangle2d,
   type BaseShape,
   type DefaultColorStyle,
+  getDefaultDisplayValues,
   type Geometry2d,
+  type ShapeUtilOptions,
   type StyleWords,
+  type TLColorMode,
+  type TLDefaultDisplayValues,
+  type TLFontFace,
+  type TLStyledShape,
+  type TLTheme,
 } from "@mocanvas/editor"
+import { frameShapeProps } from "./shape-props"
+import { frameShapeMigrations } from "./shape-migrations"
 import type { ReactNode } from "react"
 import { TextLabel } from "../text/TextEditor"
 import { propsOf, readNumber, readString } from "./prop-access"
@@ -18,6 +27,7 @@ import {
   FRAME_NAME_OFFSET,
   FRAME_STROKE,
   FRAME_STROKE_WIDTH,
+  getLabelFontFaces,
 } from "./shape-theme"
 import { rectPath } from "./indicator-paths"
 
@@ -38,8 +48,60 @@ export type FrameShape = BaseShape<"frame", FrameShapeProps>
  * {@link BaseFrameLikeShapeUtil}; the frame itself only adds its chrome (the
  * body fill, the editable name strip) and keeps the base's clipping box.
  */
+/**
+ * What a frame paints with.
+ *
+ * A frame is a container, so almost nothing it draws comes from the shared
+ * style set: its body and border are fixed chrome, and the only text it has is
+ * the name in its header. Those are what it adds.
+ */
+export interface FrameShapeUtilDisplayValues extends TLDefaultDisplayValues {
+  /** The frame body's fill. */
+  frameFill: string
+  /** The frame border's colour. */
+  frameStroke: string
+  /** The frame border's width, in page units. */
+  frameStrokeWidth: number
+  /** The header's font size, in page units. */
+  nameFontSize: number
+  /** The header's ink. */
+  nameColor: string
+  /** The header's height, in page units — how far above the body it sits. */
+  nameHeight: number
+}
+
+/** `FrameShapeUtil`'s settings; see {@link ShapeUtil.configure}. */
+export interface FrameShapeOptions extends ShapeUtilOptions<FrameShape, FrameShapeUtilDisplayValues> {
+  /** The width a new frame is created at, in page units. */
+  defaultWidth?: number
+  /** The height a new frame is created at, in page units. */
+  defaultHeight?: number
+}
+
+/** Resolve a frame's display values; see {@link FrameShapeUtilDisplayValues}. */
+export function getFrameDisplayValues(
+  editor: unknown,
+  shape: { props?: unknown },
+  theme: TLTheme,
+  colorMode: TLColorMode,
+): FrameShapeUtilDisplayValues {
+  return {
+    ...getDefaultDisplayValues(editor, shape as TLStyledShape, theme, colorMode),
+    frameFill: FRAME_FILL,
+    frameStroke: FRAME_STROKE,
+    frameStrokeWidth: FRAME_STROKE_WIDTH,
+    nameFontSize: FRAME_NAME_FONT_SIZE,
+    nameColor: FRAME_NAME_COLOR,
+    nameHeight: FRAME_NAME_HEIGHT,
+  }
+}
+
 export class FrameShapeUtil extends BaseFrameLikeShapeUtil<FrameShape> {
   static override type = "frame" as const
+  static override props = frameShapeProps
+  static override migrations = frameShapeMigrations
+  static override options: FrameShapeOptions = { getDefaultDisplayValues: getFrameDisplayValues }
+  declare readonly options: FrameShapeOptions
 
   getDefaultProps(): FrameShapeProps {
     return { w: 160, h: 90, name: "" }
@@ -75,10 +137,10 @@ export class FrameShapeUtil extends BaseFrameLikeShapeUtil<FrameShape> {
           shape={shape}
           text={name}
           isEditing={this.editor.getEditingShapeId() === shape.id}
-          font="sans"
+          fontFamily="sans"
           fontSize={FRAME_NAME_FONT_SIZE}
           color={FRAME_NAME_COLOR}
-          align="start"
+          textAlign="start"
           verticalAlign="end"
           wrap={false}
           width={w}
@@ -103,6 +165,11 @@ export class FrameShapeUtil extends BaseFrameLikeShapeUtil<FrameShape> {
 
   override hasOverlayLabel(_shape: FrameShape): boolean {
     return true
+  }
+
+  /** A frame draws its name in the sans family, whatever its children use. */
+  override getFontFaces(_shape: FrameShape): TLFontFace[] {
+    return getLabelFontFaces("sans")
   }
 
   override canEdit(_shape: FrameShape): boolean {

@@ -9,7 +9,7 @@ import {
   ZERO_INDEX_KEY,
   type IndexKey,
 } from "@mocanvas/store"
-import { EngineBridge, FLAG, type CameraState, type ClipRect, type FrameBuffers, type StyleWords } from "@mocanvas/wasm"
+import { EngineBridge, FLAG, GEO_FLAG, type CameraState, type ClipRect, type FrameBuffers, type StyleWords } from "@mocanvas/wasm"
 import { Box, Mat, Vec, type BoxLike, type Geometry2d, type VecLike } from "../geometry"
 import {
   CameraRecordType,
@@ -33,8 +33,10 @@ import {
   type ShapeId,
   type ShapePartial,
   type UnknownShape,
+  type Shape,
 } from "../records/base"
-import type { ShapeUtil, ShapeUtilConstructor } from "../shapes/ShapeUtil"
+import type { EngineGeometry, ShapeUtil, ShapeUtilConstructor } from "../shapes/ShapeUtil"
+import { ContentElementManager } from "../shapes/ContentElementManager"
 import type { BindingUtil, BindingUtilConstructor } from "../bindings/BindingUtil"
 import {
   BindingRecordType,
@@ -66,6 +68,7 @@ import {
   type EditorEvents,
   type EventInfo,
   type PointerEventInfo,
+  type ShapeHandle,
   type VecModel,
   type WheelEventInfo,
 } from "./events"
@@ -75,6 +78,7 @@ import type { InstancePresence } from "../records/presence"
 import { createCurrentUser, UserPreferencesManager } from "../user"
 import { getStylePropsOf, SharedStyleMap, type StyleProp } from "../records/styleProp"
 import { HistoryManager } from "./HistoryManager"
+import { tleditors } from "./tleditors"
 import { SnapManager } from "./SnapManager"
 import { getOwnerDocument, getOwnerWindow, type ContainerDocument, type ContainerWindow } from "./container"
 import { Timers } from "./Timers"
@@ -87,7 +91,95 @@ import {
   type TLCameraMoveOptions,
   type TLCameraOptions,
 } from "./CameraOptions"
-import { ThemeManager, type TLColorMode, type TLTheme } from "../theme"
+import { ThemeManager, type TLColorMode, type TLTheme, type TLColorScheme, type TLThemeId, type TLThemesInput } from "../theme"
+import { InputsManager, type EditorInputs } from "./inputs"
+import { createInMemoryAssetStore, type AssetStore } from "../assets/AssetStore"
+import type { CurrentUser } from "../user/userPreferences"
+import type { User, UserId, UserStore } from "../user/userRecord"
+import type { TLEditStartInfo } from "../shapes/ShapeUtil"
+import {
+  findCommonAncestor,
+  findShapeAncestor,
+  getShapeAndDescendantIds,
+  hasAncestor,
+  isAncestorSelected,
+  isShapeInPage,
+  visitDescendants,
+} from "./ancestry"
+import {
+  getShapeClipPath,
+  getShapeIdsInsideBounds,
+  getShapeMaskedPageBounds,
+  getShapesPageBounds,
+  isPointInShape,
+  type TLPointInShapeOptions,
+} from "./clipping"
+import {
+  getCulledShapes,
+  getCurrentPageRenderingShapesSorted,
+  getCurrentPageShapesInReadingOrder,
+  getNotVisibleShapes,
+  getRenderingShapes,
+  isShapeHidden,
+  type TLGetShapeVisibility,
+  type TLRenderingShape,
+} from "./culling"
+import {
+  deselect,
+  getFocusedGroup,
+  getFocusedGroupId,
+  getNearestAdjacentShape,
+  getOnlySelectedShapeId,
+  getSelectedShapeAtPoint,
+  getSelectionRotatedPageBounds,
+  getSelectionRotatedScreenBounds,
+  getSelectionScreenBounds,
+  popFocusedGroupId,
+  selectAdjacentShape,
+  selectFirstChildShape,
+  selectParentShape,
+  setFocusedGroup,
+  type TLAdjacentDirection,
+} from "./selection"
+import { canBindShapes, canCreateShape, canCreateShapes, canCropShape, canEditShape } from "./permissions"
+import {
+  animateShape,
+  animateShapes,
+  getInitialMetaForShape,
+  getShapeHandles,
+  getShapeStyleIfExists,
+  getSharedOpacity,
+  moveShapesToPage,
+  packShapes,
+  resizeToBounds,
+  setOpacityForNextShapes,
+  setOpacityForSelectedShapes,
+  type TLAnimationOptions,
+  type TLSharedOpacity,
+} from "./shapeOperations"
+import { duplicatePage, getPageStates, updatePage } from "./pages"
+import {
+  getSnapshot as getEditorSnapshot,
+  loadSnapshot as loadEditorSnapshot,
+  type TLEditorSnapshot,
+  type TLLoadSnapshotOptions,
+} from "./snapshots"
+import { CameraStateTracker, type TLCameraState } from "./CameraStateTracker"
+import { EdgeScrollManager } from "./EdgeScrollManager"
+import { CollaboratorsManager } from "./CollaboratorsManager"
+import { ClickManager } from "./ClickManager"
+import { ScribbleManager } from "./ScribbleManager"
+import { TextManager } from "./TextManager"
+import { OverlayManager, type TLAnyOverlayUtilConstructor } from "./OverlayManager"
+import { createDeepLinkString, parseDeepLinkString, type TLDeepLink, type TLDeepLinkOptions } from "./deepLinks"
+import { withCoreShapes } from "./coreShapes"
+import { defaultTldrawOptions, type TLTextOptions, type TldrawOptions } from "./tldrawOptions"
+import {
+  AssetUtilRegistry,
+  type TLAssetUtilConstructorLike,
+  type TLAssetUtilLike,
+  type TLTemporaryAssetPreview,
+} from "./assetUtils"
 
 export interface EditorOptions {
   store: EditorStore
@@ -105,59 +197,104 @@ export interface EditorOptions {
   initialState?: string
   getContainer: () => HTMLElement
   options?: Partial<EditorConfig>
+  /**
+   * Where asset bytes live. Defaults to the store's own
+   * (`store.props.assets`), which is where an app that built its store with
+   * `createStore({ assets })` already put it — pass this only to give one
+   * editor a different store than its document has.
+   */
+  assets?: AssetStore
+  /**
+   * Who is using this editor, as the owner of their preferences — the
+   * *controlled* form: an app that holds the preferences in its own state
+   * passes them in and gets every write back, instead of the editor keeping a
+   * copy the app cannot see. Defaults to an editor-owned atom.
+   */
+  user?: CurrentUser
+  /** Themes to register, merged over the built-in `default`. */
+  themes?: TLThemesInput
+  /** Which theme starts out current. Defaults to `"default"`. */
+  initialTheme?: TLThemeId
+  /** Light, dark, or follow the host window. Defaults to `"light"`. */
+  colorScheme?: TLColorScheme
+  /**
+   * Rich-text configuration. Also readable as `options.text`; this top-level
+   * spelling is the one the consumer passes, and the two are the same object
+   * — {@link Editor.textOptions} resolves whichever was given.
+   */
+  textOptions?: TLTextOptions
+  /**
+   * Where the editor asks about people, for attribution. Optional: with no
+   * store, `getAttributionUser` answers `null` and display names fall back to
+   * the id, which is exactly what a single-player board wants.
+   */
+  userStore?: UserStore
+  /**
+   * The host's hook for hiding shapes without deleting them — layers, filters,
+   * a review mode. Consulted per shape in the render path, so it must be cheap
+   * and pure. See {@link TLGetShapeVisibility}.
+   */
+  getShapeVisibility?: TLGetShapeVisibility
+  /**
+   * The `meta` every newly created shape starts with — the seam an app uses to
+   * stamp provenance (author, campaign, template) onto shapes without
+   * intercepting every creation site.
+   */
+  getInitialMetaForShape?: (shape: UnknownShape) => UnknownShape["meta"]
+  /** Canvas overlay painters to register with {@link Editor.overlays}. */
+  overlayUtils?: readonly TLAnyOverlayUtilConstructor[]
+  /** Asset utils to register. See {@link Editor.assetUtils}. */
+  assetUtils?: readonly TLAssetUtilConstructorLike[]
 }
 
-export interface EditorConfig {
-  maxShapesPerPage: number
-  dragDistanceSquared: number
-  /** Hit-test tolerance in screen pixels. */
-  hitTestMargin: number
+/**
+ * The editor's option bag.
+ *
+ * {@link TldrawOptions} is the documented set — every behavioural knob the
+ * canvas exposes. This adds the handful mocanvas needs that the documented set
+ * has no name for: the renderer's clear colour, the zoom clamp, and the
+ * separate octave threshold the debounced-zoom tracker uses.
+ */
+export interface EditorConfig extends TldrawOptions {
+  /** Whether a video shape may start playing without a user gesture. */
+  allowVideoAutoplay: boolean
+  /** Hard lower bound on camera zoom, below the camera options' own steps. */
   zoomMin: number
+  /** Hard upper bound on camera zoom. */
   zoomMax: number
+  /** The zoom levels the zoom-in / zoom-out steps land on. */
   zoomSteps: number[]
+  /** The renderer's clear colour, as premultiplied linear RGBA. */
   backgroundColor: [number, number, number, number]
-  animationMediumMs: number
+  /**
+   * How far the zoom must change, in octaves, before `getDebouncedZoomLevel()`
+   * updates mid-movement. `0.5` is half a doubling.
+   *
+   * Distinct from {@link TldrawOptions.debouncedZoomThreshold}, which is a
+   * *shape count*: the two answer different questions — when is a page busy
+   * enough to debounce at all, and how much movement is worth publishing.
+   */
+  debouncedZoomOctaves: number
 }
 
 export const DEFAULT_EDITOR_CONFIG: EditorConfig = {
-  maxShapesPerPage: 4000,
-  dragDistanceSquared: 16,
+  // The documented defaults first; the entries below are mocanvas's own knobs
+  // plus the few places where it has deliberately tuned a documented one.
+  ...defaultTldrawOptions,
+  // SEMANTICS-ASSUMED: mocanvas's hit-test margins are wider than the
+  // documented 3/4. They were tuned against this renderer and tightening every
+  // hit test is not a change to make on a version bump; an app that wants the
+  // reference numbers sets both explicitly.
   hitTestMargin: 8,
+  coarseHitTestMargin: 12,
+  allowVideoAutoplay: true,
   zoomMin: 0.05,
   zoomMax: 8,
   zoomSteps: [0.1, 0.25, 0.5, 1, 2, 4, 8],
   backgroundColor: [0.976, 0.98, 0.984, 1],
-  animationMediumMs: 320,
-}
-
-/**
- * Live pointer and modifier state.
- *
- * The `*ScreenPoint` members are in VIEWPORT space (container-relative pixels),
- * which is the space canvas events arrive in; `*PagePoint` are in page space.
- * For a window-relative point use `editor.pageToScreen(...)`.
- */
-export interface EditorInputs {
-  originPagePoint: Vec
-  originScreenPoint: Vec
-  previousPagePoint: Vec
-  previousScreenPoint: Vec
-  currentPagePoint: Vec
-  currentScreenPoint: Vec
-  keys: Set<string>
-  buttons: Set<number>
-  isPen: boolean
-  shiftKey: boolean
-  ctrlKey: boolean
-  altKey: boolean
-  metaKey: boolean
-  accelKey: boolean
-  isDragging: boolean
-  isPointing: boolean
-  isPinching: boolean
-  isEditing: boolean
-  isPanning: boolean
-  pointerVelocity: Vec
+  // SEMANTICS-ASSUMED: half an octave is the smallest zoom change a rasteriser
+  // should care about.
+  debouncedZoomOctaves: 0.5,
 }
 
 export interface HitTestOptions {
@@ -180,6 +317,9 @@ const RAD_PER_DEG = Math.PI / 180
  */
 export const COLLABORATOR_INACTIVE_TIMEOUT = 60_000
 
+/** Feeds {@link Editor.id}; process-local, so ids are readable in a log. */
+let editorSequence = 0
+
 /**
  * The editor: document access, selection, camera, tool dispatch, and the
  * bridge that mirrors the current page into the WASM engine.
@@ -192,7 +332,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   readonly shapeUtils: Readonly<Record<string, ShapeUtil>>
   readonly bindingUtils: Readonly<Record<string, BindingUtil>>
   readonly options: EditorConfig
-  readonly inputs: EditorInputs
+  readonly inputs: EditorInputs = new InputsManager()
   readonly handles = new HandleTable()
   /** GPU textures referenced by shape styles (images, rasterized text). */
   readonly textures: TextureManager = new TextureManager({ onChange: (keys) => this.onTexturesChanged(keys) })
@@ -205,8 +345,55 @@ export class Editor extends EventEmitter<EditorEvents> {
   readonly fonts: FontManager
   /** Colours and display values for the current theme and colour mode. */
   readonly theme: ThemeManager
+  /** Where this editor's asset bytes live. */
+  readonly assets: AssetStore
+  /** Rich-text configuration, from `textOptions` or `options.text`. */
+  readonly textOptions: TLTextOptions | undefined
   /** Timing events for profilers and dev overlays. Nothing depends on it. */
   readonly performance: PerformanceManager = new PerformanceManager()
+  /**
+   * DOM elements owned by shape utils rather than by the React tree — see
+   * {@link ShapeUtil.getContentElement}. They outlive a re-render and the
+   * editor's own unmount, and are released with the shape or with the editor.
+   */
+  readonly contentElements: ContentElementManager = new ContentElementManager(this)
+
+  /**
+   * This editor's own id. Stable for its lifetime, unique within the process,
+   * and the thing to key per-editor caches and log lines by.
+   */
+  readonly id: string = `editor:${(editorSequence++).toString(36)}:${Math.random().toString(36).slice(2, 8)}`
+  /**
+   * The React context instance this editor belongs to, when a host set one.
+   *
+   * Two editors rendered by two independent React trees on one page must not
+   * read each other's context; a host that mounts editors in isolated trees
+   * (a plugin host, a storybook page) sets this so context lookups can tell
+   * them apart. `undefined` in the ordinary single-tree case.
+   */
+  contextId: string | undefined
+  /** Double-click detection for the dispatch loop and for tools. */
+  readonly click: ClickManager
+  /** The trails a laser, an eraser or a select brush leaves behind. */
+  readonly scribbles: ScribbleManager
+  /** Text measurement and span layout. See {@link TextManager}. */
+  readonly text: TextManager
+  /** The registry of canvas overlay painters. */
+  readonly overlays: OverlayManager
+  /** Panning the camera when a drag reaches the viewport edge. */
+  readonly edgeScrollManager: EdgeScrollManager
+  /** Who else is in the room, and which of them to draw. */
+  readonly collaborators: CollaboratorsManager
+  /** Asset utils and in-flight asset previews. See {@link Editor.assetUtils}. */
+  private readonly assetUtilRegistry: AssetUtilRegistry
+  /** Whether the camera is in flight, and the settled zoom level. */
+  private readonly cameraStateTracker: CameraStateTracker
+  /** See {@link EditorOptions.userStore}. */
+  private readonly userStore: UserStore | undefined
+  /** See {@link EditorOptions.getShapeVisibility}. */
+  readonly getShapeVisibility: TLGetShapeVisibility | undefined
+  /** See {@link EditorOptions.getInitialMetaForShape}. */
+  readonly getInitialMetaForShapeHandler: ((shape: UnknownShape) => UnknownShape["meta"]) | undefined
 
   private readonly kindIds = new Map<string, number>()
   private readonly _frameEpoch: Atom<number>
@@ -227,6 +414,12 @@ export class Editor extends EventEmitter<EditorEvents> {
    * is over.
    */
   private readonly handledEvents = new WeakSet<object>()
+  /** Whether a host has told us the editor is on screen. See `getIsMounted`. */
+  private readonly _isMounted: Atom<boolean>
+  /** The rich-text editor instance a text shape's own DOM installed, if any. */
+  private richTextEditor: unknown = null
+  /** Tools added or removed after construction, by id. */
+  private readonly removedToolIds = new Set<string>()
 
   constructor(opts: EditorOptions) {
     super()
@@ -238,7 +431,21 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.snaps = new SnapManager(this)
     this.timers = new Timers(() => this.getContainerWindow())
     this.fonts = new FontManager(this)
-    this.theme = new ThemeManager(this)
+    // After `getContainer`: the manager reads the container's window to follow
+    // the system colour scheme, and a `colorScheme: "system"` editor would
+    // otherwise resolve against nothing on construction.
+    this.theme = new ThemeManager(this, {
+      ...(opts.themes ? { themes: opts.themes } : {}),
+      ...(opts.initialTheme ? { initialTheme: opts.initialTheme } : {}),
+      ...(opts.colorScheme ? { colorScheme: opts.colorScheme } : {}),
+    })
+    this.textOptions = opts.textOptions ?? this.options.text
+    // The controlled user wins over the editor-level `colorScheme`, which is
+    // only the fallback for a user who expressed no preference of their own.
+    this.user = new UserPreferencesManager(opts.user ?? createCurrentUser(), opts.colorScheme ?? null)
+    // A store built outside `createStore` (a hand-rolled one in a test) has no
+    // asset store on its props, so the fallback is not dead code.
+    this.assets = opts.assets ?? this.store.props?.assets ?? createInMemoryAssetStore()
 
     this._frameEpoch = atom("editor.frameEpoch", 0)
     this._cameraOptions = atom<TLCameraOptions>("editor.cameraOptions", {
@@ -248,34 +455,19 @@ export class Editor extends EventEmitter<EditorEvents> {
     this._overlayShapeIds = atom<readonly ShapeId[]>("editor.overlayShapeIds", [])
     this._overlayClips = atom<readonly (ClipRect | undefined)[]>("editor.overlayClips", [])
     this._isDisposed = atom("editor.isDisposed", false)
+    this._isMounted = atom("editor.isMounted", false)
     this._lastFrame = atom("editor.lastFrame", { drawn: 0, culled: 0, ms: 0 })
 
-    this.inputs = {
-      originPagePoint: new Vec(),
-      originScreenPoint: new Vec(),
-      previousPagePoint: new Vec(),
-      previousScreenPoint: new Vec(),
-      currentPagePoint: new Vec(),
-      currentScreenPoint: new Vec(),
-      keys: new Set(),
-      buttons: new Set(),
-      isPen: false,
-      shiftKey: false,
-      ctrlKey: false,
-      altKey: false,
-      metaKey: false,
-      accelKey: false,
-      isDragging: false,
-      isPointing: false,
-      isPinching: false,
-      isEditing: false,
-      isPanning: false,
-      pointerVelocity: new Vec(),
-    }
+    this.userStore = opts.userStore
+    this.getShapeVisibility = opts.getShapeVisibility
+    this.getInitialMetaForShapeHandler = opts.getInitialMetaForShape
 
     const utils: Record<string, ShapeUtil> = {}
     let kind = 1
-    for (const U of opts.shapeUtils) {
+    // Core shapes first, so structural types the editor itself depends on (a
+    // group) exist even when the app did not list them. An app that registers
+    // its own util for a core type replaces it — see `withCoreShapes`.
+    for (const U of withCoreShapes(opts.shapeUtils)) {
       if (utils[U.type]) throw new Error(`Duplicate ShapeUtil for type "${U.type}"`)
       utils[U.type] = new U(this)
       this.kindIds.set(U.type, kind++)
@@ -292,6 +484,41 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.ensureBaseRecords()
     this.registerBindingSideEffects()
     this.registerTextureSideEffects()
+
+    // Managers, after the records they read exist and before the root state
+    // enters — a tool's `onEnter` may reach for any of them.
+    this.click = new ClickManager(this)
+    this.scribbles = new ScribbleManager(this)
+    this.text = new TextManager(this)
+    this.overlays = new OverlayManager(this, opts.overlayUtils ?? [])
+    this.edgeScrollManager = new EdgeScrollManager(this)
+    this.collaborators = new CollaboratorsManager(this)
+    this.cameraStateTracker = new CameraStateTracker(this)
+    this.assetUtilRegistry = new AssetUtilRegistry(this, opts.assetUtils ?? [])
+
+    // Mount state is derived from the events a host already emits, so an
+    // existing `editor.emit("mount")` call site keeps working and there is one
+    // source of truth for "is this editor on screen".
+    // Enrolment follows the mount events rather than the component, so an
+    // editor built by a test, a devtools panel or a second React tree shows up
+    // in `tleditors.getMounted()` on the same terms as one from `<Mocanvas />`.
+    this.on("mount", () => {
+      this._isMounted.set(true)
+      tleditors.register(this)
+    })
+    this.on("unmount", () => {
+      this._isMounted.set(false)
+      tleditors.unregister(this)
+    })
+
+    // The frame-driven managers. Nothing in this package emits `tick` — the
+    // host's render loop does — so this is inert in a headless editor and
+    // starts working the moment a canvas is driving frames, without either
+    // manager having to own a loop of its own.
+    this.on("tick", (elapsed) => {
+      this.scribbles.tick(elapsed)
+      this.edgeScrollManager.updateEdgeScrolling(elapsed)
+    })
 
     this.history = new HistoryManager(this.store, () => this.emit("update"))
 
@@ -321,14 +548,27 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   dispose(): void {
     if (this._isDisposed.get()) return
+    // An editor that is still mounted is, by definition, unmounting now. The
+    // event goes out before the listeners are torn down so a host watching for
+    // it still hears it.
+    if (this._isMounted.get()) this.emit("unmount")
     this._isDisposed.set(true)
     this.stopCameraAnimation()
     for (const d of this.disposables) d()
+    this.click.dispose()
+    this.scribbles.dispose()
+    this.text.dispose()
+    this.overlays.dispose()
+    this.edgeScrollManager.dispose()
+    this.collaborators.dispose()
+    this.cameraStateTracker.dispose()
+    this.assetUtilRegistry.clearPreviews()
     this.timers.dispose()
     this.fonts.dispose()
     this.theme.dispose()
     this.performance.dispose()
     this.textures.dispose()
+    this.contentElements.dispose()
     this.history.destroy()
     this.removeAllListeners()
   }
@@ -368,6 +608,32 @@ export class Editor extends EventEmitter<EditorEvents> {
   /** The window the canvas is painted in; `undefined` outside a DOM. */
   getContainerWindow(): ContainerWindow | undefined {
     return getOwnerWindow(this.safeContainer())
+  }
+
+  /**
+   * Put keyboard focus on the canvas.
+   *
+   * The one thing an app needs after its own DOM took a keystroke — closing a
+   * caption editor, dismissing a menu — so that the next key press reaches the
+   * editor's shortcuts instead of the body. `preventScroll` because focusing a
+   * canvas that is partly off-screen must not scroll the page under it.
+   *
+   * A no-op with no container (a headless editor, or one already torn down).
+   */
+  focus(): this {
+    this.safeContainer()?.focus({ preventScroll: true })
+    // Recorded on the instance record as well as asked of the DOM, so
+    // `getIsFocused()` is answerable in a headless editor and reactive in a
+    // mounted one. A host that takes focus away by other means calls `blur()`.
+    if (!this.getInstanceState().isFocused) this.updateInstanceState({ isFocused: true })
+    return this
+  }
+
+  /** Take keyboard focus off the canvas. The inverse of {@link focus}. */
+  blur(): this {
+    this.safeContainer()?.blur()
+    if (this.getInstanceState().isFocused) this.updateInstanceState({ isFocused: false })
+    return this
   }
 
   /**
@@ -697,24 +963,46 @@ export class Editor extends EventEmitter<EditorEvents> {
     return new Set(this._currentPageShapes.get().map((s) => s.id))
   })
 
-  getShape<T extends UnknownShape = UnknownShape>(id: ShapeId | T): T | undefined {
+  /**
+   * One shape by id.
+   *
+   * Defaults to `Shape`, the union of registered types, so
+   * `shape.type === "note"` narrows its props at the call site. Pass a type
+   * argument for a specific one, or `UnknownShape` for a type that is not
+   * registered.
+   */
+  // `T` deliberately does NOT appear in the parameter: with `id: ShapeId | T`
+  // TypeScript attempts inference, finds no candidate, and falls back to the
+  // CONSTRAINT rather than the default — so every call returned `UnknownShape`
+  // and the union was never seen at the call site.
+  getShape<T extends UnknownShape = Shape>(id: ShapeId | UnknownShape): T | undefined {
     const shapeId = typeof id === "string" ? id : id.id
     return this.store.get(shapeId) as T | undefined
   }
 
-  getShapeUtil<T extends UnknownShape>(shape: T | T["type"]): ShapeUtil<T> {
+  /**
+   * The util registered for a shape or shape type.
+   *
+   * The type argument may be either the shape (`getShapeUtil<NoteShape>(s)`,
+   * giving `ShapeUtil<NoteShape>`) or the util itself
+   * (`getShapeUtil<NoteShapeUtil>("note")`, giving `NoteShapeUtil`) — the second
+   * is what you want when reaching for methods a custom util adds.
+   */
+  getShapeUtil<T extends UnknownShape | ShapeUtil = UnknownShape>(
+    shape: UnknownShape | string,
+  ): T extends ShapeUtil ? T : T extends UnknownShape ? ShapeUtil<T> : never {
     const type = typeof shape === "string" ? shape : shape.type
     const util = this.shapeUtils[type]
     if (!util) throw new Error(`No ShapeUtil registered for type "${type}"`)
-    return util as ShapeUtil<T>
+    return util as T extends ShapeUtil ? T : T extends UnknownShape ? ShapeUtil<T> : never
   }
 
   hasShapeUtil(type: string): boolean {
     return type in this.shapeUtils
   }
 
-  getCurrentPageShapes(): UnknownShape[] {
-    return this._currentPageShapes.get()
+  getCurrentPageShapes(): Shape[] {
+    return this._currentPageShapes.get() as Shape[]
   }
 
   getCurrentPageShapeIds(): Set<ShapeId> {
@@ -725,7 +1013,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     const result: UnknownShape[] = []
     const visit = (parentId: ParentId): void => {
       for (const child of this.getSortedChildIdsForParent(parentId)) {
-        const shape = this.getShape(child)
+        const shape = this.getShape<UnknownShape>(child)
         if (!shape) continue
         result.push(shape)
         visit(shape.id)
@@ -743,19 +1031,19 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   getAncestorPageId(shape: UnknownShape | ShapeId | undefined): PageId | undefined {
-    let cur = typeof shape === "string" ? this.getShape(shape) : shape
+    let cur = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
     let guard = 0
     while (cur && guard++ < 1000) {
       if (isPageId(cur.parentId)) return cur.parentId
-      cur = this.getShape(cur.parentId)
+      cur = this.getShape<UnknownShape>(cur.parentId)
     }
     return undefined
   }
 
   getShapeParent(shape: UnknownShape | ShapeId): UnknownShape | undefined {
-    const s = typeof shape === "string" ? this.getShape(shape) : shape
+    const s = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
     if (!s || isPageId(s.parentId)) return undefined
-    return this.getShape(s.parentId)
+    return this.getShape<UnknownShape>(s.parentId)
   }
 
   /**
@@ -767,13 +1055,13 @@ export class Editor extends EventEmitter<EditorEvents> {
    * than spinning forever.
    */
   getShapeAncestors(shape: UnknownShape | ShapeId): UnknownShape[] {
-    const start = typeof shape === "string" ? this.getShape(shape) : shape
+    const start = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
     if (!start) return []
     const ancestors: UnknownShape[] = []
     const seen = new Set<ShapeId>([start.id])
     let current = start
     while (!isPageId(current.parentId)) {
-      const parent = this.getShape(current.parentId)
+      const parent = this.getShape<UnknownShape>(current.parentId)
       if (!parent || seen.has(parent.id)) break
       seen.add(parent.id)
       ancestors.push(parent)
@@ -786,30 +1074,57 @@ export class Editor extends EventEmitter<EditorEvents> {
    * The page-space polygon a shape is clipped to by its ancestors, or
    * `undefined` when nothing clips it.
    *
-   * Only ancestors whose `ShapeUtil.isClipShape()` says so clip — a frame does,
-   * a plain container or a group does not. Several clipping ancestors intersect
-   * into one convex polygon; an intersection that is empty (a shape scrolled
-   * entirely out of its frame) comes back as an empty array, which is not the
-   * same answer as "unclipped".
+   * An ancestor contributes its `ShapeUtil.getClipPath()` — a polygon in the
+   * ancestor's own coordinates, put through its page transform here — and
+   * falls back to the ancestor's page-space bounds rectangle when it clips
+   * (`isClipShape()`) but names no path. A frame clips, a plain container or a
+   * group does not. Several clipping ancestors intersect into one polygon; an
+   * intersection that is empty (a shape scrolled entirely out of its frame)
+   * comes back as an empty array, which is not the same answer as "unclipped".
    *
    * SEMANTICS-ASSUMED: the consumer only pins the `undefined` case (a section
    * clips nothing). Empty-array-for-empty-intersection is chosen over
    * `undefined` because collapsing them would make a fully clipped shape look
    * unclipped, which is the more damaging of the two mistakes.
+   *
+   * LIMITATION: the intersection is Sutherland–Hodgman, so a *concave* clip
+   * path is honoured only where it agrees with its convex hull. Rectangles,
+   * rounded-corner approximations and any convex path — every shape mocanvas
+   * ships and the only kind the consumer defines — are exact.
    */
   getShapeMask(shape: UnknownShape | ShapeId): VecLike[] | undefined {
-    const start = typeof shape === "string" ? this.getShape(shape) : shape
+    const start = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
     if (!start) return undefined
 
     let mask: VecLike[] | undefined
     for (const ancestor of this.getShapeAncestors(start)) {
-      if (!this.getShapeUtil(ancestor).isClipShape(ancestor)) continue
-      const corners = this.getShapePageCorners(ancestor)
-      if (!corners) continue
-      mask = mask === undefined ? corners : intersectConvexPolygons(mask, corners)
+      const region = this.getShapePageClipRegion(ancestor)
+      if (!region) continue
+      mask = mask === undefined ? region : intersectConvexPolygons(mask, region)
       if (mask.length === 0) return []
     }
     return mask
+  }
+
+  /**
+   * The page-space polygon one shape clips its descendants to, or `undefined`
+   * when it clips nothing.
+   *
+   * The util's `getClipPath()` wins; `isClipShape()` with no path means "clip
+   * to my bounds", which is what every clipping shape meant before shapes
+   * could describe a clip region of their own.
+   */
+  private getShapePageClipRegion(shape: UnknownShape): VecLike[] | undefined {
+    // Explicitly `UnknownShape`: this runs for any shape in the store, not only
+    // the registered union `getShapeUtil` defaults to.
+    const util = this.getShapeUtil<UnknownShape>(shape)
+    const local = util.getClipPath(shape)
+    if (local && local.length > 0) {
+      const m = this.getShapePageTransform(shape)
+      return local.map((p: VecLike) => ({ x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f }))
+    }
+    if (!util.isClipShape(shape)) return undefined
+    return this.getShapePageCorners(shape)
   }
 
   /** A shape's geometry bounds as four page-space points, rotation included. */
@@ -838,9 +1153,9 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   getShapeGeometry<G extends Geometry2d = Geometry2d>(shape: UnknownShape | ShapeId): G {
-    const s = typeof shape === "string" ? this.getShape(shape) : shape
+    const s = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
     if (!s) throw new Error(`Shape not found`)
-    return this.getShapeUtil(s).getGeometry(s) as G
+    return this.getShapeUtil<UnknownShape>(s).getGeometry(s) as G
   }
 
   /** Local → parent transform components. */
@@ -850,19 +1165,22 @@ export class Editor extends EventEmitter<EditorEvents> {
     return new Mat(c, s, -s, c, shape.x, shape.y)
   }
 
-  getShapeParentTransform(shape: UnknownShape): Mat {
-    const parent = this.getShapeParent(shape)
+  /** Parent → page transform. Identity for a shape parented to the page. */
+  getShapeParentTransform(shape: UnknownShape | ShapeId): Mat {
+    const s = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
+    if (!s) return Mat.Identity()
+    const parent = this.getShapeParent(s)
     return parent ? this.getShapePageTransform(parent) : Mat.Identity()
   }
 
   getShapePageTransform(shape: UnknownShape | ShapeId): Mat {
-    const s = typeof shape === "string" ? this.getShape(shape) : shape
+    const s = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
     if (!s) return Mat.Identity()
     return Mat.Multiply(this.getShapeParentTransform(s), this.getShapeLocalTransform(s))
   }
 
   getShapePageBounds(shape: UnknownShape | ShapeId): Box | undefined {
-    const s = typeof shape === "string" ? this.getShape(shape) : shape
+    const s = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
     if (!s) return undefined
     const m = this.getShapePageTransform(s)
     const b = this.getShapeGeometry(s).bounds
@@ -870,7 +1188,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   getShapeGeometryBounds(shape: UnknownShape | ShapeId): Box | undefined {
-    const s = typeof shape === "string" ? this.getShape(shape) : shape
+    const s = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
     return s ? this.getShapeGeometry(s).bounds : undefined
   }
 
@@ -890,7 +1208,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   getPointInParentSpace(shape: UnknownShape | ShapeId, point: VecLike): Vec {
-    const s = typeof shape === "string" ? this.getShape(shape) : shape
+    const s = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
     if (!s) return new Vec(point.x, point.y)
     const parent = this.getShapeParent(s)
     return parent ? this.getPointInShapeSpace(parent, point) : new Vec(point.x, point.y)
@@ -902,6 +1220,14 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   // ---- engine-backed spatial queries -------------------------------------
 
+  /**
+   * The hit-test tolerance for the pointer in use: a fingertip covers more of
+   * the canvas than a cursor and needs the larger target.
+   */
+  getHitTestMargin(): number {
+    return this.getInstanceState().isCoarsePointer ? this.options.coarseHitTestMargin : this.options.hitTestMargin
+  }
+
   private hitFilterBits(opts: HitTestOptions): number {
     let bits = 0
     if (opts.hitLocked) bits |= 1
@@ -910,12 +1236,12 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   getShapeAtPoint(point: VecLike, opts: HitTestOptions = {}): UnknownShape | undefined {
     this.flushEngine()
-    const margin = (opts.margin ?? this.options.hitTestMargin) / this.getZoomLevel()
+    const margin = (opts.margin ?? this.getHitTestMargin()) / this.getZoomLevel()
     const bits = this.hitFilterBits(opts) | (opts.hitInside ? 0 : 4)
     if (!opts.filter) {
       const h = this.engine.hitTest(point.x, point.y, margin, bits)
       const id = this.handles.id(h)
-      return id ? this.getShape(id as ShapeId) : undefined
+      return id ? this.getShape<UnknownShape>(id as ShapeId) : undefined
     }
     for (const shape of this.getShapesAtPoint(point, opts)) {
       if (opts.filter(shape)) return shape
@@ -926,12 +1252,12 @@ export class Editor extends EventEmitter<EditorEvents> {
   /** Shapes under a point, topmost first. */
   getShapesAtPoint(point: VecLike, opts: HitTestOptions = {}): UnknownShape[] {
     this.flushEngine()
-    const margin = (opts.margin ?? this.options.hitTestMargin) / this.getZoomLevel()
+    const margin = (opts.margin ?? this.getHitTestMargin()) / this.getZoomLevel()
     const handles = this.engine.queryBox(point.x - margin, point.y - margin, point.x + margin, point.y + margin, 0, this.hitFilterBits(opts))
     const out: UnknownShape[] = []
     for (let i = handles.length - 1; i >= 0; i--) {
       const id = this.handles.id(handles[i]!)
-      const shape = id ? this.getShape(id as ShapeId) : undefined
+      const shape = id ? this.getShape<UnknownShape>(id as ShapeId) : undefined
       if (!shape) continue
       if (opts.filter && !opts.filter(shape)) continue
       const local = this.getPointInShapeSpace(shape, point)
@@ -959,7 +1285,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     const out: UnknownShape[] = []
     for (const h of handles) {
       const id = this.handles.id(h)
-      const shape = id ? this.getShape(id as ShapeId) : undefined
+      const shape = id ? this.getShape<UnknownShape>(id as ShapeId) : undefined
       if (shape && (!filter || filter(shape))) out.push(shape)
     }
     return out
@@ -1030,7 +1356,9 @@ export class Editor extends EventEmitter<EditorEvents> {
           props: props as T["props"],
           meta: { ...(partial.meta ?? {}) },
         }) as T
-        const next = util.onBeforeCreate?.(shape)
+        // `getShapeUtil` is deliberately loose about its type argument, so the
+        // callback's return needs narrowing back to the shape being created.
+        const next = util.onBeforeCreate?.(shape) as T | undefined
         if (next) shape = next
         records.push(shape)
       }
@@ -1057,7 +1385,7 @@ export class Editor extends EventEmitter<EditorEvents> {
           props: partial.props ? { ...prev.props, ...partial.props } : prev.props,
           meta: partial.meta ? { ...prev.meta, ...partial.meta } : prev.meta,
         } as T
-        const adjusted = util.onBeforeUpdate?.(prev, next)
+        const adjusted = util.onBeforeUpdate?.(prev, next) as T | undefined
         if (adjusted) next = adjusted
         records.push(next)
       }
@@ -1080,7 +1408,7 @@ export class Editor extends EventEmitter<EditorEvents> {
       for (const child of this.getSortedChildIdsForParent(id)) collect(child)
     }
     for (const id of shapeIds) {
-      const shape = this.getShape(id)
+      const shape = this.getShape<UnknownShape>(id)
       if (shape && !shape.isLocked) collect(id)
     }
     if (toDelete.size === 0) return this
@@ -1095,14 +1423,22 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this
   }
 
-  reparentShapes(ids: readonly ShapeId[], parentId: ParentId, insertIndex?: IndexKey): this {
+  /**
+   * Move shapes under a new parent, keeping their page position and rotation.
+   *
+   * Takes ids or records: a caller that already has the shape in hand should
+   * not have to reach for `.id`, and a caller that has only the id should not
+   * have to look the shape up.
+   */
+  reparentShapes(shapes: readonly (ShapeId | UnknownShape)[], parentId: ParentId, insertIndex?: IndexKey): this {
     this.run(() => {
       let index = insertIndex ?? this.getHighestIndexForParent(parentId)
       const updates: ShapePartial[] = []
       const parentTransform =
         isShapeId(parentId) ? this.getShapePageTransform(parentId) : { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }
-      for (const id of ids) {
-        const shape = this.getShape(id)
+      for (const target of shapes) {
+        const id = typeof target === "string" ? target : target.id
+        const shape = this.getShape<UnknownShape>(id)
         if (!shape || shape.parentId === parentId) continue
         const pageXf = this.getShapePageTransform(shape)
         // page position of shape origin → new parent's local space
@@ -1168,7 +1504,7 @@ export class Editor extends EventEmitter<EditorEvents> {
       const records: UnknownBinding[] = []
       for (const partial of partials) {
         const util = this.getBindingUtil<B>(partial.type)
-        if (!this.getShape(partial.fromId) || !this.getShape(partial.toId)) continue
+        if (!this.getShape<UnknownShape>(partial.fromId) || !this.getShape<UnknownShape>(partial.toId)) continue
         let binding = BindingRecordType.create({
           id: partial.id ?? BindingRecordType.createId(),
           type: partial.type,
@@ -1317,6 +1653,19 @@ export class Editor extends EventEmitter<EditorEvents> {
         if (from && to) bindingCreates.push({ type: b.type, fromId: from, toId: to, props: { ...b.props }, meta: { ...b.meta } })
       }
       if (bindingCreates.length) this.createBindings(bindingCreates)
+
+      // Let each util amend its own copy — a name to bump, a per-instance id to
+      // clear, randomness to re-seed. Applied after creation so the callback
+      // sees the duplicate as it actually landed, parent and offset included.
+      const patches: ShapePartial[] = []
+      for (const [sourceId, newId] of idMap) {
+        const source = this.getShape<UnknownShape>(sourceId)
+        const duplicate = this.getShape<UnknownShape>(newId)
+        if (!source || !duplicate) continue
+        const props = this.getShapeUtil<UnknownShape>(duplicate).onDuplicate?.(source, duplicate)
+        if (props) patches.push({ ...(props as ShapePartial), id: newId, type: duplicate.type })
+      }
+      if (patches.length) this.updateShapes(patches)
     })
     return ids.map((id) => idMap.get(id)!)
   }
@@ -1414,7 +1763,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     for (const shape of this.getSelectedShapes()) {
       for (const [key, sp] of this.getStylePropsForType(shape.type)) {
         if (sp !== style) continue
-        if ((shape.props as Record<string, unknown>)[key] === value) continue
+        if ((shape.props as unknown as Record<string, unknown>)[key] === value) continue
         updates.push({ id: shape.id, type: shape.type, props: { [key]: value } })
       }
     }
@@ -1440,7 +1789,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     }
     for (const shape of selected) {
       for (const [key, sp] of this.getStylePropsForType(shape.type)) {
-        map.applyValue(sp, (shape.props as Record<string, unknown>)[key])
+        map.applyValue(sp, (shape.props as unknown as Record<string, unknown>)[key])
       }
     }
     return map
@@ -1452,7 +1801,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   nudgeShapes(ids: readonly ShapeId[], offset: VecLike): this {
     const updates: ShapePartial[] = []
     for (const id of ids) {
-      const shape = this.getShape(id)
+      const shape = this.getShape<UnknownShape>(id)
       if (!shape || shape.isLocked) continue
       const parent = this.getShapeParent(shape)
       let d = new Vec(offset.x, offset.y)
@@ -1468,7 +1817,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   /** Rotate shapes by `delta` radians around the center of their common page bounds. */
   rotateShapesBy(ids: readonly ShapeId[], delta: number, center?: VecLike): this {
-    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
+    const shapes = ids.map((id) => this.getShape<UnknownShape>(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
     if (shapes.length === 0) return this
     const boxes = shapes.map((s) => this.getShapePageBounds(s)).filter((b): b is Box => !!b)
     const c = center ?? Box.Common(boxes).center
@@ -1484,7 +1833,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   /** Mirror shapes across the center of their common bounds. Positions flip; geometry is not mirrored. */
   flipShapes(ids: readonly ShapeId[], operation: "horizontal" | "vertical"): this {
-    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
+    const shapes = ids.map((id) => this.getShape<UnknownShape>(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
     if (shapes.length < 1) return this
     const boxes = shapes.map((s) => this.getShapePageBounds(s)!)
     const common = Box.Common(boxes)
@@ -1504,8 +1853,15 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   /** Align shapes along an edge or center of their common bounds. */
-  alignShapes(ids: readonly ShapeId[], operation: "left" | "center-horizontal" | "right" | "top" | "center-vertical" | "bottom"): this {
-    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
+  /**
+   * Align shapes against their common bounds. `"center"` centres on both axes
+   * at once — the two `center-*` operations applied together.
+   */
+  alignShapes(
+    ids: readonly ShapeId[],
+    operation: "left" | "center-horizontal" | "right" | "top" | "center-vertical" | "bottom" | "center",
+  ): this {
+    const shapes = ids.map((id) => this.getShape<UnknownShape>(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
     if (shapes.length < 2) return this
     const boxes = shapes.map((s) => this.getShapePageBounds(s)!)
     const common = Box.Common(boxes)
@@ -1532,6 +1888,9 @@ export class Editor extends EventEmitter<EditorEvents> {
         case "bottom":
           d = new Vec(0, common.maxY - b.maxY)
           break
+        case "center":
+          d = new Vec(common.center.x - b.center.x, common.center.y - b.center.y)
+          break
       }
       if (d.x === 0 && d.y === 0) return
       const m = this.getShapePageTransform(shape)
@@ -1543,7 +1902,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   /** Space shapes evenly between the first and last along an axis. */
   distributeShapes(ids: readonly ShapeId[], operation: "horizontal" | "vertical"): this {
-    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
+    const shapes = ids.map((id) => this.getShape<UnknownShape>(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
     if (shapes.length < 3) return this
     const items = shapes.map((s) => ({ shape: s, b: this.getShapePageBounds(s)! }))
     const horizontal = operation === "horizontal"
@@ -1568,7 +1927,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   /** Stack shapes edge to edge with a fixed gap along an axis (order by current position). */
   stackShapes(ids: readonly ShapeId[], operation: "horizontal" | "vertical", gap = 16): this {
-    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
+    const shapes = ids.map((id) => this.getShape<UnknownShape>(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
     if (shapes.length < 2) return this
     const items = shapes.map((s) => ({ shape: s, b: this.getShapePageBounds(s)! }))
     const horizontal = operation === "horizontal"
@@ -1587,7 +1946,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   /** Toggle the locked state of shapes. */
   toggleLock(ids: readonly ShapeId[] = this.getSelectedShapeIds()): this {
-    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s)
+    const shapes = ids.map((id) => this.getShape<UnknownShape>(id)).filter((s): s is UnknownShape => !!s)
     if (shapes.length === 0) return this
     const allLocked = shapes.every((s) => s.isLocked)
     return this.updateShapes(shapes.map((s) => ({ id: s.id, type: s.type, isLocked: !allLocked })))
@@ -1598,7 +1957,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   /** Wrap shapes in a new `group` shape (requires a registered "group" ShapeUtil). Returns the group id. */
   groupShapes(ids: readonly ShapeId[] = this.getSelectedShapeIds(), groupId: ShapeId = ShapeRecordType.createId() as ShapeId): ShapeId | undefined {
     if (!this.hasShapeUtil("group")) throw new Error("No ShapeUtil registered for type \"group\"")
-    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
+    const shapes = ids.map((id) => this.getShape<UnknownShape>(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
     if (shapes.length < 2) return undefined
     const parentId = shapes[0]!.parentId
     if (!shapes.every((s) => s.parentId === parentId)) return undefined
@@ -1614,7 +1973,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   /** Dissolve groups, re-parenting their children to the group's parent. */
   ungroupShapes(ids: readonly ShapeId[] = this.getSelectedShapeIds()): this {
-    const groups = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s && s.type === "group")
+    const groups = ids.map((id) => this.getShape<UnknownShape>(id)).filter((s): s is UnknownShape => !!s && s.type === "group")
     if (groups.length === 0) return this
     this.run(() => {
       const released: ShapeId[] = []
@@ -1631,12 +1990,12 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   /** The outermost group containing a shape, or undefined. */
   getOutermostSelectableShape(shape: UnknownShape | ShapeId): UnknownShape | undefined {
-    let cur = typeof shape === "string" ? this.getShape(shape) : shape
+    let cur = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
     if (!cur) return undefined
     let result = cur
     const focused = this.getCurrentPageState().focusedGroupId
     while (cur && isShapeId(cur.parentId)) {
-      const parent: UnknownShape | undefined = this.getShape(cur.parentId)
+      const parent: UnknownShape | undefined = this.getShape<UnknownShape>(cur.parentId)
       if (!parent || parent.id === focused) break
       if (parent.type === "group") result = parent
       cur = parent
@@ -1664,7 +2023,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     const set = new Set(ids)
     const byParent = new Map<ParentId, UnknownShape[]>()
     for (const id of ids) {
-      const s = this.getShape(id)
+      const s = this.getShape<UnknownShape>(id)
       if (!s) continue
       const arr = byParent.get(s.parentId) ?? []
       arr.push(s)
@@ -1735,13 +2094,15 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this.getCurrentPageState().selectedShapeIds
   }
 
-  getSelectedShapes(): UnknownShape[] {
-    return this.getSelectedShapeIds().map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s)
+  getSelectedShapes(): Shape[] {
+    return this.getSelectedShapeIds()
+      .map((id) => this.getShape<UnknownShape>(id))
+      .filter((s): s is Shape => !!s)
   }
 
   getOnlySelectedShape(): UnknownShape | undefined {
     const ids = this.getSelectedShapeIds()
-    return ids.length === 1 ? this.getShape(ids[0]!) : undefined
+    return ids.length === 1 ? this.getShape<UnknownShape>(ids[0]!) : undefined
   }
 
   setSelectedShapes(ids: readonly (ShapeId | UnknownShape)[]): this {
@@ -1757,7 +2118,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   selectAll(): this {
-    return this.setSelectedShapes(this.getSortedChildIdsForParent(this.getCurrentPageId()).filter((id) => !this.getShape(id)?.isLocked))
+    return this.setSelectedShapes(this.getSortedChildIdsForParent(this.getCurrentPageId()).filter((id) => !this.getShape<UnknownShape>(id)?.isLocked))
   }
 
   selectNone(): this {
@@ -1765,7 +2126,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   isShapeOrAncestorLocked(shape: UnknownShape | ShapeId): boolean {
-    let cur = typeof shape === "string" ? this.getShape(shape) : shape
+    let cur = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
     while (cur) {
       if (cur.isLocked) return true
       cur = this.getShapeParent(cur)
@@ -1780,8 +2141,9 @@ export class Editor extends EventEmitter<EditorEvents> {
     return boxes.length ? Box.Common(boxes) : undefined
   })
 
-  getSelectionPageBounds(): Box | undefined {
-    return this._selectionPageBounds.get()
+  /** The bounds of the current selection, or `null` when nothing is selected. */
+  getSelectionPageBounds(): Box | null {
+    return this._selectionPageBounds.get() ?? null
   }
 
   getSelectionRotation(): number {
@@ -1797,7 +2159,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   getHoveredShape(): UnknownShape | undefined {
     const id = this.getHoveredShapeId()
-    return id ? this.getShape(id) : undefined
+    return id ? this.getShape<UnknownShape>(id) : undefined
   }
 
   setHoveredShape(id: ShapeId | UnknownShape | null): this {
@@ -1812,7 +2174,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   getEditingShape(): UnknownShape | undefined {
     const id = this.getEditingShapeId()
-    return id ? this.getShape(id) : undefined
+    return id ? this.getShape<UnknownShape>(id) : undefined
   }
 
   setEditingShape(id: ShapeId | UnknownShape | null): this {
@@ -1822,14 +2184,14 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.updateCurrentPageState({ editingShapeId: next })
     // Editing toggles overlay rendering for the shape.
     for (const sid of [prev, next]) {
-      const shape = sid ? this.getShape(sid) : undefined
+      const shape = sid ? this.getShape<UnknownShape>(sid) : undefined
       if (shape) this.writeShapeToEngine(shape, true)
     }
     this.flushEngine()
     this.bumpFrame()
     if (prev) {
-      const shape = this.getShape(prev)
-      if (shape) this.getShapeUtil(shape).onEditEnd?.(shape)
+      const shape = this.getShape<UnknownShape>(prev)
+      if (shape) this.getShapeUtil<UnknownShape>(shape).onEditEnd?.(shape)
     }
     return this
   }
@@ -1865,7 +2227,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   /** The shape records behind `getHintingShapeIds()`, skipping any that are gone. */
   getHintingShapes(): UnknownShape[] {
     return this.getHintingShapeIds()
-      .map((id) => this.getShape(id))
+      .map((id) => this.getShape<UnknownShape>(id))
       .filter((shape): shape is UnknownShape => shape !== undefined)
   }
 
@@ -1941,6 +2303,7 @@ export class Editor extends EventEmitter<EditorEvents> {
       },
       { history: "ignore" },
     )
+    this.cameraStateTracker.notifyCameraMoved(next.z)
   }
 
   private animateCameraTo(
@@ -2375,14 +2738,14 @@ export class Editor extends EventEmitter<EditorEvents> {
     const touched = [...Object.values(changes.added), ...Object.values(changes.removed), ...Object.values(changes.updated).map(([, n]) => n)]
     for (const rec of touched) {
       if (rec.typeName !== "shape") continue
-      let parent: UnknownShape | undefined = isShapeId(rec.parentId) ? this.getShape(rec.parentId) : undefined
+      let parent: UnknownShape | undefined = isShapeId(rec.parentId) ? this.getShape<UnknownShape>(rec.parentId) : undefined
       while (parent && parent.type === "group") {
         rebind.add(parent.id)
-        parent = isShapeId(parent.parentId) ? this.getShape(parent.parentId) : undefined
+        parent = isShapeId(parent.parentId) ? this.getShape<UnknownShape>(parent.parentId) : undefined
       }
     }
     for (const id of rebind) {
-      const shape = this.getShape(id)
+      const shape = this.getShape<UnknownShape>(id)
       if (shape && this.getAncestorPageId(shape) === pageId && !(id in changes.added)) {
         this.writeShapeToEngine(shape, true)
         dirty = true
@@ -2435,6 +2798,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     if (shape.isLocked) flags |= FLAG.LOCKED
     let style: StyleWords | null = null
     let geometry: Geometry2d | undefined
+    let engineGeometry: EngineGeometry | undefined
     if (util) {
       // Texture references acquired while deriving the style are attributed to
       // this shape, so re-writing it neither leaks nor drops references.
@@ -2442,15 +2806,23 @@ export class Editor extends EventEmitter<EditorEvents> {
       if (style === null || util.needsOverlay(shape)) flags |= FLAG.OVERLAY
       else if (util.hasOverlayLabel(shape)) flags |= FLAG.LABEL
       if (util.isClipShape(shape)) flags |= FLAG.CLIP
-      geometry = util.getGeometry(shape)
-      if (geometry.isClosed && !geometry.isFilled) flags |= FLAG.NO_FILL
+      // The fast path: a built-in hands over the numbers that describe its
+      // outline and the engine builds it. Only a util without a descriptor —
+      // every custom shape — pays for a JS `Geometry2d` and a vertex upload.
+      engineGeometry = util.getEngineGeometry?.(shape)
+      if (!engineGeometry) geometry = util.getGeometry(shape)
+      const isClosed = engineGeometry?.isClosed ?? geometry!.isClosed
+      const isFilled = engineGeometry?.isFilled ?? geometry!.isFilled
+      if (isClosed && !isFilled) flags |= FLAG.NO_FILL
     } else {
       flags |= FLAG.OVERLAY
     }
-    const b = geometry?.bounds
-    this.engine.cmd.upsert(h, this.kindId(shape.type), parent, zlo, zhi, flags, shape.x, shape.y, shape.rotation, b?.w ?? 0, b?.h ?? 0)
-    if (withGeometry && geometry) {
-      this.engine.cmd.setGeometry(h, geometry.toPathWords())
+    const bw = engineGeometry?.w ?? geometry?.bounds.w ?? 0
+    const bh = engineGeometry?.h ?? geometry?.bounds.h ?? 0
+    this.engine.cmd.upsert(h, this.kindId(shape.type), parent, zlo, zhi, flags, shape.x, shape.y, shape.rotation, bw, bh)
+    if (withGeometry && (engineGeometry || geometry)) {
+      if (engineGeometry) this.writeEngineGeometry(h, engineGeometry)
+      else this.engine.cmd.setGeometry(h, geometry!.toPathWords())
       if (style) {
         // The hand-drawn dash style picks a shape's wobble from this seed, so it is
         // hashed (FNV-1a) from the shape's own id rather than taken from its engine
@@ -2461,6 +2833,29 @@ export class Editor extends EventEmitter<EditorEvents> {
         this.engine.cmd.setStyle(h, { ...style, opacity: style.opacity * shape.opacity, seed: style.seed ?? seed >>> 0 })
         this.engine.cmd.setTexture(h, style.texture ?? 0)
       }
+    }
+  }
+
+  /** Send a parametric outline descriptor as its engine command. */
+  private writeEngineGeometry(handle: number, g: EngineGeometry): void {
+    const cmd = this.engine.cmd
+    switch (g.type) {
+      case "geo": {
+        let f = 0
+        if (g.flipX) f |= GEO_FLAG.FLIP_X
+        if (g.flipY) f |= GEO_FLAG.FLIP_Y
+        cmd.setGeo(handle, g.kind, g.w, g.h, f)
+        break
+      }
+      case "spline":
+        cmd.setSpline(handle, g.points, g.closed ? GEO_FLAG.CLOSED : 0)
+        break
+      case "poly":
+        cmd.setPoly(handle, g.points, g.closed ? GEO_FLAG.CLOSED : 0)
+        break
+      case "draw":
+        cmd.setDraw(handle, g.segments, g.closed ? GEO_FLAG.CLOSED : 0)
+        break
     }
   }
 
@@ -2524,6 +2919,8 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.disposables.push(
       this.sideEffects.registerAfterDeleteHandler("shape", (shape) => {
         this.textures.releaseOwner(shape.id)
+        // A deleted shape's content element has nothing left to belong to.
+        this.contentElements.release(shape.id)
       }),
     )
   }
@@ -2539,7 +2936,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   private rewriteTextureOwners(owners: Iterable<string>): void {
     let dirty = false
     for (const owner of owners) {
-      const shape = this.getShape(owner as ShapeId)
+      const shape = this.getShape<UnknownShape>(owner as ShapeId)
       if (!shape || this.getAncestorPageId(shape) !== this.syncedPageId) continue
       this.writeShapeToEngine(shape, true)
       dirty = true
@@ -2693,7 +3090,7 @@ export class Editor extends EventEmitter<EditorEvents> {
    * behaviour flags that change how the editor treats their input, such as
    * dynamic-size mode. Session-only, never persisted with the document.
    */
-  readonly user: UserPreferencesManager = new UserPreferencesManager(createCurrentUser())
+  readonly user: UserPreferencesManager
 
   /** Presence records of everyone else in the room, in arrival order. */
   getCollaborators(): InstancePresence[] {
@@ -2730,7 +3127,7 @@ export class Editor extends EventEmitter<EditorEvents> {
    * The id is a USER id (`InstancePresence.userId`), not a presence record id:
    * one person with several tabs is still one person to follow.
    */
-  startFollowingUser(userId: string): this {
+  startFollowingUser(userId: UserId): this {
     if (userId === this.user.getId()) return this
     return this.updateInstanceState({ followingUserId: userId })
   }
@@ -2742,8 +3139,40 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   /** The user id being followed, or `null`. */
-  getFollowingUserId(): string | null {
+  getFollowingUserId(): UserId | null {
     return this.getInstanceState().followingUserId
+  }
+
+  /**
+   * Move the camera to whatever `userId` has selected, or — when they have
+   * nothing selected — to their cursor.
+   *
+   * A one-shot jump, unrelated to {@link startFollowingUser}: it does not keep
+   * mirroring their camera afterwards. Returns without moving when that person
+   * is not on this page, or is not here at all.
+   *
+   * SEMANTICS-ASSUMED: framing their *selection* rather than replicating their
+   * viewport. Copying their camera would put a collaborator on a 27" display
+   * somewhere unusable on a laptop; "show me what they are working on" is the
+   * question this method is actually asked. With nothing selected there is no
+   * region to frame, so the cursor is centred at the current zoom instead.
+   */
+  zoomToUser(userId: UserId, opts: TLCameraMoveOptions & { inset?: number; targetZoom?: number } = {}): this {
+    const presence = this.getCollaboratorsOnCurrentPage().find((p) => p.userId === userId)
+    if (!presence) return this
+
+    const boxes = presence.selectedShapeIds
+      .map((id) => this.getShapePageBounds(id))
+      .filter((b): b is Box => !!b)
+    if (boxes.length > 0) {
+      const bounds = Box.Common(boxes)
+      if (bounds.w > 0 && bounds.h > 0) {
+        return this.zoomToBounds(bounds, { targetZoom: Math.max(1, this.getZoomLevel()), ...opts })
+      }
+    }
+
+    if (presence.cursor) return this.centerOnPoint(presence.cursor, opts)
+    return this
   }
 
   // ---- theme -------------------------------------------------------------
@@ -2776,9 +3205,9 @@ export class Editor extends EventEmitter<EditorEvents> {
    * told the resize came from the `bottom_right` handle.
    */
   resizeShape(id: ShapeId | UnknownShape, scale: VecLike, options: ResizeShapeOptions = {}): this {
-    const shape = this.getShape(id)
+    const shape = this.getShape<UnknownShape>(id)
     if (!shape || shape.isLocked) return this
-    const util = this.getShapeUtil(shape)
+    const util = this.getShapeUtil<UnknownShape>(shape)
     if (!util.canResize(shape)) return this
     if (!Number.isFinite(scale.x) || !Number.isFinite(scale.y)) return this
 
@@ -2814,7 +3243,7 @@ export class Editor extends EventEmitter<EditorEvents> {
         initialShape: shape,
       })
       this.updateShapes([{ id: shape.id, type: shape.type, x: newPoint.x, y: newPoint.y, ...(change ?? {}) }])
-      const current = this.getShape(shape.id)
+      const current = this.getShape<UnknownShape>(shape.id)
       if (current) util.onResizeEnd?.(shape, current)
     })
     return this
@@ -2829,7 +3258,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     scale: VecLike,
     options: Omit<ResizeShapeOptions, "initialBounds"> = {},
   ): this {
-    const shapes = ids.map((id) => this.getShape(id)).filter((s): s is UnknownShape => !!s)
+    const shapes = ids.map((id) => this.getShape<UnknownShape>(id)).filter((s): s is UnknownShape => !!s)
     if (shapes.length === 0) return this
     const boxes = shapes.map((s) => this.getShapePageBounds(s)).filter((b): b is Box => !!b)
     if (boxes.length === 0) return this
@@ -2848,7 +3277,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   stretchShapes(ids: readonly ShapeId[], operation: "horizontal" | "vertical"): this {
     const items: { shape: UnknownShape; b: Box }[] = []
     for (const id of ids) {
-      const shape = this.getShape(id)
+      const shape = this.getShape<UnknownShape>(id)
       if (!shape) continue
       const b = this.getShapePageBounds(shape)
       if (b) items.push({ shape, b })
@@ -2910,6 +3339,969 @@ export class Editor extends EventEmitter<EditorEvents> {
   get textMeasure(): EditorTextMeasure {
     if (!textMeasureProvider) throw new Error(missingImplementation("textMeasure", "registerTextMeasureImplementation"))
     return textMeasureProvider(this)
+  }
+
+  // ---- lifecycle: mount, focus, readonly ----------------------------------
+  // The three questions a host integration asks before it does anything: is
+  // this editor on screen, does it have the keyboard, and may it be written to.
+
+  /**
+   * Whether a host has told us the editor is on screen.
+   *
+   * Reactive — reading it inside a signal re-runs when the editor mounts or
+   * unmounts. Derived from the `mount` / `unmount` events, so it is a first
+   * class state and not a guess made from the DOM.
+   *
+   * This is what a global registry of live editors should be built on:
+   * `@mocanvas/mocanvas`'s `tleditors` currently registers editors from the
+   * flagship component's effect, which means an editor mounted any other way
+   * never appears in it. Deriving that list from this flag would fix it — see
+   * the note in the workstream report.
+   */
+  getIsMounted(): boolean {
+    return this._isMounted.get()
+  }
+
+  /** Whether the canvas currently holds keyboard focus. */
+  getIsFocused(): boolean {
+    return this.getInstanceState().isFocused
+  }
+
+  // ---- event bookkeeping --------------------------------------------------
+
+  /**
+   * Whether something has already claimed this event.
+   *
+   * The documented spelling of {@link isEventHandled}; both read the same
+   * weakly-held set, so a shape's own DOM handler marking an event is visible
+   * to the canvas handler that sees it next.
+   */
+  wasEventAlreadyHandled(event: { nativeEvent?: unknown } | Event | null | undefined): boolean {
+    return this.isEventHandled(event)
+  }
+
+  /**
+   * Restart double-click detection, so the next press begins a fresh gesture.
+   *
+   * A tool calls this after acting on a double click that changed what is under
+   * the pointer — opening a label editor, say — so the release that follows is
+   * not read as part of the same gesture.
+   */
+  cancelDoubleClick(): this {
+    this.click.cancelDoubleClick()
+    return this
+  }
+
+  // ---- tools --------------------------------------------------------------
+
+  /**
+   * Switch tools. The documented spelling of {@link setCurrentTool}.
+   */
+  setTool(id: string, info: Record<string, unknown> = {}): this {
+    return this.setCurrentTool(id, info)
+  }
+
+  /**
+   * Take a tool out of service.
+   *
+   * The tool's state node stays in the tree — removing it would strand any
+   * state a shape holds against it — but it stops being selectable, and an
+   * editor sitting in it is moved to the first remaining tool. This is how a
+   * host disables drawing in a review mode without rebuilding the editor.
+   */
+  removeTool(id: string): this {
+    if (this.removedToolIds.has(id)) return this
+    this.removedToolIds.add(id)
+    if (this.getCurrentToolId() === id) {
+      const fallback = this.root.children ? Object.keys(this.root.children).find((toolId) => !this.removedToolIds.has(toolId)) : undefined
+      if (fallback) this.setCurrentTool(fallback)
+    }
+    return this
+  }
+
+  /** Whether a tool id is still in service. */
+  hasTool(id: string): boolean {
+    return !this.removedToolIds.has(id)
+  }
+
+  // ---- ancestry -----------------------------------------------------------
+
+  /** The nearest ancestor of `shape` that `predicate` accepts. */
+  findShapeAncestor(shape: UnknownShape | ShapeId | undefined, predicate: (parent: UnknownShape) => boolean): UnknownShape | undefined {
+    return findShapeAncestor(this, shape, predicate)
+  }
+
+  /** The innermost shape all of `shapes` sit inside, or `undefined`. */
+  findCommonAncestor(shapes: readonly (UnknownShape | ShapeId)[], predicate?: (shape: UnknownShape) => boolean): ShapeId | undefined {
+    return findCommonAncestor(this, shapes, predicate)
+  }
+
+  /** Whether `ancestorId` is above `shape` in the tree. False for the shape itself. */
+  hasAncestor(shape: UnknownShape | ShapeId | undefined, ancestorId: ShapeId): boolean {
+    return hasAncestor(this, shape, ancestorId)
+  }
+
+  /** Every id given, plus every descendant of each. */
+  getShapeAndDescendantIds(ids: readonly ShapeId[]): Set<ShapeId> {
+    return getShapeAndDescendantIds(this, ids)
+  }
+
+  /** Depth-first walk of a parent's descendants; return `false` to prune a branch. */
+  visitDescendants(parent: PageId | ShapeId, visitor: (id: ShapeId) => void | false): this {
+    visitDescendants(this, parent, visitor)
+    return this
+  }
+
+  /** Whether any ancestor of `shape` is selected. */
+  isAncestorSelected(shape: UnknownShape | ShapeId | undefined): boolean {
+    return isAncestorSelected(this, shape)
+  }
+
+  /** Whether `shape` lives on `pageId` (the current page by default). */
+  isShapeInPage(shape: UnknownShape | ShapeId | undefined, pageId?: PageId): boolean {
+    return isShapeInPage(this, shape, pageId)
+  }
+
+  /**
+   * Whether a shape is of a given type, narrowing it when so.
+   *
+   * A type guard rather than a `===` because that is what makes it usable in a
+   * filter: `shapes.filter((s) => editor.isShapeOfType<NoteShape>(s, "note"))`
+   * comes back typed.
+   */
+  isShapeOfType<T extends UnknownShape>(shape: UnknownShape | ShapeId | undefined, type: T["type"]): shape is T {
+    const record = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
+    return record?.type === type
+  }
+
+  /** Whether a shape's util declares it a frame-like container. */
+  isShapeFrameLike(shape: UnknownShape | ShapeId | undefined): boolean {
+    const record = typeof shape === "string" ? this.getShape<UnknownShape>(shape) : shape
+    if (!record) return false
+    return this.getShapeUtil<UnknownShape>(record).isFrameLike(record)
+  }
+
+  /** Whether the host's `getShapeVisibility` hides this shape. */
+  isShapeHidden(shape: UnknownShape | ShapeId | undefined): boolean {
+    return isShapeHidden(this, shape)
+  }
+
+  // ---- clipping, masking, hit tests ---------------------------------------
+
+  /** The part of a shape's page bounds its clipping ancestors leave visible. */
+  getShapeMaskedPageBounds(shape: UnknownShape | ShapeId): Box | undefined {
+    return getShapeMaskedPageBounds(this, shape)
+  }
+
+  /** A CSS `clip-path`, in the shape's own space, or `undefined` when unclipped. */
+  getShapeClipPath(shape: UnknownShape | ShapeId): string | undefined {
+    return getShapeClipPath(this, shape)
+  }
+
+  /** The common masked page bounds of several shapes, or `null`. */
+  getShapesPageBounds(ids: readonly (ShapeId | UnknownShape)[]): Box | null {
+    return getShapesPageBounds(this, ids)
+  }
+
+  /** The ids of every shape completely inside a page-space box. */
+  getShapeIdsInsideBounds(bounds: BoxLike): ShapeId[] {
+    return getShapeIdsInsideBounds(this, bounds)
+  }
+
+  /** Whether a page point falls on a shape, honouring what clips it. */
+  isPointInShape(shape: UnknownShape | ShapeId, point: VecLike, opts: TLPointInShapeOptions = {}): boolean {
+    return isPointInShape(this, shape, point, opts)
+  }
+
+  /** A shape's drag handles in its own space, or `undefined`. */
+  getShapeHandles(shape: UnknownShape | ShapeId): ShapeHandle[] | undefined {
+    return getShapeHandles(this, shape)
+  }
+
+  // ---- culling and rendering ----------------------------------------------
+
+  /** Every shape on the page in paint order, with its render metadata. */
+  getRenderingShapes(): TLRenderingShape[] {
+    return getRenderingShapes(this)
+  }
+
+  /** The page's visible shapes in paint order, without the render metadata. */
+  getCurrentPageRenderingShapesSorted(): UnknownShape[] {
+    return getCurrentPageRenderingShapesSorted(this)
+  }
+
+  /** The page's shapes in reading order — for a11y and keyboard navigation. */
+  getCurrentPageShapesInReadingOrder(): UnknownShape[] {
+    return getCurrentPageShapesInReadingOrder(this)
+  }
+
+  /** Shapes that are off screen or clipped away. Some must still be drawn. */
+  getNotVisibleShapes(): Set<ShapeId> {
+    return getNotVisibleShapes(this)
+  }
+
+  /** Shapes the renderer may skip: not visible, and willing to be skipped. */
+  getCulledShapes(): Set<ShapeId> {
+    return getCulledShapes(this)
+  }
+
+  // ---- selection ----------------------------------------------------------
+
+  /** The id of the only selected shape, or `null` when zero or many are. */
+  getOnlySelectedShapeId(): ShapeId | null {
+    return getOnlySelectedShapeId(this)
+  }
+
+  /** Remove shapes from the selection, leaving the rest of it alone. */
+  deselect(...ids: (ShapeId | UnknownShape)[]): this {
+    deselect(this, ids)
+    return this
+  }
+
+  /** The container gestures are scoped to: a drilled-into group, or the page. */
+  getFocusedGroupId(): ShapeId | PageId {
+    return getFocusedGroupId(this)
+  }
+
+  /** The focused group's record, or `undefined` when the page is focused. */
+  getFocusedGroup(): UnknownShape | undefined {
+    return getFocusedGroup(this)
+  }
+
+  /** Drill into a group, or back out to the page with `null`. */
+  setFocusedGroup(id: ShapeId | UnknownShape | null): this {
+    setFocusedGroup(this, id)
+    return this
+  }
+
+  /** Back out one level of drill-in, selecting the group being left. */
+  popFocusedGroupId(): this {
+    popFocusedGroupId(this)
+    return this
+  }
+
+  /** Select the parents of the selected shapes. */
+  selectParentShape(): this {
+    selectParentShape(this)
+    return this
+  }
+
+  /** Select the first child of the only selected shape. */
+  selectFirstChildShape(): this {
+    selectFirstChildShape(this)
+    return this
+  }
+
+  /** The shape an arrow key press from `shape` should move to. */
+  getNearestAdjacentShape(shape: UnknownShape | ShapeId, direction: TLAdjacentDirection): UnknownShape | undefined {
+    return getNearestAdjacentShape(this, shape, direction)
+  }
+
+  /** Move the selection one shape in `direction`. */
+  selectAdjacentShape(direction: TLAdjacentDirection): this {
+    selectAdjacentShape(this, direction)
+    return this
+  }
+
+  /** The selection's bounds in the selection's own rotated frame. */
+  getSelectionRotatedPageBounds(): Box | null {
+    return getSelectionRotatedPageBounds(this)
+  }
+
+  /** The selection's bounds in screen space (window-relative pixels). */
+  getSelectionScreenBounds(): Box | undefined {
+    return getSelectionScreenBounds(this)
+  }
+
+  /** The rotated selection bounds, in screen space. */
+  getSelectionRotatedScreenBounds(): Box | undefined {
+    return getSelectionRotatedScreenBounds(this)
+  }
+
+  /** The topmost SELECTED shape under a page point. */
+  getSelectedShapeAtPoint(point: VecLike): UnknownShape | undefined {
+    return getSelectedShapeAtPoint(this, point)
+  }
+
+  /** The shape records behind `getErasingShapeIds()`, skipping any that are gone. */
+  getErasingShapes(): UnknownShape[] {
+    return this.getErasingShapeIds()
+      .map((id) => this.getShape<UnknownShape>(id))
+      .filter((shape): shape is UnknownShape => shape !== undefined)
+  }
+
+  /**
+   * The single hinted shape, when exactly one is hinted.
+   *
+   * `undefined` when none or several are: the singular accessor exists for the
+   * common case of a drag with one drop target, and a caller handling several
+   * wants {@link getHintingShapes}.
+   */
+  getHintingShape(): UnknownShape | undefined {
+    const shapes = this.getHintingShapes()
+    return shapes.length === 1 ? shapes[0] : undefined
+  }
+
+  /**
+   * The frame-like shape a drag is currently over, or `undefined`.
+   *
+   * SEMANTICS-ASSUMED: derived rather than stored. It is the topmost container
+   * under the pointer during a drag, excluding whatever is being dragged —
+   * which is the same rule the drop itself uses, so the highlight a tool draws
+   * from this can never disagree with where the shapes actually land. Outside a
+   * drag there is nothing to be over and the answer is `undefined`.
+   */
+  getDraggingOverShape(): UnknownShape | undefined {
+    if (!this.inputs.getIsDragging()) return undefined
+    const dragging = this.getSelectedShapes()
+    if (dragging.length === 0) return undefined
+    const excluded = this.getShapeAndDescendantIds(dragging.map((shape) => shape.id))
+    const point = this.inputs.getCurrentPagePoint()
+    let target: UnknownShape | undefined
+    for (const shape of this.getCurrentPageShapesSorted()) {
+      if (excluded.has(shape.id) || shape.isLocked) continue
+      if (!this.isShapeFrameLike(shape)) continue
+      const bounds = this.getShapePageBounds(shape)
+      if (!bounds || !bounds.containsPoint(point)) continue
+      target = shape
+    }
+    return target
+  }
+
+  // ---- permissions --------------------------------------------------------
+
+  /** Whether one more shape can be added to the current page. */
+  canCreateShape(partial: ShapeCreate<UnknownShape>): boolean {
+    return canCreateShape(this, partial)
+  }
+
+  /** Whether a whole batch can be added, as one decision. */
+  canCreateShapes(partials: readonly ShapeCreate<UnknownShape>[]): boolean {
+    return canCreateShapes(this, partials)
+  }
+
+  /** Whether a shape can be put into its editing state right now. */
+  canEditShape(shape: UnknownShape | ShapeId, info?: TLEditStartInfo): boolean {
+    return canEditShape(this, shape, info)
+  }
+
+  /** Whether a shape can enter cropping. No readonly or locked exemption. */
+  canCropShape(shape: UnknownShape | ShapeId): boolean {
+    return canCropShape(this, shape)
+  }
+
+  /** Whether a binding may be created between two shapes. Both utils must agree. */
+  canBindShapes(opts: {
+    fromShape: UnknownShape | ShapeId
+    toShape: UnknownShape | ShapeId
+    binding: string | { type: string }
+  }): boolean {
+    return canBindShapes(this, opts)
+  }
+
+  /** Whether there is anything to undo. The documented spelling of `getCanUndo`. */
+  canUndo(): boolean {
+    return this.getCanUndo()
+  }
+
+  /** Whether there is anything to redo. The documented spelling of `getCanRedo`. */
+  canRedo(): boolean {
+    return this.getCanRedo()
+  }
+
+  // ---- cropping -----------------------------------------------------------
+  // Cropping is a mode, not an operation: entering it changes what the handles
+  // do and what a drag means, exactly the way editing does.
+
+  /** The shape being cropped, or `null`. */
+  getCroppingShapeId(): ShapeId | null {
+    return this.getCurrentPageState().croppingShapeId
+  }
+
+  /** The shape being cropped, as a record. */
+  getCroppingShape(): UnknownShape | undefined {
+    const id = this.getCroppingShapeId()
+    return id ? this.getShape<UnknownShape>(id) : undefined
+  }
+
+  /**
+   * Enter (or, with `null`, leave) cropping.
+   *
+   * Refuses a shape that {@link canCropShape} rejects rather than entering a
+   * mode with nothing to do in it. Entering also selects the shape, since every
+   * crop handle is drawn against the selection.
+   */
+  setCroppingShape(id: ShapeId | UnknownShape | null): this {
+    const next = id === null ? null : typeof id === "string" ? id : id.id
+    if (next !== null && !this.canCropShape(next)) return this
+    if (this.getCroppingShapeId() === next) return this
+    this.run(
+      () => {
+        this.updateCurrentPageState({ croppingShapeId: next })
+        if (next !== null) this.setSelectedShapes([next])
+      },
+      { history: "ignore" },
+    )
+    return this
+  }
+
+  // ---- shape operations ---------------------------------------------------
+
+  /** Move a shape to a new position/rotation/opacity over time. */
+  animateShape(partial: ShapePartial<UnknownShape> | null | undefined, opts: TLAnimationOptions = {}): this {
+    animateShape(this, partial, opts)
+    return this
+  }
+
+  /** {@link animateShape} for many shapes on one clock. */
+  animateShapes(partials: readonly (ShapePartial<UnknownShape> | null | undefined)[], opts: TLAnimationOptions = {}): this {
+    animateShapes(this, partials, opts)
+    return this
+  }
+
+  /** A shape's value for one style prop, or `undefined` when it has no such style. */
+  getShapeStyleIfExists<T>(shape: UnknownShape | ShapeId, style: StyleProp<T>): T | undefined {
+    return getShapeStyleIfExists(this, shape, style)
+  }
+
+  /** The `meta` a newly created shape starts with. See `getInitialMetaForShape`. */
+  getInitialMetaForShape(shape: UnknownShape): UnknownShape["meta"] {
+    return getInitialMetaForShape(this, shape)
+  }
+
+  /**
+   * Every style prop the registered shape utils declare, by shape type.
+   *
+   * SEMANTICS-ASSUMED: keyed by shape type, then by prop name. The style panel
+   * needs both directions of this map and the type-first shape is the one that
+   * can be built without instantiating anything.
+   */
+  get styleProps(): ReadonlyMap<string, ReadonlyMap<string, StyleProp<unknown>>> {
+    const out = new Map<string, ReadonlyMap<string, StyleProp<unknown>>>()
+    for (const type of Object.keys(this.shapeUtils)) out.set(type, this.getStylePropsForType(type))
+    return out
+  }
+
+  /** The opacity of the selection: a value, `"mixed"`, or `undefined`. */
+  getSharedOpacity(): TLSharedOpacity | undefined {
+    return getSharedOpacity(this)
+  }
+
+  /** Set the opacity newly created shapes will start with. */
+  setOpacityForNextShapes(opacity: number): this {
+    setOpacityForNextShapes(this, opacity)
+    return this
+  }
+
+  /** Set the opacity of the selected shapes. */
+  setOpacityForSelectedShapes(opacity: number): this {
+    setOpacityForSelectedShapes(this, opacity)
+    return this
+  }
+
+  /** Pack shapes into a tight block, in place, without resizing them. */
+  packShapes(ids: readonly ShapeId[] = this.getSelectedShapeIds(), gap = 16): this {
+    packShapes(this, ids, gap)
+    return this
+  }
+
+  /** Scale and move shapes so their common bounds become `bounds` exactly. */
+  resizeToBounds(ids: readonly ShapeId[], bounds: BoxLike): this {
+    resizeToBounds(this, ids, bounds)
+    return this
+  }
+
+  /** Move shapes — and everything under them — to another page. */
+  moveShapesToPage(ids: readonly ShapeId[], pageId: PageId): this {
+    moveShapesToPage(this, ids, pageId)
+    return this
+  }
+
+  // ---- pages --------------------------------------------------------------
+
+  /** Change a page's name, index or `meta`. */
+  updatePage(partial: Partial<Omit<Page, "typeName">> & { id: PageId }): this {
+    updatePage(this, partial)
+    return this
+  }
+
+  /** Copy a page and everything on it. Returns the new page's id. */
+  duplicatePage(id?: PageId, createId?: PageId): PageId | undefined {
+    return duplicatePage(this, id, createId)
+  }
+
+  /** The session state of every page: selection, hover, editing, cropping. */
+  getPageStates(): InstancePageState[] {
+    return getPageStates(this)
+  }
+
+  // ---- camera -------------------------------------------------------------
+
+  /** `"moving"` while the camera is in flight, `"idle"` once it settles. */
+  getCameraState(): TLCameraState {
+    return this.cameraStateTracker.getCameraState()
+  }
+
+  /** The zoom level as of the last time the camera settled. */
+  getDebouncedZoomLevel(): number {
+    return this.cameraStateTracker.getDebouncedZoomLevel()
+  }
+
+  /**
+   * The zoom the editor starts at: the base zoom implied by the camera
+   * constraints, or `1` when there are none.
+   *
+   * Not the same as `getBaseZoom()` only in intent — this is what
+   * `resetZoom()` should return to, and a host with constraints wants that to
+   * be the constrained fit rather than a literal 100%.
+   */
+  getInitialZoom(): number {
+    return this.getBaseZoom()
+  }
+
+  /**
+   * Fling the camera and let it coast to a stop.
+   *
+   * `direction` is a screen-space velocity in pixels per frame; `speed` scales
+   * it; friction comes from `cameraSlideFriction`. The slide stops early on any
+   * other camera instruction, because the newest instruction always wins.
+   */
+  slideCamera(opts: { speed: number; direction: VecLike; friction?: number; force?: boolean }): this {
+    if (this._cameraOptions.get().isLocked && opts.force !== true) return this
+    this.stopCameraAnimation()
+    const friction = opts.friction ?? this.options.cameraSlideFriction
+    let speed = opts.speed
+    const step = (): void => {
+      if (this.isDisposed) return
+      speed *= 1 - friction
+      if (speed < 0.01) {
+        this.cameraAnimation = undefined
+        this.performance.emit("camera-end", { animated: true })
+        return
+      }
+      const cam = this.getCamera()
+      this.writeCamera({
+        x: cam.x + (opts.direction.x * speed) / cam.z,
+        y: cam.y + (opts.direction.y * speed) / cam.z,
+        z: cam.z,
+      })
+      this.cameraAnimation = this.timers.requestAnimationFrame(step)
+    }
+    this.performance.emit("camera-start", { animated: true })
+    this.cameraAnimation = this.timers.requestAnimationFrame(step)
+    return this
+  }
+
+  /**
+   * Bring the selection into view, but only if it is not already there.
+   *
+   * The camera does not move at all when the selection is fully on screen —
+   * which is what makes this safe to call after every operation that changes the
+   * selection, without yanking the view around when nothing needed to happen.
+   */
+  zoomToSelectionIfOffscreen(padding = 16, opts: TLCameraMoveOptions & { inset?: number; targetZoom?: number } = {}): this {
+    const selection = this.getSelectionPageBounds()
+    if (!selection) return this
+    const viewport = this.getViewportPageBounds()
+    const inset = padding / this.getZoomLevel()
+    const visible = Box.FromMinMax(
+      viewport.minX + inset,
+      viewport.minY + inset,
+      viewport.maxX - inset,
+      viewport.maxY - inset,
+    )
+    if (visible.contains(selection)) return this
+    if (selection.width > visible.width || selection.height > visible.height) {
+      return this.zoomToBounds(selection, { targetZoom: this.getZoomLevel(), ...opts })
+    }
+    return this.centerOnPoint(selection.center, opts)
+  }
+
+  // ---- themes -------------------------------------------------------------
+  // Delegates onto `editor.theme`; they exist on the editor because a shape
+  // util or a component reaching for a colour should not have to know that the
+  // theme is a manager.
+
+  /** The id of the current theme. */
+  getCurrentThemeId(): TLThemeId {
+    return this.theme.getCurrentThemeId()
+  }
+
+  /** One registered theme by id, or `undefined`. */
+  getTheme(id: TLThemeId): TLTheme | undefined {
+    return this.theme.getTheme(id)
+  }
+
+  /** Every registered theme. */
+  getThemes(): Record<TLThemeId, TLTheme> {
+    return this.theme.getThemes()
+  }
+
+  /** Switch themes. Unknown ids are ignored. */
+  setCurrentTheme(id: TLThemeId): this {
+    this.theme.setCurrentTheme(id)
+    return this
+  }
+
+  /** Patch one theme in place. */
+  updateTheme(id: TLThemeId, patch: Parameters<ThemeManager["updateTheme"]>[1]): this {
+    this.theme.updateTheme(id, patch)
+    return this
+  }
+
+  /** Patch several themes at once. */
+  updateThemes(patch: Parameters<ThemeManager["updateThemes"]>[0]): this {
+    this.theme.updateThemes(patch)
+    return this
+  }
+
+  /**
+   * Choose light, dark, or follow the host window.
+   *
+   * Takes the full `TLColorScheme` and not only a resolved mode, because
+   * `"system"` is a legitimate thing to set and there would otherwise be no way
+   * back to it once a mode was pinned.
+   */
+  setColorMode(scheme: TLColorScheme): this {
+    this.theme.setColorScheme(scheme)
+    return this
+  }
+
+  // ---- rich text ----------------------------------------------------------
+
+  /** Rich-text configuration, from `textOptions` or `options.text`. */
+  getTextOptions(): TLTextOptions | undefined {
+    return this.textOptions
+  }
+
+  /**
+   * The rich-text editor instance currently attached to a shape's label, or
+   * `null`.
+   *
+   * Untyped on purpose: the editor package does not ship a text stack and must
+   * not depend on one. A host that installed a rich-text implementation casts
+   * this to whatever it installed.
+   */
+  getRichTextEditor(): unknown {
+    return this.richTextEditor
+  }
+
+  /** Attach (or, with `null`, detach) the rich-text editor instance. */
+  setRichTextEditor(instance: unknown): this {
+    this.richTextEditor = instance
+    return this
+  }
+
+  // ---- attribution --------------------------------------------------------
+  // A local adapter onto the host app's own directory. Nothing here talks to a
+  // service; a board with no `userStore` answers "nobody", which is correct for
+  // single player.
+
+  /**
+   * Who made (or last touched) a record, when the record says.
+   *
+   * SEMANTICS-ASSUMED: read from `meta.userId`, falling back to
+   * `meta.createdBy`. Attribution is carried in `meta` because that is the one
+   * field every record type already has and the only one a host can write
+   * without a schema change.
+   */
+  getAttributionUserId(record: { meta?: Record<string, unknown> } | undefined): UserId | undefined {
+    const meta = record?.meta
+    if (!meta) return undefined
+    const value = meta["userId"] ?? meta["createdBy"]
+    return typeof value === "string" && value.startsWith("user:") ? (value as UserId) : undefined
+  }
+
+  /**
+   * Look a person up in the host's user store.
+   *
+   * May return a promise, because a directory lookup usually is one — callers
+   * render a placeholder until it settles. `null` when there is no store or the
+   * id is unknown.
+   */
+  getAttributionUser(userId: UserId): User | null | Promise<User | null> {
+    return this.userStore?.resolve(userId) ?? null
+  }
+
+  /**
+   * A name to show for a person: their display name, or a short form of their
+   * id when nothing is known about them.
+   *
+   * Never returns an empty string. A blank byline reads as a bug; an id reads
+   * as "we do not know who this is", which is the truth.
+   */
+  getAttributionDisplayName(userId: UserId): string {
+    const user = this.userStore?.getCurrentUser()
+    if (user?.id === userId && user.name) return user.name
+    const resolved = this.userStore?.resolve(userId)
+    if (resolved && !(resolved instanceof Promise) && resolved.name) return resolved.name
+    return userId.slice("user:".length)
+  }
+
+  // ---- snapshots ----------------------------------------------------------
+
+  /** The document and this person's place in it, saved together. */
+  getSnapshot(): TLEditorSnapshot {
+    return getEditorSnapshot(this)
+  }
+
+  /** Restore a snapshot, or just its document half. Not undoable. */
+  loadSnapshot(snapshot: Parameters<typeof loadEditorSnapshot>[1], opts: TLLoadSnapshotOptions = {}): this {
+    loadEditorSnapshot(this, snapshot, opts)
+    return this
+  }
+
+  // ---- deep links ---------------------------------------------------------
+
+  /**
+   * A URL pointing at where we are now — the selection when there is one, the
+   * viewport otherwise.
+   *
+   * Returns a `URL` rather than a string so a caller can keep its own query
+   * parameters; the deep link occupies one parameter, `d` by default.
+   */
+  createDeepLink(opts: TLDeepLinkOptions & { to?: TLDeepLink; url?: string | URL } = {}): URL {
+    const base = opts.url ?? this.getContainerWindow()?.location.href ?? "https://localhost/"
+    const url = new URL(base.toString())
+    const target = opts.to ?? opts.getTarget?.() ?? this.getDefaultDeepLinkTarget()
+    url.searchParams.set(opts.param ?? "d", createDeepLinkString(target))
+    return url
+  }
+
+  /**
+   * Move the camera to whatever a deep link points at.
+   *
+   * A link naming shapes that are gone, or a page that is gone, moves nothing —
+   * a stale link should leave you where you were, not somewhere arbitrary.
+   */
+  navigateToDeepLink(opts: TLDeepLinkOptions & { deepLink?: TLDeepLink; url?: string | URL } = {}): this {
+    let link = opts.deepLink
+    if (!link) {
+      const base = opts.url ?? this.getContainerWindow()?.location.href
+      if (!base) return this
+      const encoded = new URL(base.toString()).searchParams.get(opts.param ?? "d")
+      if (!encoded) return this
+      try {
+        link = parseDeepLinkString(encoded)
+      } catch {
+        return this
+      }
+    }
+
+    switch (link.type) {
+      case "page": {
+        if (this.getPage(link.pageId)) this.setCurrentPage(link.pageId)
+        return this
+      }
+      case "shapes": {
+        const shapes = link.shapeIds.map((id) => this.getShape<UnknownShape>(id)).filter((s): s is UnknownShape => !!s)
+        if (shapes.length === 0) return this
+        const pageId = this.getAncestorPageId(shapes[0]!)
+        if (pageId && pageId !== this.getCurrentPageId()) this.setCurrentPage(pageId)
+        this.setSelectedShapes(shapes.map((s) => s.id))
+        return this.zoomToSelection()
+      }
+      case "viewport": {
+        if (link.pageId && this.getPage(link.pageId)) this.setCurrentPage(link.pageId)
+        return this.zoomToBounds(link.bounds)
+      }
+    }
+  }
+
+  /**
+   * Keep a URL in step with where the editor is, and return the unsubscribe.
+   *
+   * Debounced, because the camera changes on every frame of a pan and a URL
+   * rewritten sixty times a second floods the browser's history.
+   */
+  registerDeepLinkListener(opts: TLDeepLinkOptions = {}): () => void {
+    const onChange = opts.onChange
+    if (!onChange) return () => {}
+    const debounceMs = opts.debounceMs ?? 500
+    let handle: number | undefined
+    const off = this.on("change", () => {
+      if (handle !== undefined) this.timers.clearTimeout(handle)
+      handle = this.timers.setTimeout(() => {
+        handle = undefined
+        onChange(this.createDeepLink(opts))
+      }, debounceMs)
+    })
+    return () => {
+      if (handle !== undefined) this.timers.clearTimeout(handle)
+      off()
+    }
+  }
+
+  /** The selection when there is one, otherwise the current viewport. */
+  private getDefaultDeepLinkTarget(): TLDeepLink {
+    const selected = this.getSelectedShapeIds()
+    if (selected.length > 0) return { type: "shapes", shapeIds: [...selected] }
+    return { type: "viewport", bounds: this.getViewportPageBounds(), pageId: this.getCurrentPageId() }
+  }
+
+  // ---- asset utils --------------------------------------------------------
+  // An asset util is to a file what a shape util is to a shape. See
+  // `assetUtils.ts` for why the contract is structural.
+
+  /** Every registered asset util, keyed by asset type. */
+  get assetUtils(): ReadonlyMap<string, TLAssetUtilLike> {
+    return this.assetUtilRegistry.all
+  }
+
+  /** The util for an asset type, or `undefined`. */
+  getAssetUtil(type: string | Asset): TLAssetUtilLike | undefined {
+    return this.assetUtilRegistry.get(typeof type === "string" ? type : type.type)
+  }
+
+  /** Whether an asset type has a util registered. */
+  hasAssetUtil(type: string): boolean {
+    return this.assetUtilRegistry.has(type)
+  }
+
+  /** The util that claims a MIME type — what a drop handler asks first. */
+  getAssetUtilForMimeType(mimeType: string): TLAssetUtilLike | undefined {
+    return this.assetUtilRegistry.getForMimeType(mimeType)
+  }
+
+  /**
+   * The `ShapeUtil` that should represent an asset of this type on the canvas,
+   * or `undefined` when nothing claims it.
+   *
+   * Two lookups in one: the asset util names a shape type, and that shape type
+   * is resolved to its util here — so a caller placing a dropped file never has
+   * to know both registries exist.
+   */
+  getShapeUtilForAssetType(assetType: string): ShapeUtil | undefined {
+    const shapeType = this.assetUtilRegistry.getShapeTypeFor(assetType)
+    if (!shapeType || !this.hasShapeUtil(shapeType)) return undefined
+    return this.getShapeUtil<UnknownShape>(shapeType)
+  }
+
+  /**
+   * Turn a file into an asset record through the util that claims its type,
+   * and store it.
+   *
+   * `undefined` when no util wants the file — the caller shows "unsupported
+   * file type" rather than silently dropping it.
+   */
+  async uploadAsset(file: File): Promise<Asset | undefined> {
+    const asset = await this.assetUtilRegistry.upload(file)
+    if (!asset || this.getIsDisposed()) return undefined
+    this.createAssets([asset])
+    return asset
+  }
+
+  /**
+   * The URL to paint an asset from.
+   *
+   * A temporary preview wins while one is current, so a just-dropped image
+   * appears immediately and is replaced by the uploaded one without the shape
+   * having to re-render against a null src in between.
+   */
+  resolveAssetUrl(asset: AssetId | Asset): string | null | Promise<string | null> {
+    const record = this.getAsset(asset as AssetId)
+    if (!record) return null
+    const preview = this.assetUtilRegistry.getPreview(record.id)
+    if (preview) return preview.url
+    return this.assetUtilRegistry.resolveUrl(record)
+  }
+
+  /**
+   * Resolve every asset referenced by a piece of content, so it can be
+   * rendered somewhere the store is not — an export, a thumbnail, a paste into
+   * another document.
+   *
+   * Returns a map rather than mutating the content: the content may be frozen,
+   * and the caller usually wants both the original ids and the URLs.
+   */
+  async resolveAssetsInContent(content: { shapes: readonly UnknownShape[] }): Promise<Map<AssetId, string>> {
+    const out = new Map<AssetId, string>()
+    const ids = new Set<AssetId>()
+    for (const shape of content.shapes) {
+      const assetId = (shape.props as { assetId?: AssetId | null }).assetId
+      if (assetId) ids.add(assetId)
+    }
+    await Promise.all(
+      [...ids].map(async (id) => {
+        const url = await this.resolveAssetUrl(id)
+        if (url) out.set(id, url)
+      }),
+    )
+    return out
+  }
+
+  /** Remember a URL to paint for an asset while its upload is in flight. */
+  createTemporaryAssetPreview(assetId: AssetId, url: string): this {
+    this.assetUtilRegistry.setPreview(assetId, url)
+    return this
+  }
+
+  /** The in-flight preview for an asset, or `undefined` once it has expired. */
+  getTemporaryAssetPreview(assetId: AssetId): TLTemporaryAssetPreview | undefined {
+    return this.assetUtilRegistry.getPreview(assetId)
+  }
+
+  /**
+   * Replace a shape's content with something dropped onto it, rather than
+   * creating a new shape beside it.
+   *
+   * The "drop an image onto an image" gesture. Delegates to the registered
+   * external-content handler with the target shape attached, so an app that
+   * already customised drop handling customises this too; with no handler it
+   * does nothing rather than falling back to creating a shape, which is the
+   * behaviour the caller explicitly did not ask for.
+   */
+  async replaceExternalContent(info: ExternalContent & { shapeId: ShapeId }): Promise<void> {
+    if (!this.getShape<UnknownShape>(info.shapeId)) return
+    await this.putExternalContent(info)
+  }
+
+  // ---- export -------------------------------------------------------------
+
+  /**
+   * The export as a live `<svg>` element rather than a string.
+   *
+   * What a preview pane wants: an element can be measured, styled and inserted
+   * without a parse step. `undefined` when there is nothing to export, or when
+   * there is no DOM to build an element in.
+   */
+  getSvgElement(ids?: readonly ShapeId[], opts?: EditorSvgExportOptions): SVGSVGElement | undefined {
+    const result = this.getSvgString(ids, opts)
+    const doc = this.getContainerDocument()
+    if (!result || !doc) return undefined
+    const parsed = new (doc.defaultView ?? globalThis).DOMParser().parseFromString(result.svg, "image/svg+xml")
+    const element = parsed.documentElement
+    return element instanceof SVGSVGElement ? element : undefined
+  }
+
+  /**
+   * The export as a `data:` URL.
+   *
+   * The form that can go straight into an `<img src>` or a clipboard write
+   * without a blob URL to revoke afterwards — at the cost of about a third more
+   * bytes, which is why {@link toImage} and its blob remain the default.
+   */
+  async toImageDataUrl(ids?: readonly ShapeId[], opts?: EditorImageExportOptions): Promise<string> {
+    const { blob } = await this.toImage(ids, opts)
+    const buffer = await blob.arrayBuffer()
+    let binary = ""
+    const bytes = new Uint8Array(buffer)
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!)
+    const base64 = typeof btoa === "function" ? btoa(binary) : Buffer.from(bytes).toString("base64")
+    return `data:${blob.type || "application/octet-stream"};base64,${base64}`
+  }
+
+  // ---- presence -----------------------------------------------------------
+
+  /**
+   * Everybody who counts as present, on any page: their presence record was
+   * refreshed within `collaboratorInactiveTimeoutMs`.
+   *
+   * The list a people-menu shows. For the cursors to draw, which is a narrower
+   * question, use {@link getVisibleCollaboratorsOnCurrentPage}.
+   */
+  getVisibleCollaborators(): InstancePresence[] {
+    return this.collaborators.getVisibleCollaborators()
   }
 
   // ---- menus -------------------------------------------------------------
@@ -3030,8 +4422,15 @@ export interface ResizeShapeOptions {
 // dependency.
 
 export interface EditorSvgExportOptions {
-  /** Page units added around the shapes' bounds. */
-  padding?: number
+  /**
+   * Space left around the shapes, in page units.
+   *
+   * `"auto"` — the default when the option is omitted — pads by
+   * `options.defaultSvgPadding` and then trims back to the visual content, so
+   * an overhanging stroke or arrowhead is captured without leaving a margin of
+   * empty space. A number is fixed padding and clips anything past it.
+   */
+  padding?: number | "auto"
   /** Paint a full-size background rectangle. */
   background?: boolean
   /** Multiplier applied to the output `width`/`height`. */
@@ -3095,12 +4494,18 @@ export interface EditorTextMeasureOptions {
   fontFamily: string
   fontSize: number
   fontWeight?: string | number
+  /** CSS `font-style`, e.g. `"italic"`. */
+  fontStyle?: string
   /** Unitless line height (multiplier of the font size). */
   lineHeight: number
-  /** Wrap width in CSS px, including `padding`. Omit for a single unwrapped run per paragraph. */
-  maxWidth?: number
+  /**
+   * Wrap width in CSS px, including `padding`. `null` (or omitted) measures a
+   * single unwrapped run per paragraph — callers toggling wrapping on and off
+   * pass `null` rather than deleting the key.
+   */
+  maxWidth?: number | null
   /** Padding applied on every side; included in the returned `w`/`h`. */
-  padding?: number
+  padding?: number | string
 }
 
 export interface EditorTextMeasurement {
@@ -3134,8 +4539,12 @@ export interface EditorTextMeasureHtmlOptions {
 export interface EditorTextHtmlMeasurement {
   w: number
   h: number
-  /** Unwrapped content width; only meaningful with `measureScrollWidth`. */
-  scrollWidth?: number
+  /**
+   * Unwrapped content width. Always reported: a caller that asked for it needs
+   * a number, and one that did not can ignore it, which is cheaper than making
+   * every reader handle `undefined`.
+   */
+  scrollWidth: number
 }
 
 export interface EditorTextMeasure {

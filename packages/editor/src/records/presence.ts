@@ -2,6 +2,7 @@ import { atom, type Atom } from "@mocanvas/state"
 import type { RecordId } from "@mocanvas/store"
 import { createRecordType, uniqueId } from "@mocanvas/store"
 import type { JsonObject, PageId, Scribble, ShapeId } from "./base"
+import type { UserId } from "../user/userRecord"
 
 /** Eight colours that stay readable on the canvas background in any order. */
 export const PRESENCE_COLORS = [
@@ -29,18 +30,32 @@ export function randomPresenceColor(): string {
 export interface InstancePresence {
   readonly id: InstancePresenceId
   readonly typeName: "instance_presence"
-  /** Stable id of the person (survives reconnects; one person may have many tabs). */
-  userId: string
+  /**
+   * Stable id of the person (survives reconnects; one person may have many
+   * tabs). A branded {@link UserId}, not a bare string: a presence record
+   * carries a *user* id and a *presence record* id side by side, and the two
+   * were far too easy to swap. Mint one with `createUserId`.
+   */
+  userId: UserId
   userName: string
   /** CSS colour used for their cursor, name chip and selection outlines. */
   color: string
   currentPageId: PageId
-  cursor: { x: number; y: number; type: string; rotation: number }
-  camera: { x: number; y: number; z: number }
+  /**
+   * Where their pointer is, or `null` for a collaborator that has no pointer at
+   * all — an agent acting on the board, or a viewer whose pointer has left the
+   * canvas. A cursor parked at the origin is not the same thing as no cursor.
+   */
+  cursor: { x: number; y: number; type: string; rotation: number } | null
+  /**
+   * Where their viewport is, or `null` for a collaborator that has no camera —
+   * an agent acting on the board. Distinct from a camera parked at the origin.
+   */
+  camera: { x: number; y: number; z: number } | null
   selectedShapeIds: ShapeId[]
   brush: { x: number; y: number; w: number; h: number } | null
   scribbles: Scribble[]
-  followingUserId: string | null
+  followingUserId: UserId | null
   /** `Date.now()` on the sender when the record was produced. */
   lastActivityTimestamp: number
   chatMessage: string
@@ -48,6 +63,8 @@ export interface InstancePresence {
 }
 
 export type InstancePresenceId = RecordId<InstancePresence>
+/** The `TL`-spelled name for {@link InstancePresenceId}. Same type. */
+export type TLInstancePresenceID = InstancePresenceId
 
 export const InstancePresenceRecordType = createRecordType<InstancePresence>("instance_presence", {
   scope: "presence",

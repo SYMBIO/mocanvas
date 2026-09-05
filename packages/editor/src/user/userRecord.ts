@@ -37,8 +37,18 @@ export const UserRecordType = createRecordType<User>("user", { scope: "presence"
  * Mint a `user:` id. Passing `id` makes it deterministic, which is how a host
  * turns its own account id — or a synthetic actor like `agent:planner` — into a
  * stable canvas identity: `createUserId("agent:planner") === "user:agent:planner"`.
+ *
+ * SEMANTICS-ASSUMED: idempotent. An `id` that is already a `user:` id is
+ * returned unchanged rather than prefixed again. `UserId` is a branded type, so
+ * every host that stores its own ids as plain strings now has to funnel them
+ * through this function; without idempotence the same value would double-prefix
+ * on a second pass (a round trip through a URL, a re-read from storage) and
+ * silently become a different person. The cost is that a host whose own
+ * namespace literally begins with `user:` cannot mint a nested id — a trade
+ * worth making against a class of silent identity bugs.
  */
 export function createUserId(id?: string): UserId {
+  if (id !== undefined && isUserId(id)) return id
   return UserRecordType.createId(id)
 }
 

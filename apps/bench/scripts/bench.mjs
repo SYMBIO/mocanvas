@@ -44,7 +44,18 @@ const FIXTURE = resolve(ROOT, "public/compare.tldr")
  * Null when every run behind the report was made from a clean tree, which is the
  * case for this one: the whole report comes from a single clean-tree run.
  */
-const RUN_NOTE = "What was clean, exactly. `git status --short` was empty at `2ef11f1` when this run started, and the bundle under measurement is built once, before the first measurement — so every number here comes from a clean `2ef11f1`. The working tree went dirty later in the run, while it was still measuring, because this report generator (`apps/bench/scripts/bench.mjs`) and `apps/bench/results/visible-differences.md` were being edited to describe the run. Neither is part of what was measured: nothing under `packages/` or `crates/` was touched at any point."
+/**
+ * What the numbers were measured from, derived rather than asserted.
+ *
+ * This used to be a hand-written paragraph naming a specific commit. A report
+ * that states its own provenance from a string nobody updates will eventually
+ * state it falsely, which is worse than saying nothing.
+ */
+function runNote(rev) {
+  return rev.endsWith("-dirty")
+    ? `Measured from a **dirty working tree** at \`${rev.replace("-dirty", "")}\`: the bundle under measurement was built from the files as they were when this run started, which are not any committed state. Treat these numbers as provisional until they are re-run on a clean tree.`
+    : `Measured from a clean tree at \`${rev}\`. The bundle under measurement is built once, before the first measurement, so every number here comes from that commit.`
+}
 
 const PREVIOUS = {
   date: "2026-09-04 09:26:29 UTC",
@@ -115,6 +126,7 @@ function parseArgs(argv) {
     else if (k === "skip-perf") opts.perf = false
     else if (k === "skip-compare") opts.compare = false
     else if (k === "report-only") opts.reportOnly = true
+    else if (k === "headed") opts.headed = true
   }
   return opts
 }
@@ -372,8 +384,13 @@ function comparisonSection(compare, versions) {
   /** Look a shape's row up by the stable fixture id, so prose quotes measured values. */
   const byId = (rows, suffix) => rows?.find((v) => v.id.endsWith(suffix))
 
-  if (!interior || !band) {
-    md.push(`Region metrics unavailable: ${r?.error ?? "not computed"}. Only the whole-image diff is reported below.`)
+  // `overall` is absent when a metric found nothing comparable — which is what
+  // happens when one side rendered no pixels at all. Guard on it, not just on
+  // the metric object: a report that crashes here loses the whole run,
+  // including the frame-time matrix that was already measured.
+  if (!interior?.overall || !band?.overall?.symmetric) {
+    const why = r?.error ?? (interior?.overall?.pixelsMocanvas === 0 ? "mocanvas rendered nothing" : "not computed")
+    md.push(`Region metrics unavailable: ${why}. Only the whole-image diff is reported below.`)
     md.push("")
   } else {
     md.push("Three numbers, in decreasing order of how much a pixel comparison can be trusted to mean what it")
@@ -612,12 +629,22 @@ function summarySection(data) {
   md.push(`mocanvas creates shapes ${span(ratios("createMs"))} faster than tldraw and reaches first paint up to ${Math.max(...ratios("firstFrameMs")).toFixed(0)}× faster,`)
   md.push(`answers hit-test queries ${span(ratios("hitAvgUs"), 0)} faster and holds ${span(ratios("memoryMB"), 0)} less JS heap; at 20,000 shapes it is also`)
   md.push(`${span(ratios("panP50", big))} faster on the median pan/zoom frame and ${span(ratios("dragP50", big))} faster on select-all-drag.`)
-  md.push(`At 1,000 and 5,000 shapes it is slower per frame — ${span(ratios("panP50", small).map((v) => 1 / v))} on the median pan/zoom frame — for two`)
-  md.push("reasons set out in the caveats: this machine has no GPU, so mocanvas's WebGL2 output is rasterised on the")
-  md.push("CPU, where 4× MSAA alone accounts for roughly 70% of the frame; and the pan/zoom metric counts only")
-  md.push("main-thread work, which tldraw largely avoids by panning with a CSS transform on the compositor. The")
-  md.push("`selectAllDragRun` tables are the fairer frame comparison; mocanvas is behind there at 1,000 shapes,")
-  md.push("level at 5,000, and ahead at 20,000.")
+  // Only say something about the smaller sizes when they were actually run;
+  // this paragraph used to be unconditional and printed `Infinity×` for a
+  // single-N run.
+  const smallRatios = ratios("panP50", small)
+  if (smallRatios.length > 0) {
+    md.push(`At the smaller sizes it is slower per frame — ${span(smallRatios.map((v) => 1 / v))} on the median pan/zoom frame — for two`)
+    md.push("reasons set out in the caveats: this machine has no GPU, so mocanvas's WebGL2 output is rasterised on the")
+    md.push("CPU, where 4× MSAA alone accounts for roughly 70% of the frame; and the pan/zoom metric counts only")
+    md.push("main-thread work, which tldraw largely avoids by panning with a CSS transform on the compositor. The")
+    md.push("`selectAllDrag` tables are the fairer frame comparison.")
+  } else {
+    md.push("This run measured 20,000 shapes only. The caveats below matter for reading the frame figures: this")
+    md.push("machine has no GPU, so mocanvas's WebGL2 output is rasterised on the CPU, and the pan/zoom metric")
+    md.push("counts only main-thread work, which tldraw largely avoids by panning with a CSS transform on the")
+    md.push("compositor. The `selectAllDrag` tables are the fairer frame comparison.")
+  }
   if (compare?.ok && !compare.diff?.error && compare.regions) {
     const i = compare.regions.interior?.overall
     const b = compare.regions.stroke?.overall?.symmetric
@@ -764,8 +791,8 @@ function renderDoc(data) {
   md.push(`| Viewport | ${VIEWPORT.width}×${VIEWPORT.height} CSS px, device scale 1 |`)
   md.push(`| Matrix | N ∈ {${ns.join(", ")}} × kind ∈ {${kinds.join(", ")}}, ${repeats} repeats, medians reported |`)
   md.push("")
-  if (RUN_NOTE) {
-    md.push(`_${RUN_NOTE}_`)
+  {
+    md.push(`_${runNote(data.versions?.git ?? "unknown")}_`)
     md.push("")
   }
 
@@ -1070,7 +1097,7 @@ async function main() {
   const server = await startPreview()
   console.log(`preview at ${server.url}`)
 
-  const launched = await launchBrowser({ chromium }, server.url)
+  const launched = await launchBrowser({ chromium }, server.url, { headed: opts.headed === true })
   console.log(`chromium ${launched.version} — mode=${launched.mode} software=${launched.software}`)
   console.log(`renderer: ${launched.gpu.renderer}`)
 

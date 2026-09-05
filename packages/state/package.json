@@ -1,6 +1,6 @@
 {
   "name": "@mocanvas/state",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Signals for mocanvas: atoms, computed values, transactions and React bindings.",
   "license": "MIT",
   "author": "Symbio Digital",
@@ -23,7 +23,7 @@
   ],
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12.0"
   },
   "files": [
     "dist",

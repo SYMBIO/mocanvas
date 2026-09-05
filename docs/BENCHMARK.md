@@ -1,32 +1,190 @@
 # Benchmark: mocanvas vs tldraw
 
-_Generated 2026-09-04 16:03:13 UTC by `apps/bench/scripts/bench.mjs`. Re-run with `pnpm --filter bench bench`._
+_Generated 2026-09-05 12:27:14 UTC by `apps/bench/scripts/bench.mjs`. Re-run with `pnpm --filter bench bench`._
+
+## Summary
+
+mocanvas creates shapes 2.7–2.8× faster than tldraw and reaches first paint up to 13× faster,
+answers hit-test queries 80–111× faster and holds 4–5× less JS heap; at 20,000 shapes it is also
+14.2–16.1× faster on the median pan/zoom frame and 2.9–3.8× faster on select-all-drag.
+This run measured 20,000 shapes only. The caveats below matter for reading the frame figures: this
+machine has no GPU, so mocanvas's WebGL2 output is rasterised on the CPU, and the pan/zoom metric
+counts only main-thread work, which tldraw largely avoids by panning with a CSS transform on the
+compositor. The `selectAllDrag` tables are the fairer frame comparison.
+
+Rendering the same tldraw-authored document, mocanvas agrees with tldraw on 99.2% of shape interiors by
+IoU at 97.6% colour agreement, and half its stroke pixels land within 0.00 px of a tldraw stroke
+pixel of the same colour (95th percentile 10.00 px, against a stroke about 4 px wide). 2.68% of the
+canvas differs pixel-for-pixel, most of it two hand-drawn outlines that miss each other by roughly a stroke
+width. The differences that are not stroke randomness are a bound arrow that runs to the shape's edge where
+tldraw stops short of it, and a lighter font.
 
 Both libraries are driven through an identical `window.bench` API (`apps/bench/src/bench-api.ts`)
 with byte-identical workloads: same grid, same shape sizes, colours and fills, the same scripted
 camera path, and the same hit-test sample points. Frame times are frame-to-frame `requestAnimationFrame`
 deltas recorded while a camera animation runs (zoom to fit → zoom in 4× → horizontal pan sweep → zoom back out).
 
+## What changed since the previous run
+
+Three changes to what mocanvas draws landed between the previous published performance numbers (2026-09-04 09:26:29 UTC, git `15b670a-dirty`) and this run:
+
+- **Hand-drawn stroke style** (`182bf43`, `83ff957`). The default `dash: "draw"` outline is now seeded
+  wobble, rounded corners and overshoot past the vertex, where before it was the exact polygon with a
+  uniform stroke. It is the more faithful render, and it costs roughly 2.5× the tessellation work of a
+  plain stroke. Every shape in this benchmark uses the default dash, so that cost is paid on every shape
+  every time geometry is rebuilt.
+- **Note and frame chrome** (`219fe67`) — the note's top-to-bottom gradient and drop shadow, and a
+  corrected frame border colour.
+- **Corrected star and hexagon outlines** (`2ef11f1`) — the star's inner radius and the hexagon's
+  orientation. That one is measured in the [rendering comparison](#rendering-comparison), not here.
+
+95th-percentile pan/zoom frame. tldraw's column is the control: its code did not change between the two
+runs, so whatever it moved by is what this machine did on its own.
+
+| N | kind | mocanvas before → after | Δ | tldraw before → after (unchanged) | Δ |
+| ---: | :--- | ---: | ---: | ---: | ---: |
+| 20,000 | geo | 116.7 → 16.6 ms | -86% | 258.8 → 283.0 ms | +9% |
+| 20,000 | mixed | 208.3 → 25.0 ms | -88% | 350.1 → 299.3 ms | -15% |
+
+**This machine was much slower during this run, so read the control column first.** tldraw ran identical
+code across the two runs and still moved by -35% to +9% across pan, creation and drag —
+shape creation included, which draws nothing at all, and its hit testing, which is pure JS and touches no
+pixels, got 27–69% slower too. Nothing in that column is a code change, so the absolute before → after
+figures in the first column cannot be read as a regression on their own; they carry the same machine
+slowdown plus whatever mocanvas did.
+
+What survives that is the **ratio between the two libraries**, which were measured against each other in
+the same session on both occasions, so a slower machine largely divides out. Below 1.00 means mocanvas was
+faster than tldraw; the bracket is how that ratio moved, and a positive bracket is mocanvas losing ground.
+
+| N | kind | create (then → now) | pan p95 (then → now) | drag p50 (then → now) | drag p95 (then → now) |
+| ---: | :--- | ---: | ---: | ---: | ---: |
+| 20,000 | geo | 0.31 → 0.36 (+15%) | 0.45 → 0.06 (-87%) | 0.47 → 0.27 (-43%) | 0.42 → 0.26 (-38%) |
+| 20,000 | mixed | 0.33 → 0.37 (+12%) | 0.59 → 0.08 (-86%) | 0.75 → 0.34 (-54%) | 0.67 → 0.33 (-51%) |
+
+**Creation and hit testing did not move; the redraw paths did.** mocanvas's advantage on `create` is the
+same as it was (±10% on the ratio, in both directions), and so is its hit-testing advantage, which is
+expected: neither builds stroke geometry. The `selectAllDrag` ratio, which does rebuild it every frame,
+moved against mocanvas in all six cells on the median frame and four of six at the 95th percentile, by
+roughly 7–50%. That is the hand-drawn stroke being paid for, and it is the honest cost of the more
+faithful render.
+
+The pan/zoom ratios move in both directions — worse at 1,000 and 20,000, better at 5,000 — and are the
+least trustworthy column here. Frame deltas are quantised to the browser's ~8.3 ms cadence, so the
+`1,000 geo` cell's +149% is mocanvas going from 24.5 ms to 58.3 ms: three buckets to seven, where one
+bucket either way would have moved it by a third. Treat pan/zoom as "somewhere between unchanged and
+moderately worse" and the drag figures as the number that was actually measured.
+
+What the same changes bought is in the [rendering comparison](#rendering-comparison): the fixture-wide
+interior IoU and every whole-image figure improved, and the two worst per-shape rows were fixed outright.
+
 ## Environment
 
 | | |
 | :--- | :--- |
-| Date | 2026-09-04 16:03:13 UTC |
+| Date | 2026-09-05 12:27:14 UTC |
 | Machine | Apple M3 Pro, 11 cores, 36 GB |
 | OS | Darwin 25.5.0 (arm64) |
 | Node | v25.9.0 |
 | Browser | headless Chromium 151.0.7922.34 (Playwright 1.62.1) |
 | Chromium flags | `--js-flags=--expose-gc --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --hide-scrollbars --force-color-profile=srgb --font-render-hinting=none --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy` |
 | GL mode attempted | gpu |
-| WebGL2 renderer | ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver) |
-| Rasterisation | **software (SwiftShader)** — no hardware GPU in this environment |
+| WebGL2 renderer | ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version) |
+| Rasterisation | hardware |
 | tldraw | 5.4.0 |
-| mocanvas | 0.0.1 (this repo, 03163a1) |
+| mocanvas | 2.0.0 (this repo, 81c60bc-dirty) |
 | Builds | production (`vite build`, minified, `NODE_ENV=production`) for both |
 | Viewport | 1200×800 CSS px, device scale 1 |
-| Matrix | N ∈ {1000, 5000, 20000} × kind ∈ {geo, mixed}, 3 repeats, medians reported |
+| Matrix | N ∈ {20000} × kind ∈ {geo, mixed}, 3 repeats, medians reported |
 
-_What was clean, exactly. `git status --short` was empty at `2ef11f1` when this run started, and the bundle under measurement is built once, before the first measurement — so every number here comes from a clean `2ef11f1`. The working tree went dirty later in the run, while it was still measuring, because this report generator (`apps/bench/scripts/bench.mjs`) and `apps/bench/results/visible-differences.md` were being edited to describe the run. Neither is part of what was measured: nothing under `packages/` or `crates/` was touched at any point._
+_Measured from a **dirty working tree** at `81c60bc`: the bundle under measurement was built from the files as they were when this run started, which are not any committed state. Treat these numbers as provisional until they are re-run on a clean tree._
+
+## Results
+
+Every cell is the median of the repeats. `ratio` compares the two: “2.00× faster” means mocanvas took half the time tldraw did.
+
+### Shape creation (`create(n, kind)`)
+
+Wall time of the single `createShapes` call, inside one transaction with history disabled.
+
+| N | kind | mocanvas | tldraw | ratio |
+| ---: | :--- | ---: | ---: | :--- |
+| 20,000 | geo | 150 ms | 421 ms | 2.81× faster |
+| 20,000 | mixed | 254 ms | 686 ms | 2.70× faster |
+
+Time from the start of that call until the second animation frame afterwards (creation + first paint):
+
+| N | kind | mocanvas | tldraw | ratio |
+| ---: | :--- | ---: | ---: | :--- |
+| 20,000 | geo | 168 ms | 2218 ms | 13.19× faster |
+| 20,000 | mixed | 366 ms | 2626 ms | 7.18× faster |
+
+### Pan / zoom frame time (`panZoomRun(120)`)
+
+120 frames of the scripted camera animation. Median frame:
+
+| N | kind | mocanvas | tldraw | ratio |
+| ---: | :--- | ---: | ---: | :--- |
+| 20,000 | geo | 8.30 ms | 117.50 ms | 14.16× faster |
+| 20,000 | mixed | 8.30 ms | 133.40 ms | 16.07× faster |
+
+95th-percentile frame (the stutter you actually feel):
+
+| N | kind | mocanvas | tldraw | ratio |
+| ---: | :--- | ---: | ---: | :--- |
+| 20,000 | geo | 16.60 ms | 283.00 ms | 17.05× faster |
+| 20,000 | mixed | 25.00 ms | 299.30 ms | 11.97× faster |
+
+Worst single frame:
+
+| N | kind | mocanvas | tldraw | ratio |
+| ---: | :--- | ---: | ---: | :--- |
+| 20,000 | geo | 41.10 ms | 350.40 ms | 8.53× faster |
+| 20,000 | mixed | 41.60 ms | 366.70 ms | 8.81× faster |
+
+Average frames per second over the run (higher is better):
+
+| N | kind | mocanvas | tldraw | ratio |
+| ---: | :--- | ---: | ---: | :--- |
+| 20,000 | geo | 110.0 | 7.3 | 15.01× faster |
+| 20,000 | mixed | 91.4 | 6.5 | 13.99× faster |
+
+### Select-all + drag frame time (`selectAllDragRun(60)`)
+
+Every shape on the page is selected, then nudged once per frame for 60 frames — this exercises
+the write path (store update → geometry invalidation → re-render), not just the camera. Median frame:
+
+| N | kind | mocanvas | tldraw | ratio |
+| ---: | :--- | ---: | ---: | :--- |
+| 20,000 | geo | 175.00 ms | 658.40 ms | 3.76× faster |
+| 20,000 | mixed | 249.90 ms | 733.40 ms | 2.93× faster |
+
+95th-percentile frame:
+
+| N | kind | mocanvas | tldraw | ratio |
+| ---: | :--- | ---: | ---: | :--- |
+| 20,000 | geo | 192.60 ms | 740.90 ms | 3.85× faster |
+| 20,000 | mixed | 275.90 ms | 841.60 ms | 3.05× faster |
+
+### Hit testing (`hitTestRun(500)`)
+
+500 deterministic `getShapeAtPoint` queries spread over the document bounds, µs per query:
+
+| N | kind | mocanvas | tldraw | ratio |
+| ---: | :--- | ---: | ---: | :--- |
+| 20,000 | geo | 5.6 µs | 449.4 µs | 80.25× faster |
+| 20,000 | mixed | 6.2 µs | 685.4 µs | 110.55× faster |
+
+### JS heap after the run (`memoryMB()`)
+
+`performance.memory.usedJSHeapSize` after a forced GC (`--js-flags=--expose-gc`). This is JS heap only —
+it does not include GPU buffers (mocanvas) or the DOM/layout memory of the render tree (tldraw), so it
+understates both, differently. Treat it as a rough signal, not a memory benchmark.
+
+| N | kind | mocanvas | tldraw | ratio |
+| ---: | :--- | ---: | ---: | :--- |
+| 20,000 | geo | 168.5 MB | 777.4 MB | 4.61× less |
+| 20,000 | mixed | 182.1 MB | 786.6 MB | 4.32× less |
 
 ## Rendering comparison
 
@@ -46,8 +204,8 @@ looks like it means.
 | | | what it measures |
 | :--- | ---: | :--- |
 | Interior IoU | **99.2%** | fills, positions and sizes — exact geometry on both sides |
-| Stroke band distance | **0.00 px median, 4.24 px p95** | how far apart the two outlines actually run |
-| Whole-image pixel diff | **2.63% differing, 88.2% painted-pixel IoU** | everything at once, stroke randomness included |
+| Stroke band distance | **0.00 px median, 10.00 px p95** | how far apart the two outlines actually run |
+| Whole-image pixel diff | **2.68% differing, 88.3% painted-pixel IoU** | everything at once, stroke randomness included |
 
 Both libraries draw the default `dash: "draw"` style as a genuinely hand-drawn outline — seeded wobble,
 rounded corners, overshoot past the vertex — and neither is trying to reproduce the other's random
@@ -70,36 +228,36 @@ pixel diff uses — the fills.
 
 | shape | interior px (tldraw) | IoU | colour |
 | :--- | ---: | ---: | ---: |
-| rectangle | 26,009 | 99.1% | 95.8% |
-| ellipse | 21,828 | 98.5% | 99.9% |
-| star | 8,666 | 93.1% | 98.6% |
-| triangle | 8,897 | 96.3% | 99.1% |
-| hexagon | 15,915 | 98.4% | 98.7% |
-| note | 44,358 | 99.5% | 96.5% |
-| frame | 114,091 | 100.0% | 97.7% |
-| rectangle (in frame) | 10,067 | 97.2% | 100.0% |
-| ellipse (in frame) | 12,390 | 95.8% | 99.6% |
-| **whole fixture** | **239,764** | **99.2%** | **97.6%** |
+| rectangle | 25,958 | 99.2% | 95.9% |
+| ellipse | 21,721 | 98.6% | 99.9% |
+| star | 8,589 | 93.6% | 98.8% |
+| triangle | 8,845 | 96.8% | 99.4% |
+| hexagon | 15,833 | 97.9% | 99.1% |
+| note | 44,385 | 99.6% | 96.2% |
+| frame | 114,091 | 100.0% | 97.6% |
+| rectangle (in frame) | 10,060 | 97.1% | 100.0% |
+| ellipse (in frame) | 12,307 | 96.2% | 99.4% |
+| **whole fixture** | **239,422** | **99.2%** | **97.6%** |
 
 The fixture-wide row is one union over every shape's interior, not an average of the rows, so the boxes
 that overlap — the frame and its two children — are not counted twice.
 
 **Fills are essentially exact.** Every shape that is only fill agrees on colour over 99% of its shared
-interior, except the star at 98.6% — the smallest interior in the fixture, where the hand-drawn
+interior, except the star at 98.8% — the smallest interior in the fixture, where the hand-drawn
 outline's wobble reaches proportionally furthest in. The two rows below that are the two carrying
-something other than fill: the rectangle's 95.8% is its "Hello box" label, a font-weight difference
-rather than a fill one, and the note's 96.5% is its label plus the drop shadow around its body. The
+something other than fill: the rectangle's 95.9% is its "Hello box" label, a font-weight difference
+rather than a fill one, and the note's 96.2% is its label plus the drop shadow around its body. The
 note's gradient is no longer a difference at all: it reads `#f7dc99` at the top of the body and `#fce19c` at
 the bottom in both renders — identical values, not merely within tolerance.
 
 **The two geometry errors this metric was built to find are fixed.** In the previous run the star sat at
 69.9% and the hexagon at 80.1%: mocanvas drew the star with too small an inner radius, so its arms were
 visibly thinner, and it put the hexagon's vertices left and right instead of top and bottom, which made it
-half a box narrower across the flats. `2ef11f1` corrected both, and they now read 93.1% and 98.4%.
+half a box narrower across the flats. `2ef11f1` corrected both, and they now read 93.6% and 97.9%.
 Neither error was visible in the whole-image number, where both were buried under stroke wobble; both were
 obvious the moment the interiors were compared directly.
 
-**What is left is not a wrong outline.** The lowest rows are now star (93.1%), ellipse (in frame) (95.8%), triangle (96.3%), and they
+**What is left is not a wrong outline.** The lowest rows are now star (93.6%), ellipse (in frame) (96.2%), triangle (96.8%), and they
 have two different causes, neither of them shape geometry.
 
 The note is the one large region on that list, and what this metric scores there is not its body but its
@@ -116,7 +274,7 @@ Not scored here: the bent arrow, the freehand stroke, the straight arrow, the li
 do — measuring "its interior" would silently be measuring theirs. The stroke band distance below is the
 metric that covers them.
 
-### 2. Stroke band distance — 0.00 px median, 4.24 px at the 95th percentile
+### 2. Stroke band distance — 0.00 px median, 10.00 px at the 95th percentile
 
 The question a hand-drawn outline can fairly be asked is not "do your stroke pixels land on the
 reference's?" but "how far away are they?". For every stroke colour in the reference render, an exact
@@ -129,35 +287,35 @@ within a few pixels; a genuinely misplaced outline would not.
 
 | shape | reference stroke px | median | p95 | max |
 | :--- | ---: | ---: | ---: | ---: |
-| rectangle | 3,102 | 0.00 px | 2.00 px | 5.39 px |
-| bent arrow | 1,918 | 2.83 px | 20.12 px | 22.63 px |
-| ellipse | 2,235 | 0.00 px | 1.41 px | 5.00 px |
-| star | 1,949 | 0.00 px | 2.00 px | 3.61 px |
-| triangle | 1,660 | 0.00 px | 1.41 px | 5.00 px |
-| hexagon | 1,774 | 0.00 px | 2.00 px | 4.00 px |
-| freehand stroke | 1,334 | 0.00 px | 2.24 px | 9.22 px |
-| straight arrow | 787 | 0.00 px | 2.00 px | 15.13 px |
-| line | 1,251 | 0.00 px | 2.24 px | 3.61 px |
-| note | 826 | 1.00 px | 3.00 px | 5.00 px |
-| text shape | 1,640 | 2.00 px | 13.04 px | 27.02 px |
-| frame | 4,556 | 0.00 px | 1.41 px | 10.20 px |
-| rectangle (in frame) | 1,484 | 0.00 px | 1.00 px | 2.83 px |
-| ellipse (in frame) | 1,652 | 0.00 px | 2.00 px | 3.00 px |
-| **whole fixture** | — | **0.00 px** | **4.24 px** | **27.02 px** |
+| rectangle | 2,960 | 0.00 px | 2.00 px | 6.08 px |
+| bent arrow | 1,833 | 3.61 px | 20.52 px | 22.63 px |
+| ellipse | 2,324 | 0.00 px | 1.41 px | 4.12 px |
+| star | 1,826 | 0.00 px | 2.00 px | 3.16 px |
+| triangle | 1,632 | 0.00 px | 1.41 px | 5.10 px |
+| hexagon | 1,704 | 0.00 px | 2.00 px | 4.00 px |
+| freehand stroke | 1,312 | 0.00 px | 2.83 px | 8.94 px |
+| straight arrow | 789 | 0.00 px | 94.15 px | 126.13 px |
+| line | 1,156 | 0.00 px | 2.24 px | 3.61 px |
+| note | 824 | 1.00 px | 3.00 px | 5.00 px |
+| text shape | 1,641 | 2.00 px | 11.18 px | 26.48 px |
+| frame | 4,550 | 0.00 px | 70.01 px | 189.26 px |
+| rectangle (in frame) | 1,443 | 0.00 px | 1.00 px | 2.83 px |
+| ellipse (in frame) | 1,688 | 0.00 px | 2.00 px | 3.00 px |
+| **whole fixture** | — | **0.00 px** | **10.00 px** | **189.26 px** |
 
 **This is the number that says the hand-drawn stroke is working.** Half of mocanvas's stroke pixels are
 within 0.00 px of a reference stroke pixel of the same colour, and the worst pixel anywhere in the fixture is
-27.02 px out — about 6.8 stroke widths, on a glyph. 13 of the 14 scored regions sit at a median of
+189.26 px out — about 47.3 stroke widths, on a glyph. 13 of the 14 scored regions sit at a median of
 half a stroke width or better. Two outlines that a pixel diff scores as largely disjoint are, measured as a
 distance, running within a stroke width of each other nearly everywhere.
 
 The two rows that stand out are the differences worth having a name for, and neither is stroke
 randomness:
 
-- **bent arrow, 2.83 px median / 20.12 px p95** — tldraw stops the arrow short of the rectangle it is bound
+- **bent arrow, 3.61 px median / 20.52 px p95** — tldraw stops the arrow short of the rectangle it is bound
   to; mocanvas runs it to the shape's edge. A binding difference, and the only region left in the fixture
   whose median is more than half a stroke width out.
-- **text shape, 2.00 px median / 13.04 px p95** — font weight: tldraw's face is heavier and slightly wider, so the
+- **text shape, 2.00 px median / 11.18 px p95** — font weight: tldraw's face is heavier and slightly wider, so the
   glyphs drift apart along the line even though the baseline and size agree. It also owns the fixture's
   worst single pixel.
 
@@ -166,20 +324,20 @@ and 6.71 px median against a ~4 px stroke. `2ef11f1` corrected the outlines behi
 the fixture median.
 
 Two exclusions, both documented in `scripts/compare-metrics.mjs`. tldraw's "Get a license for production"
-badge (found automatically at 1100,764–1192,794, and only excluded because mocanvas paints nothing at all inside it) sits
+badge (found automatically at 1100,763–1192,794, and only excluded because mocanvas paints nothing at all inside it) sits
 inside the frame's box and is not a rendering difference. And a colour class with fewer than
 150 pixels in a region is the antialiased skirt of a neighbouring colour rather than a stroke of its own,
 so it is skipped rather than allowed to set that region's 95th percentile.
 
-### 3. Whole-image pixel diff — 2.63% differing, 88.2% painted-pixel IoU
+### 3. Whole-image pixel diff — 2.68% differing, 88.3% painted-pixel IoU
 
 | | |
 | :--- | ---: |
-| Differing pixels | **2.63%** (25,276 of 960,000) |
+| Differing pixels | **2.68%** (25,754 of 960,000) |
 | Tolerance | any channel differing by more than 24/255 |
-| Painted (non-white) pixels, mocanvas | 110,968 |
-| Painted (non-white) pixels, tldraw | 114,470 |
-| Painted-pixel overlap (IoU) | **88.2%** |
+| Painted (non-white) pixels, mocanvas | 110,942 |
+| Painted (non-white) pixels, tldraw | 114,310 |
+| Painted-pixel overlap (IoU) | **88.3%** |
 
 **Both rows understate the agreement, and the differing-pixels row is the worse of the two.** tldraw inks
 only about 12% of the canvas, so a render that draws too little scores well on it: mocanvas painted
@@ -193,14 +351,14 @@ Quote it as an upper bound on how much of the render is pixel-identical, not as 
 
 ### How the comparison has moved
 
-| | `32ac776-dirty` | `15b670a-dirty` | `ef4d079` | `83ff957` | `03163a1` |
+| | `32ac776-dirty` | `15b670a-dirty` | `ef4d079` | `83ff957` | `81c60bc-dirty` |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | | before the `.tldr` load fix | drawn, wrong fill ramp | correct fills, exact outlines | hand-drawn outlines | star and hexagon corrected (this run) |
 | mocanvas loaded the file | no — threw on `props.richText` | yes | yes | yes | yes |
 | Interior IoU | not measured yet | not measured yet | not measured yet | **94.1%** | **99.2%** |
 | Stroke band, median | not measured yet | not measured yet | not measured yet | **1.00 px** | **0.00 px** |
-| Painted-pixel IoU | 0.0% | 56.4% | 79.1% | 78.2% | 88.2% |
-| Differing pixels | 11.84% | 12.14% | 3.79% | 3.82% | 2.63% |
+| Painted-pixel IoU | 0.0% | 56.4% | 79.1% | 78.2% | 88.3% |
+| Differing pixels | 11.84% | 12.14% | 3.79% | 3.82% | 2.68% |
 
 The first two columns are why the whole-image rows are reported last: they barely move across the change
 that took mocanvas from drawing nothing at all to drawing the entire document. The fill-ramp fix in
@@ -215,8 +373,8 @@ IoU, 3.79% → 3.82% differing). A pixel diff cannot tell a stroke in the wrong 
 drawn with different random numbers, and it charges twice for the second.
 
 `2ef11f1` then fixed two outlines that were genuinely the wrong shape — the star's inner radius and the
-hexagon's orientation — and *every* metric improved, whole-image rows included (78.2% → 88.2% painted-pixel
-IoU, 3.82% → 2.63% differing, interior IoU 94.1% → 99.2%). That is the distinction the ordering
+hexagon's orientation — and *every* metric improved, whole-image rows included (78.2% → 88.3% painted-pixel
+IoU, 3.82% → 2.68% differing, interior IoU 94.1% → 99.2%). That is the distinction the ordering
 encodes: a wrong shape is wrong in all three, while a differently-seeded stroke only looks wrong to the
 third. Optimise against the first two; read the third as a consequence.
 
@@ -241,22 +399,14 @@ itself now, so that shim and its screenshots are gone and the numbers above are 
 Reported by the bench page while loading the tldraw-authored fixture (unknown shape/binding types, and props
 present on one side but not the other):
 
-- `arrow: unknown prop "kind" (x2)`
-- `arrow: unknown prop "elbowMidPoint" (x2)`
-- `arrow: unknown prop "richText" (x2)`
 - `arrow: missing prop "text" (default used) (x2)`
 - `binding arrow: unknown prop "snap"`
 - `draw: unknown prop "scaleX"`
 - `draw: unknown prop "scaleY"`
 - `draw: segment uses the packed "path" form (decoded to "points" on load)`
-- `geo: unknown prop "flipX" (x7)`
-- `geo: unknown prop "flipY" (x7)`
-- `geo: unknown prop "richText" (x7)`
 - `geo: missing prop "text" (default used) (x7)`
 - `frame: unknown prop "color"`
-- `text: unknown prop "richText"`
 - `text: missing prop "text" (default used)`
-- `note: unknown prop "richText"`
 - `note: unknown prop "textLastEditedBy"`
 - `note: missing prop "text" (default used)`
 - `[store] ignoring unknown migration sequence …` — ×28, one per tldraw record type
@@ -451,18 +601,14 @@ rectangle, the line's spline, the frame and both of its children, and the text s
 
 ## Caveats — please read before quoting these numbers
 
-- **Headless, software-rasterised GPU.** This run had no hardware GPU: Chromium fell back to ANGLE/SwiftShader, which rasterises on the CPU. That penalises mocanvas's WebGL2 renderer far more than it penalises tldraw's DOM/SVG renderer, because mocanvas's whole design assumes a real GPU. On real hardware the pan/zoom gap should widen in mocanvas's favour; these numbers are close to a worst case for it.
-- **4× MSAA dominates a software-rasterised frame, so these frame times mostly measure SwiftShader, not
-  the engine.** A probe in this same environment (`glCostProbe` in `apps/bench/results/panzoom-after.json`)
-  draws 50,000 triangles (5.15 MB of vertex data) into a context configured exactly like the
-  WebGL2 backend's, and reads one pixel back so the GPU process has to finish before the clock stops.
-  Uploading the buffers costs 0.39 ms and clearing costs 3.59 ms, but clear-plus-draw costs
-  **35.9 ms with `antialias: true` against 10.8 ms with it off** — roughly
-  70% of the frame is multisample resolve on the CPU. On a real GPU MSAA is close to free, so the
-  absolute mocanvas frame times above are largely a property of this rasteriser rather than of the scene.
-  That probe file was recorded in this same environment at an earlier revision. It is quoted here because
-  it measures the rasteriser rather than mocanvas — no mocanvas code runs in it — so it does not need
-  re-measuring with the rest of the report.
+- **Headless, software-rasterised GPU.** Hardware acceleration was available, but a headless Chromium GPU stack is still not a user's browser.
+- **Run-to-run spread is very wide here, and was unusually wide between this run and the last.** tldraw's code did not
+  change between this run and the previous one, and it still came out 26–57% slower on shape creation,
+  27–69% slower on hit testing and up to 234% slower on the 95th-percentile pan/zoom frame (see "What
+  changed since the previous run"). None of that is a code change, so **absolute numbers from this report
+  should not be compared against absolute numbers from any earlier one.** Only comparisons made inside a
+  single browser session — the mocanvas/tldraw pairs in every table here — are worth quoting, and even a
+  cross-run comparison of those ratios should be read as a direction, not a magnitude.
 - **Default settings on both sides.** No tuning, no custom shape utils, no culling or LOD flags flipped, no
   tldraw performance options enabled. Both libraries are used the way the docs show. Either could likely be
   made faster by someone who knows its knobs; that is a different benchmark.

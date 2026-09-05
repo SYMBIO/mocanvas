@@ -15,7 +15,57 @@ export const OP = {
   SET_STYLE: 4,
   CLEAR: 5,
   SET_TEXTURE: 6,
+  SET_GEO: 7,
+  SET_SPLINE: 8,
+  SET_POLY: 9,
+  SET_DRAW: 10,
 } as const
+
+/**
+ * Flag bits for the parametric geometry commands; must match
+ * `crates/mocanvas-wasm/src/lib.rs::geo_flag`.
+ */
+export const GEO_FLAG = {
+  /** `setGeo`: mirror the silhouette left-to-right inside its own box. */
+  FLIP_X: 1 << 0,
+  /** `setGeo`: mirror the silhouette top-to-bottom inside its own box. */
+  FLIP_Y: 1 << 1,
+  /** `setSpline` / `setPoly` / `setDraw`: close the outline. */
+  CLOSED: 1 << 0,
+  /** `setDraw`, per segment: this run came from a pen, so smooth it. */
+  FREEHAND: 1 << 0,
+} as const
+
+/**
+ * The built-in geo silhouettes the engine can build from parameters, by name.
+ *
+ * The numbers are the indices of `GEO_SHAPE_KINDS`, which is part of the file
+ * format — a kind is only ever appended. A `geo` value that is not in here is a
+ * custom silhouette the engine has no generator for; upload its path with
+ * {@link CommandWriter.setGeometry} instead.
+ */
+export const GEO_KIND: Readonly<Record<string, number>> = Object.freeze({
+  rectangle: 0,
+  ellipse: 1,
+  triangle: 2,
+  diamond: 3,
+  pentagon: 4,
+  hexagon: 5,
+  octagon: 6,
+  star: 7,
+  rhombus: 8,
+  "rhombus-2": 9,
+  oval: 10,
+  trapezoid: 11,
+  "arrow-right": 12,
+  "arrow-left": 13,
+  "arrow-up": 14,
+  "arrow-down": 15,
+  "x-box": 16,
+  "check-box": 17,
+  cloud: 18,
+  heart: 19,
+})
 
 /** Path opcodes; must match `mocanvas-geo::PathCmd`. */
 export const PATH_OP = {
@@ -249,6 +299,87 @@ export class CommandWriter {
     v[i++] = handle
     v[i++] = n
     for (let k = 0; k < n; k++) v[i++] = f32bits(pathWords[k]!)
+    this.len = i
+  }
+
+  /**
+   * Build a built-in geo silhouette in the engine from its parameters.
+   *
+   * This is the fast path behind {@link CommandWriter.setGeometry} for the
+   * shapes the engine knows how to draw itself: five words go over the wire
+   * instead of a whole outline, and the trigonometry runs in WebAssembly. The
+   * resulting path is identical to the one the TypeScript generators produce.
+   *
+   * `kind` is an index from {@link GEO_KIND}. A silhouette that is not in that
+   * table has no generator here — send its path with `setGeometry`.
+   */
+  setGeo(handle: Handle, kind: number, w: number, h: number, flags = 0): void {
+    this.ensure(6)
+    const v = this.view
+    let i = this.len
+    v[i++] = OP.SET_GEO
+    v[i++] = handle
+    v[i++] = kind >>> 0
+    v[i++] = flags >>> 0
+    v[i++] = f32bits(w)
+    v[i++] = f32bits(h)
+    this.len = i
+  }
+
+  /**
+   * A smooth cubic spline through `points` (interleaved `x, y`), built in the
+   * engine. `flags` takes {@link GEO_FLAG}.CLOSED.
+   */
+  setSpline(handle: Handle, points: ArrayLike<number>, flags = 0): void {
+    this.writePoints(OP.SET_SPLINE, handle, points, flags)
+  }
+
+  /**
+   * A polyline through `points` (interleaved `x, y`), or a polygon when
+   * `flags` has {@link GEO_FLAG}.CLOSED.
+   */
+  setPoly(handle: Handle, points: ArrayLike<number>, flags = 0): void {
+    this.writePoints(OP.SET_POLY, handle, points, flags)
+  }
+
+  private writePoints(op: number, handle: Handle, points: ArrayLike<number>, flags: number): void {
+    const n = points.length >> 1
+    this.ensure(4 + n * 2)
+    const v = this.view
+    let i = this.len
+    v[i++] = op
+    v[i++] = handle
+    v[i++] = flags >>> 0
+    v[i++] = n
+    for (let k = 0; k < n * 2; k++) v[i++] = f32bits(points[k]!)
+    this.len = i
+  }
+
+  /**
+   * A freehand stroke, as the runs the pen actually made.
+   *
+   * Each segment is `{ points, freehand }` with `points` interleaved `x, y`; a
+   * `freehand` run is smoothed in the engine (one 1-2-1 pass, endpoints fixed)
+   * before the runs are concatenated into one outline. `flags` takes
+   * {@link GEO_FLAG}.CLOSED, which closes the stroke when it has more than two
+   * points.
+   */
+  setDraw(handle: Handle, segments: readonly { points: ArrayLike<number>; freehand: boolean }[], flags = 0): void {
+    let words = 4
+    for (const seg of segments) words += 2 + (seg.points.length & ~1)
+    this.ensure(words)
+    const v = this.view
+    let i = this.len
+    v[i++] = OP.SET_DRAW
+    v[i++] = handle
+    v[i++] = flags >>> 0
+    v[i++] = segments.length
+    for (const seg of segments) {
+      const n = seg.points.length >> 1
+      v[i++] = seg.freehand ? GEO_FLAG.FREEHAND : 0
+      v[i++] = n
+      for (let k = 0; k < n * 2; k++) v[i++] = f32bits(seg.points[k]!)
+    }
     this.len = i
   }
 

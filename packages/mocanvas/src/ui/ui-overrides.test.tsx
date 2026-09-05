@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
 import type { Editor, TLComponents, TLUiOverrides, TLUiToolsContextType } from "@mocanvas/editor"
-import { useIsToolSelected, useTools } from "@mocanvas/editor"
+import { useEditorComponents, useIsToolSelected, useTools } from "@mocanvas/editor"
 import { DefaultToolbar, MocanvasUiMenuItem } from "./DefaultToolbar"
 import { DefaultUi } from "./DefaultUi"
 import { buildDefaultToolItems } from "./tools-context"
@@ -226,5 +226,74 @@ describe("DefaultToolbar overflow", () => {
     )
     expect(html).not.toContain('aria-label="More tools"')
     for (const id of ["a", "b", "c", "d", "e"]) expect(html, id).toContain(`data-tool="${id}"`)
+  })
+})
+
+/**
+ * The canvas is a chrome slot, so that chrome which has to WRAP it — a
+ * right-click menu owning the DOM node the browser fires `contextmenu` at —
+ * can render it from inside its own trigger.
+ */
+describe("the Canvas slot", () => {
+  const CANVAS = <div data-testid="the-canvas" />
+
+  /** Render the chrome with only the slots under test alive. */
+  function renderWithCanvas(opts: { components?: TLComponents; hidePanels?: boolean } = {}): string {
+    const { editor } = makeEditor()
+    const components: TLComponents = { Toolbar: null, NavigationPanel: null, StylePanel: null, DebugPanel: null, Tooltip: null, ...opts.components }
+    return renderToStaticMarkup(
+      <DefaultUi editor={editor} canvas={CANVAS} components={components} showStats={false} {...(opts.hidePanels ? { hidePanels: true } : {})} />,
+    )
+  }
+
+  it("renders the canvas through the slot", () => {
+    expect(renderWithCanvas()).toContain('data-testid="the-canvas"')
+  })
+
+  it("publishes it on the map, so a slot can render it with `useEditorComponents()`", () => {
+    function Menu() {
+      const { Canvas } = useEditorComponents()
+      return <div data-testid="trigger">{Canvas ? <Canvas /> : null}</div>
+    }
+    const html = renderWithCanvas({ components: { ContextMenu: Menu } })
+    // Inside the trigger, and exactly once — rendering it twice would mount two canvases.
+    expect(html).toContain('<div data-testid="trigger"><div data-testid="the-canvas"></div></div>')
+    expect(html.match(/the-canvas/g)).toHaveLength(1)
+  })
+
+  it("still renders the canvas when the panels are hidden", () => {
+    const html = renderWithCanvas({ hidePanels: true })
+    expect(html).toContain('data-testid="the-canvas"')
+    expect(html).not.toContain('role="toolbar"')
+  })
+
+  it("renders nothing for the slot when no canvas was supplied", () => {
+    const { editor } = makeEditor()
+    const html = renderToStaticMarkup(<DefaultUi editor={editor} components={{ Toolbar: null, NavigationPanel: null, StylePanel: null, DebugPanel: null, Tooltip: null }} showStats={false} />)
+    expect(html).not.toContain("the-canvas")
+  })
+})
+
+describe("the Grid slot", () => {
+  const Grid = ({ x, y, z, size }: { x: number; y: number; z: number; size: number }) => (
+    <div data-testid="grid" data-camera={`${x},${y},${z}`} data-size={size} />
+  )
+  const OFF = { Toolbar: null, NavigationPanel: null, StylePanel: null, DebugPanel: null, Tooltip: null }
+
+  function renderGrid(isGridMode: boolean): string {
+    const { editor } = makeEditor({
+      getInstanceState: () => ({ openMenus: [], isReadonly: false, isGridMode }),
+      getCamera: () => ({ x: 12, y: -3, z: 2 }),
+      getDocumentSettings: () => ({ gridSize: 40 }),
+    })
+    return renderToStaticMarkup(<DefaultUi editor={editor} components={{ ...OFF, Grid }} showStats={false} />)
+  }
+
+  it("hands the slot the camera and the document's grid step", () => {
+    expect(renderGrid(true)).toContain('data-camera="12,-3,2" data-size="40"')
+  })
+
+  it("does not mount it while grid mode is off", () => {
+    expect(renderGrid(false)).not.toContain('data-testid="grid"')
   })
 })

@@ -222,14 +222,9 @@ describe("putExternalContent", () => {
     expect(b.center.y).toBeCloseTo(200, 6)
     expect(editor.getSelectedShapeIds()).toEqual([shape!.id])
 
-    // whitespace-only text is dropped; urls become text too
+    // whitespace-only text is dropped
     await editor.putExternalContent({ type: "text", text: "  " })
-    await editor.putExternalContent({ type: "url", url: "https://example.com" })
-    const texts = shapesOfType<TextShape>(editor, "text")
-    expect(texts).toHaveLength(2)
-    expect(texts[1]!.props.text).toBe("https://example.com")
-    // defaults to the viewport center when no point is given
-    expect(editor.getShapePageBounds(texts[1]!)!.center.x).toBeCloseTo(editor.getViewportPageCenter().x, 6)
+    expect(shapesOfType<TextShape>(editor, "text")).toHaveLength(1)
   })
 
   it("registered handlers are replaceable, removable, and defaults do not override them", async () => {

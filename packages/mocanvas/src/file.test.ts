@@ -78,9 +78,10 @@ describe("loadMocanvasFile", () => {
   it("keeps props no util declares, so a round trip preserves them", () => {
     const editor = makeEditor()
     loadMocanvasFile(editor, fixture)
-    // `note.textLastEditedBy` and `geo.flipX` are props no util here declares.
+    // `note.textLastEditedBy` is a prop no util here declares.
     const note = shapesOf(editor).find((s) => s.type === "note")!
     expect((note.props as Record<string, unknown>)["textLastEditedBy"]).toBeDefined()
+    // `geo.flipX` is declared now, and read back as stored.
     const geo = shapesOf(editor).find((s) => s.type === "geo")!
     expect((geo.props as Record<string, unknown>)["flipX"]).toBe(false)
     // The arrow's `kind` and `elbowMidPoint` are declared now, and read back.

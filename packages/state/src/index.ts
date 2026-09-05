@@ -11,10 +11,19 @@ export {
 	isSignal,
 	isAtom,
 	isComputed,
+	isUninitialized,
+	getComputedInstance,
 	getGlobalEpoch,
+	localStorageAtom,
 	subscribeToSignal,
+	whyAmIRunning,
 	RenderTracker,
 } from "./core"
+
+export { AtomMap } from "./AtomMap"
+export { AtomSet } from "./AtomSet"
+
+export { RESET_VALUE, WithDiff, withDiff, isWithDiff, HistoryBuffer, type ComputeDiff, type ResetValue } from "./diff"
 
 export type {
 	Uninitialized,
@@ -25,5 +34,6 @@ export type {
 	ComputedOptions,
 	ReactOptions,
 	EffectScheduler,
+	EffectSchedulerOptions,
 	Reactor,
 } from "./core"

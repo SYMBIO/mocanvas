@@ -25,6 +25,7 @@ import {
   getBookmarkHostname,
   getBookmarkLayout,
   getEmbedDefinition,
+  getEmbedInfo,
   getVideoPlayTriangle,
   getVideoSource,
   VIDEO_HEIGHT,
@@ -248,6 +249,45 @@ describe("getEmbedDefinition", () => {
       embedDefinitions.length = before
     }
     expect(getEmbedDefinition("https://wiki.example.test/page")).toBeNull()
+  })
+})
+
+describe("getEmbedInfo", () => {
+  it("resolves a shared page url, keeping the url the shape should store", () => {
+    const info = getEmbedInfo(DEFAULT_EMBED_DEFINITIONS, "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    expect(info?.definition.type).toBe("youtube")
+    // The PAGE url, verbatim — the shape stores what a person would share, and
+    // the util re-derives the iframe url when it renders.
+    expect(info?.url).toBe("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    expect(info?.embedUrl).toBe("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ")
+  })
+
+  it("recovers the page url from an already-embeddable url", () => {
+    const embed =
+      "https://www.figma.com/embed?embed_host=mocanvas&url=" +
+      encodeURIComponent("https://www.figma.com/file/abc/Board")
+    const info = getEmbedInfo(DEFAULT_EMBED_DEFINITIONS, embed)
+    expect(info?.definition.type).toBe("figma")
+    expect(info?.url).toBe("https://www.figma.com/file/abc/Board")
+    // Already the form the iframe wants, so it is not wrapped a second time.
+    expect(info?.embedUrl).toBe(embed)
+  })
+
+  it("answers undefined rather than throwing on input that is not a url at all", () => {
+    for (const bad of ["", "   ", "not a url", "javascript:alert(1)", "://///"]) {
+      expect(getEmbedInfo(DEFAULT_EMBED_DEFINITIONS, bad), bad).toBeUndefined()
+    }
+  })
+
+  it("answers undefined for a url outside the list it was handed", () => {
+    expect(getEmbedInfo([], "https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBeUndefined()
+    expect(getEmbedInfo(DEFAULT_EMBED_DEFINITIONS, "https://example.test/video")).toBeUndefined()
+  })
+
+  it("takes the list as an argument, so a picker decides what it accepts", () => {
+    const onlyVimeo = DEFAULT_EMBED_DEFINITIONS.filter((d) => d.type === "vimeo")
+    expect(getEmbedInfo(onlyVimeo, "https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBeUndefined()
+    expect(getEmbedInfo(onlyVimeo, "https://vimeo.com/123456")?.definition.type).toBe("vimeo")
   })
 })
 

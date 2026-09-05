@@ -8,10 +8,26 @@ import { createBackend } from "../render/webgl2"
 import type { UnknownShape } from "../records/base"
 import { Vec } from "../geometry"
 import { EditorProvider } from "./EditorContext"
+import { useEditorComponents } from "./ui-context"
+import { useThemeCssVars } from "./themeVars"
 import { useCanvasEvents } from "./useCanvasEvents"
 import { getSelectionHandlePositions } from "../editor/selectionHandles"
-import { ShapeIndicatorOverlayUtil, type TLIndicatorHost } from "../indicators/ShapeIndicatorOverlayUtil"
+import { ShapeIndicatorCompositor, type TLIndicatorHost } from "../indicators/ShapeIndicatorCompositor"
 import { getIndicatorSource } from "../indicators/resolve"
+
+/**
+ * What the `Canvas` component slot is handed.
+ *
+ * A host replacing the canvas gets only presentation: a class name and
+ * children. It deliberately does *not* receive the editor as a prop — the
+ * replacement is rendered inside the editor's provider and reads it with
+ * `useEditor()`, so a slot cannot be rendered against a different editor than
+ * the one it is inside of.
+ */
+export interface TLCanvasComponentProps {
+  className?: string
+  children?: ReactNode
+}
 
 export interface CanvasProps {
   editor: Editor
@@ -25,10 +41,10 @@ export interface CanvasProps {
    * The overlay util that paints shape indicators onto the canvas layer.
    *
    * A *class*, not an instance — one is constructed per editor. Pass
-   * `ShapeIndicatorOverlayUtil.configure({ lineWidth })` to restyle, or a
+   * `ShapeIndicatorCompositor.configure({ lineWidth })` to restyle, or a
    * subclass to control which shapes get an outline.
    */
-  indicatorOverlayUtil?: typeof ShapeIndicatorOverlayUtil
+  indicatorOverlayUtil?: typeof ShapeIndicatorCompositor
 }
 
 export interface CanvasComponents {
@@ -167,32 +183,44 @@ export function Canvas({ editor, className, style, children, components, indicat
   }, [events])
 
   const cursor = useValue("cursor", () => cssCursor(editor.getInstanceState().cursor.type), [editor])
+  /*
+   * Suppressing the browser's own menu is the canvas's job only while nothing
+   * else wants the gesture. An app that filled the `ContextMenu` chrome slot
+   * WRAPS this element with its own trigger, and a `preventDefault` here would
+   * reach that trigger as an already-handled event and silently stop it from
+   * opening — the canvas would eat the menu it exists to make room for.
+   */
+  const hasChromeContextMenu = useEditorComponents().ContextMenu != null
+  // The theme's surface colours, stamped as custom properties so the SVG
+  // overlays, the chrome and an app's own CSS all read one source. `style`
+  // comes after, so a caller can still override an individual variable.
+  const themeVars = useThemeCssVars(editor)
   const Indicators = components?.Indicators ?? DefaultIndicators
-  const Brush = components?.Brush ?? DefaultBrush
+  const Brush = components?.Brush ?? (hasOverlay(editor, "brush") ? null : DefaultBrush)
   const Background = components?.Background
 
   return (
-    <EditorProvider value={editor}>
+    <EditorProvider editor={editor}>
       <div
         ref={containerRef}
         className={className ? `mocanvas ${className}` : "mocanvas"}
-        style={{ ...containerStyle, ...style, cursor }}
+        style={{ ...containerStyle, ...themeVars, ...style, cursor }}
         tabIndex={0}
         onPointerDown={events.onPointerDown}
         onPointerMove={events.onPointerMove}
         onPointerUp={events.onPointerUp}
         onPointerCancel={events.onPointerCancel}
-        onContextMenu={events.onContextMenu}
+        {...(hasChromeContextMenu ? {} : { onContextMenu: events.onContextMenu })}
         data-testid="mocanvas-container"
       >
         {Background ? <Background editor={editor} /> : null}
         <canvas ref={canvasRef} style={{ ...layerStyle, display: "block" }} />
         <OverlayLayer editor={editor} />
-        <IndicatorCanvas editor={editor} util={indicatorOverlayUtil ?? ShapeIndicatorOverlayUtil} />
+        <IndicatorCanvas editor={editor} util={indicatorOverlayUtil ?? ShapeIndicatorCompositor} />
         <svg style={{ ...layerStyle, pointerEvents: "none", overflow: "visible" }}>
           <Indicators editor={editor} />
-          <SnapLines editor={editor} />
-          <Brush editor={editor} />
+          {hasOverlay(editor, "snapIndicator") ? null : <SnapLines editor={editor} />}
+          {Brush ? <Brush editor={editor} /> : null}
         </svg>
         {children}
       </div>
@@ -209,10 +237,24 @@ export function Canvas({ editor, className, style, children, components, indicat
  * destroyed per pointer move is the thing that makes a big board feel slow.
  *
  * The layer is sized in device pixels and drawn under a `dpr` transform, so
- * everything below it (and inside {@link ShapeIndicatorOverlayUtil.render}) can
+ * everything below it (and inside {@link ShapeIndicatorCompositor.render}) can
  * be expressed in CSS pixels and page units without a factor in sight.
  */
-function IndicatorCanvas({ editor, util }: { editor: Editor; util: typeof ShapeIndicatorOverlayUtil }) {
+/**
+ * Whether an overlay painter is registered for `type`.
+ *
+ * The SVG layer below predates the canvas painters and still knows how to draw
+ * the brush, the snap lines and the selection handles. Where a painter is
+ * registered it owns that job, and the SVG version stands down rather than
+ * stroking the same thing twice. Where one is not — an app that passed its own
+ * `overlayUtils` and left something out — the SVG version still draws it, so
+ * nothing silently disappears.
+ */
+function hasOverlay(editor: Editor, type: string): boolean {
+  return editor.overlays.getOverlayUtil(type) !== undefined
+}
+
+function IndicatorCanvas({ editor, util }: { editor: Editor; util: typeof ShapeIndicatorCompositor }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const overlay = useMemo(() => new util(editor as unknown as TLIndicatorHost), [editor, util])
 
@@ -238,7 +280,13 @@ function IndicatorCanvas({ editor, util }: { editor: Editor; util: typeof ShapeI
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.clearRect(0, 0, w, h)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      overlay.render(ctx)
+      // The registered overlay utils paint here — brush, scribble, snap lines,
+      // handles, collaborators. When one of them is the shape-indicator util,
+      // it draws the indicators too, so the standalone compositor stands down
+      // rather than stroking every outline twice.
+      const registered = editor.overlays.getOverlayUtil("shapeIndicator")
+      if (!registered) overlay.render(ctx)
+      editor.overlays.render(ctx)
     }
     const stop = reactSignal("canvas.indicators", () => {
       editor.getCamera()
@@ -249,6 +297,12 @@ function IndicatorCanvas({ editor, util }: { editor: Editor; util: typeof ShapeI
       editor.getCurrentToolId()
       // Shape edits move the outline with the shape.
       editor.getFrameEpoch()
+      // What the overlay painters draw from. Without these the overlays paint
+      // once and then freeze: the brush, the scribbles and the collaborators
+      // all change without touching the camera or the selection.
+      editor.getInstanceState()
+      editor.snaps.getLines()
+      editor.getCollaborators()
       dirty = true
       if (!raf) raf = requestAnimationFrame(draw)
     })
@@ -322,6 +376,7 @@ const OverlayShape = track(function OverlayShape({
       }}
     >
       {util.component(shape)}
+      {util.getContentElement ? <ContentElementSlot editor={editor} shape={shape} /> : null}
     </div>
   )
   if (!clip) return el
@@ -342,6 +397,35 @@ const OverlayShape = track(function OverlayShape({
     </div>
   )
 })
+
+/**
+ * Where a shape's {@link ShapeUtil.getContentElement} element is parked while
+ * the shape is on screen.
+ *
+ * The element belongs to the editor, not to this component: mounting appends
+ * it, unmounting only takes it out of the DOM. That asymmetry is the whole
+ * feature — a cross-origin iframe that were removed *and destroyed* here would
+ * reload, and re-authenticate, every time its shape scrolled out of view or
+ * React re-rendered the layer.
+ */
+function ContentElementSlot({ editor, shape }: { editor: Editor; shape: UnknownShape }) {
+  const slotRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const slot = slotRef.current
+    if (!slot) return
+    const element = editor.contentElements.get(shape)
+    if (!element) return
+    slot.appendChild(element)
+    return () => {
+      // Detach, do not release: the editor still owns it.
+      if (element.parentNode === slot) slot.removeChild(element)
+    }
+    // Only the identity of the shape matters; the element is stable across edits.
+  }, [editor, shape.id])
+
+  return <div ref={slotRef} style={{ position: "absolute", inset: 0 }} />
+}
 
 const CURSORS: Record<string, string> = {
   default: "default",
@@ -367,7 +451,7 @@ function cssCursor(type: string): string {
  *
  * @deprecated The SVG indicator layer only draws utils still on the deprecated
  * `indicator()` hook. A util that implements `getIndicatorPath` is stroked on
- * the canvas overlay by `ShapeIndicatorOverlayUtil` instead.
+ * the canvas overlay by `ShapeIndicatorCompositor` instead.
  */
 export function getShapeIndicatorNode<T extends UnknownShape>(
   util: { indicator?(shape: T): ReactNode },
@@ -451,10 +535,13 @@ const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor:
         const ind = indicatorFor(shape, "bounds", stroke)
         if (ind) items.push(ind)
       }
-      const handles = util.getHandles?.(shape) ?? []
+      const handles = hasOverlay(editor, "shapeHandle") ? [] : (util.getHandles?.(shape) ?? [])
       for (const hd of handles) {
         const p = new Vec(m.a * hd.x + m.c * hd.y + m.e, m.b * hd.x + m.d * hd.y + m.f)
-        const sp = editor.pageToScreen(p)
+        // Viewport, not screen: the SVG layer is `inset: 0` inside the canvas
+        // container, so its origin IS the container's. `pageToScreen` would add
+        // the container's own position in the window on top.
+        const sp = editor.pageToViewport(p)
         items.push(
           <circle
             key={`h-${hd.id}`}
@@ -473,7 +560,7 @@ const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor:
       const [x1, y1] = toScreen(bounds.maxX, bounds.maxY)
       items.push(<rect key="bounds" x={x0} y={y0} width={x1 - x0} height={y1 - y0} fill="none" stroke={stroke} strokeWidth={INDICATOR_STROKE} />)
     }
-    if (info) {
+    if (info && !hasOverlay(editor, "selectionForeground")) {
       for (const h of info.handles) {
         if (h.handle === "rotate") {
           items.push(<circle key="rotate" cx={h.point.x} cy={h.point.y} r={HANDLE.rotate} fill={HANDLE_FILL} stroke={stroke} strokeWidth={INDICATOR_STROKE} />)
@@ -504,7 +591,8 @@ const SnapLines = track(function SnapLines({ editor }: { editor: Editor }) {
   return (
     <>
       {lines.map((l) => {
-        const pts = l.points.map((p) => editor.pageToScreen(p))
+        // Container-relative, like every other coordinate on this SVG layer.
+        const pts = l.points.map((p) => editor.pageToViewport(p))
         return (
           <g key={l.id}>
             <polyline points={pts.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke={SNAP} strokeWidth={INDICATOR_STROKE} />

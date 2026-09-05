@@ -1,4 +1,5 @@
 import type { IdOf, UnknownRecord } from "./ids"
+import type { SerializedSchemaV1 } from "./legacy"
 
 /** Serialized records keyed by id. */
 export type SerializedStore<R extends UnknownRecord> = Record<IdOf<R>, R>
@@ -12,7 +13,15 @@ export interface SerializedSchemaV2 {
   sequences: { [sequenceId: string]: number }
 }
 
-export type SerializedSchema = SerializedSchemaV2
+/**
+ * A persisted schema, in either format mocanvas can read.
+ *
+ * Only {@link SerializedSchemaV2} is ever *written* — see
+ * `StoreSchema.serialize`. The v1 arm is here so a document saved by an older,
+ * pre-sequence writer is still loadable rather than being rejected as
+ * "unsupported schema version".
+ */
+export type SerializedSchema = SerializedSchemaV1 | SerializedSchemaV2
 
 export type MigrationId = `${string}/${number}`
 

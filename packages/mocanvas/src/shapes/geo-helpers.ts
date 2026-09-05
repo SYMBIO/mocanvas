@@ -270,23 +270,70 @@ export function getHeartSegments(w: number, h: number): CubicSegment[] {
   ]
 }
 
-/** Build the outline geometry for a geo kind inside a w×h box. */
-export function getGeoGeometry(kind: GeoShapeKind, w: number, h: number, isFilled: boolean): Geometry2d {
+/**
+ * Which axes a silhouette is mirrored about, inside its own `w × h` box.
+ *
+ * A flip is a property of the *outline*, not of the shape's transform: the box
+ * and the label stay where they are, and only the drawing inside them turns
+ * over. That is what makes a flipped triangle still occupy exactly its own
+ * bounds, and what keeps its label upright.
+ */
+export interface GeoFlip {
+  flipX?: boolean | undefined
+  flipY?: boolean | undefined
+}
+
+/** Whether `flip` asks for anything at all. */
+export function hasGeoFlip(flip: GeoFlip | undefined): boolean {
+  return flip !== undefined && (flip.flipX === true || flip.flipY === true)
+}
+
+/** Mirror `points` about the centre of the `w × h` box on the requested axes. */
+export function mirrorPointsInBox(points: readonly VecLike[], w: number, h: number, flip: GeoFlip | undefined): VecLike[] {
+  if (!hasGeoFlip(flip)) return points.map((p) => ({ x: p.x, y: p.y }))
+  const fx = flip!.flipX === true
+  const fy = flip!.flipY === true
+  return points.map((p) => ({ x: fx ? w - p.x : p.x, y: fy ? h - p.y : p.y }))
+}
+
+/** {@link mirrorPointsInBox} for cubic segments: every control point moves with its anchors. */
+export function mirrorSegmentsInBox(segments: readonly CubicSegment[], w: number, h: number, flip: GeoFlip | undefined): CubicSegment[] {
+  if (!hasGeoFlip(flip)) return segments.map((s) => ({ ...s }))
+  const fx = flip!.flipX === true
+  const fy = flip!.flipY === true
+  const map = (p: VecLike): VecLike => ({ x: fx ? w - p.x : p.x, y: fy ? h - p.y : p.y })
+  return segments.map((s) => ({ p0: map(s.p0), c1: map(s.c1), c2: map(s.c2), p1: map(s.p1) }))
+}
+
+/**
+ * Build the outline geometry for a geo kind inside a w×h box.
+ *
+ * `flip` mirrors the silhouette in place — see {@link GeoFlip}. It is applied
+ * to the *source* points and control points rather than to the finished
+ * geometry, so a curved outline keeps its curves instead of being flattened
+ * into a mirrored polygon.
+ */
+export function getGeoGeometry(kind: GeoShapeKind, w: number, h: number, isFilled: boolean, flip?: GeoFlip): Geometry2d {
   switch (kind) {
     case "ellipse":
+      // An axis-aligned ellipse is its own mirror image on both axes.
       return new Ellipse2d({ width: w, height: h, isFilled })
     case "oval":
-      return new CubicSpline2d({ segments: getStadiumSegments(w, h), isClosed: true, isFilled })
+      // As is a stadium — but it is built from segments, so it goes through the
+      // same path as the rest for the sake of one behaviour rather than two.
+      return new CubicSpline2d({ segments: mirrorSegmentsInBox(getStadiumSegments(w, h), w, h, flip), isClosed: true, isFilled })
     case "cloud":
-      return new CubicSpline2d({ segments: getCloudSegments(w, h), isClosed: true, isFilled })
+      return new CubicSpline2d({ segments: mirrorSegmentsInBox(getCloudSegments(w, h), w, h, flip), isClosed: true, isFilled })
     case "heart":
-      return new CubicSpline2d({ segments: getHeartSegments(w, h), isClosed: true, isFilled })
+      return new CubicSpline2d({ segments: mirrorSegmentsInBox(getHeartSegments(w, h), w, h, flip), isClosed: true, isFilled })
     default: {
-      const points = getGeoPolygonPoints(kind, w, h) ?? []
+      const points = mirrorPointsInBox(getGeoPolygonPoints(kind, w, h) ?? [], w, h, flip)
       const body = new Polygon2d({ points, isFilled })
       const decorations = getGeoDecorations(kind, w, h)
       if (decorations.length === 0) return body
-      return new Group2d({ children: [body, ...decorations.map((points) => new Polyline2d({ points }))] })
+      return new Group2d({
+        children: [body, ...decorations.map((points) => new Polyline2d({ points: mirrorPointsInBox(points, w, h, flip) }))],
+      })
     }
   }
 }

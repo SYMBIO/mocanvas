@@ -1,11 +1,31 @@
-import { atom, computed, transact, unsafe__withoutCapture, type Atom, type Computed } from "./_signals"
-import type { IdOf, RecordFromId, RecordScope, RecordType, UnknownRecord } from "./ids"
+import {
+  atom,
+  computed,
+  isUninitialized,
+  RESET_VALUE,
+  transact,
+  unsafe__withoutCapture,
+  withDiff,
+  type Atom,
+  type Computed,
+} from "./_signals"
+import type { IdOf, RecordFromId, RecordScope, RecordType, StoreValidator, UnknownRecord } from "./ids"
 import { parseRecordId, uniqueId } from "./ids"
+import {
+  getIndexablePropertyOf,
+  matchesQuery,
+  type CollectionDiff,
+  type QueryExpression,
+  type RSIndex,
+  type RSIndexDiff,
+  type RSIndexMap,
+} from "./query"
 import type { SerializedSchema, SerializedStore } from "./migrate"
 import {
   applyChangeToDiff,
   createEmptyRecordsDiff,
   isRecordsDiffEmpty,
+  squashRecordDiffs,
   type RecordsDiff,
 } from "./RecordsDiff"
 import type { StoreSchema, StoreSnapshot, StoreValidationPhase } from "./StoreSchema"
@@ -27,6 +47,40 @@ export interface StoreListenerFilters {
 export type RecordFromTypeName<R extends UnknownRecord, T extends string> = Extract<R, { typeName: T }>
 
 export type StoreRecord<S extends Store<any, any>> = S extends Store<infer R, any> ? R : never
+
+/**
+ * Anything that owns a store: a `Store` itself, or an object holding one (an
+ * `Editor`). Written for the helpers that want to accept either without their
+ * callers having to reach for `.store`.
+ */
+export type StoreObject<R extends UnknownRecord = UnknownRecord> = Store<R, any> | { store: Store<R, any> }
+
+/** The record union of whatever store a {@link StoreObject} carries. */
+export type StoreObjectRecordType<Context extends StoreObject<any>> = Context extends Store<infer R, any>
+  ? R
+  : Context extends { store: Store<infer R, any> }
+    ? R
+    : never
+
+/** A validator per record type, as `StoreSchema` collects them from the record types. */
+export type StoreValidators<R extends UnknownRecord> = {
+  [TypeName in R["typeName"]]: StoreValidator<Extract<R, { typeName: TypeName }>>
+}
+
+/**
+ * A record that failed validation, with enough context to say what was being
+ * done to it at the time.
+ *
+ * Thrown rather than returned: a store that keeps going after writing an
+ * invalid record is a store whose next save produces a file nothing can load.
+ */
+export interface StoreError {
+  error: Error
+  phase: "initialize" | "createRecord" | "updateRecord" | "tests"
+  recordBefore?: unknown
+  recordAfter: unknown
+  isExistingValidationIssue: boolean
+}
 
 export interface StoreOptions<R extends UnknownRecord, Props> {
   schema: StoreSchema<R, Props>
@@ -306,14 +360,45 @@ interface Listener<R extends UnknownRecord> {
 /* ------------------------------------------------------------------------ */
 
 /** Reactive views over the store's records, cached per type name. */
+/**
+ * How the records of one type are narrowed: a predicate, or a declarative
+ * {@link QueryExpression} the store can answer from an index.
+ *
+ * Prefer the query object. A predicate has to be run against every record of
+ * the type; a query with an `eq` clause is answered from an index bucket.
+ */
+export type StoreQueryFilter<Rec extends UnknownRecord> =
+  | ((record: Rec) => boolean)
+  | QueryExpression<Rec>
+
+function toPredicate<Rec extends UnknownRecord>(filter: StoreQueryFilter<Rec>): (record: Rec) => boolean {
+  return typeof filter === "function" ? filter : (record) => matchesQuery(filter, record)
+}
+
 export class StoreQueries<R extends UnknownRecord> {
   private readonly idsCache = new Map<string, Computed<ReadonlySet<IdOf<R>>>>()
   private readonly recordsCache = new Map<string, Computed<R[]>>()
+  private readonly indexCache = new Map<string, RSIndex<any, any>>()
+  private readonly historyCache = new Map<string, Computed<number, RecordsDiff<R>>>()
 
   constructor(private readonly store: Store<R, any>) {}
 
-  /** The set of ids of every record of `typeName`. Maintained incrementally. */
-  ids<T extends R["typeName"]>(typeName: T): Computed<ReadonlySet<IdOf<RecordFromTypeName<R, T>>>> {
+  /**
+   * The set of ids of every record of `typeName`, optionally narrowed by a
+   * filter. Maintained incrementally.
+   */
+  ids<T extends R["typeName"]>(
+    typeName: T,
+    filter?: StoreQueryFilter<RecordFromTypeName<R, T>>,
+  ): Computed<ReadonlySet<IdOf<RecordFromTypeName<R, T>>>> {
+    if (filter) {
+      const records = this.records(typeName, filter)
+      return computed(`store:${this.store.id}:ids:${typeName}:filtered`, () => {
+        const set = new Set<IdOf<RecordFromTypeName<R, T>>>()
+        for (const record of records.get()) set.add(record.id as IdOf<RecordFromTypeName<R, T>>)
+        return set as ReadonlySet<IdOf<RecordFromTypeName<R, T>>>
+      })
+    }
     let c = this.idsCache.get(typeName)
     if (!c) {
       const index = this.store.getTypeIndex(typeName)
@@ -326,8 +411,19 @@ export class StoreQueries<R extends UnknownRecord> {
     return c as unknown as Computed<ReadonlySet<IdOf<RecordFromTypeName<R, T>>>>
   }
 
-  /** Every record of `typeName`, in insertion order. */
-  records<T extends R["typeName"]>(typeName: T): Computed<RecordFromTypeName<R, T>[]> {
+  /**
+   * Every record of `typeName`, in insertion order, optionally narrowed by a
+   * filter.
+   *
+   * A {@link QueryExpression} with an `eq` clause is answered from the index on
+   * that property, so a page with ten thousand shapes does not have to be
+   * walked to find the twelve on one frame.
+   */
+  records<T extends R["typeName"]>(
+    typeName: T,
+    filter?: StoreQueryFilter<RecordFromTypeName<R, T>>,
+  ): Computed<RecordFromTypeName<R, T>[]> {
+    if (filter) return this.filteredRecords(typeName, filter)
     let c = this.recordsCache.get(typeName)
     if (!c) {
       const ids = this.ids(typeName)
@@ -344,26 +440,205 @@ export class StoreQueries<R extends UnknownRecord> {
     return c as unknown as Computed<RecordFromTypeName<R, T>[]>
   }
 
-  /** The first record of `typeName` matching `predicate` (or the first record, when omitted). */
+  private filteredRecords<T extends R["typeName"]>(
+    typeName: T,
+    filter: StoreQueryFilter<RecordFromTypeName<R, T>>,
+  ): Computed<RecordFromTypeName<R, T>[]> {
+    type Rec = RecordFromTypeName<R, T>
+    const predicate = toPredicate<Rec>(filter)
+    const indexedProperty = typeof filter === "function" ? undefined : getIndexablePropertyOf(filter)
+
+    if (indexedProperty !== undefined) {
+      const clause = (filter as QueryExpression<Rec>)[indexedProperty as keyof Rec]
+      const wanted = clause && "eq" in clause ? clause.eq : undefined
+      const index = this.index(typeName, indexedProperty as keyof Rec & string)
+      return computed(`store:${this.store.id}:records:${typeName}:${String(indexedProperty)}`, () => {
+        const bucket = index.get().get(wanted as Rec[keyof Rec & string])
+        if (!bucket) return []
+        const result: Rec[] = []
+        for (const id of bucket) {
+          const record = this.store.get(id as IdOf<R>) as Rec | undefined
+          if (record !== undefined && predicate(record)) result.push(record)
+        }
+        return result
+      })
+    }
+
+    const all = this.records(typeName)
+    return computed(`store:${this.store.id}:records:${typeName}:filtered`, () => all.get().filter(predicate))
+  }
+
+  /** The first record of `typeName` matching `filter` (or the first record, when omitted). */
   record<T extends R["typeName"]>(
     typeName: T,
-    predicate?: (record: RecordFromTypeName<R, T>) => boolean,
+    filter?: StoreQueryFilter<RecordFromTypeName<R, T>>,
   ): Computed<RecordFromTypeName<R, T> | undefined> {
-    const records = this.records(typeName)
-    return computed(`store:${this.store.id}:record:${typeName}`, () => {
-      const all = records.get()
-      if (!predicate) return all[0]
-      for (const record of all) if (predicate(record)) return record
-      return undefined
-    })
+    const records = filter ? this.filteredRecords(typeName, filter) : this.records(typeName)
+    return computed(`store:${this.store.id}:record:${typeName}`, () => records.get()[0])
   }
 
   /** Non-reactive filter over the records of `typeName`. */
   exec<T extends R["typeName"]>(
     typeName: T,
-    predicate: (record: RecordFromTypeName<R, T>) => boolean,
+    filter: StoreQueryFilter<RecordFromTypeName<R, T>>,
   ): RecordFromTypeName<R, T>[] {
-    return unsafe__withoutCapture(() => this.records(typeName).get().filter(predicate))
+    return unsafe__withoutCapture(() => this.filteredRecords(typeName, filter).get())
+  }
+
+  /**
+   * A live index from the values of one property to the ids of the records
+   * holding them.
+   *
+   * The index is cached per type and property, and it carries diffs: a
+   * dependent that already built something from it can ask
+   * `index.getDiffSince(epoch)` and patch, instead of walking the whole map
+   * again. That is what makes "every shape whose parentId is this frame" cheap
+   * enough to recompute on every pointer move.
+   */
+  index<T extends R["typeName"], Property extends keyof RecordFromTypeName<R, T> & string>(
+    typeName: T,
+    property: Property,
+  ): RSIndex<RecordFromTypeName<R, T>, Property> {
+    type Rec = RecordFromTypeName<R, T>
+    const key = `${typeName}:${property}`
+    const cached = this.indexCache.get(key)
+    if (cached) return cached as RSIndex<Rec, Property>
+
+    const history = this.filterHistory(typeName)
+
+    const index = computed<RSIndexMap<Rec, Property>, RSIndexDiff<Rec, Property>>(
+      `store:${this.store.id}:index:${key}`,
+      (previous, lastComputedEpoch) => {
+        if (isUninitialized(previous)) {
+          history.get()
+          return this.buildIndex<T, Property>(typeName, property)
+        }
+
+        const diffs = history.getDiffSince(lastComputedEpoch)
+        if (diffs === RESET_VALUE) return this.buildIndex<T, Property>(typeName, property)
+
+        const nextMap: RSIndexMap<Rec, Property> = new Map(previous)
+        const indexDiff: RSIndexDiff<Rec, Property> = new Map()
+        let changed = false
+
+        const remove = (value: Rec[Property], id: IdOf<Rec>) => {
+          const bucket = nextMap.get(value)
+          if (!bucket?.has(id)) return
+          const next = new Set(bucket)
+          next.delete(id)
+          if (next.size === 0) nextMap.delete(value)
+          else nextMap.set(value, next)
+          const entry = indexDiff.get(value) ?? {}
+          ;(entry.removed ??= new Set()).add(id)
+          indexDiff.set(value, entry)
+          changed = true
+        }
+        const add = (value: Rec[Property], id: IdOf<Rec>) => {
+          const bucket = nextMap.get(value)
+          if (bucket?.has(id)) return
+          nextMap.set(value, new Set(bucket).add(id))
+          const entry = indexDiff.get(value) ?? {}
+          ;(entry.added ??= new Set()).add(id)
+          indexDiff.set(value, entry)
+          changed = true
+        }
+
+        for (const diff of diffs) {
+          for (const id in diff.added) {
+            const record = diff.added[id as IdOf<R>] as Rec | undefined
+            if (record?.typeName === typeName) add(record[property], record.id as IdOf<Rec>)
+          }
+          for (const id in diff.updated) {
+            const [before, after] = diff.updated[id as IdOf<R>] as [Rec, Rec]
+            if (after.typeName !== typeName) continue
+            if (Object.is(before[property], after[property])) continue
+            remove(before[property], before.id as IdOf<Rec>)
+            add(after[property], after.id as IdOf<Rec>)
+          }
+          for (const id in diff.removed) {
+            const record = diff.removed[id as IdOf<R>] as Rec | undefined
+            if (record?.typeName === typeName) remove(record[property], record.id as IdOf<Rec>)
+          }
+        }
+
+        if (!changed) return previous
+        return withDiff(nextMap, indexDiff)
+      },
+      { historyLength: 128 },
+    )
+
+    this.indexCache.set(key, index as RSIndex<any, any>)
+    return index as RSIndex<Rec, Property>
+  }
+
+  private buildIndex<T extends R["typeName"], Property extends keyof RecordFromTypeName<R, T> & string>(
+    typeName: T,
+    property: Property,
+  ): RSIndexMap<RecordFromTypeName<R, T>, Property> {
+    type Rec = RecordFromTypeName<R, T>
+    const map: RSIndexMap<Rec, Property> = new Map()
+    for (const record of this.records(typeName).get()) {
+      const value = record[property]
+      const bucket = map.get(value)
+      if (bucket) bucket.add(record.id as IdOf<Rec>)
+      else map.set(value, new Set([record.id as IdOf<Rec>]))
+    }
+    return map
+  }
+
+  /**
+   * The store's history, narrowed to one record type.
+   *
+   * Its *value* is only a counter — what it is for is the diffs it carries.
+   * `filterHistory("shape").getDiffSince(epoch)` is every change to shapes
+   * since `epoch`, with changes to other record types dropped, which is how a
+   * derived collection stays incremental without re-reading the store.
+   */
+  filterHistory<T extends R["typeName"]>(typeName: T): Computed<number, RecordsDiff<RecordFromTypeName<R, T>>> {
+    const cached = this.historyCache.get(typeName)
+    if (cached) return cached as unknown as Computed<number, RecordsDiff<RecordFromTypeName<R, T>>>
+
+    const filtered = computed<number, RecordsDiff<R>>(
+      `store:${this.store.id}:history:${typeName}`,
+      (previous, lastComputedEpoch) => {
+        const epoch = this.store.history.get()
+        if (isUninitialized(previous)) return epoch
+
+        const diffs = this.store.history.getDiffSince(lastComputedEpoch)
+        if (diffs === RESET_VALUE) return epoch
+
+        const merged = createEmptyRecordsDiff<R>()
+        let any = false
+        for (const diff of diffs) {
+          for (const id in diff.added) {
+            const record = diff.added[id as IdOf<R>]!
+            if (record.typeName !== typeName) continue
+            merged.added[id as IdOf<R>] = record
+            any = true
+          }
+          for (const id in diff.updated) {
+            const pair = diff.updated[id as IdOf<R>]!
+            if (pair[1].typeName !== typeName) continue
+            merged.updated[id as IdOf<R>] = pair
+            any = true
+          }
+          for (const id in diff.removed) {
+            const record = diff.removed[id as IdOf<R>]!
+            if (record.typeName !== typeName) continue
+            merged.removed[id as IdOf<R>] = record
+            any = true
+          }
+        }
+        // Nothing of this type changed: keep the old value so dependents are
+        // not woken at all.
+        if (!any) return previous
+        return withDiff(epoch, merged)
+      },
+      { historyLength: 128 },
+    )
+
+    this.historyCache.set(typeName, filtered)
+    return filtered as unknown as Computed<number, RecordsDiff<RecordFromTypeName<R, T>>>
   }
 }
 
@@ -386,8 +661,16 @@ export class Store<R extends UnknownRecord = UnknownRecord, Props = unknown> {
   readonly scopedTypes: { readonly [S in RecordScope]: ReadonlySet<string> }
   readonly sideEffects = new StoreSideEffects<R>()
   readonly query: StoreQueries<R>
-  /** Bumped once per completed operation that changed something. */
-  readonly history: Atom<number>
+  /**
+   * Bumped once per completed operation that changed something.
+   *
+   * The counter itself carries no information; the diffs do. The atom keeps a
+   * bounded history of the squashed {@link RecordsDiff} of each operation, so a
+   * derived collection can ask `history.getDiffSince(epoch)` and patch itself
+   * instead of rebuilding. `store.query.filterHistory(typeName)` is the same
+   * thing narrowed to one record type.
+   */
+  readonly history: Atom<number, RecordsDiff<R>>
 
   private readonly records = new Map<IdOf<R>, Atom<R | undefined>>()
   private readonly typeIndexes = new Map<string, TypeIndex<R>>()
@@ -399,12 +682,23 @@ export class Store<R extends UnknownRecord = UnknownRecord, Props = unknown> {
   private runCallbacks = true
   private inOperationComplete = false
   private disposed = false
+  /**
+   * The diff of the operation currently being committed, handed to the history
+   * atom's `computeDiff` as it is written. The atom only sees two counter
+   * values, so the diff has to be staged here for the one write that follows.
+   */
+  private pendingHistoryDiff: RecordsDiff<R> | null = null
 
   constructor(options: StoreOptions<R, Props>) {
     this.id = options.id ?? uniqueId()
     this.schema = options.schema
     this.props = options.props
-    this.history = atom(`store:${this.id}:history`, 0)
+    this.history = atom<number, RecordsDiff<R>>(`store:${this.id}:history`, 0, {
+      // 128 operations is deep enough that a dependent which rendered a frame
+      // ago can still patch, and shallow enough that the buffer costs nothing.
+      historyLength: 128,
+      computeDiff: () => this.pendingHistoryDiff ?? RESET_VALUE,
+    })
     this.query = new StoreQueries(this)
 
     const scoped = { document: new Set<string>(), session: new Set<string>(), presence: new Set<string>() }
@@ -699,6 +993,29 @@ export class Store<R extends UnknownRecord = UnknownRecord, Props = unknown> {
   }
 
   /**
+   * Bring a snapshot saved by an older document up to this store's schema,
+   * without loading it.
+   *
+   * Every migration sequence the schema knows is run — including the ones
+   * `createStore` derives from the shape and binding utils, so a board saved
+   * before a prop existed is backfilled here rather than failing validation on
+   * load. The input is not mutated: the result is a new snapshot carrying this
+   * schema's serialized version, ready for {@link Store.loadStoreSnapshot} (or
+   * for a caller that wants to inspect the migrated records first).
+   *
+   * A snapshot that cannot be migrated — an unknown schema version, a sequence
+   * from a NEWER build than this one, a migration that throws — raises rather
+   * than returning half-migrated data, so a caller can fail closed on it.
+   */
+  migrateSnapshot(snapshot: StoreSnapshot<R>): StoreSnapshot<R> {
+    const migrated = this.schema.migrateStoreSnapshot(snapshot)
+    if (migrated.type === "error") {
+      throw new Error(`Failed to migrate snapshot: ${migrated.reason}`)
+    }
+    return { store: migrated.value, schema: this.schema.serialize() }
+  }
+
+  /**
    * Replace the store's contents with a snapshot (migrating it first).
    * Existing records in `document` scope and in every scope present in the
    * snapshot are removed unless the snapshot contains them; other scopes are
@@ -823,8 +1140,20 @@ export class Store<R extends UnknownRecord = UnknownRecord, Props = unknown> {
         this.inOperationComplete = false
       }
     }
-    this.history.update((n) => n + 1)
+    this.pendingHistoryDiff = this.squashPendingEntries()
+    try {
+      this.history.update((n) => n + 1)
+    } finally {
+      this.pendingHistoryDiff = null
+    }
     this.flushHistory()
+  }
+
+  /** One diff describing everything the operation just committed changed. */
+  private squashPendingEntries(): RecordsDiff<R> {
+    const diffs = this.pendingEntries.map((entry) => entry.changes).filter((diff) => !isRecordsDiffEmpty(diff))
+    if (diffs.length === 1) return diffs[0]!
+    return squashRecordDiffs(diffs)
   }
 
   private flushHistory() {

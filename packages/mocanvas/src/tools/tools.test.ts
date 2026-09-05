@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { createStore, Editor, loadEngineSync, type ShapeId, type UnknownShape } from "@mocanvas/editor"
 import { defaultBindingUtils, type ArrowBinding } from "../bindings"
 import { defaultShapeUtils, getLinePoints, type ArrowShape, type FrameShape, type GeoShape, type LineShape } from "../shapes"
-import { BaseBoxShapeTool, defaultTools } from "./index"
+import { BaseBoxShapeTool, defaultShapeTools, defaultTools } from "./index"
 
 const wasmPath = fileURLToPath(new URL("../../../wasm/pkg/mocanvas_bg.wasm", import.meta.url))
 
@@ -69,7 +69,9 @@ function key(editor: Editor, k: string): void {
 }
 
 function shapesOfType<T extends UnknownShape>(editor: Editor, type: T["type"]): T[] {
-  return editor.getCurrentPageShapes().filter((s): s is T => s.type === type)
+  // Read back as UnknownShape: the caller names the concrete type it wants,
+  // which the registered union cannot be narrowed to generically.
+  return (editor.getCurrentPageShapes() as UnknownShape[]).filter((s): s is T => s.type === type)
 }
 
 function createGeo(editor: Editor, x: number, y: number, w = 100, h = 100): GeoShape {
@@ -515,5 +517,40 @@ describe("frame-like drop targets while translating", () => {
     pressShape(editor.getShape(geo.id)!, 160, 160)
     pointer(editor, "pointer_up", 160, 160)
     expect(editor.getShape(geo.id)!.parentId).toBe(pageId)
+  })
+})
+
+describe("defaultShapeTools", () => {
+  it("is the shape-placing subset of defaultTools", () => {
+    const all = new Set(defaultTools.map((t) => t.id))
+    for (const tool of defaultShapeTools) expect(all.has(tool.id), tool.id).toBe(true)
+    // The canvas tools are NOT in it: they place nothing.
+    const shapeIds = new Set(defaultShapeTools.map((t) => t.id))
+    for (const id of ["select", "hand", "eraser", "laser"]) expect(shapeIds.has(id), id).toBe(false)
+  })
+
+  it("names every default tool exactly once between the two lists", () => {
+    const ids = defaultTools.map((t) => t.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    // select, hand, eraser and laser: the four that place nothing.
+    expect(ids.length).toBe(defaultShapeTools.length + 4)
+  })
+
+  it("starts the editor in select, whichever way the two lists are spread", () => {
+    const engine = loadEngineSync(readFileSync(wasmPath))
+    // The spread the consumer writes: every shape tool is named twice, which a
+    // tool registry keyed by id has to survive.
+    const editor = new Editor({
+      store: createStore(),
+      shapeUtils: defaultShapeUtils,
+      bindingUtils: defaultBindingUtils,
+      tools: [...defaultTools, ...defaultShapeTools],
+      engine,
+      getContainer: () => ({}) as HTMLElement,
+    })
+    expect(editor.getCurrentToolId()).toBe("select")
+    editor.setCurrentTool("geo")
+    expect(editor.getCurrentToolId()).toBe("geo")
+    editor.dispose()
   })
 })

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 import { LINE_HEIGHT } from "../shapes/text-helpers"
-import { getRichTextExtensions, measureRichText, renderHtmlFromRichTextForMeasurement } from "./measure-html"
+import {
+  getRichTextExtensions,
+  measureRichText,
+  renderHtmlFromRichTextForMeasurement,
+  renderHtmlFromRichTextWithExtensions,
+} from "./measure-html"
 import { toRichText, type RichText } from "./rich-text"
 import { measureLabel } from "./text-layout"
 import { getTextMeasure, TextMeasure } from "./TextMeasure"
@@ -19,6 +24,27 @@ describe("renderHtmlFromRichTextForMeasurement", () => {
 
   it("emits no whitespace between tags — pre-wrap would measure it as a space", () => {
     expect(renderHtmlFromRichTextForMeasurement(null, toRichText("a\nb\nc"))).not.toMatch(/>\s+</)
+  })
+})
+
+describe("renderHtmlFromRichTextWithExtensions", () => {
+  it("renders with the list it was given, no editor involved", () => {
+    expect(renderHtmlFromRichTextWithExtensions(toRichText("one\ntwo"), tipTapDefaultExtensions)).toBe("<p>one</p><p>two</p>")
+  })
+
+  it("agrees with the editor-driven renderer when the lists agree", () => {
+    const doc = toRichText("hello")
+    const editor = { options: { text: { tipTapConfig: { extensions: tipTapDefaultExtensions } } } } as never
+    expect(renderHtmlFromRichTextWithExtensions(doc, tipTapDefaultExtensions)).toBe(renderHtmlFromRichTextForMeasurement(editor, doc))
+  })
+
+  it("honours a narrower list — a node type left out keeps its text but loses its wrapper", () => {
+    const only = tipTapDefaultExtensions.filter((e) => e.name !== "paragraph")
+    expect(renderHtmlFromRichTextWithExtensions(toRichText("one\ntwo"), only)).toBe("onetwo")
+  })
+
+  it("accepts a plain string, like its sibling", () => {
+    expect(renderHtmlFromRichTextWithExtensions("a\nb", tipTapDefaultExtensions)).toBe("<p>a</p><p>b</p>")
   })
 })
 

@@ -10,10 +10,17 @@
  * = (-dy, dx), so for a left-to-right arrow a positive bend bows the arc toward
  * +y (down in screen space).
  */
-import { CubicSpline2d, Polygon2d, Polyline2d, Vec, type Geometry2d, type VecLike } from "@mocanvas/editor"
+import { CubicSpline2d, Polygon2d, Polyline2d, Vec, type ArrowShapeArrowheadKind, type Geometry2d, type VecLike } from "@mocanvas/editor"
 import { arcToCubicSegments } from "./spline-helpers"
 
-export type ArrowheadKind = "none" | "arrow" | "triangle" | "square" | "dot" | "diamond" | "inverted" | "bar" | "pipe"
+/**
+ * How an arrow's terminal is drawn.
+ *
+ * The vocabulary itself lives with the other style vocabularies in the editor
+ * (`ARROWHEAD_KINDS`), so the style prop and the geometry cannot drift apart;
+ * this is the name the arrow code has always used for it.
+ */
+export type ArrowheadKind = ArrowShapeArrowheadKind
 
 export interface StraightBody {
   kind: "straight"

@@ -13,6 +13,9 @@
  */
 
 import { richTextToPlainText, type EnumStyleProp } from "@mocanvas/editor"
+// Imported from the module rather than through `../text`, which would close a
+// cycle back through the label components.
+import { isRichText, toRichText, type RichText } from "../text/rich-text"
 
 type Props = Record<string, unknown>
 
@@ -49,16 +52,47 @@ export function readBoolean(props: unknown, key: string, fallback: boolean): boo
 }
 
 /**
- * A shape's label. Prefers `props.text`; a record that still carries a
- * rich-text document (one that skipped the load-time normalization) is
- * flattened here so it renders rather than throwing.
+ * A shape's label as plain text.
+ *
+ * A label has two spellings on the record — `props.richText`, the document the
+ * store keeps, and `props.text`, its flattened form — and this reconciles them
+ * through {@link readRichText} so the two readers can never disagree about what
+ * a shape says.
+ *
+ * `key` names a *plain-text-only* prop (a frame's `name`); only the default
+ * `"text"` participates in the reconciliation, because only it has a rich
+ * counterpart.
  */
 export function readText(props: unknown, key = "text"): string {
-  const bag = props as Props | undefined
-  const value = bag?.[key]
-  if (typeof value === "string") return value
-  const rich = bag?.["richText"]
-  return rich === undefined || rich === null ? "" : richTextToPlainText(rich)
+  if (key !== "text") return readString(props, key, "")
+  return richTextToPlainText(readRichText(props))
+}
+
+/**
+ * A shape's label as a rich-text document — the reader every other label read
+ * goes through.
+ *
+ * A record can carry either spelling, or both, or both *disagreeing*: a v5
+ * writer sets `props.richText` and leaves `props.text` at its default, a
+ * pre-v5 writer does the reverse, and a partial update touches one without the
+ * other. So the rule is stated once, here:
+ *
+ * 1. a rich-text document that actually says something wins — it is the
+ *    canonical spelling and the only one that can carry formatting;
+ * 2. otherwise a non-empty `props.text` is lifted into a document;
+ * 3. otherwise the label is empty, and the stored document (if any) is kept so
+ *    an empty-but-structured document survives a round trip.
+ *
+ * An empty label is one empty paragraph, which is what this format spells
+ * "nothing typed yet" — never a document with no content at all.
+ */
+export function readRichText(props: unknown, key = "richText"): RichText {
+  const value = (props as Props | undefined)?.[key]
+  const stored = isRichText(value) ? value : null
+  if (stored !== null && richTextToPlainText(stored).length > 0) return stored
+  const text = (props as Props | undefined)?.["text"]
+  if (typeof text === "string" && text.length > 0) return toRichText(text)
+  return stored ?? toRichText("")
 }
 
 /** A `{ x, y }` prop, with each coordinate falling back independently. */

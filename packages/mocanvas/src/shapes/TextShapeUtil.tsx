@@ -2,32 +2,55 @@ import {
   FONT_SIZES,
   Rectangle2d,
   ShapeUtil,
+  getDefaultDisplayValues,
+  getDisplayValues,
   DefaultColorStyle,
   DefaultFontStyle,
   DefaultHorizontalAlignStyle,
+  type DefaultTextAlignStyle,
+  type TLColorMode,
+  type TLDefaultDisplayValues,
+  type TLStyledShape,
+  type TLTheme,
   DefaultSizeStyle,
   type BaseShape,
   type Editor,
   type Geometry2d,
   type ResizeInfo,
+  type ShapeUtilOptions,
   type StyleWords,
+  type TLFontFace,
 } from "@mocanvas/editor"
 import type { ReactNode } from "react"
 import { TextLabel } from "../text/TextEditor"
+import { applyPlainTextToRichText, richTextToText, toRichText, type RichText } from "../text/rich-text"
 import { getTextShapeSize } from "../text/text-layout"
 import { getTextTextureKey, renderTextToCanvas, type TextTextureSpec } from "../text/TextTexture"
 import { LINE_HEIGHT } from "./text-helpers"
-import { propsOf, readBoolean, readEnum, readNumber, readStyle, readText } from "./prop-access"
-import { getFontFamily, getStrokeRgba, getTextCssColor } from "./shape-theme"
+import { propsOf, readBoolean, readEnum, readNumber, readRichText, readStyle, readText } from "./prop-access"
+import { getFontFamily, getLabelFontFaces, getStrokeRgba, getTheme, getThemeColors, getTextCssColor } from "./shape-theme"
 import { rectPath } from "./indicator-paths"
+import { textShapeProps } from "./shape-props"
+import { textShapeMigrations } from "./shape-migrations"
 
 export interface TextShapeProps {
   color: DefaultColorStyle
   size: DefaultSizeStyle
   font: DefaultFontStyle
-  textAlign: "start" | "middle" | "end"
+  /**
+   * How the paragraphs are aligned inside the shape's own width.
+   *
+   * Typed as the whole horizontal-align set because that is the style the
+   * shape declares, and a record written by an older client may hold one of
+   * its `-legacy` values. `readTextProps` narrows every one of them to
+   * `start` / `middle` / `end`, so nothing downstream has to know they exist.
+   */
+  textAlign: DefaultHorizontalAlignStyle
   w: number
-  text: string
+  /** The label as a rich-text document; see `NoteShapeProps.richText`. */
+  richText: RichText
+  /** The label as plain text — optional and derived; see `NoteShapeProps.text`. */
+  text?: string
   scale: number
   autoSize: boolean
 }
@@ -40,7 +63,25 @@ const TEXT_ALIGNS = ["start", "middle", "end"] as const
  * `shape.props` with every declared prop present and of the declared type, so
  * measuring and rendering survive a record that arrived without one.
  */
-export function readTextProps(shape: { props?: unknown }): TextShapeProps {
+/**
+ * {@link TextShapeProps} with the *derived* label filled in as well.
+ *
+ * `props.text` is optional on the record — a v5 writer only sets `richText` —
+ * but a util that has run it through {@link readTextProps} always has both, so
+ * everything downstream can take a plain `string`.
+ */
+export type ResolvedTextProps = Omit<TextShapeProps, "textAlign"> & {
+  text: string
+  richText: RichText
+  /**
+   * Narrowed to the three alignments that mean something for a paragraph: a
+   * stored `-legacy` value reads as `start`, which is what those spellings
+   * aligned a label box to.
+   */
+  textAlign: DefaultTextAlignStyle
+}
+
+export function readTextProps(shape: { props?: unknown }): ResolvedTextProps {
   const p = propsOf(shape)
   return {
     color: readStyle(p, "color", DefaultColorStyle),
@@ -48,6 +89,7 @@ export function readTextProps(shape: { props?: unknown }): TextShapeProps {
     font: readStyle(p, "font", DefaultFontStyle),
     textAlign: readEnum(p, "textAlign", TEXT_ALIGNS, "start"),
     w: readNumber(p, "w", 100),
+    richText: readRichText(p),
     text: readText(p),
     scale: readNumber(p, "scale", 1),
     autoSize: readBoolean(p, "autoSize", true),
@@ -55,19 +97,29 @@ export function readTextProps(shape: { props?: unknown }): TextShapeProps {
 }
 
 /** Measured size of a text shape: intrinsic when `autoSize`, else wrapped at `w`. */
-export function getTextShapeSizeFor(shape: TextShape): { w: number; h: number; lineCount: number } {
-  const { text, size, scale, w, font, autoSize } = readTextProps(shape)
-  return getTextShapeSize({ text, font, fontSize: FONT_SIZES[size] * scale, autoSize, w })
+export function getTextShapeSizeFor(
+  shape: { props?: unknown },
+  editor?: Editor | null,
+): { w: number; h: number; lineCount: number } {
+  const { richText, size, scale, w, font, autoSize } = readTextProps(shape)
+  return getTextShapeSize({
+    text: richText,
+    fontFamily: font,
+    fontSize: FONT_SIZES[size] * scale,
+    autoSize,
+    w,
+    editor: editor ?? null,
+  })
 }
 
 /** Height of the text block at its current width. */
-export function getTextShapeHeight(shape: TextShape): number {
-  return getTextShapeSizeFor(shape).h
+export function getTextShapeHeight(shape: TextShape, editor?: Editor | null): number {
+  return getTextShapeSizeFor(shape, editor).h
 }
 
 /** The box `getGeometry` produces: what a texture for this shape must cover. */
-export function getTextShapeBox(shape: TextShape): { w: number; h: number } {
-  const { w, h } = getTextShapeSizeFor(shape)
+export function getTextShapeBox(shape: TextShape, editor?: Editor | null): { w: number; h: number } {
+  const { w, h } = getTextShapeSizeFor(shape, editor)
   const props = readTextProps(shape)
   return { w: Math.max(1, props.autoSize ? Math.max(w, props.w) : props.w), h }
 }
@@ -75,12 +127,12 @@ export function getTextShapeBox(shape: TextShape): { w: number; h: number } {
 /** The rasterization spec for a text shape at the editor's current resolution bucket. */
 export function getTextShapeTextureSpec(editor: Editor, shape: TextShape): TextTextureSpec {
   const { text, font, size, scale, color, textAlign, autoSize } = readTextProps(shape)
-  const box = getTextShapeBox(shape)
+  const box = getTextShapeBox(shape, editor)
   return {
     text,
-    fontFamily: getFontFamily(font),
+    fontFamily: getFontFamily(font, getTheme(editor)),
     fontSize: FONT_SIZES[size] * scale,
-    color: getTextCssColor(color),
+    color: getTextCssColor(color, getThemeColors(editor)),
     align: textAlign,
     verticalAlign: "start",
     lineHeight: LINE_HEIGHT,
@@ -96,19 +148,74 @@ function canRasterizeText(): boolean {
   return typeof document !== "undefined"
 }
 
-const SIZE_KEYS: readonly (keyof TextShapeProps)[] = ["text", "font", "size", "scale", "autoSize"]
+const SIZE_KEYS: readonly (keyof TextShapeProps)[] = ["richText", "text", "font", "size", "scale", "autoSize"]
 
-export class TextShapeUtil extends ShapeUtil<TextShape> {
+/** `TextShapeUtil`'s settings; see {@link ShapeUtil.configure}. */
+/**
+ * What a text shape paints with.
+ *
+ * A text shape is nothing but a label, and its label carries a `scale` the
+ * shared set knows nothing about — so the sizes it actually draws at are
+ * reported separately from the ones the style asks for.
+ */
+export interface TextShapeUtilDisplayValues extends TLDefaultDisplayValues {
+  /** The font size actually drawn, in page units: `fontSize` with `scale` applied. */
+  labelFontSize: number
+  /** The line height actually drawn, in page units. */
+  labelLineHeight: number
+  /** The label's CSS font stack. */
+  labelFontFamily: string
+}
+
+/** `TextShapeUtil`'s settings; see {@link ShapeUtil.configure}. */
+export interface TextShapeOptions extends ShapeUtilOptions<TextShape, TextShapeUtilDisplayValues> {}
+
+/** Resolve a text shape's display values; see {@link TextShapeUtilDisplayValues}. */
+export function getTextDisplayValues(
+  editor: unknown,
+  shape: { props?: unknown },
+  theme: TLTheme,
+  colorMode: TLColorMode,
+): TextShapeUtilDisplayValues {
+  const base = getDefaultDisplayValues(editor, shape as TLStyledShape, theme, colorMode)
+  const scale = readNumber(propsOf(shape), "scale", 1)
+  return {
+    ...base,
+    labelFontSize: base.fontSize * scale,
+    labelLineHeight: base.fontSize * scale * LINE_HEIGHT,
+    labelFontFamily: base.fontFamily,
+  }
+}
+
+export class TextShapeUtil extends ShapeUtil<TextShape, TextShapeUtilDisplayValues> {
   static override type = "text" as const
-  static override props = { color: DefaultColorStyle, size: DefaultSizeStyle, font: DefaultFontStyle, textAlign: DefaultHorizontalAlignStyle }
+  static override props = textShapeProps
+  static override migrations = textShapeMigrations
+  static override options: TextShapeOptions = { getDefaultDisplayValues: getTextDisplayValues }
+  declare readonly options: TextShapeOptions
 
   getDefaultProps(): TextShapeProps {
-    return { color: "black", size: "m", font: "draw", textAlign: "start", w: 100, text: "", scale: 1, autoSize: true }
+    return {
+      color: "black",
+      size: "m",
+      font: "draw",
+      textAlign: "start",
+      w: 100,
+      richText: toRichText(""),
+      text: "",
+      scale: 1,
+      autoSize: true,
+    }
   }
 
   getGeometry(shape: TextShape): Geometry2d {
-    const box = getTextShapeBox(shape)
+    const box = getTextShapeBox(shape, this.editor)
     return new Rectangle2d({ width: box.w, height: box.h, isFilled: true })
+  }
+
+  /** A text shape is nothing but a label, so it always needs its family's faces. */
+  override getFontFaces(shape: TextShape): TLFontFace[] {
+    return getLabelFontFaces(readTextProps(shape).font)
   }
 
   /**
@@ -122,7 +229,14 @@ export class TextShapeUtil extends ShapeUtil<TextShape> {
     if (!key) return null
     const texture = this.editor.textures.acquire(key.key, async () => renderTextToCanvas(key.spec))
     if (!texture) return null
-    return { fill: getStrokeRgba(readTextProps(shape).color), stroke: 0, strokeWidth: 0, dash: 0, opacity: 1, texture }
+    return {
+      fill: getStrokeRgba(readTextProps(shape).color, getThemeColors(this.editor)),
+      stroke: 0,
+      strokeWidth: 0,
+      dash: 0,
+      opacity: 1,
+      texture,
+    }
   }
 
   /** The DOM label stands in while editing and until the texture is ready. */
@@ -140,20 +254,35 @@ export class TextShapeUtil extends ShapeUtil<TextShape> {
   }
 
   component(shape: TextShape): ReactNode {
-    const { text, font, size, scale, color, textAlign, w, autoSize } = readTextProps(shape)
+    const { richText, text, font, size, scale, textAlign, w, autoSize } = readTextProps(shape)
+    const display = getDisplayValues<TextShape>(this, shape)
     return (
       <TextLabel
         shape={shape}
         text={text}
+        richText={richText}
         isEditing={this.editor.getEditingShapeId() === shape.id}
-        font={font}
+        fontFamily={font}
         fontSize={FONT_SIZES[size] * scale}
-        color={getTextCssColor(color)}
-        align={textAlign}
+        color={display.color}
+        textAlign={textAlign}
         verticalAlign="start"
         wrap={!autoSize}
         width={Math.max(1, w)}
-        onChange={(next) => this.editor.updateShape<TextShape>({ id: shape.id, type: "text", props: { text: next } })}
+        onChange={(next) =>
+          this.editor.updateShape<TextShape>({
+            id: shape.id,
+            type: "text",
+            props: { text: next, richText: applyPlainTextToRichText(richText, next) },
+          })
+        }
+        onChangeRichText={(next) =>
+          this.editor.updateShape<TextShape>({
+            id: shape.id,
+            type: "text",
+            props: { richText: next, text: richTextToText(next) },
+          })
+        }
       />
     )
   }
@@ -189,7 +318,7 @@ export class TextShapeUtil extends ShapeUtil<TextShape> {
   private fitWidth(shape: TextShape): TextShape | void {
     const props = readTextProps(shape)
     if (!props.autoSize) return
-    const { w } = getTextShapeSizeFor(shape)
+    const { w } = getTextShapeSizeFor(shape, this.editor)
     if (w !== props.w) return { ...shape, props: { ...shape.props, w } }
   }
 

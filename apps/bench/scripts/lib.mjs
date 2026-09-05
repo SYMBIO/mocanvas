@@ -36,11 +36,17 @@ export async function startPreview(port = 5182) {
 }
 
 /**
- * Launch headless Chromium. Tries GPU args first; if the page cannot get a
- * WebGL2 context, relaunches forcing SwiftShader. Returns the browser plus a
- * `mode` string ("gpu" | "swiftshader") for the report.
+ * Launch Chromium. Tries GPU args first; if the page cannot get a WebGL2
+ * context, relaunches forcing SwiftShader. Returns the browser plus a `mode`
+ * string ("gpu" | "swiftshader") for the report.
+ *
+ * `headed: true` opens a real window. That matters: headless Chromium on macOS
+ * lands on ANGLE/SwiftShader whatever GPU flags it is given, so every frame is
+ * rasterised on the CPU — which penalises a WebGL2 renderer far more than a DOM
+ * one and makes the frame-time columns unrepresentative. Headed gets the real
+ * Metal device. The pixel-comparison numbers are unaffected either way.
  */
-export async function launchBrowser({ chromium }, previewUrl) {
+export async function launchBrowser({ chromium }, previewUrl, { headed = false } = {}) {
   const attempts = [
     { mode: "gpu", args: [...BASE_ARGS, ...GPU_ARGS] },
     { mode: "swiftshader", args: [...BASE_ARGS, ...SWIFTSHADER_ARGS] },
@@ -49,7 +55,7 @@ export async function launchBrowser({ chromium }, previewUrl) {
   for (const attempt of attempts) {
     let browser
     try {
-      browser = await chromium.launch({ headless: true, args: attempt.args })
+      browser = await chromium.launch({ headless: !headed, args: attempt.args })
       const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 })
       await page.goto(`${previewUrl}/?lib=mocanvas`, { waitUntil: "load" })
       const gpu = await page.evaluate(() => {

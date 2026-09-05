@@ -1,6 +1,6 @@
 import { atom, type Signal } from "@mocanvas/state"
 import { PRESENCE_COLORS, randomPresenceColor } from "../records/presence"
-import { createUserId } from "./userRecord"
+import { createUserId, type UserId } from "./userRecord"
 
 /**
  * How the canvas picks its palette: an explicit choice, or `"system"` to follow
@@ -24,8 +24,14 @@ export type ColorScheme = "light" | "dark" | "system"
  * the editor migrates.
  */
 export interface UserPreferencesState {
-  /** Stable id for this person. Presence records are attributed to it. */
-  id: string
+  /**
+   * Stable id for this person. Presence records are attributed to it.
+   *
+   * A branded {@link UserId}: pass `createUserId(myAccountId)` rather than a
+   * bare string, so that an id minted here and an id read off a presence
+   * record are the same kind of thing.
+   */
+  id: UserId
   /** Display name on the cursor chip. */
   name?: string
   /** CSS colour for the cursor, name chip and selection outlines. */
@@ -140,7 +146,7 @@ export class UserPreferencesManager {
     this.user.setUserPreferences({ ...this.getUserPreferences(), ...patch })
   }
 
-  getId(): string {
+  getId(): UserId {
     return this.getUserPreferences().id
   }
 

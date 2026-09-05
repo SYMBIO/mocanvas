@@ -9,7 +9,13 @@ export interface VecModel {
 export type UiEventType = "pointer" | "click" | "keyboard" | "wheel" | "pinch" | "cancel" | "complete" | "interrupt" | "tick" | "misc"
 
 export type PointerEventName = "pointer_down" | "pointer_move" | "pointer_up" | "right_click" | "middle_click"
-export type ClickEventName = "double_click" | "triple_click" | "quadruple_click"
+/**
+ * The only multi-click the editor reports. Triple and quadruple click were
+ * removed: they were never distinguishable from a fast double click on a
+ * trackpad, and every consumer that wanted "select the paragraph" ended up
+ * reimplementing it against the text layer anyway.
+ */
+export type ClickEventName = "double_click"
 export type KeyboardEventName = "key_down" | "key_up" | "key_repeat"
 
 export type PointerTarget =
@@ -129,8 +135,6 @@ export type EventHandlers = {
   onRightClick?(info: PointerEventInfo): void
   onMiddleClick?(info: PointerEventInfo): void
   onDoubleClick?(info: ClickEventInfo): void
-  onTripleClick?(info: ClickEventInfo): void
-  onQuadrupleClick?(info: ClickEventInfo): void
   onKeyDown?(info: KeyboardEventInfo): void
   onKeyUp?(info: KeyboardEventInfo): void
   onKeyRepeat?(info: KeyboardEventInfo): void
@@ -148,8 +152,6 @@ export const EVENT_NAME_MAP: Record<string, keyof EventHandlers> = {
   right_click: "onRightClick",
   middle_click: "onMiddleClick",
   double_click: "onDoubleClick",
-  triple_click: "onTripleClick",
-  quadruple_click: "onQuadrupleClick",
   key_down: "onKeyDown",
   key_up: "onKeyUp",
   key_repeat: "onKeyRepeat",
@@ -161,7 +163,17 @@ export const EVENT_NAME_MAP: Record<string, keyof EventHandlers> = {
 }
 
 export interface EditorEvents {
+  /**
+   * The editor is on screen. A host emits this once its container is attached;
+   * `Editor.getIsMounted()` is derived from it.
+   */
   mount: () => void
+  /**
+   * The editor is no longer on screen. Emitted by a host that unmounts an
+   * editor it intends to keep, and by `Editor.dispose()` for one that was
+   * mounted — so a listener never sees a mount without a matching unmount.
+   */
+  unmount: () => void
   "max-shapes": (info: { name: string; pageId: string; count: number }) => void
   change: (info: { source: "user" | "remote" }) => void
   update: () => void

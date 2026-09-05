@@ -8,7 +8,7 @@ import {
   type CurrentUser,
   type UserPreferencesState,
 } from "./userPreferences"
-import { isUserId } from "./userRecord"
+import { createUserId, isUserId } from "./userRecord"
 
 describe("getFreshUserPreferences", () => {
   it("mints an id and a colour, and nothing else", () => {
@@ -64,7 +64,7 @@ describe("UserPreferencesManager", () => {
   }
 
   it("reads what the owner holds", () => {
-    const { user } = controlled({ id: "user:a", name: "Ada", color: "#ff0000" })
+    const { user } = controlled({ id: createUserId("a"), name: "Ada", color: "#ff0000" })
     const manager = new UserPreferencesManager(user)
     expect(manager.getId()).toBe("user:a")
     expect(manager.getName()).toBe("Ada")
@@ -72,7 +72,7 @@ describe("UserPreferencesManager", () => {
   })
 
   it("merges an update instead of replacing the object", () => {
-    const { user, seen } = controlled({ id: "user:a", name: "Ada", colorScheme: "dark" })
+    const { user, seen } = controlled({ id: createUserId("a"), name: "Ada", colorScheme: "dark" })
     const manager = new UserPreferencesManager(user)
 
     manager.updateUserPreferences({ name: "Grace", color: "#00ff00" })
@@ -86,33 +86,33 @@ describe("UserPreferencesManager", () => {
   })
 
   it("writes every change out through the owner's setter", () => {
-    const { user, seen } = controlled({ id: "user:a" })
+    const { user, seen } = controlled({ id: createUserId("a") })
     const manager = new UserPreferencesManager(user)
 
     manager.setName("Ada")
     manager.setColor("#123456")
-    manager.setUserPreferences({ id: "user:a", isSnapMode: true })
+    manager.setUserPreferences({ id: createUserId("a"), isSnapMode: true })
 
     expect(seen.map((preferences) => preferences.name)).toEqual(["Ada", "Ada", undefined])
     expect(manager.getIsSnapMode()).toBe(true)
   })
 
   it("lets the controlled preference outrank the editor-level colorScheme", () => {
-    const dark = new UserPreferencesManager(createCurrentUser({ id: "user:a", colorScheme: "dark" }), "light")
+    const dark = new UserPreferencesManager(createCurrentUser({ id: createUserId("a"), colorScheme: "dark" }), "light")
     expect(dark.getIsDarkMode()).toBe(true)
 
-    const light = new UserPreferencesManager(createCurrentUser({ id: "user:a", colorScheme: "light" }), "dark")
+    const light = new UserPreferencesManager(createCurrentUser({ id: createUserId("a"), colorScheme: "light" }), "dark")
     expect(light.getIsDarkMode()).toBe(false)
   })
 
   it("falls back to the editor-level colorScheme when the user has none", () => {
-    const manager = new UserPreferencesManager(createCurrentUser({ id: "user:a" }), "dark")
+    const manager = new UserPreferencesManager(createCurrentUser({ id: createUserId("a") }), "dark")
     expect(manager.getColorScheme()).toBe("dark")
     expect(manager.getIsDarkMode()).toBe(true)
   })
 
   it("resolves \"system\" against the OS, and reads light where there is no DOM", () => {
-    const manager = new UserPreferencesManager(createCurrentUser({ id: "user:a", colorScheme: "system" }))
+    const manager = new UserPreferencesManager(createCurrentUser({ id: createUserId("a"), colorScheme: "system" }))
     expect(manager.getColorScheme()).toBe("system")
     expect(manager.getIsDarkMode()).toBe(false)
 
@@ -125,7 +125,7 @@ describe("UserPreferencesManager", () => {
   })
 
   it("is reactive: a preference change re-runs anything that read it", () => {
-    const { user } = controlled({ id: "user:a", name: "Ada" })
+    const { user } = controlled({ id: createUserId("a"), name: "Ada" })
     const manager = new UserPreferencesManager(user)
     const names: string[] = []
 
@@ -142,10 +142,10 @@ describe("UserPreferencesManager", () => {
 
 describe("createCurrentUser", () => {
   it("holds preferences in a signal and replaces them wholesale", () => {
-    const user = createCurrentUser({ id: "user:a", name: "Ada" })
+    const user = createCurrentUser({ id: createUserId("a"), name: "Ada" })
     expect(user.userPreferences.get().name).toBe("Ada")
 
-    user.setUserPreferences({ id: "user:a", name: "Grace" })
+    user.setUserPreferences({ id: createUserId("a"), name: "Grace" })
     expect(user.userPreferences.get().name).toBe("Grace")
   })
 

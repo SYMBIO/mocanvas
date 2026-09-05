@@ -20,3 +20,20 @@ export {
   imageAssetValidator,
   videoAssetValidator,
 } from "./assetValidators"
+
+export {
+  AssetUtil,
+  type TLAssetUtilClass,
+  type TLAssetUtilOptions,
+  type TLAnyAssetUtilConstructor,
+  type TLAssetUtilConstructor,
+} from "./AssetUtil"
+
+export {
+  dataUrlToFile,
+  fileToBase64DataUrl,
+  getDefaultCdnBaseUrl,
+  inlineBase64AssetStore,
+  setDefaultCdnBaseUrl,
+  type AssetIdList,
+} from "./inlineAssets"

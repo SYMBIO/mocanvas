@@ -33,12 +33,19 @@ export abstract class BaseFrameLikeShapeUtil<T extends FrameLikeShape = FrameLik
   }
 
   /** A container paints the surface its children sit on. */
-  override providesBackgroundForChildren(_shape: T): boolean {
+  override providesBackgroundForChildren(_shape?: T): boolean {
     return true
   }
 
-  /** The container's own box, as a polygon. Return `undefined` to stop clipping. */
-  override getClipPath(shape: T): VecLike[] | undefined {
+  /**
+   * The container's own box, as a polygon. Return `undefined` to stop clipping.
+   *
+   * `shape` is optional to match the base signature — a subclass that clips
+   * nothing overrides this with a no-argument method — and a call without it
+   * has no box to describe.
+   */
+  override getClipPath(shape?: T): VecLike[] | undefined {
+    if (shape === undefined) return undefined
     const { w, h } = shape.props
     return [
       { x: 0, y: 0 },

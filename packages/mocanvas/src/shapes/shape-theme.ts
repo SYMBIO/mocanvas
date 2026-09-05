@@ -1,18 +1,69 @@
 /**
- * Theme lookups shared by the default shapes. Everything resolves against the
- * light theme for now; a theme-aware variant can be threaded through later.
+ * Theme lookups shared by the default shapes.
+ *
+ * Everything here resolves against a *ramp* — `theme.colors[colorMode]` — never
+ * against a hardcoded palette. A util passes the ramp its editor is currently
+ * painting with, which is what makes the built-in shapes follow the theme and
+ * the colour mode; a caller with no editor to ask (an exporter rendering a
+ * detached snapshot, a preview swatch) omits it and gets the built-in light
+ * ramp, which is exactly what these functions used to return unconditionally.
+ *
+ * The *shape-level* resolution — which colour a shape's `color` prop means,
+ * how wide its stroke is, what font size its label uses — belongs to
+ * `getDisplayValues(util, shape)` and is not restated here. What is left is the
+ * chrome no style prop describes: a note's gradient and shadow, a frame's
+ * border and heading strip.
  */
 import {
+  DEFAULT_FILL_TOKENS,
+  DEFAULT_THEME,
+  DefaultFontFaces,
+  getColorValue,
   hexToRgba,
-  LIGHT_THEME,
   type DefaultColorStyle,
   type DefaultFillStyle,
   type DefaultFontStyle,
+  type TLColorMode,
+  type TLFontFace,
+  type TLTheme,
+  type TLThemeColors,
 } from "@mocanvas/editor"
 
+/**
+ * The ramp a caller that has no editor resolves against: the built-in theme's
+ * light half. Named rather than inlined so it is obvious that every default
+ * below is one decision, not eight.
+ */
+export const FALLBACK_THEME_COLORS: TLThemeColors = DEFAULT_THEME.colors.light
+
+/** What a ramp can be read off: the editor, or anything else theme-shaped. */
+export interface ThemeSource {
+  getCurrentTheme?(): TLTheme
+  getColorMode?(): TLColorMode
+}
+
+/**
+ * The theme `source` is currently painting with, or the built-in one.
+ *
+ * Tolerant on purpose: a util's `editor` is typed but a test double, a
+ * half-constructed editor or a detached exporter may not implement either
+ * method, and a missing theme must degrade to the default rather than throw
+ * inside a render.
+ */
+export function getTheme(source: ThemeSource | null | undefined): TLTheme {
+  return source?.getCurrentTheme?.() ?? DEFAULT_THEME
+}
+
+/** The ramp `source` is currently painting with; see {@link getTheme}. */
+export function getThemeColors(source: ThemeSource | null | undefined): TLThemeColors {
+  const theme = getTheme(source)
+  const mode = source?.getColorMode?.() ?? "light"
+  return theme.colors[mode] ?? theme.colors.light
+}
+
 /** Engine RGBA for a shape's stroke. */
-export function getStrokeRgba(color: DefaultColorStyle): number {
-  return hexToRgba(LIGHT_THEME[color].solid)
+export function getStrokeRgba(color: DefaultColorStyle, colors: TLThemeColors = FALLBACK_THEME_COLORS): number {
+  return hexToRgba(getColorValue(colors, color, "solid"))
 }
 
 /**
@@ -21,54 +72,65 @@ export function getStrokeRgba(color: DefaultColorStyle): number {
  * The fill *styles* and the palette *tokens* share names but are one step
  * apart, which is easy to get wrong: `semi` paints the paper colour with a
  * barely-there tint, `solid` paints the hue's pale tint (the `semi` token),
- * and only `fill` paints the hue at full strength (the `solid` token). Reading
- * the token whose name matches the style makes every filled shape a step too
- * saturated. The stroke always uses the full-strength colour, so a `solid`
+ * and only `fill` paints the hue at full strength (the `solid` token). That
+ * table is stated once, in `DEFAULT_FILL_TOKENS`, and read here rather than
+ * restated — the stroke always uses the full-strength colour, so a `solid`
  * fill reads as a pale body inside a saturated outline.
  */
-export function getFillRgba(color: DefaultColorStyle, fill: DefaultFillStyle): number {
-  const theme = LIGHT_THEME[color]
-  switch (fill) {
-    case "none":
-      return 0
-    case "semi":
-      return hexToRgba(LIGHT_THEME.solid)
-    case "pattern":
-      return hexToRgba(theme.pattern)
-    case "solid":
-      return hexToRgba(theme.semi)
-    case "fill":
-      return hexToRgba(theme.fill)
-  }
+export function getFillRgba(
+  color: DefaultColorStyle,
+  fill: DefaultFillStyle,
+  colors: TLThemeColors = FALLBACK_THEME_COLORS,
+): number {
+  const token = DEFAULT_FILL_TOKENS[fill] ?? "none"
+  if (token === "none") return 0
+  if (token === "paper") return hexToRgba(colors.solid)
+  return hexToRgba(getColorValue(colors, color, token))
 }
 
 /** Engine RGBA for a sticky note's background. */
-export function getNoteFillRgba(color: DefaultColorStyle): number {
-  return hexToRgba(LIGHT_THEME[color].note.fill)
+export function getNoteFillRgba(color: DefaultColorStyle, colors: TLThemeColors = FALLBACK_THEME_COLORS): number {
+  return hexToRgba(getColorValue(colors, color, "noteFill"))
 }
 
 /** CSS color string for text drawn in the DOM overlay. */
-export function getTextCssColor(color: DefaultColorStyle): string {
-  return LIGHT_THEME[color].solid
+export function getTextCssColor(color: DefaultColorStyle, colors: TLThemeColors = FALLBACK_THEME_COLORS): string {
+  return getColorValue(colors, color, "solid")
 }
 
 /** CSS color string for text on a sticky note. */
-export function getNoteTextCssColor(color: DefaultColorStyle): string {
-  return LIGHT_THEME[color].note.text
+export function getNoteTextCssColor(color: DefaultColorStyle, colors: TLThemeColors = FALLBACK_THEME_COLORS): string {
+  return getColorValue(colors, color, "noteText")
 }
 
-/** Local-only font stacks; no web fonts are loaded. */
-export function getFontFamily(font: DefaultFontStyle): string {
-  switch (font) {
-    case "draw":
-      return '"Comic Sans MS", "Segoe Print", "Bradley Hand", "Chalkboard SE", cursive'
-    case "sans":
-      return 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-    case "serif":
-      return 'Georgia, "Times New Roman", Times, serif'
-    case "mono":
-      return 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace'
+/** The CSS font stack a font style resolves to, in `theme`. */
+export function getFontFamily(font: DefaultFontStyle, theme: TLTheme = DEFAULT_THEME): string {
+  return theme.fonts[font] ?? theme.fonts.draw
+}
+
+// SEMANTICS-ASSUMED: a label needs all four faces of its family, not just the
+// upright regular one. Rich text can turn any run bold or italic without
+// changing the shape's `font` prop, so loading one face would leave a bold run
+// synthesised (and mis-measured) until something else happened to pull the real
+// one in. The built-in faces are local families, so asking for four costs
+// nothing; a theme that swaps in webfonts pays four requests per family used.
+/**
+ * The typefaces a label in `font` needs: the four `[style][weight]` faces of
+ * that family.
+ *
+ * This is what a text-bearing `ShapeUtil.getFontFaces` answers. Only the
+ * *built-in* face registry is consulted — a theme that names its own families
+ * registers their faces with the font manager itself, because a CSS stack says
+ * which families to try, not where to fetch them.
+ */
+export function getLabelFontFaces(font: DefaultFontStyle): TLFontFace[] {
+  const set = DefaultFontFaces[`tldraw_${font}`]
+  if (set === undefined) return []
+  const faces: TLFontFace[] = []
+  for (const byWeight of Object.values(set)) {
+    for (const face of Object.values(byWeight)) faces.push(face)
   }
+  return faces
 }
 
 /** Engine dash pattern id for a dash style (see `mocanvas-render::dash`). */
@@ -168,8 +230,8 @@ export function hexToCssRgba(hex: string, alpha: number): string {
 }
 
 /** CSS colour at the bottom of a note's body gradient (the palette's note fill). */
-export function getNoteFillCssColor(color: DefaultColorStyle): string {
-  return LIGHT_THEME[color].note.fill
+export function getNoteFillCssColor(color: DefaultColorStyle, colors: TLThemeColors = FALLBACK_THEME_COLORS): string {
+  return getColorValue(colors, color, "noteFill")
 }
 
 /**
@@ -183,13 +245,13 @@ export function getNoteGradientTopFrom(fill: string): string {
 }
 
 /** CSS colour at the top of a note's body gradient. */
-export function getNoteGradientTopCssColor(color: DefaultColorStyle): string {
-  return getNoteGradientTopFrom(getNoteFillCssColor(color))
+export function getNoteGradientTopCssColor(color: DefaultColorStyle, colors: TLThemeColors = FALLBACK_THEME_COLORS): string {
+  return getNoteGradientTopFrom(getNoteFillCssColor(color, colors))
 }
 
 /** CSS `background` for a note body: the vertical gradient, top to bottom. */
-export function getNoteBodyGradientCss(color: DefaultColorStyle): string {
-  return `linear-gradient(to bottom, ${getNoteGradientTopCssColor(color)} 0%, ${getNoteFillCssColor(color)} 100%)`
+export function getNoteBodyGradientCss(color: DefaultColorStyle, colors: TLThemeColors = FALLBACK_THEME_COLORS): string {
+  return `linear-gradient(to bottom, ${getNoteGradientTopCssColor(color, colors)} 0%, ${getNoteFillCssColor(color, colors)} 100%)`
 }
 
 /** CSS `box-shadow` for a note body, in shape-local units at `scale`. */

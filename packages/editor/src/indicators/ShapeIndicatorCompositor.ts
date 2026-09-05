@@ -6,7 +6,7 @@ import type { UnknownShape } from "../records/base"
 import type { TLThemeHost } from "../theme/types"
 import { OverlayUtil, type OverlayHost } from "./OverlayUtil"
 import { getShapeIndicatorPath, type IndicatorPathSource } from "./resolve"
-import type { TLIndicatorContext, TLIndicatorTransform, TLShapeIndicator } from "./types"
+import type { TLIndicatorContext, TLIndicatorTransform, TLIndicatorOverlay } from "./types"
 
 /** The subset of a shape util the compositor reads. */
 export interface IndicatorShapeUtil extends IndicatorPathSource<UnknownShape> {
@@ -50,41 +50,39 @@ export const DEFAULT_SHAPE_INDICATOR_OPTIONS: TLShapeIndicatorOptions = {
 /**
  * Paints shape indicators onto the canvas overlay.
  *
+ * This is the *engine*. The name the SDK exposes for it —
+ * `ShapeIndicatorOverlayUtil` — lives in `@mocanvas/mocanvas`, which subclasses
+ * this and adds nothing: 5.2 moved that class out of the editor package. The
+ * implementation could not follow it, because `<Canvas>` here has to composite
+ * indicators for an app that only ever depends on `@mocanvas/editor`, and the
+ * editor cannot import the package that depends on it. So the seam and the
+ * engine stay, and the exported name moves.
+ *
  * Two override points, in ascending order of effort:
  *
- * - `ShapeIndicatorOverlayUtil.configure({ lineWidth, hintedLineWidth })`
+ * - `ShapeIndicatorCompositor.configure({ lineWidth, hintedLineWidth })`
  *   returns a subclass with different stroke weights and nothing else changed.
- * - subclassing and overriding {@link ShapeIndicatorOverlayUtil.shouldShowIndicator}
+ * - subclassing and overriding {@link ShapeIndicatorCompositor.shouldShowIndicator}
  *   controls *which* shapes get an outline at all — the hook for a board that
  *   reads selection through its own chrome instead of a stroke.
  *
  * Anything finer than that belongs in the shape util's `getIndicatorPath`.
  */
-export class ShapeIndicatorOverlayUtil<H extends TLIndicatorHost = TLIndicatorHost> extends OverlayUtil<H> {
+export class ShapeIndicatorCompositor<H extends TLIndicatorHost = TLIndicatorHost> extends OverlayUtil<
+  H,
+  TLShapeIndicatorOptions
+> {
   static override type = "shapeIndicator"
 
-  /** Stroke weights for this class. Replaced wholesale by {@link configure}. */
-  static options: TLShapeIndicatorOptions = DEFAULT_SHAPE_INDICATOR_OPTIONS
-
   /**
-   * A subclass of this util with different stroke weights.
+   * Stroke weights for this class. Replaced wholesale on a fresh subclass by
+   * the inherited {@link OverlayUtil.configure}:
    *
-   * Returns a *class*, not an instance, because overlay utils are registered by
-   * constructor: `overlayUtils: [ShapeIndicatorOverlayUtil.configure({ lineWidth: 2 })]`.
-   * Omitted keys keep the value they had, so configuring a subclass twice
-   * layers rather than resets.
+   * ```ts
+   * overlayUtils: [ShapeIndicatorOverlayUtil.configure({ lineWidth: 2 })]
+   * ```
    */
-  static configure<T extends typeof ShapeIndicatorOverlayUtil>(this: T, options: Partial<TLShapeIndicatorOptions>): T {
-    const base = this as typeof ShapeIndicatorOverlayUtil
-    const merged: TLShapeIndicatorOptions = { ...base.options, ...options }
-    return class extends base {
-      static override options = merged
-    } as unknown as T
-  }
-
-  get options(): TLShapeIndicatorOptions {
-    return (this.constructor as typeof ShapeIndicatorOverlayUtil).options
-  }
+  static override options: TLShapeIndicatorOptions = DEFAULT_SHAPE_INDICATOR_OPTIONS
 
   /**
    * Whether this shape shows an outline in this context.
@@ -114,9 +112,9 @@ export class ShapeIndicatorOverlayUtil<H extends TLIndicatorHost = TLIndicatorHo
    * Each shape appears at most once: a shape that is both selected and hinted
    * is drawn as hinted, because the gesture in flight is the more urgent fact.
    */
-  getIndicators(): TLShapeIndicator[] {
+  getIndicators(): TLIndicatorOverlay[] {
     const editor = this.editor
-    const out: TLShapeIndicator[] = []
+    const out: TLIndicatorOverlay[] = []
     const claimed = new Set<string>()
 
     const push = (shape: UnknownShape, context: TLIndicatorContext): void => {

@@ -78,6 +78,10 @@ class Idle extends StateNode {
   }
 
   override onDoubleClick(info: ClickEventInfo): void {
+    // A double click is reported in three phases; act on the release, which is
+    // the one this tool has always acted on. Acting on `down` too would enter a
+    // group and then immediately act again inside it.
+    if (info.phase !== "up") return
     if (info.target !== "shape") return
     const outer = this.editor.getOutermostSelectableShape(info.shape) ?? info.shape
     if (outer.type === "group" && outer.id !== info.shape.id) {
@@ -367,7 +371,9 @@ class Translating extends StateNode {
     const editor = this.editor
     if (!editor.inputs.isDragging) return
     this.didDrag = true
-    const dragging = [...this.initialShapes.keys()].map((id) => editor.getShape(id)).filter((s): s is UnknownShape => !!s)
+    const dragging = [...this.initialShapes.keys()]
+      .map((id) => editor.getShape<UnknownShape>(id))
+      .filter((s): s is UnknownShape => !!s)
     this.dropTarget = getFrameLikeDropTarget(editor, editor.inputs.currentPagePoint, dragging)
     editor.setHintingShapes(this.dropTarget ? [this.dropTarget.id] : [])
   }
@@ -398,7 +404,9 @@ class Translating extends StateNode {
     // the shape it selected.
     if (!this.didDrag) return
     const editor = this.editor
-    const dragging = [...this.initialShapes.keys()].map((id) => editor.getShape(id)).filter((s): s is UnknownShape => !!s)
+    const dragging = [...this.initialShapes.keys()]
+      .map((id) => editor.getShape<UnknownShape>(id))
+      .filter((s): s is UnknownShape => !!s)
     if (dragging.length === 0) return
     dropShapesOnFrameLike(editor, this.dropTarget, dragging)
   }

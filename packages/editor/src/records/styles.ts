@@ -59,6 +59,46 @@ export const GEO_SHAPE_KINDS = [
 ] as const
 export type GeoShapeKind = (typeof GEO_SHAPE_KINDS)[number]
 
+/**
+ * Horizontal alignment of *text inside a text-bearing shape*, as opposed to the
+ * alignment of the shape's own label box, which is
+ * {@link DEFAULT_H_ALIGNS}. Both exist because a note can be centred on the
+ * canvas while its paragraphs are left-aligned.
+ */
+export const DEFAULT_TEXT_ALIGNS = ["start", "middle", "end"] as const
+export type DefaultTextAlignStyle = (typeof DEFAULT_TEXT_ALIGNS)[number]
+
+/** Shapes an arrow terminal can be drawn as. */
+export const ARROWHEAD_KINDS = [
+  "none",
+  "arrow",
+  "triangle",
+  "square",
+  "dot",
+  "diamond",
+  "inverted",
+  "bar",
+  "pipe",
+] as const
+export type ArrowShapeArrowheadKind = (typeof ARROWHEAD_KINDS)[number]
+
+/** How an arrow's body is routed. */
+export const ARROW_SHAPE_KINDS = ["arc", "elbow"] as const
+export type ArrowShapeKind = (typeof ARROW_SHAPE_KINDS)[number]
+
+/** How a line shape interpolates between its points. */
+export const LINE_SPLINE_KINDS = ["cubic", "line"] as const
+export type LineShapeSplineKind = (typeof LINE_SPLINE_KINDS)[number]
+
+/**
+ * Where an elbow arrow is allowed to attach when its terminal is bound to a
+ * shape: `"none"` keeps the stored point, `"edge"` snaps to the nearest edge,
+ * `"center"` to the shape's centre, `"edge-point"` to the nearest point on an
+ * edge, `"none-edge"` to an edge only while dragging.
+ */
+export const ELBOW_ARROW_SNAP_MODES = ["none", "edge", "center", "edge-point", "none-edge"] as const
+export type ElbowArrowSnapMode = (typeof ELBOW_ARROW_SNAP_MODES)[number]
+
 /** Stroke widths in page units per size, matching the classic look. */
 export const STROKE_SIZES: Record<DefaultSizeStyle, number> = { s: 2, m: 3.5, l: 5, xl: 10 }
 export const FONT_SIZES: Record<DefaultSizeStyle, number> = { s: 18, m: 24, l: 36, xl: 44 }

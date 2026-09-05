@@ -12,6 +12,7 @@ import { InstancePresenceRecordType } from "../../records/presence"
 import type { BaseShape, ShapeId } from "../../records/base"
 import { BaseBoxShapeUtil } from "../../shapes/ShapeUtil"
 import { StateNode } from "../../tools/StateNode"
+import { createUserId } from "../../user/userRecord"
 
 const wasmPath = fileURLToPath(new URL("../../../../wasm/pkg/mocanvas_bg.wasm", import.meta.url))
 
@@ -517,10 +518,11 @@ describe("collaboration", () => {
     editor.dispose()
   })
 
-  function addCollaborator(userId: string, lastActivityTimestamp: number): void {
+  function addCollaborator(name: string, lastActivityTimestamp: number): void {
+    const userId = createUserId(name)
     editor.store.put([
       InstancePresenceRecordType.create({
-        id: InstancePresenceRecordType.createId(userId),
+        id: InstancePresenceRecordType.createId(name),
         userId,
         currentPageId: editor.getCurrentPageId(),
         lastActivityTimestamp,
@@ -533,8 +535,8 @@ describe("collaboration", () => {
     addCollaborator("live", now)
     addCollaborator("stale", now - COLLABORATOR_INACTIVE_TIMEOUT - 1)
 
-    expect(editor.getCollaboratorsOnCurrentPage().map((c) => c.userId).sort()).toEqual(["live", "stale"])
-    expect(editor.getVisibleCollaboratorsOnCurrentPage().map((c) => c.userId)).toEqual(["live"])
+    expect(editor.getCollaboratorsOnCurrentPage().map((c) => c.userId).sort()).toEqual(["user:live", "user:stale"])
+    expect(editor.getVisibleCollaboratorsOnCurrentPage().map((c) => c.userId)).toEqual(["user:live"])
   })
 
   it("hides collaborators looking at another page, however active they are", () => {
@@ -548,7 +550,7 @@ describe("collaboration", () => {
 
   it("follows and unfollows a user id", () => {
     expect(editor.getFollowingUserId()).toBeNull()
-    editor.startFollowingUser("user:someone")
+    editor.startFollowingUser(createUserId("someone"))
     expect(editor.getFollowingUserId()).toBe("user:someone")
     editor.stopFollowingUser()
     expect(editor.getFollowingUserId()).toBeNull()
@@ -557,6 +559,65 @@ describe("collaboration", () => {
   it("refuses to follow yourself", () => {
     editor.startFollowingUser(editor.user.getId())
     expect(editor.getFollowingUserId()).toBeNull()
+  })
+
+  /** Puts `name` on this page with `selectedShapeIds` and a cursor. */
+  function addCollaboratorAt(
+    name: string,
+    selectedShapeIds: ShapeId[],
+    cursor: { x: number; y: number } | null,
+  ): void {
+    editor.store.put([
+      InstancePresenceRecordType.create({
+        id: InstancePresenceRecordType.createId(name),
+        userId: createUserId(name),
+        currentPageId: editor.getCurrentPageId(),
+        selectedShapeIds,
+        cursor: cursor ? { ...cursor, type: "default", rotation: 0 } : null,
+        lastActivityTimestamp: Date.now(),
+      }),
+    ])
+  }
+
+  it("zooms to what a collaborator has selected", () => {
+    editor.createShapes([{ type: "box", x: 800, y: 800, props: { w: 100, h: 100 } }])
+    const id = editor.getCurrentPageShapes()[0]!.id
+    addCollaboratorAt("ada", [id], { x: 0, y: 0 })
+
+    editor.zoomToUser(createUserId("ada"))
+
+    // The shape they have selected is now inside the viewport.
+    const viewport = editor.getViewportPageBounds()
+    const bounds = editor.getShapePageBounds(id)!
+    expect(viewport.x).toBeLessThanOrEqual(bounds.x + 1)
+    expect(viewport.y).toBeLessThanOrEqual(bounds.y + 1)
+    expect(viewport.x + viewport.w).toBeGreaterThanOrEqual(bounds.x + bounds.w - 1)
+  })
+
+  it("centres on their cursor when they have nothing selected", () => {
+    addCollaboratorAt("ada", [], { x: 500, y: 400 })
+    const zoom = editor.getZoomLevel()
+
+    editor.zoomToUser(createUserId("ada"))
+
+    const centre = editor.getViewportPageBounds().center
+    expect(centre.x).toBeCloseTo(500, 5)
+    expect(centre.y).toBeCloseTo(400, 5)
+    // A cursor is a point, so there is nothing to fit: the zoom is left alone.
+    expect(editor.getZoomLevel()).toBe(zoom)
+  })
+
+  it("does nothing for somebody who is not here", () => {
+    const before = editor.getCamera()
+    editor.zoomToUser(createUserId("nobody"))
+    expect(editor.getCamera()).toEqual(before)
+  })
+
+  it("does nothing for somebody with neither a selection nor a cursor", () => {
+    addCollaboratorAt("ada", [], null)
+    const before = editor.getCamera()
+    editor.zoomToUser(createUserId("ada"))
+    expect(editor.getCamera()).toEqual(before)
   })
 })
 

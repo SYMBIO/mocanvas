@@ -30,3 +30,28 @@ export {
   type PresenceStateDerivationOptions,
   type PresenceUser,
 } from "./presence"
+
+export {
+  createTLCurrentUser,
+  defaultUserPreferences,
+  defaultUserStore,
+  getUserPreferences,
+  setUserPreferences,
+  userPreferencesValidator,
+  userTypeValidator,
+} from "./globalPreferences"
+
+export {
+  createCachedUserResolve,
+  createUserRecordType,
+  getDefaultUserProperties,
+  type CachedUserResolve,
+  type CreateCachedUserResolveOptions,
+  type UserRecordId,
+} from "./userSchema"
+
+export {
+  getDefaultUserPresence,
+  type CreatePresenceStateDerivationOpts,
+  type TLPresenceStateInfo,
+} from "./presence"

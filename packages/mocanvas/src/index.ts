@@ -2,19 +2,23 @@
 import "./install"
 
 export * from "@mocanvas/editor"
+// The tldraw-5.2 indicator spellings; the compositor itself stays in the editor.
+export * from "./indicators"
+export * from "./ui"
 export * from "./shapes"
 export * from "./bindings"
 export * from "./tools"
 export * from "./text"
-export * from "./ui/DefaultUi"
-export * from "./ui/StylePanel"
-export { Icon, ICONS, ICON_NAMES, ICON_GRID, GEO_BOX, GEO_ICON_PATHS, getGeoIconBox, type IconName, type IconProps } from "./ui/icons"
-export { Popover, UiTooltip, placeNear, type PopoverProps, type Placement } from "./ui/overlays"
-export { useKeyboardShortcuts, debugStatsOpen } from "./ui/useKeyboardShortcuts"
 export * from "./file"
 export * from "./Mocanvas"
 export * from "./export"
 export * from "./external"
+export * from "./assets"
+export * from "./config"
+export * from "./interaction"
+export * from "./fonts"
+export * from "./path"
+export * from "./stroke"
 
 // --- workstream E: toolbar built on the override surface -----------------------
 export {
@@ -23,5 +27,3 @@ export {
   type DefaultToolbarProps,
   type MocanvasUiMenuItemProps,
 } from "./ui/DefaultToolbar"
-export { buildDefaultToolItems, buildDefaultActionItems, registeredToolIds } from "./ui/tools-context"
-export { useToolShortcuts, ToolShortcuts, toolKeyMap } from "./ui/useToolShortcuts"

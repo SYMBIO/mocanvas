@@ -5,9 +5,17 @@ import {
   type BaseShape,
   type Editor,
   type Geometry2d,
+  getDefaultDisplayValues,
+  type ShapeUtilOptions,
   type StyleWords,
+  type TLColorMode,
+  type TLDefaultDisplayValues,
+  type TLStyledShape,
+  type TLTheme,
   type VideoAsset,
 } from "@mocanvas/editor"
+import { videoShapeProps } from "./shape-props"
+import { videoShapeMigrations } from "./shape-migrations"
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react"
 import { propsOf, readBoolean, readNumber, readString } from "./prop-access"
 import { rectPath } from "./indicator-paths"
@@ -38,6 +46,32 @@ export const VIDEO_PLAY_SIZE = 48
 
 /** Seeking to within this many seconds of the stored time is treated as already there. */
 export const VIDEO_TIME_EPSILON = 0.1
+
+/**
+ * The editor members this module reads, none of which it requires to exist.
+ *
+ * `allowVideoAutoplay` is an editor *option*, so its declaration belongs on
+ * `EditorConfig` in the editor package; it is read structurally here so that a
+ * host which already sets it is honoured whether or not the field has been
+ * declared yet.
+ */
+interface EditorWithVideoOptions {
+  options?: { allowVideoAutoplay?: boolean }
+}
+
+/**
+ * Whether a video may start itself.
+ *
+ * Defaults to `true` — the historical behaviour, where a shape carrying
+ * `props.playing` starts as soon as it is on screen. An app that sets
+ * `options.allowVideoAutoplay: false` gets the opposite: no video ever starts
+ * on its own, and one only plays once someone presses play in its controls.
+ * The shape's `playing` prop is left alone either way, so the setting is a
+ * property of this editor rather than an edit to the document.
+ */
+export function isVideoAutoplayAllowed(editor: Editor | null | undefined): boolean {
+  return (editor as EditorWithVideoOptions | null | undefined)?.options?.allowVideoAutoplay !== false
+}
 
 /**
  * The file the shape plays: the asset's `src`, or `null` when there is no
@@ -138,8 +172,51 @@ function VideoPlayer({ src, time, playing, controls, altText }: VideoPlayerProps
   )
 }
 
+/**
+ * What a video shape paints with: the placeholder frame and the play glyph
+ * drawn over it. Like an image, a video carries no styles of its own.
+ */
+export interface VideoShapeUtilDisplayValues extends TLDefaultDisplayValues {
+  /** Fill of the frame drawn before the video can be shown. */
+  placeholderFill: string
+  /** Border of that placeholder. */
+  placeholderStroke: string
+  /** Ink of the play glyph. */
+  playColor: string
+  /** The play glyph's side, in page units. */
+  playSize: number
+}
+
+/** `VideoShapeUtil`'s settings; see {@link ShapeUtil.configure}. */
+export interface VideoShapeOptions extends ShapeUtilOptions<VideoShape, VideoShapeUtilDisplayValues> {
+  /** The width a new video shape is created at, in page units. */
+  defaultWidth?: number
+  /** The height a new video shape is created at, in page units. */
+  defaultHeight?: number
+}
+
+/** Resolve a video shape's display values; see {@link VideoShapeUtilDisplayValues}. */
+export function getVideoDisplayValues(
+  editor: unknown,
+  shape: { props?: unknown },
+  theme: TLTheme,
+  colorMode: TLColorMode,
+): VideoShapeUtilDisplayValues {
+  return {
+    ...getDefaultDisplayValues(editor, shape as TLStyledShape, theme, colorMode),
+    placeholderFill: VIDEO_PLACEHOLDER_FILL,
+    placeholderStroke: VIDEO_PLACEHOLDER_STROKE,
+    playColor: VIDEO_PLAY_COLOR,
+    playSize: VIDEO_PLAY_SIZE,
+  }
+}
+
 export class VideoShapeUtil extends BaseBoxShapeUtil<VideoShape> {
   static override type = "video" as const
+  static override props = videoShapeProps
+  static override migrations = videoShapeMigrations
+  static override options: VideoShapeOptions = { getDefaultDisplayValues: getVideoDisplayValues }
+  declare readonly options: VideoShapeOptions
 
   getDefaultProps(): VideoShapeProps {
     return { w: VIDEO_WIDTH, h: VIDEO_HEIGHT, assetId: null, time: 0, playing: true, url: "", altText: "" }
@@ -179,7 +256,7 @@ export class VideoShapeUtil extends BaseBoxShapeUtil<VideoShape> {
         <VideoPlayer
           src={src}
           time={readNumber(p, "time", 0)}
-          playing={readBoolean(p, "playing", true)}
+          playing={readBoolean(p, "playing", true) && isVideoAutoplayAllowed(this.editor)}
           controls={this.editor.getEditingShapeId() === shape.id}
           altText={altText}
         />

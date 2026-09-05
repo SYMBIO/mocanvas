@@ -1,7 +1,8 @@
 import { atom, type Atom } from "@mocanvas/state"
 import type { Editor } from "./Editor"
 import { Box, Vec, type BoxLike } from "../geometry"
-import type { ShapeId } from "../records/base"
+import { isShapeId, type ShapeId, type UnknownShape } from "../records/base"
+import { BoundsSnaps, HandleSnaps, type SnapIndicator } from "./snaps"
 
 export interface SnapLine {
   id: string
@@ -27,11 +28,23 @@ interface SnapPoints {
  */
 export class SnapManager {
   private readonly _lines: Atom<SnapLine[]>
+  private readonly _indicators: Atom<SnapIndicator[]>
   /** Snap distance in screen pixels. */
   threshold = 8
 
-  constructor(private readonly editor: Editor) {
+  /**
+   * Bounds snapping: aligning a dragged or resized selection with its
+   * neighbours. See {@link BoundsSnaps}.
+   */
+  readonly shapeBounds: BoundsSnaps
+  /** Handle snapping: finding a landing point for a dragged endpoint. See {@link HandleSnaps}. */
+  readonly handles: HandleSnaps
+
+  constructor(readonly editor: Editor) {
     this._lines = atom<SnapLine[]>("snap.lines", [])
+    this._indicators = atom<SnapIndicator[]>("snap.indicators", [])
+    this.shapeBounds = new BoundsSnaps(this)
+    this.handles = new HandleSnaps(this)
   }
 
   getLines(): SnapLine[] {
@@ -40,6 +53,79 @@ export class SnapManager {
 
   clearLines(): void {
     if (this._lines.get().length) this._lines.set([])
+  }
+
+  /**
+   * What the canvas should draw to explain the current snap.
+   *
+   * Kept separate from {@link getLines} because the two are different
+   * vocabularies: a *line* is this renderer's primitive, an *indicator* is the
+   * documented, renderer-agnostic description. Setting indicators explicitly
+   * replaces the derived ones for as long as they stand.
+   */
+  getIndicators(): SnapIndicator[] {
+    const explicit = this._indicators.get()
+    if (explicit.length > 0) return explicit
+    return this._lines.get().map((line) => ({ id: line.id, type: "points", points: line.points }))
+  }
+
+  /** Publish indicators directly, for a tool that snaps something the manager does not. */
+  setIndicators(indicators: SnapIndicator[]): void {
+    this._indicators.set(indicators)
+  }
+
+  /** Drop both the explicit indicators and the derived lines. */
+  clearIndicators(): void {
+    if (this._indicators.get().length) this._indicators.set([])
+    this.clearLines()
+  }
+
+  /** The snap distance in *page* units: the screen threshold divided by the zoom. */
+  getSnapThreshold(): number {
+    return this.threshold / this.editor.getZoomLevel()
+  }
+
+  /**
+   * The shapes a drag may snap against.
+   *
+   * Siblings under {@link getCurrentCommonAncestor} only. Snapping a shape to
+   * something in a different frame would align it with a thing it cannot
+   * overlap, and the guide line would run through a clipping boundary.
+   */
+  getSnappableShapes(): UnknownShape[] {
+    const editor = this.editor
+    const ancestor = this.getCurrentCommonAncestor() ?? editor.getCurrentPageId()
+    const viewport = editor.getViewportPageBounds()
+    const padded = Box.Expand(viewport, Math.max(viewport.w, viewport.h))
+    const selected = new Set<ShapeId>(editor.getSelectedShapeIds())
+    return editor.getShapesIntersectingBounds(padded).filter((shape) => {
+      if (selected.has(shape.id)) return false
+      if (shape.isLocked) return false
+      return shape.parentId === ancestor
+    })
+  }
+
+  /**
+   * The parent every selected shape shares, or `undefined` when they do not
+   * share one.
+   *
+   * This is what scopes snapping to a frame: a selection entirely inside one
+   * frame snaps to that frame's other children, and a selection spanning two
+   * frames snaps to nothing, because there is no coordinate space both halves
+   * agree on.
+   */
+  getCurrentCommonAncestor(): ShapeId | undefined {
+    const editor = this.editor
+    const ids = editor.getSelectedShapeIds()
+    if (ids.length === 0) return undefined
+    let common: string | undefined
+    for (const id of ids) {
+      const shape = editor.getShape<UnknownShape>(id)
+      if (!shape) return undefined
+      if (common === undefined) common = shape.parentId
+      else if (common !== shape.parentId) return undefined
+    }
+    return common !== undefined && isShapeId(common) ? common : undefined
   }
 
   /** Bounds of shapes near the viewport that are not being moved. */

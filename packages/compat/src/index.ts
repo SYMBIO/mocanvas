@@ -65,18 +65,20 @@ import type {
   EmbedDefinition,
   InstancePresence,
   InstancePresenceId,
-  MocanvasUiMenuItemProps,
   User,
   UserPreferencesState,
   UserStore,
 } from "@mocanvas/mocanvas"
-import { Mocanvas, createSchema, createStore, Canvas, Editor, MocanvasUiMenuItem, useCurrentUser } from "@mocanvas/mocanvas"
+import { Mocanvas, createSchema, createStore, Canvas, Editor, useCurrentUser } from "@mocanvas/mocanvas"
 
 // ---- records ----------------------------------------------------------------
 export type TLRecord = EditorRecord
 export type TLStore = EditorStore
 export type TLStoreSnapshot = EditorStoreSnapshot
-export type TLShape<Type extends string = string> = Shape<Type>
+// `never` as the default so a bare `TLShape` is `Shape` itself — the union of
+// registered types. Spelling the default `string` collapsed it to one
+// non-union type and `shape.type === "note"` narrowed nothing.
+export type TLShape<Type extends string = never> = [Type] extends [never] ? Shape : Shape<Type>
 export type TLUnknownShape = UnknownShape
 export type TLShapeId = ShapeId
 export type TLParentId = ParentId
@@ -89,7 +91,7 @@ export type TLCamera = Camera
 export type TLCameraId = CameraId
 export type TLInstance = Instance
 export type TLInstancePageState = InstancePageState
-export type TLBinding<Type extends string = string> = Binding<Type>
+export type TLBinding<Type extends string = never> = [Type] extends [never] ? Binding : Binding<Type>
 export type TLBindingId = BindingId
 export type TLArrowBinding = ArrowBinding
 
@@ -161,7 +163,6 @@ export const useTldrawCurrentUser = useCurrentUser
 // ---- embeds -----------------------------------------------------------------
 export type TLEmbedDefinition = EmbedDefinition
 
-// ---- UI ---------------------------------------------------------------------
-/** The `Tldraw`-spelled menu item. */
-export const TldrawUiMenuItem = MocanvasUiMenuItem
-export type TldrawUiMenuItemProps = MocanvasUiMenuItemProps
+// `TldrawUiMenuItem` used to be aliased here, back when the flagship only had
+// `MocanvasUiMenuItem`. The UI layer now exports the documented name itself, and
+// an alias here would shadow it — so there is nothing to add.

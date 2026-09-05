@@ -1,7 +1,17 @@
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
-import { BATCH_WORDS, EngineBridge, FLAG, OVERLAY_WORDS, PATH_OP, VERTEX_FLOATS, loadEngineSync } from "./index"
+import {
+  BATCH_WORDS,
+  EngineBridge,
+  FLAG,
+  GEO_FLAG,
+  GEO_KIND,
+  OVERLAY_WORDS,
+  PATH_OP,
+  VERTEX_FLOATS,
+  loadEngineSync,
+} from "./index"
 
 const wasmPath = fileURLToPath(new URL("../pkg/mocanvas_bg.wasm", import.meta.url))
 
@@ -207,5 +217,121 @@ describe("EngineBridge", () => {
     expect(frames).toBe(4)
     // Backlog cleared: the frame is cacheable again.
     expect(bridge.frame({ x: 0, y: 0, z: 1 }, 1000, 500, 1).dirty).toBe(false)
+  })
+
+  describe("parametric geometry", () => {
+    /** Bounds of one shape built by `write`, on a scene of its own. */
+    function boundsOf(write: () => void): [number, number, number, number] | null {
+      bridge.cmd.clear()
+      bridge.cmd.upsert(1, 1, 0, 1, 0, 0, 0, 0, 0, 100, 60)
+      write()
+      bridge.cmd.flush()
+      return bridge.geometryBounds(1)
+    }
+
+    it("builds a geo silhouette from its box", () => {
+      for (const kind of Object.values(GEO_KIND)) {
+        const b = boundsOf(() => bridge.cmd.setGeo(1, kind, 100, 60))
+        expect(b, `kind ${kind}`).not.toBeNull()
+        // The engine measures a curved outline off its own flattening, so a
+        // cloud or a heart lands a fraction of a unit inside the box it was
+        // fitted to. Half a unit on a 100 x 60 box is the tolerance that
+        // distinguishes "fills its box" from "is somewhere else entirely".
+        expect(b, `kind ${kind}`).toEqual([
+          expect.closeTo(0, 0.5),
+          expect.closeTo(0, 0.5),
+          expect.closeTo(100, 0.5),
+          expect.closeTo(60, 0.5),
+        ])
+      }
+    })
+
+    it("agrees with the same outline uploaded as a path", () => {
+      const parametric = boundsOf(() => bridge.cmd.setGeo(1, GEO_KIND["rectangle"]!, 100, 60))
+      const uploaded = boundsOf(() => bridge.cmd.setGeometry(1, rectPath(100, 60)))
+      expect(parametric).toEqual(uploaded)
+    })
+
+    it("flips the silhouette without moving its box", () => {
+      const flags = GEO_FLAG.FLIP_X | GEO_FLAG.FLIP_Y
+      const flipped = boundsOf(() => bridge.cmd.setGeo(1, GEO_KIND["triangle"]!, 100, 60, flags))
+      const plain = boundsOf(() => bridge.cmd.setGeo(1, GEO_KIND["triangle"]!, 100, 60))
+      expect(flipped).toEqual(plain)
+      // But the outline itself did turn over: the apex is now hit-testable at
+      // the bottom edge's midpoint rather than the top's.
+      bridge.cmd.clear()
+      bridge.cmd.upsert(1, 1, 0, 1, 0, 0, 0, 0, 0, 100, 60)
+      bridge.cmd.setGeo(1, GEO_KIND["triangle"]!, 100, 60, flags)
+      bridge.cmd.setStyle(1, solid)
+      bridge.cmd.flush()
+      expect(bridge.hitTest(50, 58, 1)).toBe(1)
+    })
+
+    it("reports a geo kind it has no generator for", () => {
+      bridge.cmd.clear()
+      bridge.cmd.upsert(1, 1, 0, 1, 0, 0, 0, 0, 0, 100, 60)
+      bridge.cmd.setGeo(1, 999, 100, 60)
+      expect(() => bridge.cmd.flush()).toThrow(/unknown geo kind 999/)
+    })
+
+    it("builds splines and polylines from points", () => {
+      // Three sides of a square: the polyline is the square's own bounds, and a
+      // smooth curve through the same corners has to bow outside them.
+      const points = [0, 0, 100, 0, 100, 100, 0, 100]
+      expect(boundsOf(() => bridge.cmd.setPoly(1, points))).toEqual([0, 0, 100, 100])
+      const spline = boundsOf(() => bridge.cmd.setSpline(1, points))
+      expect(spline![2]).toBeGreaterThan(100)
+      expect(spline![1]).toBeLessThan(0)
+    })
+
+    it("closes a polygon only when asked", () => {
+      bridge.cmd.clear()
+      bridge.cmd.upsert(1, 1, 0, 1, 0, 0, 0, 0, 0, 100, 100)
+      bridge.cmd.setPoly(1, [0, 0, 100, 0, 100, 100, 0, 100], GEO_FLAG.CLOSED)
+      bridge.cmd.setStyle(1, solid)
+      bridge.cmd.flush()
+      // A closed, filled outline is hit inside; an open one is not.
+      expect(bridge.hitTest(50, 50, 1)).toBe(1)
+      bridge.cmd.setPoly(1, [0, 0, 100, 0, 100, 100, 0, 100])
+      bridge.cmd.flush()
+      expect(bridge.hitTest(50, 50, 1)).toBe(0)
+    })
+
+    it("smooths freehand runs and concatenates segments", () => {
+      const pen = [0, 0, 10, 4, 22, 1, 33, 12, 41, 30, 52, 25]
+      const smoothed = boundsOf(() => bridge.cmd.setDraw(1, [{ points: pen, freehand: true }]))
+      const raw = boundsOf(() => bridge.cmd.setDraw(1, [{ points: pen, freehand: false }]))
+      expect(smoothed).not.toEqual(raw)
+      // Smoothing pulls the interior in but leaves the endpoints where the pen was.
+      expect(smoothed![0]).toBe(0)
+      expect(smoothed![2]).toBe(52)
+
+      const joined = boundsOf(() =>
+        bridge.cmd.setDraw(1, [
+          { points: [0, 0, 10, 0], freehand: false },
+          { points: [40, 40, 50, 40], freehand: false },
+        ]),
+      )
+      expect(joined).toEqual([0, 0, 50, 40])
+    })
+
+    it("costs a fraction of the words an uploaded path does", () => {
+      bridge.cmd.clear()
+      bridge.cmd.flush()
+      bridge.cmd.setGeo(1, GEO_KIND["cloud"]!, 400, 300)
+      const parametric = bridge.cmd.pending
+      bridge.cmd.flush()
+      expect(parametric).toBe(6)
+
+      // The same silhouette as an uploaded path: a move, twelve cubics and a
+      // close, which is what the host used to build and copy for every cloud.
+      const asPath = [PATH_OP.MOVE, 0, 0]
+      for (let k = 0; k < 12; k++) asPath.push(PATH_OP.CUBIC, 0, 0, 0, 0, 0, 0)
+      asPath.push(PATH_OP.CLOSE)
+      bridge.cmd.setGeometry(1, asPath)
+      expect(bridge.cmd.pending).toBe(3 + asPath.length)
+      expect(bridge.cmd.pending).toBeGreaterThan(parametric * 10)
+      bridge.cmd.flush()
+    })
   })
 })

@@ -5,17 +5,28 @@ import {
   type BaseShape,
   type Editor,
   type Geometry2d,
+  getDefaultDisplayValues,
   type ImageAsset,
+  type ShapeUtilOptions,
   type StyleWords,
+  type TLColorMode,
+  type TLDefaultDisplayValues,
+  type TLStyledShape,
+  type TLTheme,
+  type TLCropInfo,
 } from "@mocanvas/editor"
 import type { CSSProperties, ReactNode } from "react"
 import { propsOf, readBoolean, readNumber, readString } from "./prop-access"
 import { rectPath } from "./indicator-paths"
+import { getCropBox } from "./crop-box"
+import { imageShapeProps } from "./shape-props"
+import { imageShapeMigrations } from "./shape-migrations"
 
 /** Normalized crop window: both corners in [0, 1] of the source image. */
 export interface ImageCrop {
   topLeft: { x: number; y: number }
   bottomRight: { x: number; y: number }
+  /** Whether the window is the circle inscribed in that rectangle. */
   isCircle?: boolean
 }
 
@@ -144,8 +155,58 @@ function readImageCrop(shape: { props?: unknown }): ImageCrop | null {
   }
 }
 
+/**
+ * What an image shape paints with.
+ *
+ * An image has no styles at all — the pixels are the picture — so the only
+ * values it adds are the placeholder it draws while there is nothing to show.
+ */
+export interface ImageShapeUtilDisplayValues extends TLDefaultDisplayValues {
+  /** Fill of the frame drawn while the image has no asset or is still loading. */
+  placeholderFill: string
+  /** Border of that placeholder. */
+  placeholderStroke: string
+}
+
+/** `ImageShapeUtil`'s settings; see {@link ShapeUtil.configure}. */
+export interface ImageShapeOptions extends ShapeUtilOptions<ImageShape, ImageShapeUtilDisplayValues> {
+  /** The narrowest a crop may make the shape, in page units. */
+  minCropWidth?: number
+  /** The shortest a crop may make the shape, in page units. */
+  minCropHeight?: number
+}
+
+/** Resolve an image shape's display values; see {@link ImageShapeUtilDisplayValues}. */
+export function getImageDisplayValues(
+  editor: unknown,
+  shape: { props?: unknown },
+  theme: TLTheme,
+  colorMode: TLColorMode,
+): ImageShapeUtilDisplayValues {
+  return {
+    ...getDefaultDisplayValues(editor, shape as TLStyledShape, theme, colorMode),
+    placeholderFill: IMAGE_PLACEHOLDER_FILL,
+    placeholderStroke: IMAGE_PLACEHOLDER_STROKE,
+  }
+}
+
 export class ImageShapeUtil extends BaseBoxShapeUtil<ImageShape> {
   static override type = "image" as const
+  static override props = imageShapeProps
+  static override migrations = imageShapeMigrations
+  static override options: ImageShapeOptions = { getDefaultDisplayValues: getImageDisplayValues }
+  declare readonly options: ImageShapeOptions
+
+  /**
+   * Cropping an image resizes the window, not the picture; the arithmetic is
+   * shared with every other croppable shape.
+   */
+  onCrop(shape: ImageShape, info: TLCropInfo<ImageShape>): Partial<ImageShape> | undefined {
+    return getCropBox<ImageShape>(shape, info, {
+      ...(this.options.minCropWidth === undefined ? {} : { minWidth: this.options.minCropWidth }),
+      ...(this.options.minCropHeight === undefined ? {} : { minHeight: this.options.minCropHeight }),
+    })
+  }
 
   getDefaultProps(): ImageShapeProps {
     return { w: 100, h: 100, assetId: null, playing: true, url: "", crop: null, flipX: false, flipY: false, altText: "" }

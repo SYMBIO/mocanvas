@@ -83,6 +83,17 @@ export type ExternalContent =
   | { type: "text"; text: string; point?: VecLikeJson }
   | { type: "url"; url: string; point?: VecLikeJson }
   | { type: "svg-text"; text: string; point?: VecLikeJson }
+  /**
+   * A url an app has already decided to embed, rather than one to be sniffed.
+   * `url` skips the bookmark/embed negotiation `type: "url"` performs.
+   */
+  | {
+      type: "embed"
+      url: string
+      point?: VecLikeJson
+      /** The definition the url was matched against, when the caller already has it. */
+      embed?: unknown
+    }
 export type ExternalContentType = ExternalContent["type"]
 
 /** Something an asset can be produced from. */

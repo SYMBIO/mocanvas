@@ -1,5 +1,5 @@
 {
-  "date": "2026-09-04 16:03:13 UTC",
+  "date": "2026-09-05 12:27:14 UTC",
   "machine": {
     "os": "Darwin 25.5.0 (arm64)",
     "cpu": "Apple M3 Pro",
@@ -10,11 +10,11 @@
   "browser": {
     "version": "151.0.7922.34",
     "mode": "gpu",
-    "software": true,
+    "software": false,
     "gpu": {
       "webgl2": true,
-      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
-      "vendor": "Google Inc. (Google)"
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+      "vendor": "Google Inc. (Apple)"
     },
     "args": [
       "--js-flags=--expose-gc",
@@ -32,12 +32,10 @@
   "versions": {
     "tldraw": "5.4.0",
     "playwright": "1.62.1",
-    "mocanvas": "0.0.1",
-    "git": "03163a1"
+    "mocanvas": "2.0.0",
+    "git": "81c60bc-dirty"
   },
   "ns": [
-    1000,
-    5000,
     20000
   ],
   "kinds": [
@@ -49,7 +47,92 @@
     "width": 1200,
     "height": 800
   },
-  "matrix": null,
+  "matrix": {
+    "mocanvas": {
+      "20000:geo": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 150,
+        "firstFrameMs": 168.19999998807907,
+        "shapes": 20000,
+        "panAvgMs": 9.0925,
+        "panP50": 8.300000000000068,
+        "panP95": 16.59999999999991,
+        "panMaxMs": 41.09999999999991,
+        "panFps": 109.98075336816058,
+        "panLongTasks": 0,
+        "dragP50": 175,
+        "dragP95": 192.5999999999999,
+        "dragFps": 5.607319420950815,
+        "hitAvgUs": 5.600000023841858,
+        "hitHits": 500,
+        "memoryMB": 168.52480030059814,
+        "errors": []
+      },
+      "20000:mixed": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 253.90000000596046,
+        "firstFrameMs": 365.59999999403954,
+        "shapes": 20000,
+        "panAvgMs": 10.938333333333333,
+        "panP50": 8.300000000000182,
+        "panP95": 25,
+        "panMaxMs": 41.600000000000136,
+        "panFps": 91.42160597287827,
+        "panLongTasks": 0,
+        "dragP50": 249.89999999999964,
+        "dragP95": 275.89999999999964,
+        "dragFps": 3.964766442216833,
+        "hitAvgUs": 6.199999988079071,
+        "hitHits": 499,
+        "memoryMB": 182.1485252380371,
+        "errors": []
+      }
+    },
+    "tldraw": {
+      "20000:geo": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 421.09999999403954,
+        "firstFrameMs": 2217.9000000059605,
+        "shapes": 20000,
+        "panAvgMs": 136.45749999999998,
+        "panP50": 117.5,
+        "panP95": 283,
+        "panMaxMs": 350.4000000000001,
+        "panFps": 7.328289027719254,
+        "panLongTasks": 120,
+        "dragP50": 658.4000000000015,
+        "dragP95": 740.8999999999942,
+        "dragFps": 1.5059447167694473,
+        "hitAvgUs": 449.4000000357628,
+        "hitHits": 165,
+        "memoryMB": 777.3548002243042,
+        "errors": []
+      },
+      "20000:mixed": {
+        "repeats": 3,
+        "ok": 3,
+        "createMs": 685.9000000059605,
+        "firstFrameMs": 2625.9000000059605,
+        "shapes": 20000,
+        "panAvgMs": 152.98583333333332,
+        "panP50": 133.39999999999964,
+        "panP95": 299.3000000000002,
+        "panMaxMs": 366.6999999999998,
+        "panFps": 6.536552948802449,
+        "panLongTasks": 121,
+        "dragP50": 733.4000000000015,
+        "dragP95": 841.6000000000058,
+        "dragFps": 1.3538944774644264,
+        "hitAvgUs": 685.4000000357628,
+        "hitHits": 170,
+        "memoryMB": 786.6480302810669,
+        "errors": []
+      }
+    }
+  },
   "compare": {
     "ok": true,
     "shots": {
@@ -90,22 +173,14 @@
           "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.image\" in persisted schema",
           "warn: [store] ignoring unknown migration sequence \"com.tldraw.shape.video\" in persisted schema",
           "warn: [store] ignoring unknown migration sequence \"com.tldraw.binding.arrow\" in persisted schema",
-          "arrow: unknown prop \"kind\" (x2)",
-          "arrow: unknown prop \"elbowMidPoint\" (x2)",
-          "arrow: unknown prop \"richText\" (x2)",
           "arrow: missing prop \"text\" (default used) (x2)",
           "binding arrow: unknown prop \"snap\"",
           "draw: unknown prop \"scaleX\"",
           "draw: unknown prop \"scaleY\"",
           "draw: segment uses the packed \"path\" form (decoded to \"points\" on load)",
-          "geo: unknown prop \"flipX\" (x7)",
-          "geo: unknown prop \"flipY\" (x7)",
-          "geo: unknown prop \"richText\" (x7)",
           "geo: missing prop \"text\" (default used) (x7)",
           "frame: unknown prop \"color\"",
-          "text: unknown prop \"richText\"",
           "text: missing prop \"text\" (default used)",
-          "note: unknown prop \"richText\"",
           "note: unknown prop \"textLastEditedBy\"",
           "note: missing prop \"text\" (default used)"
         ]
@@ -121,11 +196,11 @@
       "width": 1200,
       "height": 800,
       "totalPixels": 960000,
-      "differentPixels": 25276,
-      "diffPercent": 2.6329166666666666,
-      "inkPixelsMocanvas": 110968,
-      "inkPixelsTldraw": 114470,
-      "inkOverlapPercent": 88.18805616307995,
+      "differentPixels": 25754,
+      "diffPercent": 2.6827083333333333,
+      "inkPixelsMocanvas": 110942,
+      "inkPixelsTldraw": 114310,
+      "inkOverlapPercent": 88.26538287949451,
       "tolerance": 24
     },
     "boxes": {
@@ -221,7 +296,7 @@
           "x": 332.07547169811323,
           "y": 539.3207547169811,
           "w": 321.50943396226415,
-          "h": 33.42626415094345
+          "h": 33.43698113207552
         },
         {
           "id": "shape:fx-frame",
@@ -245,9 +320,9 @@
           "type": "geo",
           "geo": "ellipse",
           "x": 910.7924528301887,
-          "y": 539.6730071808475,
+          "y": 539.3207547169811,
           "w": 128.60377358490567,
-          "h": 127.89926865717275
+          "h": 128.60377358490567
         }
       ],
       "tldraw": [
@@ -389,10 +464,10 @@
             "w": 214.33962264150944,
             "h": 128.60377358490567,
             "interior": {
-              "pixelsMocanvas": 26039,
-              "pixelsTldraw": 26009,
-              "iouPercent": 99.14294459749006,
-              "colourAgreementPercent": 95.84362457548626
+              "pixelsMocanvas": 26037,
+              "pixelsTldraw": 25958,
+              "iouPercent": 99.20692693766522,
+              "colourAgreementPercent": 95.86390669653201
             }
           },
           {
@@ -414,10 +489,10 @@
             "w": 171.47169811320754,
             "h": 171.47169811320754,
             "interior": {
-              "pixelsMocanvas": 21670,
-              "pixelsTldraw": 21828,
-              "iouPercent": 98.48505589778689,
-              "colourAgreementPercent": 99.87953481907057
+              "pixelsMocanvas": 21674,
+              "pixelsTldraw": 21721,
+              "iouPercent": 98.56776791434062,
+              "colourAgreementPercent": 99.86073069959612
             }
           },
           {
@@ -430,9 +505,9 @@
             "h": 148.66959768351117,
             "interior": {
               "pixelsMocanvas": 8113,
-              "pixelsTldraw": 8666,
-              "iouPercent": 93.06178805661028,
-              "colourAgreementPercent": 98.62759643916914
+              "pixelsTldraw": 8589,
+              "iouPercent": 93.55661142658477,
+              "colourAgreementPercent": 98.83562492258145
             }
           },
           {
@@ -444,10 +519,10 @@
             "w": 150.0377358490566,
             "h": 128.60377358490567,
             "interior": {
-              "pixelsMocanvas": 8575,
-              "pixelsTldraw": 8897,
-              "iouPercent": 96.27050101100876,
-              "colourAgreementPercent": 99.1365227537923
+              "pixelsMocanvas": 8580,
+              "pixelsTldraw": 8845,
+              "iouPercent": 96.78147939017504,
+              "colourAgreementPercent": 99.35822637106185
             }
           },
           {
@@ -459,10 +534,10 @@
             "w": 150.0377358490566,
             "h": 150.0377358490566,
             "interior": {
-              "pixelsMocanvas": 16157,
-              "pixelsTldraw": 15915,
-              "iouPercent": 98.3671449777338,
-              "colourAgreementPercent": 98.67957746478874
+              "pixelsMocanvas": 16158,
+              "pixelsTldraw": 15833,
+              "iouPercent": 97.89063466534702,
+              "colourAgreementPercent": 99.08372827804108
             }
           },
           {
@@ -503,10 +578,10 @@
             "w": 214.33962264150944,
             "h": 214.33962264150944,
             "interior": {
-              "pixelsMocanvas": 44244,
-              "pixelsTldraw": 44358,
-              "iouPercent": 99.52709093365762,
-              "colourAgreementPercent": 96.54267354511721
+              "pixelsMocanvas": 44231,
+              "pixelsTldraw": 44385,
+              "iouPercent": 99.57210098416773,
+              "colourAgreementPercent": 96.16854771221134
             }
           },
           {
@@ -530,7 +605,7 @@
               "pixelsMocanvas": 114091,
               "pixelsTldraw": 114091,
               "iouPercent": 100,
-              "colourAgreementPercent": 97.66502178085913
+              "colourAgreementPercent": 97.62470308788599
             }
           },
           {
@@ -542,10 +617,10 @@
             "w": 128.60377358490567,
             "h": 85.73584905660377,
             "interior": {
-              "pixelsMocanvas": 10035,
-              "pixelsTldraw": 10067,
-              "iouPercent": 97.19442809495781,
-              "colourAgreementPercent": 99.98990714574082
+              "pixelsMocanvas": 10040,
+              "pixelsTldraw": 10060,
+              "iouPercent": 97.13613181639859,
+              "colourAgreementPercent": 99.95961227786752
             }
           },
           {
@@ -557,24 +632,24 @@
             "w": 128.60377358490567,
             "h": 128.60377358490567,
             "interior": {
-              "pixelsMocanvas": 11884,
-              "pixelsTldraw": 12390,
-              "iouPercent": 95.75806451612904,
-              "colourAgreementPercent": 99.57049014653866
+              "pixelsMocanvas": 11882,
+              "pixelsTldraw": 12307,
+              "iouPercent": 96.22779265027988,
+              "colourAgreementPercent": 99.38458944528747
             }
           }
         ],
         "overall": {
-          "pixelsMocanvas": 238889,
-          "pixelsTldraw": 239764,
-          "iouPercent": 99.1823027851641,
-          "colourAgreementPercent": 97.61269425704025
+          "pixelsMocanvas": 238884,
+          "pixelsTldraw": 239422,
+          "iouPercent": 99.21199172008214,
+          "colourAgreementPercent": 97.56556272485695
         }
       },
       "stroke": {
         "excluded": {
           "x0": 1100,
-          "y0": 764,
+          "y0": 763,
           "x1": 1192,
           "y1": 794,
           "note": "tldraw watermark badge; mocanvas paints nothing here"
@@ -583,52 +658,52 @@
         "colors": [
           {
             "hex": "#1d1d1d",
-            "pixels": 5220,
+            "pixels": 5122,
             "halfWidthP90": 2
           },
           {
             "hex": "#4ba1f1",
-            "pixels": 2835,
+            "pixels": 2599,
             "halfWidthP90": 2
           },
           {
             "hex": "#4465e9",
-            "pixels": 2466,
+            "pixels": 2322,
             "halfWidthP90": 2
           },
           {
             "hex": "#f1ac4b",
-            "pixels": 2031,
+            "pixels": 1841,
             "halfWidthP90": 2
           },
           {
             "hex": "#e03131",
-            "pixels": 1819,
+            "pixels": 1784,
             "halfWidthP90": 2
           },
           {
             "hex": "#ae3ec9",
-            "pixels": 1774,
+            "pixels": 1704,
             "halfWidthP90": 2
           },
           {
             "hex": "#099268",
-            "pixels": 1660,
+            "pixels": 1632,
             "halfWidthP90": 2
           },
           {
             "hex": "#f87777",
-            "pixels": 2111,
-            "halfWidthP90": 2
+            "pixels": 2228,
+            "halfWidthP90": 2.23606797749979
           },
           {
             "hex": "#e16919",
-            "pixels": 787,
+            "pixels": 789,
             "halfWidthP90": 2
           },
           {
-            "hex": "#939394",
-            "pixels": 2479,
+            "hex": "#828282",
+            "pixels": 2517,
             "halfWidthP90": 1
           }
         ],
@@ -643,24 +718,24 @@
             "w": 214.33962264150944,
             "h": 128.60377358490567,
             "band": {
-              "referenceStrokePixels": 3102,
+              "referenceStrokePixels": 2960,
               "forward": {
-                "samples": 3102,
+                "samples": 2960,
                 "medianPx": 0,
                 "p95Px": 2,
-                "maxPx": 4
+                "maxPx": 3.605551275463989
               },
               "reverse": {
-                "samples": 2495,
+                "samples": 2457,
                 "medianPx": 0,
                 "p95Px": 2.23606797749979,
-                "maxPx": 5.385164807134504
+                "maxPx": 6.082762530298219
               },
               "symmetric": {
-                "samples": 5597,
+                "samples": 5417,
                 "medianPx": 0,
                 "p95Px": 2,
-                "maxPx": 5.385164807134504
+                "maxPx": 6.082762530298219
               }
             }
           },
@@ -672,23 +747,23 @@
             "w": 180.8343369468835,
             "h": 218.5528419573356,
             "band": {
-              "referenceStrokePixels": 1918,
+              "referenceStrokePixels": 1833,
               "forward": {
-                "samples": 1918,
+                "samples": 1833,
                 "medianPx": 3.1622776601683795,
-                "p95Px": 20.248456731316587,
+                "p95Px": 20.518284528683193,
                 "maxPx": 22.627416997969522
               },
               "reverse": {
-                "samples": 1889,
-                "medianPx": 2.23606797749979,
-                "p95Px": 20,
-                "maxPx": 22.02271554554524
+                "samples": 1735,
+                "medianPx": 3.605551275463989,
+                "p95Px": 20.248456731316587,
+                "maxPx": 22.360679774997898
               },
               "symmetric": {
-                "samples": 3807,
-                "medianPx": 2.8284271247461903,
-                "p95Px": 20.12461179749811,
+                "samples": 3568,
+                "medianPx": 3.605551275463989,
+                "p95Px": 20.518284528683193,
                 "maxPx": 22.627416997969522
               }
             }
@@ -702,24 +777,24 @@
             "w": 171.47169811320754,
             "h": 171.47169811320754,
             "band": {
-              "referenceStrokePixels": 2235,
+              "referenceStrokePixels": 2324,
               "forward": {
-                "samples": 2235,
+                "samples": 2324,
                 "medianPx": 0,
                 "p95Px": 1.4142135623730951,
                 "maxPx": 4.123105625617661
               },
               "reverse": {
-                "samples": 1939,
-                "medianPx": 0,
-                "p95Px": 2,
-                "maxPx": 5
-              },
-              "symmetric": {
-                "samples": 4174,
+                "samples": 1930,
                 "medianPx": 0,
                 "p95Px": 1.4142135623730951,
-                "maxPx": 5
+                "maxPx": 4
+              },
+              "symmetric": {
+                "samples": 4254,
+                "medianPx": 0,
+                "p95Px": 1.4142135623730951,
+                "maxPx": 4.123105625617661
               }
             }
           },
@@ -732,24 +807,24 @@
             "w": 149.6783257645911,
             "h": 148.66959768351117,
             "band": {
-              "referenceStrokePixels": 1949,
+              "referenceStrokePixels": 1826,
               "forward": {
-                "samples": 1949,
+                "samples": 1826,
                 "medianPx": 0,
                 "p95Px": 2,
                 "maxPx": 3
               },
               "reverse": {
-                "samples": 1310,
+                "samples": 1313,
                 "medianPx": 0,
                 "p95Px": 1,
-                "maxPx": 3.605551275463989
+                "maxPx": 3.1622776601683795
               },
               "symmetric": {
-                "samples": 3259,
+                "samples": 3139,
                 "medianPx": 0,
                 "p95Px": 2,
-                "maxPx": 3.605551275463989
+                "maxPx": 3.1622776601683795
               }
             }
           },
@@ -762,24 +837,24 @@
             "w": 150.0377358490566,
             "h": 128.60377358490567,
             "band": {
-              "referenceStrokePixels": 1660,
+              "referenceStrokePixels": 1632,
               "forward": {
-                "samples": 1660,
+                "samples": 1632,
                 "medianPx": 0,
                 "p95Px": 2,
-                "maxPx": 5
+                "maxPx": 5.0990195135927845
               },
               "reverse": {
-                "samples": 1072,
+                "samples": 1075,
                 "medianPx": 0,
                 "p95Px": 0,
                 "maxPx": 3
               },
               "symmetric": {
-                "samples": 2732,
+                "samples": 2707,
                 "medianPx": 0,
                 "p95Px": 1.4142135623730951,
-                "maxPx": 5
+                "maxPx": 5.0990195135927845
               }
             }
           },
@@ -792,21 +867,21 @@
             "w": 150.0377358490566,
             "h": 150.0377358490566,
             "band": {
-              "referenceStrokePixels": 1774,
+              "referenceStrokePixels": 1704,
               "forward": {
-                "samples": 1774,
-                "medianPx": 1,
-                "p95Px": 2.23606797749979,
+                "samples": 1704,
+                "medianPx": 0,
+                "p95Px": 2,
                 "maxPx": 3.1622776601683795
               },
               "reverse": {
-                "samples": 1210,
+                "samples": 1213,
                 "medianPx": 0,
                 "p95Px": 1,
                 "maxPx": 4
               },
               "symmetric": {
-                "samples": 2984,
+                "samples": 2917,
                 "medianPx": 0,
                 "p95Px": 2,
                 "maxPx": 4
@@ -821,24 +896,24 @@
             "w": 278.6959316037736,
             "h": 59.664268195191646,
             "band": {
-              "referenceStrokePixels": 1334,
+              "referenceStrokePixels": 1312,
               "forward": {
-                "samples": 1334,
+                "samples": 1312,
                 "medianPx": 0,
-                "p95Px": 2,
-                "maxPx": 5.830951894845301
+                "p95Px": 2.8284271247461903,
+                "maxPx": 8.06225774829855
               },
               "reverse": {
-                "samples": 1307,
+                "samples": 1311,
                 "medianPx": 0,
-                "p95Px": 2.23606797749979,
-                "maxPx": 9.219544457292887
+                "p95Px": 3.1622776601683795,
+                "maxPx": 8.94427190999916
               },
               "symmetric": {
-                "samples": 2641,
+                "samples": 2623,
                 "medianPx": 0,
-                "p95Px": 2.23606797749979,
-                "maxPx": 9.219544457292887
+                "p95Px": 2.8284271247461903,
+                "maxPx": 8.94427190999916
               }
             }
           },
@@ -850,9 +925,9 @@
             "w": 214.33962264150944,
             "h": 85.73584905660377,
             "band": {
-              "referenceStrokePixels": 787,
+              "referenceStrokePixels": 789,
               "forward": {
-                "samples": 787,
+                "samples": 789,
                 "medianPx": 0,
                 "p95Px": 1,
                 "maxPx": 1.4142135623730951
@@ -860,14 +935,14 @@
               "reverse": {
                 "samples": 852,
                 "medianPx": 0,
-                "p95Px": 2.8284271247461903,
-                "maxPx": 15.132745950421556
+                "p95Px": 108.33743581975715,
+                "maxPx": 126.1269202034205
               },
               "symmetric": {
-                "samples": 1639,
+                "samples": 1641,
                 "medianPx": 0,
-                "p95Px": 2,
-                "maxPx": 15.132745950421556
+                "p95Px": 94.14881836751856,
+                "maxPx": 126.1269202034205
               }
             }
           },
@@ -879,21 +954,21 @@
             "w": 257.20754716981133,
             "h": 96.45283018867924,
             "band": {
-              "referenceStrokePixels": 1251,
+              "referenceStrokePixels": 1156,
               "forward": {
-                "samples": 1251,
+                "samples": 1156,
                 "medianPx": 0,
                 "p95Px": 2.23606797749979,
                 "maxPx": 3.605551275463989
               },
               "reverse": {
-                "samples": 817,
+                "samples": 820,
                 "medianPx": 0,
-                "p95Px": 1,
-                "maxPx": 2
+                "p95Px": 1.4142135623730951,
+                "maxPx": 2.23606797749979
               },
               "symmetric": {
-                "samples": 2068,
+                "samples": 1976,
                 "medianPx": 0,
                 "p95Px": 2.23606797749979,
                 "maxPx": 3.605551275463989
@@ -908,21 +983,21 @@
             "w": 214.33962264150944,
             "h": 214.33962264150944,
             "band": {
-              "referenceStrokePixels": 826,
+              "referenceStrokePixels": 824,
               "forward": {
-                "samples": 826,
+                "samples": 824,
                 "medianPx": 1,
                 "p95Px": 3.1622776601683795,
                 "maxPx": 5
               },
               "reverse": {
-                "samples": 694,
+                "samples": 695,
                 "medianPx": 1,
                 "p95Px": 3,
                 "maxPx": 5
               },
               "symmetric": {
-                "samples": 1520,
+                "samples": 1519,
                 "medianPx": 1,
                 "p95Px": 3,
                 "maxPx": 5
@@ -937,24 +1012,24 @@
             "w": 321.50943396226415,
             "h": 34.29433962264151,
             "band": {
-              "referenceStrokePixels": 1640,
+              "referenceStrokePixels": 1641,
               "forward": {
-                "samples": 1640,
-                "medianPx": 2,
-                "p95Px": 19,
-                "maxPx": 27.018512172212592
+                "samples": 1641,
+                "medianPx": 2.23606797749979,
+                "p95Px": 18.973665961010276,
+                "maxPx": 26.476404589747453
               },
               "reverse": {
-                "samples": 1205,
-                "medianPx": 1.4142135623730951,
-                "p95Px": 6.4031242374328485,
-                "maxPx": 11.180339887498949
+                "samples": 1206,
+                "medianPx": 2,
+                "p95Px": 7.0710678118654755,
+                "maxPx": 12.083045973594572
               },
               "symmetric": {
-                "samples": 2845,
+                "samples": 2847,
                 "medianPx": 2,
-                "p95Px": 13.038404810405298,
-                "maxPx": 27.018512172212592
+                "p95Px": 11.180339887498949,
+                "maxPx": 26.476404589747453
               }
             }
           },
@@ -966,24 +1041,24 @@
             "w": 428.6792452830189,
             "h": 278.64150943396226,
             "band": {
-              "referenceStrokePixels": 4556,
+              "referenceStrokePixels": 4550,
               "forward": {
-                "samples": 4556,
-                "medianPx": 0,
-                "p95Px": 2,
-                "maxPx": 3
+                "samples": 4550,
+                "medianPx": 1,
+                "p95Px": 107.46627377926528,
+                "maxPx": 189.2643653728826
               },
               "reverse": {
-                "samples": 3695,
+                "samples": 2998,
                 "medianPx": 0,
                 "p95Px": 1,
-                "maxPx": 10.198039027185569
+                "maxPx": 10
               },
               "symmetric": {
-                "samples": 8251,
+                "samples": 7548,
                 "medianPx": 0,
-                "p95Px": 1.4142135623730951,
-                "maxPx": 10.198039027185569
+                "p95Px": 70.00714249274856,
+                "maxPx": 189.2643653728826
               }
             }
           },
@@ -996,21 +1071,21 @@
             "w": 128.60377358490567,
             "h": 85.73584905660377,
             "band": {
-              "referenceStrokePixels": 1484,
+              "referenceStrokePixels": 1443,
               "forward": {
-                "samples": 1484,
+                "samples": 1443,
                 "medianPx": 0,
                 "p95Px": 2,
                 "maxPx": 2.8284271247461903
               },
               "reverse": {
-                "samples": 1086,
+                "samples": 1079,
                 "medianPx": 0,
                 "p95Px": 1,
-                "maxPx": 2.23606797749979
+                "maxPx": 2.8284271247461903
               },
               "symmetric": {
-                "samples": 2570,
+                "samples": 2522,
                 "medianPx": 0,
                 "p95Px": 1,
                 "maxPx": 2.8284271247461903
@@ -1026,21 +1101,21 @@
             "w": 128.60377358490567,
             "h": 128.60377358490567,
             "band": {
-              "referenceStrokePixels": 1652,
+              "referenceStrokePixels": 1688,
               "forward": {
-                "samples": 1652,
+                "samples": 1688,
                 "medianPx": 0,
                 "p95Px": 2,
                 "maxPx": 3
               },
               "reverse": {
-                "samples": 1179,
+                "samples": 1178,
                 "medianPx": 0,
-                "p95Px": 1.4142135623730951,
+                "p95Px": 1,
                 "maxPx": 2.23606797749979
               },
               "symmetric": {
-                "samples": 2831,
+                "samples": 2866,
                 "medianPx": 0,
                 "p95Px": 2,
                 "maxPx": 3
@@ -1050,28 +1125,583 @@
         ],
         "overall": {
           "forward": {
-            "samples": 26168,
+            "samples": 25682,
             "medianPx": 0,
-            "p95Px": 4.242640687119285,
-            "maxPx": 27.018512172212592
+            "p95Px": 13.45362404707371,
+            "maxPx": 189.2643653728826
           },
           "reverse": {
-            "samples": 20750,
+            "samples": 19862,
             "medianPx": 0,
-            "p95Px": 4.47213595499958,
-            "maxPx": 22.02271554554524
+            "p95Px": 6.708203932499369,
+            "maxPx": 126.1269202034205
           },
           "symmetric": {
-            "samples": 46918,
+            "samples": 45544,
             "medianPx": 0,
-            "p95Px": 4.242640687119285,
-            "maxPx": 27.018512172212592
+            "p95Px": 10,
+            "maxPx": 189.2643653728826
           }
         }
       }
     },
     "fixtureRecords": 18
   },
-  "raw": [],
+  "raw": [
+    {
+      "lib": "mocanvas",
+      "n": 20000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 146.80000001192093,
+        "firstFrameMs": 166.2000000178814,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "vendor": "Google Inc. (Apple)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 9.0925,
+        "p50": 8.300000000000068,
+        "p95": 16.59999999999991,
+        "maxMs": 41.09999999999991,
+        "fps": 109.98075336816058,
+        "totalMs": 1091.1,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 179.58333333333334,
+        "p50": 175,
+        "p95": 192.5999999999999,
+        "maxMs": 224.5,
+        "fps": 5.56844547563805,
+        "totalMs": 10775,
+        "longTasks": 61,
+        "longTaskMs": 10741
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 5.600000023841858,
+        "hits": 500
+      },
+      "memoryMB": 168.54037189483643,
+      "consoleErrors": [
+        "error: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ]
+    },
+    {
+      "lib": "mocanvas",
+      "n": 20000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 155.40000000596046,
+        "firstFrameMs": 173.7999999821186,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "vendor": "Google Inc. (Apple)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 8.958333333333334,
+        "p50": 8.300000000000068,
+        "p95": 16.59999999999991,
+        "maxMs": 33.40000000000009,
+        "fps": 111.62790697674419,
+        "totalMs": 1075,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 178.3383333333333,
+        "p50": 175,
+        "p95": 208.29999999999927,
+        "maxMs": 216.59999999999945,
+        "fps": 5.607319420950815,
+        "totalMs": 10700.3,
+        "longTasks": 61,
+        "longTaskMs": 10665
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 6.199999988079071,
+        "hits": 500
+      },
+      "memoryMB": 168.49286556243896,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 20000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 150,
+        "firstFrameMs": 168.19999998807907,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "vendor": "Google Inc. (Apple)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 9.166666666666666,
+        "p50": 8.299999999999955,
+        "p95": 16.59999999999991,
+        "maxMs": 41.59999999999991,
+        "fps": 109.0909090909091,
+        "totalMs": 1100,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 176.38666666666668,
+        "p50": 175,
+        "p95": 191.70000000000027,
+        "maxMs": 216.60000000000036,
+        "fps": 5.669362763625368,
+        "totalMs": 10583.2,
+        "longTasks": 62,
+        "longTaskMs": 10630
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 5.399999976158142,
+        "hits": 500
+      },
+      "memoryMB": 168.52480030059814,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 20000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 421.09999999403954,
+        "firstFrameMs": 2222.5,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "vendor": "Google Inc. (Apple)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 135.9025,
+        "p50": 116.89999999999964,
+        "p95": 283,
+        "maxMs": 350.4000000000001,
+        "fps": 7.358216368352311,
+        "totalMs": 16308.300000000001,
+        "longTasks": 120,
+        "longTaskMs": 15924,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 650.8316666666666,
+        "p50": 641.7000000000007,
+        "p95": 708.3000000000029,
+        "maxMs": 933.2999999999956,
+        "fps": 1.536495612024615,
+        "totalMs": 39049.899999999994,
+        "longTasks": 61,
+        "longTaskMs": 39014
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 443.5999999642372,
+        "hits": 165
+      },
+      "memoryMB": 777.3548002243042,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 20000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 436.7000000178814,
+        "firstFrameMs": 2217.9000000059605,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "vendor": "Google Inc. (Apple)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 136.45749999999998,
+        "p50": 117.5,
+        "p95": 275.09999999999854,
+        "maxMs": 425,
+        "fps": 7.328289027719254,
+        "totalMs": 16374.899999999998,
+        "longTasks": 120,
+        "longTaskMs": 16074,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 671.2416666666667,
+        "p50": 666.3000000000029,
+        "p95": 740.8999999999942,
+        "maxMs": 875,
+        "fps": 1.4897764093905572,
+        "totalMs": 40274.5,
+        "longTasks": 61,
+        "longTaskMs": 40280
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 460.60000002384186,
+        "hits": 165
+      },
+      "memoryMB": 777.4290208816528,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 20000,
+      "kind": "geo",
+      "errors": [],
+      "create": {
+        "ms": 420.09999999403954,
+        "firstFrameMs": 2161.5,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "vendor": "Google Inc. (Apple)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 136.95083333333332,
+        "p50": 124.89999999999964,
+        "p95": 283.3000000000002,
+        "maxMs": 350,
+        "fps": 7.3018905811696415,
+        "totalMs": 16434.1,
+        "longTasks": 120,
+        "longTaskMs": 16087,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 664.0350000000001,
+        "p50": 658.4000000000015,
+        "p95": 758.8999999999978,
+        "maxMs": 883,
+        "fps": 1.5059447167694473,
+        "totalMs": 39842.100000000006,
+        "longTasks": 61,
+        "longTaskMs": 39866
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 449.4000000357628,
+        "hits": 165
+      },
+      "memoryMB": 777.2483758926392,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 20000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 253.90000000596046,
+        "firstFrameMs": 365.59999999403954,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "vendor": "Google Inc. (Apple)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 10.764166666666664,
+        "p50": 8.300000000000182,
+        "p95": 25,
+        "maxMs": 33.40000000000009,
+        "fps": 92.90082836571962,
+        "totalMs": 1291.6999999999998,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 252.22166666666666,
+        "p50": 249.89999999999964,
+        "p95": 275.7999999999993,
+        "maxMs": 308.39999999999964,
+        "fps": 3.964766442216833,
+        "totalMs": 15133.3,
+        "longTasks": 62,
+        "longTaskMs": 15182
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 6.199999988079071,
+        "hits": 499
+      },
+      "memoryMB": 182.14437866210938,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 20000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 249.69999998807907,
+        "firstFrameMs": 365.2999999821186,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "vendor": "Google Inc. (Apple)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 10.938333333333333,
+        "p50": 8.300000000000182,
+        "p95": 25,
+        "maxMs": 41.600000000000136,
+        "fps": 91.42160597287827,
+        "totalMs": 1312.6,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 253.20166666666665,
+        "p50": 249.89999999999964,
+        "p95": 283.8000000000002,
+        "maxMs": 316.89999999999964,
+        "fps": 3.9494210806932553,
+        "totalMs": 15192.099999999999,
+        "longTasks": 63,
+        "longTaskMs": 15361
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 6.600000023841858,
+        "hits": 499
+      },
+      "memoryMB": 182.14865684509277,
+      "consoleErrors": []
+    },
+    {
+      "lib": "mocanvas",
+      "n": 20000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 255.5,
+        "firstFrameMs": 368.5,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "vendor": "Google Inc. (Apple)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 11.0075,
+        "p50": 8.399999999999864,
+        "p95": 25,
+        "maxMs": 50,
+        "fps": 90.84714967067907,
+        "totalMs": 1320.9,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 250.97,
+        "p50": 250,
+        "p95": 275.89999999999964,
+        "maxMs": 291.6999999999989,
+        "fps": 3.984539984858748,
+        "totalMs": 15058.2,
+        "longTasks": 63,
+        "longTaskMs": 15197
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 6,
+        "hits": 499
+      },
+      "memoryMB": 182.1485252380371,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 20000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 685.9000000059605,
+        "firstFrameMs": 2625.9000000059605,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "vendor": "Google Inc. (Apple)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 149.785,
+        "p50": 133.3000000000011,
+        "p95": 299.3000000000002,
+        "maxMs": 366.6999999999998,
+        "fps": 6.676235938178055,
+        "totalMs": 17974.2,
+        "longTasks": 121,
+        "longTaskMs": 17945,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 722.7750000000001,
+        "p50": 708.4000000000015,
+        "p95": 841.6000000000058,
+        "maxMs": 983.2999999999993,
+        "fps": 1.3835564318079623,
+        "totalMs": 43366.50000000001,
+        "longTasks": 61,
+        "longTaskMs": 43352
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 685,
+        "hits": 170
+      },
+      "memoryMB": 786.6480302810669,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 20000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 687.5999999940395,
+        "firstFrameMs": 2663.5999999940395,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "vendor": "Google Inc. (Apple)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 153.26333333333332,
+        "p50": 134.1999999999989,
+        "p95": 300.10000000000036,
+        "maxMs": 375,
+        "fps": 6.524717805954893,
+        "totalMs": 18391.6,
+        "longTasks": 121,
+        "longTaskMs": 18349,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 767.7750000000001,
+        "p50": 758.2999999999956,
+        "p95": 833.4000000000015,
+        "maxMs": 1067,
+        "fps": 1.302464914851356,
+        "totalMs": 46066.50000000001,
+        "longTasks": 61,
+        "longTaskMs": 46124
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 791.4000000357628,
+        "hits": 170
+      },
+      "memoryMB": 786.702808380127,
+      "consoleErrors": []
+    },
+    {
+      "lib": "tldraw",
+      "n": 20000,
+      "kind": "mixed",
+      "errors": [],
+      "create": {
+        "ms": 666.6999999880791,
+        "firstFrameMs": 2621.7999999821186,
+        "count": 20000
+      },
+      "gpu": {
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "vendor": "Google Inc. (Apple)",
+        "webgl2": true
+      },
+      "panZoom": {
+        "frames": 120,
+        "avgMs": 152.98583333333332,
+        "p50": 133.39999999999964,
+        "p95": 292.2000000000007,
+        "maxMs": 358.40000000000055,
+        "fps": 6.536552948802449,
+        "totalMs": 18358.3,
+        "longTasks": 121,
+        "longTaskMs": 18317,
+        "zoomFit": 0.05
+      },
+      "drag": {
+        "frames": 60,
+        "avgMs": 738.61,
+        "p50": 733.4000000000015,
+        "p95": 850,
+        "maxMs": 1058.4000000000015,
+        "fps": 1.3538944774644264,
+        "totalMs": 44316.6,
+        "longTasks": 61,
+        "longTaskMs": 44419
+      },
+      "hit": {
+        "samples": 500,
+        "avgUs": 685.4000000357628,
+        "hits": 170
+      },
+      "memoryMB": 786.6417093276978,
+      "consoleErrors": []
+    }
+  ],
   "visibleDifferences": "Comparing `compare-tldraw.png` with `compare-mocanvas.png`. Both are the same unmodified fixture\nrendered by each library. Re-measured on `2ef11f1`, in the same run that produced the numbers above.\n\n**Interior IoU 96.0%** at 97.3% colour agreement, **stroke band distance 1.00 px median / 5.10 px\np95** against a ~4 px stroke, whole-image diff 3.33% at 81.6% painted-pixel IoU. Both libraries draw\nthe default `dash: \"draw\"` style as a genuinely hand-drawn outline — seeded wobble, rounded corners,\novershoot past the vertex — from *different* random numbers, and a pixel diff charges for that twice,\nonce in each direction. So the list below is ordered by what the first two numbers say; each shape's\nshare of the whole-image diff is quoted second, so the older version of this list stays comparable.\n\nEvery figure in this file was measured off the two PNGs; none is carried over from an earlier run.\n\n#### Where the two renders genuinely differ\n\n1. **The bound arrow terminates differently. Band 4.12 px median, 19.85 px p95 — the worst in the\n   fixture by a wide margin, and now the only region whose median is more than half a stroke width\n   out; 11.5% of the diff.** tldraw stops the bent arrow short of the rectangle it is bound to,\n   leaving a visible gap; mocanvas runs it to the shape's edge, so its arrowhead sits on the border.\n   The arrowhead is also slightly larger and at a slightly different angle. A binding difference, not\n   a stroke one, and the largest single thing left on this list.\n\n2. **The note's drop shadow spreads further. Interior IoU 90.3%, joint-lowest in the fixture; 10.3%\n   of the diff.** The note *body* is not the problem: it measures 214 px wide in both renders, its\n   top-to-bottom gradient reads `#f7dc99` at the top and `#fce19c` at the bottom in **both** images —\n   identical, not merely within tolerance — and it sits 2 px right of tldraw's. What differs is the\n   shadow around it. Including the shadow, mocanvas's note silhouette spans x 24–257 and starts at\n   y 489, against tldraw's x 31–246 from y 496: mocanvas's shadow reaches about 7 px further on each\n   side and 7 px higher. Since the interior metric scores the whole silhouette, that spread is most\n   of the missing 10 points. It is also why mocanvas's ink bounding box starts 4 px further left than\n   tldraw's (see 4).\n\n3. **Font weight. Text-shape band 2.00 px median, 12.04 px p95, and the fixture's worst single pixel\n   at 26.17 px; 7.9% of the diff.** Size, baseline and position agree — \"Hello box\", \"Sticky note\",\n   \"Plain text shape\" and the frame label all sit where tldraw puts them, at the same size, and\n   \"Plain text shape\" starts at exactly x=334 in both. The face differs: tldraw's is heavier and\n   slightly wider, so that line ends at x=522 in mocanvas against x=548 in tldraw — 26 px earlier —\n   and inks 1,170 dark pixels against tldraw's 1,590. This is also what the rectangle's 94.8%\n   interior colour agreement is (its \"Hello box\" label), and part of the note's 95.9%.\n\n4. **Framing: mocanvas fits *ink* bounds where tldraw fits *geometry* bounds.** Ignoring the\n   watermark, mocanvas's ink bounding box is 1146×710 px starting at (24, 44), against tldraw's\n   1143×712 starting at (28, 43). The 4 px on the left edge is the note's wider shadow (see 2). The\n   rest is not the constant 1 px offset it was described as: it is a 0.33% scale difference plus a\n   0.67 px downward shift, which reads as +1.8 px at the top of the content and −0.5 px at the\n   bottom. Both harness pages compute the camera with the *same* helper (`fitCameraFor`, a fixed\n   64 px inset) at the same 1200×800 viewport, so the only free input is each library's own\n   `getCurrentPageBounds()`. tldraw returns the geometric union, `(100, 100, 1060, 660)`; mocanvas\n   returns the engine's culling bounds — `Scene::page_bounds`, each shape's geometry expanded by\n   half its stroke width — which is `(98.25, 98.25, 1063.5, 662.25)`: 1.75 px of pad around the\n   `size: \"m\"` (3.5 px) strokes at the top, left and right, and only 0.5 px under the frame's 1 px\n   hairline at the bottom. Feeding those two boxes to the shared formula reproduces both recorded\n   cameras exactly, to the last digit — tldraw `z = 1.071698113208`, mocanvas `z = 1.068171133051`\n   (the ratio 1060/1063.5), with the fitted centre 0.625 page px above the geometric centre because\n   the pad is thicker at the top than at the bottom. That accounts for the whole framing difference;\n   nothing is left over for a renderer offset. It costs each interior-IoU row a point or two and\n   costs the small shapes more than the large ones.\n\n   The renderer itself is not implicated and was checked directly: with the WebGL2 clip mapping from\n   `packages/editor/src/render/webgl2.ts` (`screen = (pos + cam) * zoom`, `clip = screen / vp * 2 −\n   1`, y flipped), a quad spanning page y 100–101 at `cam = (0, 0, 1)` fills device row 100 exactly\n   at dpr 1 and rows 200–201 at dpr 2, and page y 100.5–101.5 fills rows 201–202 — i.e. a page\n   coordinate of N lands on a pixel *boundary* at N × dpr, the same convention a DOM or SVG renderer\n   uses. No half pixel is introduced by the transform, by the `round(cssSize × dpr)` backing store,\n   or by `updateViewportScreenBounds` taking a viewport-relative rect.\n\n   No code was changed for this. The fix belongs in `Editor.getCurrentPageBounds()` (or in what the\n   engine reports), not in the camera: `getShapePageBounds()` returns geometry while\n   `getCurrentPageBounds()` returns ink, and the two silently disagree. Fitting to ink is defensible\n   on its own — it keeps a fat stroke from being clipped at the viewport edge — but it should not be\n   *asymmetric*: because the pad is per-shape, a thick stroke at the top and a hairline at the\n   bottom pull the fitted centre off the content's actual centre. Two 200×120 rectangles at the same\n   x, one `size: \"xl\"` and one `size: \"s\"`, make it visible with nothing else on the page: geometric\n   union `(100, 100, 200, 420)`, `getCurrentPageBounds()` `(95, 95, 210, 426)` — 5 px of pad above,\n   1 px below, so the fitted centre sits 2 px high. `Editor.zoomToFit()` inherits the same skew.\n   Nudging the camera to make this fixture line up would be the wrong repair.\n\n5. **tldraw watermark. 2.1% of the diff.** tldraw paints a \"Get a license for production\" badge in\n   the bottom-right corner; mocanvas has nothing there. Not a rendering difference. Both region\n   metrics exclude it — found automatically as the one place in the corner where the reference\n   painted and mocanvas painted nothing at all.\n\n#### Where a large diff share is *not* a difference worth fixing\n\n- **The frame. 19.1% of the diff — the largest single region — at an interior IoU of 98.8% and a\n  band of 1.00 px median / 2.00 px p95.** Almost all of it is one thing: the frame's border is a\n  hairline, and it lands one pixel off in mocanvas. A 1 px offset of a 1 px line differs on every\n  pixel of both copies, which is expensive in a pixel diff and invisible on screen. Border colour\n  matches exactly (`#717171` on both sides), and the frame's two children score 98.4% and 94.7%\n  interior IoU at 99.8% / 99.5% colour agreement for 3.5% and 5.3% of the diff.\n\n- **The outlines of the rectangle, ellipse, star, hexagon and triangle. 13.2%, 7.7%, 7.4%, 7.0% and\n  6.1% of the diff.** All five now sit at a 1.00 px median band distance with a p95 of 2.24–3.00 px,\n  which is as close as two independently seeded hand-drawn outlines can get. Their interior IoUs are\n  96.8%, 96.8%, 90.3%, 95.7% and 92.8%, at ≥98.0% colour agreement inside. This is the case the\n  whole-image number cannot score: two hand-drawn rings that never coincide, around interiors that\n  agree. The star's and triangle's IoUs are the lowest of the five simply because they are the two\n  smallest interiors in the fixture (8,666 and 8,897 px), so the 6 px erosion and the 1 px framing\n  offset both cost them proportionally more. The rectangle's diff share is additionally inflated by\n  the \"Hello box\" label and by the bent arrow crossing its box.\n\n- **The freehand stroke. 4.9% of the diff, band 1.00 px median / 3.00 px p95.** Both draw the same\n  wave along the same curve, within a stroke width the whole way, and at closely matching widths.\n\n- **The line and the straight arrow. 4.7% and 1.9%, band medians 1.00 px and 0.00 px.** The straight\n  arrow is the closest match in the fixture.\n\n#### Retired from this list\n\nThese were real in earlier runs and are not differences any more:\n\n- **The star's inner radius (was cause #1 at `83ff957`, interior IoU 69.9%, 9.9% of the diff).**\n  mocanvas drew the star with an inner radius of 0.40 of the outer where the reference uses about\n  0.51, so its arms were visibly thinner and its points longer. `2ef11f1` sets the ratio to 0.5 as a\n  named constant with a test. Interior IoU 69.9% → **90.3%**, band median 2.83 px → **1.00 px**,\n  p95 8.06 px → **3.00 px**. What remains is small-shape erosion, not shape.\n- **The hexagon's orientation (was cause #2 at `83ff957`, interior IoU 80.1%, 15.4% of the diff).**\n  mocanvas put a vertex left and right where the reference puts one top and bottom, which made the\n  shape half a box narrower across the flats. `2ef11f1` rotated it. Interior IoU 80.1% → **95.7%**,\n  band median 6.71 px → **1.00 px**, p95 14.42 px → **3.00 px**. It was the second-worst band in the\n  fixture and is now at the fixture median.\n- **The note's trim (was cause #3 two runs ago).** mocanvas draws the note's gradient and drop\n  shadow. The gradient is now an exact match at both ends of the body; only the shadow's spread\n  differs, which is item 2 above.\n- **The frame's border colour.** mocanvas drew `#9fa8b2`; it now draws `#717171`, the same as tldraw.\n- **Fill strength (was #1 at `15b670a`, ~85% of the diff).** `getFillRgba`\n  (`packages/mocanvas/src/shapes/shape-theme.ts`, commit `ef4d079`) maps `semi` to the paper colour,\n  `solid` to the hue's pale tint, and `fill` to the hue. Interior colour agreement is now ≥98.0% on\n  every shape that is only fill, and ≥99.1% on all but the star.\n- **Exact, uniform outlines (was cause #1 at `ef4d079`).** mocanvas drew the exact polygon with a\n  uniform stroke and sharp vertices where tldraw wobbled, overshot and rounded. It now draws a\n  hand-drawn outline of its own. That change *raised* the whole-image diff slightly, which is why\n  that number is reported last.\n- mocanvas rendered *nothing* from the unmodified file (it threw on `props.richText`). It loads and\n  draws all 14 shapes.\n- The sticky note's \"Sticky note\" label was missing, and the text shape's and freehand stroke's\n  content were only present in a shimmed render. All three come from the raw file now.\n\nEverything else lines up: the page background (`#f9fafb` on both, exactly), every fill colour, every\nstroke colour, shape positions and sizes, the geo shape set, the bent arrow's binding to the\nrectangle, the line's spline, the frame and both of its children, and the text shape's position."
 }

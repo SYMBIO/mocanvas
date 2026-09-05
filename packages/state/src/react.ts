@@ -135,6 +135,34 @@ function useTrackedRender<P>(name: string, render: RenderFn<P>, props: P, ref: F
 }
 
 /**
+ * Run `render` with signal tracking on, and re-render the calling component
+ * whenever anything it read changes.
+ *
+ * This is the hook {@link track} is built from, exposed for the cases the
+ * wrapper cannot cover: a component that only wants part of its body tracked,
+ * a class component's render delegate, or a render function received as a
+ * prop, where there is no component to wrap.
+ *
+ * ```tsx
+ * function Panel({ shape }: { shape: TLShape }) {
+ *   return useStateTracking("Panel", () => <span>{editor.getShapePageBounds(shape)?.w}</span>)
+ * }
+ * ```
+ *
+ * The name is for debugging only; it shows up in {@link whyAmIRunning} output.
+ */
+export function useStateTracking<T>(name: string, render: () => T): T {
+	const [tracker] = useState(() => new RenderTracker(name))
+	useSyncExternalStore(tracker.subscribe, tracker.getSnapshot, tracker.getSnapshot)
+	return tracker.track(runRenderFn as (fn: () => T, unused: null) => T, render, null)
+}
+
+/** Adapts a zero-argument render to {@link RenderTracker.track}'s two-argument shape. */
+function runRenderFn<T>(fn: () => T): T {
+	return fn()
+}
+
+/**
  * Wraps a function component so that it re-renders whenever any signal read
  * during its render changes. The result is memoized on props. Supports plain
  * function components and components wrapped in `memo` and/or `forwardRef`.

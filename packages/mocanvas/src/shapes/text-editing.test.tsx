@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createShapeId, type Editor, type PageId, type ShapeId, type UnknownShape } from "@mocanvas/editor"
 import type { IndexKey } from "@mocanvas/store"
+import { toRichText } from "../text/rich-text"
 import { LINE_HEIGHT } from "./text-helpers"
 import { GeoShapeUtil, getGeoGrowY, type GeoShape } from "./GeoShapeUtil"
 import { NoteShapeUtil, NOTE_SIZE, type NoteShape } from "./NoteShapeUtil"
@@ -131,7 +132,11 @@ describe("GeoShapeUtil growY", () => {
   it("trims trailing whitespace on edit end", () => {
     const shape = makeShape<GeoShape>("geo", { ...util.getDefaultProps(), text: "label \n" })
     util.onEditEnd(shape)
-    expect(updates).toEqual([{ id: shape.id, type: "geo", props: { text: "label" } }])
+    // Both spellings are written together: a util that trimmed only `text`
+    // would leave the document — the canonical spelling — untrimmed.
+    expect(updates).toEqual([
+      { id: shape.id, type: "geo", props: { text: "label", richText: toRichText("label") } },
+    ])
   })
 
   it("stays on the GPU while editing and shows the label overlay when editing an empty label", () => {

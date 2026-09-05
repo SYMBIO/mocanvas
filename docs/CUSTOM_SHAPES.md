@@ -197,27 +197,46 @@ geometry bounds, with `pointerEvents: "none"` unless the shape is being edited.
 Render in shape-local space starting at `(0, 0)`; do not apply the camera or
 the shape transform yourself.
 
-### `indicator` — the selection outline
+### `getIndicatorPath` — the selection outline
 
 ```ts
-abstract indicator(shape: T): ReactNode
+getIndicatorPath?(shape: T): Path2D | TLIndicatorPath | undefined
 ```
 
-Also required. Return SVG in shape-local space; the convention among the
-built-ins is a single `<path>` over the geometry:
+Return a `Path2D` in shape-local space. The compositor applies the shape's page
+transform and supplies the stroke — colour from the theme's selection colour,
+width in CSS pixels so it stays a hairline at any zoom — so an indicator is
+usually just the outline:
 
-```tsx
-import { pathWordsToSvgD } from "@mocanvas/mocanvas"
+```ts
+import { svgPath } from "@mocanvas/mocanvas"
 
-indicator(shape: CalloutShape): ReactNode {
-  return <path d={pathWordsToSvgD(this.getGeometry(shape).toPathWords())} />
+override getIndicatorPath(shape: CalloutShape): Path2D {
+  return svgPath(pathWordsToSvgD(this.getGeometry(shape).toPathWords()))
 }
 ```
 
-Note that the default indicators layer currently draws geometry-bounds
-rectangles and handle dots rather than calling `indicator`, so implementing it
-costs you nothing today and pays off when a custom indicators component (via
-`<Mocanvas components={{ Indicators }} />`) or a future default layer uses it.
+Return a `TLIndicatorPath` when the outline needs a hole punched in it:
+
+```ts
+{ path: outline, clipPath: labelRect, additionalPaths: [tail] }
+```
+
+`clipPath` is applied even-odd *before* stroking `path`, so an outer rectangle
+plus a label rectangle leaves the label uncovered. `additionalPaths` are stroked
+afterwards, without the clip.
+
+Returning `undefined` means **no outline**, not "use the default". A shape that
+wants the plain bounds rectangle simply does not implement the method.
+
+Indicators are drawn on a canvas overlay, not as React elements. A util that
+throws here does not blank the whole selection layer — the compositor catches it
+per shape — but do not rely on that.
+
+> **Coming from mocanvas 1.x**, `indicator(shape): ReactNode` still works and is
+> deprecated. A util that implements only the old one is routed to the SVG
+> layer, so nothing breaks; a util that implements both is drawn once, on the
+> canvas.
 
 ---
 
@@ -637,7 +656,7 @@ creates.
 
 Handlers available on any `StateNode`: `onEnter`, `onExit`, `onPointerDown`,
 `onPointerMove`, `onPointerUp`, `onRightClick`, `onMiddleClick`,
-`onDoubleClick`, `onTripleClick`, `onQuadrupleClick`, `onKeyDown`, `onKeyUp`,
+`onDoubleClick`, `onKeyDown`, `onKeyUp`,
 `onKeyRepeat`, `onWheel`, `onCancel`, `onComplete`, `onInterrupt`, `onTick`.
 
 ---
@@ -808,8 +827,8 @@ export class CalloutShapeUtil extends BaseBoxShapeUtil<CalloutShape> {
     )
   }
 
-  indicator(shape: CalloutShape): ReactNode {
-    return <path d={pathWordsToSvgD(this.getGeometry(shape).toPathWords())} />
+  override getIndicatorPath(shape: CalloutShape): Path2D {
+    return svgPath(pathWordsToSvgD(this.getGeometry(shape).toPathWords()))
   }
 
   override canEdit(_shape: CalloutShape): boolean {

@@ -90,11 +90,16 @@ export {
   type StoreBeforeCreateHandler,
   type StoreBeforeDeleteHandler,
   type StoreListener,
+  type StoreError,
   type StoreListenerFilters,
+  type StoreObject,
+  type StoreObjectRecordType,
   type StoreOperationCompleteHandler,
   type StoreOptions,
+  type StoreQueryFilter,
   type StoreRecord,
   type StoreSideEffectHandlers,
+  type StoreValidators,
 } from "./Store"
 
 export {
@@ -107,3 +112,49 @@ export {
   type TldrFile,
   type TldrFileParseError,
 } from "./tldr"
+
+export {
+  createComputedCache,
+  type ComputedCache,
+  type ComputedCacheContext,
+  type CreateComputedCacheOpts,
+  type CreateComputedCacheOptions,
+} from "./computedCache"
+
+export { assertIdType, devFreeze } from "./devFreeze"
+
+export {
+  applyCollectionDiff,
+  getIndexablePropertyOf,
+  isCollectionDiffEmpty,
+  matchesQuery,
+  matchesQueryValue,
+  type CollectionDiff,
+  type QueryExpression,
+  type QueryValueMatcher,
+  type RSIndex,
+  type RSIndexDiff,
+  type RSIndexMap,
+} from "./query"
+
+export {
+  isSerializedSchemaV1,
+  MigrationFailureReason,
+  type LegacyBaseMigrationsInfo,
+  type LegacyMigration,
+  type LegacyMigrations,
+  type SerializedSchemaV1,
+  type StandaloneDependsOn,
+} from "./legacy"
+
+export {
+  createInMemoryStorage,
+  type SynchronousRecordStorage,
+  type SynchronousStorage,
+} from "./storage"
+
+// The reactive collections, re-exported so `@mocanvas/store` is a complete
+// answer to "where do the store's data structures live?".
+export { AtomMap, AtomSet } from "@mocanvas/state"
+
+export { getGraphemeLength, getGraphemes, iterateGraphemes } from "./graphemes"

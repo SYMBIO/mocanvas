@@ -174,8 +174,6 @@ export abstract class StateNode {
   onRightClick?(info: PointerEventInfo): void
   onMiddleClick?(info: PointerEventInfo): void
   onDoubleClick?(info: ClickEventInfo): void
-  onTripleClick?(info: ClickEventInfo): void
-  onQuadrupleClick?(info: ClickEventInfo): void
   onKeyDown?(info: KeyboardEventInfo): void
   onKeyUp?(info: KeyboardEventInfo): void
   onKeyRepeat?(info: KeyboardEventInfo): void

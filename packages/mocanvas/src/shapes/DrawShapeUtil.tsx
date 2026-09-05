@@ -1,4 +1,5 @@
 import {
+  type EngineGeometry,
   Polygon2d,
   Polyline2d,
   ShapeUtil,
@@ -7,22 +8,35 @@ import {
   DefaultDashStyle,
   DefaultFillStyle,
   DefaultSizeStyle,
+  getDefaultDisplayValues,
   type BaseShape,
   type Geometry2d,
   type ResizeInfo,
+  type ShapeUtilOptions,
   type StyleWords,
+  type TLColorMode,
+  type TLDefaultDisplayValues,
+  type TLStyledShape,
+  type TLTheme,
   type VecLike,
 } from "@mocanvas/editor"
 import type { ReactNode } from "react"
 import { smoothPoints } from "./draw-helpers"
 import { propsOf, readArray, readBoolean, readEnum, readNumber, readStyle } from "./prop-access"
-import { getFillRgba, getStrokeRgba, getDashId } from "./shape-theme"
+import { getFillRgba, getStrokeRgba, getDashId, getThemeColors } from "./shape-theme"
 import { polylinePath } from "./indicator-paths"
+import { drawShapeProps } from "./shape-props"
+import { drawShapeMigrations } from "./shape-migrations"
 
 export interface DrawPoint {
   x: number
   y: number
-  z?: number
+  /**
+   * Pen pressure, `0..1`. Absent on points a mouse or a finger made — and
+   * spelled `| undefined` so a validator that produces the key explicitly
+   * still describes this type under `exactOptionalPropertyTypes`.
+   */
+  z?: number | undefined
 }
 
 export interface DrawSegment {
@@ -67,8 +81,44 @@ export function readDrawSegments(shape: { props?: unknown }): DrawSegment[] {
   return out
 }
 
+/**
+ * What a draw shape paints with.
+ *
+ * A draw shape carries its own `scale`, which the shared set knows nothing
+ * about: `strokeWidth` on the base is the width the *style* asks for, and
+ * {@link DrawShapeUtilDisplayValues.scaledStrokeWidth} is the width actually
+ * drawn. Both are reported rather than one overwriting the other, so a caller
+ * comparing two shapes' styles and a caller measuring one shape's ink each get
+ * the number they meant.
+ */
+export interface DrawShapeUtilDisplayValues extends TLDefaultDisplayValues {
+  /** `strokeWidth` with the shape's own `scale` applied. */
+  scaledStrokeWidth: number
+  /** Whether the outline is actually filled: it must be closed *and* have a fill style. */
+  isFilled: boolean
+}
+
+/** `DrawShapeUtil`'s settings; see {@link ShapeUtil.configure}. */
+export interface DrawShapeOptions extends ShapeUtilOptions<DrawShape, DrawShapeUtilDisplayValues> {}
+
+/** Resolve a draw shape's display values against a theme. */
+export function getDrawDisplayValues(
+  editor: unknown,
+  shape: { props?: unknown },
+  theme: TLTheme,
+  colorMode: TLColorMode,
+): DrawShapeUtilDisplayValues {
+  const base = getDefaultDisplayValues(editor, shape as TLStyledShape, theme, colorMode)
+  const p = propsOf(shape)
+  return {
+    ...base,
+    scaledStrokeWidth: base.strokeWidth * readNumber(p, "scale", 1),
+    isFilled: readBoolean(p, "isClosed", false) && readStyle(p, "fill", DefaultFillStyle) !== "none",
+  }
+}
+
 /** Flatten a draw shape's segments to one outline, smoothing freehand runs. */
-export function getDrawOutlinePoints(shape: DrawShape): VecLike[] {
+export function getDrawOutlinePoints(shape: { props?: unknown }): VecLike[] {
   const out: VecLike[] = []
   for (const seg of readDrawSegments(shape)) {
     const pts = seg.type === "free" && seg.points.length >= 4 ? smoothPoints(seg.points) : seg.points
@@ -77,9 +127,12 @@ export function getDrawOutlinePoints(shape: DrawShape): VecLike[] {
   return out
 }
 
-export class DrawShapeUtil extends ShapeUtil<DrawShape> {
+export class DrawShapeUtil extends ShapeUtil<DrawShape, DrawShapeUtilDisplayValues> {
   static override type = "draw" as const
-  static override props = { color: DefaultColorStyle, fill: DefaultFillStyle, dash: DefaultDashStyle, size: DefaultSizeStyle }
+  static override props = drawShapeProps
+  static override migrations = drawShapeMigrations
+  static override options: DrawShapeOptions = { getDefaultDisplayValues: getDrawDisplayValues }
+  declare readonly options: DrawShapeOptions
 
   getDefaultProps(): DrawShapeProps {
     return {
@@ -92,6 +145,45 @@ export class DrawShapeUtil extends ShapeUtil<DrawShape> {
       isClosed: false,
       isPen: false,
       scale: 1,
+    }
+  }
+
+  /**
+   * Freehand smoothing runs in the engine: the raw segment points go across and
+   * the outline is built there. `w`/`h` are the extents of the *unsmoothed*
+   * points — the smoothed outline can only sit inside them, and this util sets
+   * neither `OVERLAY` nor `LABEL`, so those words feed a fallback the engine
+   * never reaches once the geometry command has run.
+   */
+  override getEngineGeometry(shape: DrawShape): EngineGeometry {
+    const p = propsOf(shape)
+    const segments = readDrawSegments(shape).map((seg) => ({
+      points: seg.points.flatMap((q) => [q.x, q.y]),
+      freehand: seg.type === "free",
+    }))
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const seg of segments) {
+      for (let i = 0; i < seg.points.length; i += 2) {
+        const x = seg.points[i]!
+        const y = seg.points[i + 1]!
+        if (x < minX) minX = x
+        if (x > maxX) maxX = x
+        if (y < minY) minY = y
+        if (y > maxY) maxY = y
+      }
+    }
+    const isClosed = readBoolean(p, "isClosed", false)
+    return {
+      type: "draw",
+      segments,
+      closed: isClosed,
+      w: Number.isFinite(minX) ? maxX - minX : 0,
+      h: Number.isFinite(minY) ? maxY - minY : 0,
+      isClosed,
+      isFilled: isClosed && readStyle(p, "fill", DefaultFillStyle) !== "none",
     }
   }
 
@@ -112,10 +204,11 @@ export class DrawShapeUtil extends ShapeUtil<DrawShape> {
     const scale = readNumber(p, "scale", 1)
     const isClosed = readBoolean(p, "isClosed", false)
     const dash = readStyle(p, "dash", DefaultDashStyle)
+    const colors = getThemeColors(this.editor)
     return {
-      stroke: getStrokeRgba(color),
+      stroke: getStrokeRgba(color, colors),
       strokeWidth: STROKE_SIZES[size] * scale,
-      fill: isClosed && fill !== "none" ? getFillRgba(color, fill) : 0,
+      fill: isClosed && fill !== "none" ? getFillRgba(color, fill, colors) : 0,
       // `draw` asks the engine to replace an outline with a hand-drawn version of
       // it. A draw shape's points *are* a hand-drawn version already — a recorded
       // pen movement, smoothed — so putting them through it a second time only

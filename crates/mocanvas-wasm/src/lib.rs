@@ -7,6 +7,7 @@
 
 #![warn(missing_docs)]
 
+use mocanvas_geo::shapes::{catmull_rom_path, geo_path, polyline_path, smooth_freehand, GeoKind};
 use mocanvas_geo::{Box2d, Path, Vec2};
 use mocanvas_render::Renderer;
 use mocanvas_scene::{BoxQueryMode, Handle, HitFilter, Scene, Style, ZKey};
@@ -26,6 +27,33 @@ pub mod op {
     pub const CLEAR: u32 = 5;
     /// `handle texture` (3 words). Texture 0 = solid fill.
     pub const SET_TEXTURE: u32 = 6;
+    /// `handle kind flags w(f32) h(f32)` (6 words). Builds a built-in geo
+    /// silhouette here instead of shipping its vertices; see [`geo_flag`].
+    pub const SET_GEO: u32 = 7;
+    /// `handle flags npoints [x y(f32)]...` (4 + 2n words). Smooth cubic spline
+    /// through the points (Catmull-Rom). `flags` bit 0 closes the curve.
+    pub const SET_SPLINE: u32 = 8;
+    /// `handle flags npoints [x y(f32)]...` (4 + 2n words). Polyline, or polygon
+    /// when `flags` bit 0 is set.
+    pub const SET_POLY: u32 = 9;
+    /// `handle flags nsegments [segflags npoints (x y(f32))...]...`. A freehand
+    /// stroke: each segment is smoothed here when its `segflags` bit 0 is set,
+    /// then all of them are concatenated into one outline. `flags` bit 0 closes it.
+    pub const SET_DRAW: u32 = 10;
+}
+
+/// Flag bits shared by the parametric geometry commands.
+pub mod geo_flag {
+    /// [`super::op::SET_GEO`]: mirror the silhouette left-to-right in its box.
+    pub const FLIP_X: u32 = 1 << 0;
+    /// [`super::op::SET_GEO`]: mirror the silhouette top-to-bottom in its box.
+    pub const FLIP_Y: u32 = 1 << 1;
+    /// [`super::op::SET_SPLINE`], [`super::op::SET_POLY`], [`super::op::SET_DRAW`]:
+    /// close the outline.
+    pub const CLOSED: u32 = 1 << 0;
+    /// [`super::op::SET_DRAW`], per segment: this run came from a pen rather than
+    /// a straight-line tool, so smooth it.
+    pub const FREEHAND: u32 = 1 << 0;
 }
 
 /// The engine: one scene (the current page) and one renderer.
@@ -151,6 +179,89 @@ impl Engine {
                     };
                     self.scene.set_style(c[1], style);
                     i += 8;
+                }
+                op::SET_GEO => {
+                    if i + 6 > len {
+                        return self.fail(count, "truncated SET_GEO");
+                    }
+                    let c = &self.cmd[i..i + 6];
+                    match GeoKind::from_u32(c[2]) {
+                        Some(kind) => {
+                            let path = geo_path(
+                                kind,
+                                f32::from_bits(c[4]),
+                                f32::from_bits(c[5]),
+                                c[3] & geo_flag::FLIP_X != 0,
+                                c[3] & geo_flag::FLIP_Y != 0,
+                            );
+                            self.scene.set_geometry(c[1], path);
+                        }
+                        // A kind this build has no generator for. The host falls
+                        // back to SET_GEOMETRY for its own shapes, so this only
+                        // happens on a corrupt stream or a newer host; say so and
+                        // leave the shape's previous outline alone.
+                        None => self.last_error = Some(format!("unknown geo kind {} for handle {}", c[2], c[1])),
+                    }
+                    i += 6;
+                }
+                op::SET_SPLINE | op::SET_POLY => {
+                    if i + 4 > len {
+                        return self.fail(count, "truncated SET_SPLINE/SET_POLY");
+                    }
+                    let h = self.cmd[i + 1];
+                    let closed = self.cmd[i + 2] & geo_flag::CLOSED != 0;
+                    let n = self.cmd[i + 3] as usize;
+                    if i + 4 + n * 2 > len {
+                        return self.fail(count, "truncated SET_SPLINE/SET_POLY payload");
+                    }
+                    let points = read_points(&self.cmd[i + 4..i + 4 + n * 2]);
+                    let path = if opcode == op::SET_SPLINE {
+                        catmull_rom_path(&points, closed)
+                    } else {
+                        polyline_path(&points, closed)
+                    };
+                    self.scene.set_geometry(h, path);
+                    i += 4 + n * 2;
+                }
+                op::SET_DRAW => {
+                    if i + 4 > len {
+                        return self.fail(count, "truncated SET_DRAW");
+                    }
+                    let h = self.cmd[i + 1];
+                    let closed = self.cmd[i + 2] & geo_flag::CLOSED != 0;
+                    let segments = self.cmd[i + 3] as usize;
+                    let mut at = i + 4;
+                    let mut points: Vec<Vec2> = Vec::new();
+                    let mut truncated = false;
+                    for _ in 0..segments {
+                        if at + 2 > len {
+                            truncated = true;
+                            break;
+                        }
+                        let seg_flags = self.cmd[at];
+                        let n = self.cmd[at + 1] as usize;
+                        if at + 2 + n * 2 > len {
+                            truncated = true;
+                            break;
+                        }
+                        let run = read_points(&self.cmd[at + 2..at + 2 + n * 2]);
+                        if seg_flags & geo_flag::FREEHAND != 0 {
+                            smooth_freehand(&run, &mut points);
+                        } else {
+                            points.extend_from_slice(&run);
+                        }
+                        at += 2 + n * 2;
+                    }
+                    if truncated {
+                        return self.fail(count, "truncated SET_DRAW payload");
+                    }
+                    // A stroke with nothing in it still has to be *somewhere*, or
+                    // the scene would fall back to the shape's box for its bounds.
+                    if points.is_empty() {
+                        points.push(Vec2::ZERO);
+                    }
+                    self.scene.set_geometry(h, polyline_path(&points, closed && points.len() > 2));
+                    i = at;
                 }
                 op::SET_TEXTURE => {
                     if i + 3 > len {
@@ -381,8 +492,178 @@ impl Engine {
     }
 }
 
+/// Decode interleaved `x y` f32 bit patterns into points.
+fn read_points(words: &[u32]) -> Vec<Vec2> {
+    words.chunks_exact(2).map(|c| Vec2::new(f32::from_bits(c[0]), f32::from_bits(c[1]))).collect()
+}
+
 /// Library version.
 #[wasm_bindgen]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mocanvas_geo::PathCmd;
+
+    /// Bit-cast, the way the host writes floats into the u32 command stream.
+    fn b(v: f32) -> u32 {
+        v.to_bits()
+    }
+
+    fn engine_with_one_shape() -> Engine {
+        let mut e = Engine::new();
+        let cmd = [
+            op::UPSERT_SHAPE,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            b(0.0),
+            b(0.0),
+            b(0.0),
+            b(100.0),
+            b(60.0),
+        ];
+        write_and_apply(&mut e, &cmd);
+        e
+    }
+
+    fn write_and_apply(e: &mut Engine, words: &[u32]) -> u32 {
+        let ptr = e.cmd_ptr(words.len());
+        // Safety: `cmd_ptr` just guaranteed `words.len()` writable u32 words.
+        unsafe { std::ptr::copy_nonoverlapping(words.as_ptr(), ptr, words.len()) };
+        e.apply(words.len())
+    }
+
+    #[test]
+    fn set_geo_builds_the_same_outline_as_an_uploaded_path() {
+        let mut e = engine_with_one_shape();
+        let applied = write_and_apply(&mut e, &[op::SET_GEO, 1, GeoKind::Hexagon as u32, 0, b(100.0), b(60.0)]);
+        assert_eq!(applied, 1);
+        assert_eq!(e.take_error(), None);
+        let bounds = e.bounds(1);
+        assert!(bounds);
+        let got: Vec<f32> = unsafe { std::slice::from_raw_parts(e.f32_ptr(), 4) }.to_vec();
+
+        // The same shape, uploaded the old way.
+        let mut reference = engine_with_one_shape();
+        let words = geo_path(GeoKind::Hexagon, 100.0, 60.0, false, false).to_wire();
+        let mut cmd = vec![op::SET_GEOMETRY, 1, words.len() as u32];
+        cmd.extend(words.iter().map(|w| w.to_bits()));
+        write_and_apply(&mut reference, &cmd);
+        assert!(reference.bounds(1));
+        let want: Vec<f32> = unsafe { std::slice::from_raw_parts(reference.f32_ptr(), 4) }.to_vec();
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn set_geo_flips_are_read_from_the_flag_word() {
+        let mut e = engine_with_one_shape();
+        write_and_apply(
+            &mut e,
+            &[op::SET_GEO, 1, GeoKind::Triangle as u32, geo_flag::FLIP_Y, b(100.0), b(60.0)],
+        );
+        assert_eq!(e.take_error(), None);
+        let path = e.scene.get(1).map(|s| s.path.clone()).unwrap();
+        // Flipped top-to-bottom, the apex sits on the bottom edge.
+        assert_eq!(path.cmds()[0], PathCmd::MoveTo(Vec2::new(50.0, 60.0)));
+    }
+
+    #[test]
+    fn an_unknown_geo_kind_is_reported_and_skipped() {
+        let mut e = engine_with_one_shape();
+        let applied = write_and_apply(&mut e, &[op::SET_GEO, 1, 999, 0, b(100.0), b(60.0)]);
+        // The command is consumed — one bad kind must not desynchronise the stream.
+        assert_eq!(applied, 1);
+        assert!(e.take_error().unwrap().contains("unknown geo kind 999"));
+    }
+
+    #[test]
+    fn set_poly_closes_only_when_asked() {
+        let mut e = engine_with_one_shape();
+        write_and_apply(
+            &mut e,
+            &[op::SET_POLY, 1, 0, 3, b(0.0), b(0.0), b(10.0), b(0.0), b(10.0), b(10.0)],
+        );
+        assert!(!e.scene.get(1).unwrap().path.is_closed());
+        write_and_apply(
+            &mut e,
+            &[op::SET_POLY, 1, geo_flag::CLOSED, 3, b(0.0), b(0.0), b(10.0), b(0.0), b(10.0), b(10.0)],
+        );
+        assert!(e.scene.get(1).unwrap().path.is_closed());
+    }
+
+    #[test]
+    fn set_spline_produces_one_cubic_per_span() {
+        let mut e = engine_with_one_shape();
+        write_and_apply(
+            &mut e,
+            &[op::SET_SPLINE, 1, 0, 4, b(0.0), b(0.0), b(10.0), b(20.0), b(30.0), b(5.0), b(50.0), b(40.0)],
+        );
+        assert_eq!(e.take_error(), None);
+        let path = e.scene.get(1).unwrap().path.clone();
+        // MoveTo plus three cubics for four points.
+        assert_eq!(path.cmds().len(), 4);
+    }
+
+    #[test]
+    fn set_draw_smooths_only_the_freehand_runs() {
+        let raw = [b(0.0), b(0.0), b(10.0), b(4.0), b(22.0), b(1.0), b(33.0), b(12.0)];
+        let mut smoothed_engine = engine_with_one_shape();
+        let mut cmd = vec![op::SET_DRAW, 1, 0, 1, geo_flag::FREEHAND, 4];
+        cmd.extend_from_slice(&raw);
+        write_and_apply(&mut smoothed_engine, &cmd);
+        let smoothed = smoothed_engine.scene.get(1).unwrap().path.clone();
+
+        let mut straight_engine = engine_with_one_shape();
+        let mut cmd = vec![op::SET_DRAW, 1, 0, 1, 0, 4];
+        cmd.extend_from_slice(&raw);
+        write_and_apply(&mut straight_engine, &cmd);
+        let straight = straight_engine.scene.get(1).unwrap().path.clone();
+
+        assert_ne!(smoothed, straight, "the freehand flag must actually smooth");
+        // Both keep the pen's first and last point.
+        assert_eq!(smoothed.cmds().first(), straight.cmds().first());
+        assert_eq!(smoothed.cmds().last(), straight.cmds().last());
+    }
+
+    #[test]
+    fn set_draw_concatenates_segments() {
+        let mut e = engine_with_one_shape();
+        let cmd = vec![
+            op::SET_DRAW, 1, 0, 2,
+            0, 2, b(0.0), b(0.0), b(10.0), b(0.0),
+            0, 2, b(10.0), b(10.0), b(20.0), b(10.0),
+        ];
+        write_and_apply(&mut e, &cmd);
+        assert_eq!(e.take_error(), None);
+        assert_eq!(e.scene.get(1).unwrap().path.cmds().len(), 4);
+    }
+
+    #[test]
+    fn an_empty_draw_still_lands_somewhere() {
+        let mut e = engine_with_one_shape();
+        write_and_apply(&mut e, &[op::SET_DRAW, 1, 0, 0]);
+        assert_eq!(e.take_error(), None);
+        assert_eq!(e.scene.get(1).unwrap().path.cmds().len(), 1);
+    }
+
+    #[test]
+    fn truncated_parametric_commands_are_reported() {
+        for cmd in [
+            vec![op::SET_GEO, 1, 0, 0],
+            vec![op::SET_POLY, 1, 0, 4, b(0.0), b(0.0)],
+            vec![op::SET_SPLINE, 1, 0, 4, b(0.0), b(0.0)],
+            vec![op::SET_DRAW, 1, 0, 1, 0, 8, b(0.0), b(0.0)],
+        ] {
+            let mut e = engine_with_one_shape();
+            write_and_apply(&mut e, &cmd);
+            assert!(e.take_error().is_some(), "no error for {cmd:?}");
+        }
+    }
 }

@@ -89,7 +89,9 @@ class Pointing extends StateNode {
     if (this.dragged) this.finish()
   }
 
-  override onDoubleClick(_info: ClickEventInfo): void {
+  override onDoubleClick(info: ClickEventInfo): void {
+    // See `SelectTool.onDoubleClick`: act on the release, not every phase.
+    if (info.phase !== "up") return
     this.finish()
   }
 

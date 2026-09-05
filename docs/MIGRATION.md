@@ -14,6 +14,90 @@ renderer, and (c) rebuilding UI, which has no slot compatibility yet.
 
 ---
 
+## 0. Coming from mocanvas 1.x
+
+1.x was shaped after the tldraw 3.x API. 2.0.0 targets **tldraw 5.4**, which is a
+different architecture in a few places rather than a set of renames. Everything
+below is a real change; the rest of the API is unchanged.
+
+**Indicators are canvas paths.** `indicator(shape): ReactNode` still works and is
+deprecated. The new form returns a `Path2D` in shape-local space:
+
+```ts
+override getIndicatorPath(shape: MyShape): Path2D {
+  const path = new Path2D()
+  path.rect(0, 0, shape.props.w, shape.props.h)
+  return path
+}
+```
+
+Returning `undefined` means *no outline*, not "use the default". A util that
+implements neither method still gets a rectangle around its geometry bounds.
+
+**Custom shapes register their props.** Without this, `shape.props` is `object`:
+
+```ts
+declare module "@mocanvas/mocanvas" {
+  interface TLGlobalShapePropsMap {
+    myShape: MyShapeProps
+  }
+}
+```
+
+`Shape` with no type argument is now the union of *registered* types, and
+`shape.type === "myShape"` narrows its props. A type nobody registered is an
+`UnknownShape` — use that where the type is not known statically. Inside library
+code that must handle any shape, `editor.getShape<UnknownShape>(id)`.
+
+**`static props` are validators, not a plain object.** `T` is exported for this:
+
+```ts
+static override props = { w: T.positiveNumber, h: T.positiveNumber, color: DefaultColorStyle }
+```
+
+**`pageToScreen` changed meaning.** 1.x computed container-relative coordinates
+under that name. Now `pageToViewport` is container-relative and `pageToScreen`
+is window-relative. **If you position an overlay inside the canvas container,
+you want `pageToViewport`** — the old call was silently correct only while the
+container sat at the window origin.
+
+**Geometry primitives follow the documented contract**, which changed a few
+existing names and behaviours: `Box.expandBy` and `Mat.invert` now mutate and
+return `this` (`Box.ExpandBy` and `Mat.Inverse` are the pure forms);
+`Box.Expand(a, b)` is the union of two boxes, with the old scalar form kept as a
+deprecated overload; `Vec.Dot` is now `Vec.Dpr` (alias kept) and `Vec.Cross`
+returns a `Vec`, with the old scalar as `Vec.Cpr`. `Vec` gained `z` for pen
+pressure, defaulting to `undefined` so `toJson()` is byte-for-byte what it was.
+
+**Double click is reported in phases.** A handler that acts on every
+`double_click` will now fire twice. Filter:
+
+```ts
+override onDoubleClick(info: ClickEventInfo): void {
+  if (info.phase !== "up") return
+  …
+}
+```
+
+**`engine` is optional.** `new Editor({ store, shapeUtils, tools, getContainer })`
+picks up whatever `loadEngine()` last produced, because importing
+`@mocanvas/mocanvas` registers a provider. Pass one explicitly only to run two
+editors on separate engines.
+
+**Built-in shape migrations moved namespace.** If you registered a migration for
+one of *your own* shape types, nothing changes — you keep `com.tldraw.shape.*`.
+mocanvas's own built-ins moved to `com.mocanvas.shape.*` so they stop claiming
+the reference implementation's migration line, which was making real `.tldr`
+files fail to load. You do not need to do anything unless you deliberately
+registered a sequence under a built-in type's id.
+
+**Optional, and worth doing for large documents:** a built-in shape can now
+describe its outline to the engine by parameters instead of uploading vertices
+(`ShapeUtil.getEngineGeometry`). Custom shapes keep the `getGeometry` path and
+need no change; see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
 ## 1. What stays the same
 
 **Records.** The shape record is field-for-field the same:
@@ -70,7 +154,7 @@ with the same names. `editor.store`, `editor.inputs`, `editor.sideEffects`,
 
 **Lifecycles.** `ShapeUtil` keeps `static type`, `static props`,
 `static migrations`, `getDefaultProps`, `getGeometry`, `component`,
-`indicator`, the `can*` / `hide*` predicates, and the whole
+`getIndicatorPath`, the `can*` / `hide*` predicates, and the whole
 `onBeforeCreate` / `onBeforeUpdate` / `onResize*` / `onTranslate*` /
 `onRotate*` / `onDoubleClick*` / `onEditEnd` / `onChildrenChange` /
 `onDragShapesOver` / `onDragShapesOut` / `onDropShapesOver` /
@@ -603,8 +687,10 @@ export class CardShapeUtil extends ShapeUtil<CardShape> {
     )
   }
 
-  indicator(shape: CardShape) {
-    return <rect width={shape.props.w} height={shape.props.h} />
+  override getIndicatorPath(shape: CardShape): Path2D {
+    const path = new Path2D()
+    path.rect(0, 0, shape.props.w, shape.props.h)
+    return path
   }
 }
 ```
@@ -697,8 +783,10 @@ export class CardShapeUtil extends BaseBoxShapeUtil<CardShape> {
     )
   }
 
-  indicator(shape: CardShape): ReactNode {
-    return <rect width={shape.props.w} height={shape.props.h} />
+  override getIndicatorPath(shape: CardShape): Path2D {
+    const path = new Path2D()
+    path.rect(0, 0, shape.props.w, shape.props.h)
+    return path
   }
 }
 ```
@@ -712,7 +800,7 @@ Register it, additively:
 What changed, and only this: `getRenderStyle` was added, `hasOverlayLabel` was
 added, `component` shrank to the label, `extends ShapeUtil` became
 `extends BaseBoxShapeUtil` to inherit `onResize`, and two props were promoted to
-styles with `static props`. `getGeometry`, `indicator`, `getDefaultProps`, the
+styles with `static props`. `getGeometry`, `getIndicatorPath`, `getDefaultProps`, the
 record and the props are the same code you already had.
 
 For a shape written from scratch — including tools, handles and geometry

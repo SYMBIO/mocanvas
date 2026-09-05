@@ -4,6 +4,7 @@ import {
   type Editor,
   type InstancePresence,
   type InstancePresenceId,
+  type UserId,
 } from "@mocanvas/editor"
 import type { IdOf, Store, UnknownRecord } from "@mocanvas/store"
 
@@ -21,7 +22,7 @@ export const DEFAULT_PRESENCE_TIMEOUT_MS = 10_000
 export interface PresenceEditor {
   readonly store: Store<any, any>
   readonly inputs: { readonly currentPagePoint: { x: number; y: number } }
-  readonly user: { getId(): string; getName(): string; getColor(): string }
+  readonly user: { getId(): UserId; getName(): string; getColor(): string }
   getCurrentPageId(): string
   getCamera(): { x: number; y: number; z: number }
   getSelectedShapeIds(): readonly string[]
@@ -29,7 +30,7 @@ export interface PresenceEditor {
     cursor: { type: string; rotation: number }
     brush: { x: number; y: number; w: number; h: number } | null
     scribbles: readonly unknown[]
-    followingUserId: string | null
+    followingUserId: UserId | null
   }
   /** Optional: used to sample the cursor, which is not itself a signal. */
   on?(name: "event", fn: () => void): () => void
@@ -170,18 +171,25 @@ export function isSamePresence(a: InstancePresence, b: InstancePresence): boolea
     a.currentPageId === b.currentPageId &&
     a.chatMessage === b.chatMessage &&
     a.followingUserId === b.followingUserId &&
-    a.cursor.x === b.cursor.x &&
-    a.cursor.y === b.cursor.y &&
-    a.cursor.type === b.cursor.type &&
-    a.cursor.rotation === b.cursor.rotation &&
-    a.camera.x === b.camera.x &&
-    a.camera.y === b.camera.y &&
-    a.camera.z === b.camera.z &&
+    sameCursor(a.cursor, b.cursor) &&
+    sameCamera(a.camera, b.camera) &&
     sameIds(a.selectedShapeIds, b.selectedShapeIds) &&
     sameBrush(a.brush, b.brush) &&
     a.scribbles.length === b.scribbles.length &&
     a.scribbles.every((s, i) => s === b.scribbles[i])
   )
+}
+
+/** Cameras compare equal when both are absent, or when all three fields match. */
+function sameCamera(a: InstancePresence["camera"], b: InstancePresence["camera"]): boolean {
+  if (a === null || b === null) return a === b
+  return a.x === b.x && a.y === b.y && a.z === b.z
+}
+
+/** Cursors compare equal when both are absent, or when all four fields match. */
+function sameCursor(a: InstancePresence["cursor"], b: InstancePresence["cursor"]): boolean {
+  if (a === null || b === null) return a === b
+  return a.x === b.x && a.y === b.y && a.type === b.type && a.rotation === b.rotation
 }
 
 function sameIds(a: readonly string[], b: readonly string[]): boolean {

@@ -53,7 +53,12 @@ const CollaboratorCursor = track(function CollaboratorCursor({
   presence: InstancePresence
   showName: boolean
 }) {
-  const point = editor.pageToScreen(presence.cursor)
+  // A collaborator with no pointer — an agent, or someone whose pointer has left
+  // the canvas — draws no cursor at all.
+  if (presence.cursor === null) return null
+  // Viewport space: the overlay is positioned inside the canvas container, not
+  // the window.
+  const point = editor.pageToViewport(presence.cursor)
   const name = presence.userName || "Anonymous"
   // A 16x22 arrow drawn from the hotspot, then the name chip below it.
   return (
@@ -100,8 +105,10 @@ const CollaboratorSelection = track(function CollaboratorSelection({
       [bounds.x, bounds.maxY],
     ]
     const points = corners.map(([x, y]) => {
-      const screen = editor.pageToScreen({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f })
-      return `${screen.x},${screen.y}`
+      // Viewport space, like the cursor above: this overlay lives in the canvas
+      // container, so window offsets must not be added.
+      const p = editor.pageToViewport({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f })
+      return `${p.x},${p.y}`
     })
     outlines.push(points.join(" "))
   }

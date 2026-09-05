@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   createShapeId,
   createStore,
+  createUserId,
   InstancePresenceRecordType,
   PageRecordType,
   ShapeRecordType,
@@ -9,6 +10,7 @@ import {
   type EditorStore,
   type PageId,
   type ShapeId,
+  type UserId,
 } from "@mocanvas/editor"
 import { ZERO_INDEX_KEY, type HistoryEntry } from "@mocanvas/store"
 import { createSyncClient, type SyncClient } from "../SyncClient"
@@ -47,7 +49,7 @@ describe("protocol", () => {
     const shape = makeShape(createShapeId("a"), 1)
     const presence = InstancePresenceRecordType.create({
       id: presenceIdForClient("c1"),
-      userId: "user:1",
+      userId: createUserId("1"),
       currentPageId: PAGE_ID,
     })
     const messages: SyncMessage<EditorRecord>[] = [
@@ -201,7 +203,7 @@ describe("document sync", () => {
 /* presence                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function makePresenceEditor(store: EditorStore, userId: string): PresenceEditor & { cursor: { x: number; y: number } } {
+function makePresenceEditor(store: EditorStore, userId: UserId): PresenceEditor & { cursor: { x: number; y: number } } {
   const cursor = { x: 0, y: 0 }
   return {
     cursor,
@@ -235,7 +237,7 @@ describe("presence", () => {
 
   it("collapses a burst of updates into one send", async () => {
     const store = makeStore()
-    const editor = makePresenceEditor(store, "user:burst")
+    const editor = makePresenceEditor(store, createUserId("burst"))
     const sent: unknown[] = []
     const presence = createPresenceSync({
       editor,
@@ -276,7 +278,7 @@ describe("presence", () => {
       roomId: "room",
       transport: ta,
       clientId: "a",
-      presence: { editor: makePresenceEditor(a, "user:a") },
+      presence: { editor: makePresenceEditor(a, createUserId("a")) },
       presenceThrottleMs: 34,
       presenceHeartbeatMs: 100_000,
       presenceTimeoutMs: 10_000,
@@ -286,7 +288,7 @@ describe("presence", () => {
       roomId: "room",
       transport: tb,
       clientId: "b",
-      presence: { editor: makePresenceEditor(b, "user:b") },
+      presence: { editor: makePresenceEditor(b, createUserId("b")) },
       presenceThrottleMs: 34,
       presenceHeartbeatMs: 100_000,
       presenceTimeoutMs: 10_000,
@@ -328,7 +330,7 @@ describe("presence", () => {
       roomId: "room",
       transport: transportB,
       clientId: "b",
-      presence: { editor: makePresenceEditor(b, "user:b") },
+      presence: { editor: makePresenceEditor(b, createUserId("b")) },
       presenceThrottleMs: 34,
       presenceHeartbeatMs: 100_000,
       presenceTimeoutMs: 10_000,

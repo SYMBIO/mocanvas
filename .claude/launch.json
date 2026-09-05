@@ -25,6 +25,19 @@
         "--strictPort"
       ],
       "port": 5190
+    },
+    {
+      "name": "bench",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "bench",
+        "dev",
+        "--",
+        "--host",
+        "127.0.0.1"
+      ],
+      "port": 5181
     }
   ]
 }

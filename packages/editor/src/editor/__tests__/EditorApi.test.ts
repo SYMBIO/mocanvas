@@ -276,8 +276,8 @@ describe("Editor textMeasure seam", () => {
   it("delegates to the registered measurer", () => {
     const measure: EditorTextMeasure = {
       measureText: vi.fn(() => ({ w: 42, h: 24, lineCount: 2 })),
-      measureHtml: vi.fn(() => ({ w: 42, h: 24 })),
-      measureHtmlBatch: vi.fn(() => [{ w: 42, h: 24 }]),
+      measureHtml: vi.fn(() => ({ w: 42, h: 24, scrollWidth: 42 })),
+      measureHtmlBatch: vi.fn(() => [{ w: 42, h: 24, scrollWidth: 42 }]),
     }
     const provider = vi.fn(() => measure)
     dispose = registerTextMeasureImplementation(provider)

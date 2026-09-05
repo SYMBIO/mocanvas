@@ -1,4 +1,5 @@
 import {
+  type EngineGeometry,
   CubicSpline2d,
   Polyline2d,
   ShapeUtil,
@@ -8,16 +9,47 @@ import {
   DefaultSizeStyle,
   type BaseShape,
   type Geometry2d,
+  getDefaultDisplayValues,
   type ShapeHandle,
+  type ShapeUtilOptions,
   type StyleWords,
+  type TLColorMode,
+  type TLDefaultDisplayValues,
+  type TLStyledShape,
+  type TLTheme,
 } from "@mocanvas/editor"
 import { getIndexBetween, sortByIndex, type IndexKey } from "@mocanvas/store"
 import type { ReactNode } from "react"
+import { lineShapeProps } from "./shape-props"
+import { lineShapeMigrations } from "./shape-migrations"
 import { propsOf, readEnum, readNumber, readString, readStyle } from "./prop-access"
-import { getStrokeRgba, getDashId } from "./shape-theme"
+import { getStrokeRgba, getDashId, getThemeColors } from "./shape-theme"
 import { catmullRomToBezier } from "./spline-helpers"
 import { pathWordsToSvgD } from "./svg-path"
 import { svgPath } from "./indicator-paths"
+
+/**
+ * What a line paints with. A line is a stroke and nothing else, so the one
+ * thing it adds is its own `scale` applied to the style's width.
+ */
+export interface LineShapeUtilDisplayValues extends TLDefaultDisplayValues {
+  /** `strokeWidth` with the shape's own `scale` applied. */
+  scaledStrokeWidth: number
+}
+
+/** `LineShapeUtil`'s settings; see {@link ShapeUtil.configure}. */
+export interface LineShapeOptions extends ShapeUtilOptions<LineShape, LineShapeUtilDisplayValues> {}
+
+/** Resolve a line's display values; see {@link LineShapeUtilDisplayValues}. */
+export function getLineDisplayValues(
+  editor: unknown,
+  shape: { props?: unknown },
+  theme: TLTheme,
+  colorMode: TLColorMode,
+): LineShapeUtilDisplayValues {
+  const base = getDefaultDisplayValues(editor, shape as TLStyledShape, theme, colorMode)
+  return { ...base, scaledStrokeWidth: base.strokeWidth * readNumber(propsOf(shape), "scale", 1) }
+}
 
 export interface LinePoint {
   id: string
@@ -25,6 +57,9 @@ export interface LinePoint {
   x: number
   y: number
 }
+
+/** The `@tldraw/tlschema` spelling of {@link LinePoint}. */
+export type TLLineShapePoint = LinePoint
 
 export interface LineShapeProps {
   color: DefaultColorStyle
@@ -64,9 +99,12 @@ function midIndex(a: string, b: string): string {
   }
 }
 
-export class LineShapeUtil extends ShapeUtil<LineShape> {
+export class LineShapeUtil extends ShapeUtil<LineShape, LineShapeUtilDisplayValues> {
   static override type = "line" as const
-  static override props = { color: DefaultColorStyle, dash: DefaultDashStyle, size: DefaultSizeStyle }
+  static override props = lineShapeProps
+  static override migrations = lineShapeMigrations
+  static override options: LineShapeOptions = { getDefaultDisplayValues: getLineDisplayValues }
+  declare readonly options: LineShapeOptions
 
   getDefaultProps(): LineShapeProps {
     return {
@@ -79,6 +117,38 @@ export class LineShapeUtil extends ShapeUtil<LineShape> {
         a2: { id: "a2", index: "a2", x: 100, y: 100 },
       },
       scale: 1,
+    }
+  }
+
+  /**
+   * A line is its points: the engine fits the spline. `w`/`h` are the point
+   * extents; a cubic spline through them stays within its control hull, and
+   * this util has neither an overlay nor a label, so those words feed a
+   * fallback the engine never reaches.
+   */
+  override getEngineGeometry(shape: LineShape): EngineGeometry {
+    const pts = getLinePoints(shape)
+    const points: number[] = []
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const q of pts) {
+      points.push(q.x, q.y)
+      if (q.x < minX) minX = q.x
+      if (q.x > maxX) maxX = q.x
+      if (q.y < minY) minY = q.y
+      if (q.y > maxY) maxY = q.y
+    }
+    const cubic = readEnum(propsOf(shape), "spline", SPLINES, "line") === "cubic" && pts.length > 2
+    return {
+      type: cubic ? "spline" : "poly",
+      points,
+      closed: false,
+      w: Number.isFinite(minX) ? maxX - minX : 0,
+      h: Number.isFinite(minY) ? maxY - minY : 0,
+      isClosed: false,
+      isFilled: false,
     }
   }
 
@@ -96,7 +166,7 @@ export class LineShapeUtil extends ShapeUtil<LineShape> {
     const color = readStyle(p, "color", DefaultColorStyle)
     const size = readStyle(p, "size", DefaultSizeStyle)
     return {
-      stroke: getStrokeRgba(color),
+      stroke: getStrokeRgba(color, getThemeColors(this.editor)),
       strokeWidth: STROKE_SIZES[size] * readNumber(p, "scale", 1),
       fill: 0,
       dash: getDashId(readStyle(p, "dash", DefaultDashStyle)),

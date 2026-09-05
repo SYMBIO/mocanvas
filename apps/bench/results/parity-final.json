@@ -1,0 +1,35 @@
+{
+  "when": "2026-09-04T22:50:18.213Z",
+  "consumer": "/Users/martin.cajthaml/Sites/symbio/molekula-app",
+  "target": "src",
+  "scope": "canvas",
+  "totalErrors": 5,
+  "toolchainNoiseIgnored": 269,
+  "samples": {
+    "TS2345": [
+      "packages/canvas/src/__tests__/section-shape-util.test.tsx:297  Argument of type 'UnknownShape | null' is not assignable to parameter of type 'Shape | null'.",
+      "packages/canvas/src/board-note-size.ts:117  Argument of type '(shape: TLShape, source: \"remote\" | \"user\") => TLShape' is not assignable to parameter of type 'StoreBeforeCreateHandler<UnknownShape>'.",
+      "packages/canvas/src/board-note-size.ts:340  Argument of type '(shape: TLShape) => void' is not assignable to parameter of type 'StoreAfterCreateHandler<UnknownShape>'."
+    ],
+    "TS2322": [
+      "packages/canvas/src/ghost-preview-geometry.ts:196  Type 'ShapeUtil<UnknownShape, TLDefaultDisplayValues> | undefined' is not assignable to type 'ShapeUtil<Shape, TLDefaultDisplayValues> | undefined'."
+    ]
+  },
+  "filesWithErrors": 3,
+  "byCode": {
+    "TS2345": 4,
+    "TS2322": 1
+  },
+  "bySymbol": {
+    "UnknownShape | null": 1,
+    "(shape: TLShape, source: \"remote\" | \"user\") => TLShape": 1,
+    "(shape: TLShape) => void": 1,
+    "(prev: TLShape, next: TLShape) => void": 1,
+    "ShapeUtil<UnknownShape, TLDefaultDisplayValues> | undefined": 1
+  },
+  "byFile": {
+    "packages/canvas/src/__tests__/section-shape-util.test.tsx": 1,
+    "packages/canvas/src/board-note-size.ts": 3,
+    "packages/canvas/src/ghost-preview-geometry.ts": 1
+  }
+}

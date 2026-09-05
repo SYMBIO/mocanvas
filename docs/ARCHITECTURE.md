@@ -89,9 +89,39 @@ SET_GEOMETRY   op=3  handle nwords [path command words...]                  (3+n
 SET_STYLE      op=4  handle fill stroke stroke_w_f32 dash opacity_f32 seed (8 words)
 CLEAR          op=5                                                         (1 word)
 SET_TEXTURE    op=6  handle texture                                         (3 words)
+SET_GEO        op=7  handle kind flags w_f32 h_f32                          (6 words)
+SET_SPLINE     op=8  handle flags npoints [x y (f32)]...                    (4+2n words)
+SET_POLY       op=9  handle flags npoints [x y (f32)]...                    (4+2n words)
+SET_DRAW       op=10 handle flags nsegs [segflags npoints (x y f32)...]...
 
 Word counts include the opcode.
 ```
+
+`geo_flag` bits: `FLIP_X=1`, `FLIP_Y=2` on `SET_GEO`; `CLOSED=1` on
+`SET_SPLINE` / `SET_POLY` / `SET_DRAW`; `FREEHAND=1` per `SET_DRAW` segment.
+
+**Opcodes 7-10 are the parametric fast path.** A built-in shape sends the
+numbers that *describe* its outline and the engine generates it, instead of the
+host building a `Geometry2d` in JavaScript and uploading its vertices. A shape
+util opts in by implementing `getEngineGeometry`; returning `undefined` — the
+default, and what every custom shape does — keeps `SET_GEOMETRY`, which is why
+opcode 3 is not going away.
+
+Measured at 20,000 shapes (`pnpm --filter bench geo-microbench`): host-side work
+drops 10-20×, total time 1.5-1.6×, and the command stream shrinks 1.4-4.6×,
+because a rectangle travels as `(kind, w, h)` rather than as its vertices. The
+engine half is unchanged — it is dominated by the spatial reindex, not by path
+construction, so building the outline in Rust is close to free.
+
+The generators live in `crates/mocanvas-geo/src/shapes.rs` and cover all 20 geo
+kinds, cubic splines and freehand smoothing. They compute in `f64` and narrow to
+`f32` only when a coordinate enters the path, exactly as the host does, so the
+two are **byte-identical** — pinned by `crates/mocanvas-geo/tests/ts_parity.rs`
+against fixtures generated from the host implementation itself
+(`apps/bench/scripts/dump-shape-fixtures.mts`), not hand-typed.
+
+An unknown geo kind is consumed and reported through `take_error` rather than
+desynchronising the stream, and leaves the shape's previous outline in place.
 
 `flags` bits: `HIDDEN=1`, `LOCKED=2`, `OVERLAY=4` (DOM only), `NO_FILL=8`,
 `LABEL=16` (GPU + DOM label), `CLIP=32`. A `CLIP` shape (frames) clips every
@@ -328,8 +358,48 @@ frame; `docs/BENCHMARK.md` measures a 7-50% cost in the drag redraw path
 against a plain stroke. Turning it off is a per-shape style change
 (`dash: "solid"`), not a build flag.
 
-Open: elbow arrows, bookmark/embed/video shapes, freehand pressure taper, and
-routing the default indicators layer through `ShapeUtil.indicator` instead of
-drawing geometry bounds. Concurrent edits are merged by a per-field CRDT
+Concurrent edits are merged by a per-field CRDT
 (`packages/sync/src/crdt.ts`); what it does and does not promise is in
 `packages/sync/README.md`.
+
+## Known performance defects
+
+Two were found by measurement rather than by reading, and neither is fixed yet.
+Both are recorded here because they are the kind of thing that reads as a hang
+rather than as a slowdown.
+
+**The spatial index degenerates on coincident boxes.** Creating 20,000 shapes
+that all share a bounding box — every one at the origin — makes `Engine::apply()`
+take about **1,660 ms instead of 25 ms**. The rstar index cannot split entries
+whose boxes are identical, so the tree collapses. This is not an exotic input:
+an app that creates shapes and positions them afterwards hits it directly, which
+is what a paste, an import, a template instantiation or a generated layout does.
+Candidate fixes, in the order worth trying: an infinitesimal deterministic jitter
+applied *in the index only*, never to stored geometry; bulk-loading the index
+when a batch arrives instead of inserting one at a time; or detecting
+pathological overlap and falling back to a linear scan.
+
+**Snapping rebuilds geometry the engine already holds.** `SnapManager` takes its
+candidates from the spatial index — that part is fine — and then calls
+`getShapePageBounds` per candidate, where `getShapeGeometry` is not memoised and
+reconstructs an entire `Geometry2d` for a box the engine has to hand. Measured at
+**0.92 µs per candidate**, which is nothing for a few hundred but about
+**18.5 ms per drag frame** when zoomed out over a 20,000-shape page — missing
+60 fps on its own. The fix is a bulk read (`Engine::bounds_many`, shaped like the
+existing `union_bounds`), not a Rust port of the snap loop: once the boxes are to
+hand the loop is trivial arithmetic.
+
+## Assessed and deliberately left in TypeScript
+
+**Arrow routing.** `resolveBody` needs the store — binding terminals, and the
+bound shape's outline for the edge intersection — and the label rect needs canvas
+text measurement, so a parametric arrow command would cover only the middle third
+of the work. The payoff is small: an arrow's path is 10-40 words against a geo
+shape's 13-90, and the host-side cost is around 1 µs each, so it would matter
+only on a page of 20,000 *arrows*. Worth revisiting if a profile ever shows
+arrows dominating.
+
+**Text line breaking.** Breaks are decided from measurements taken by the
+browser's own shaper, so moving the loop to Rust would mean shipping every glyph
+advance across the boundary per measurement, and the results are already cached.
+This becomes a candidate together with the phase-2 glyph atlas, not before.

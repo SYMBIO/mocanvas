@@ -1,188 +1,38 @@
 {
-  "when": "2026-09-04T22:03:19.827Z",
+  "when": "2026-09-05T07:56:34.859Z",
   "consumer": "/Users/martin.cajthaml/Sites/symbio/molekula-app",
   "target": "src",
   "scope": "canvas",
-  "totalErrors": 125,
-  "toolchainNoiseIgnored": 269,
+  "totalErrors": 6,
+  "toolchainNoiseIgnored": 275,
   "samples": {
-    "TS2305": [
-      "packages/canvas/src/__tests__/board-paste-external-url.test.ts:5  Module '\"tldraw\"' has no exported member 'defaultHandleExternalUrlContent'.",
-      "packages/canvas/src/__tests__/ghost-preview-geometry.test.ts:8  Module '\"tldraw\"' has no exported member 'getPolygonVertices'.",
-      "packages/canvas/src/board-derived-materialization.ts:1  Module '\"tldraw\"' has no exported member 'RecordsDiff'."
-    ],
-    "TS2353": [
-      "packages/canvas/src/__tests__/board-tool-shortcuts.test.ts:105  Object literal may only specify known properties, and 'translations' does not exist in type 'TLUiOverrides'.",
-      "packages/canvas/src/__tests__/mol-2045-note-text-normalization.test.ts:44  Object literal may only specify known properties, and 'richText' does not exist in type 'NoteShapeProps'.",
-      "packages/canvas/src/__tests__/mol-2045-note-text-normalization.test.ts:244  Object literal may only specify known properties, and 'richText' does not exist in type 'NoteShapeProps'."
-    ],
-    "TS2339": [
-      "packages/canvas/src/__tests__/board-tool-shortcuts.test.ts:107  Property 'translations' does not exist on type 'TLUiOverrides'.",
-      "packages/canvas/src/__tests__/feed-post-block-shape-util.test.tsx:892  Property 'onClick' does not exist on type 'FeedPostBlockShapeUtil'.",
-      "packages/canvas/src/__tests__/feed-post-block-shape-util.test.tsx:894  Property 'onClick' does not exist on type 'FeedPostBlockShapeUtil'."
+    "TS2345": [
+      "packages/canvas/src/__tests__/section-shape-util.test.tsx:297  Argument of type 'UnknownShape | null' is not assignable to parameter of type 'Shape | null'.",
+      "packages/canvas/src/board-note-size.ts:117  Argument of type '(shape: TLShape, source: \"remote\" | \"user\") => TLShape' is not assignable to parameter of type 'StoreBeforeCreateHandler<UnknownShape>'.",
+      "packages/canvas/src/board-note-size.ts:340  Argument of type '(shape: TLShape) => void' is not assignable to parameter of type 'StoreAfterCreateHandler<UnknownShape>'."
     ],
     "TS2322": [
-      "packages/canvas/src/__tests__/canvas-grid.test.tsx:49  Type '{ x: number; y: number; z: number; size: number; }' is not assignable to type 'IntrinsicAttributes & object'.",
-      "packages/canvas/src/__tests__/canvas-grid.test.tsx:58  Type '{ x: number; y: number; z: number; size: number; }' is not assignable to type 'IntrinsicAttributes & object'.",
-      "packages/canvas/src/__tests__/canvas-grid.test.tsx:67  Type '{ x: number; y: number; z: number; size: number; }' is not assignable to type 'IntrinsicAttributes & object'."
-    ],
-    "TS2724": [
-      "packages/canvas/src/__tests__/ghost-preview.test.tsx:8  '\"tldraw\"' has no exported member named 'defaultShapeTools'. Did you mean 'defaultShapeUtils'?",
-      "packages/canvas/src/__tests__/mol-921-placement-size-legacy-user.test.ts:5  '\"tldraw\"' has no exported member named 'defaultShapeTools'. Did you mean 'defaultShapeUtils'?",
-      "packages/canvas/src/__tests__/mol-921-placement-size.test.tsx:6  '\"tldraw\"' has no exported member named 'defaultShapeTools'. Did you mean 'defaultShapeUtils'?"
-    ],
-    "TS2345": [
-      "packages/canvas/src/__tests__/mol-942-fold-arrange-parity.test.ts:195  Argument of type 'ShapeId' is not assignable to parameter of type 'UnknownShape'.",
-      "packages/canvas/src/__tests__/section-shape-util.test.tsx:404  Argument of type 'SectionShape' is not assignable to parameter of type 'SectionShapeUtil'.",
-      "packages/canvas/src/__tests__/section-shape-util.test.tsx:420  Argument of type 'SectionShape' is not assignable to parameter of type 'SectionShapeUtil'."
-    ],
-    "TS2554": [
-      "packages/canvas/src/__tests__/section-shape-util.test.tsx:126  Expected 1 arguments, but got 0."
-    ],
-    "TS2344": [
-      "packages/canvas/src/__tests__/section-shape-util.test.tsx:402  Type 'SectionShapeUtil' does not satisfy the constraint 'BaseShape<string, object>'.",
-      "packages/canvas/src/__tests__/section-shape-util.test.tsx:418  Type 'SectionShapeUtil' does not satisfy the constraint 'BaseShape<string, object>'.",
-      "packages/canvas/src/__tests__/section-shape-util.test.tsx:431  Type 'SectionShapeUtil' does not satisfy the constraint 'BaseShape<string, object>'."
-    ],
-    "TS2722": [
-      "packages/canvas/src/__tests__/section-shape-util.test.tsx:404  Cannot invoke an object which is possibly 'undefined'.",
-      "packages/canvas/src/__tests__/section-shape-util.test.tsx:420  Cannot invoke an object which is possibly 'undefined'.",
-      "packages/canvas/src/__tests__/section-shape-util.test.tsx:433  Cannot invoke an object which is possibly 'undefined'."
-    ],
-    "TS18048": [
-      "packages/canvas/src/board-note-size.ts:199  'measured.scrollWidth' is possibly 'undefined'.",
-      "packages/canvas/src/selection-anchor-point.ts:22  'bounds' is possibly 'undefined'.",
-      "packages/canvas/src/selection-anchor-point.ts:22  'bounds' is possibly 'undefined'."
-    ],
-    "TS7006": [
-      "packages/canvas/src/canvas-readonly-mount.ts:29  Parameter 'editor' implicitly has an 'any' type.",
-      "packages/canvas/src/ghost-preview-geometry.ts:376  Parameter 'point' implicitly has an 'any' type."
-    ],
-    "TS2416": [
-      "packages/canvas/src/feed-post-block-shape-util.tsx:646  Property 'canEdit' in type 'FeedPostBlockShapeUtil' is not assignable to the same property in base type 'ShapeUtil<FeedPostBlockShape>'.",
-      "packages/canvas/src/section-shape-util.tsx:398  Property 'canEdit' in type 'SectionShapeUtil' is not assignable to the same property in base type 'BaseFrameLikeShapeUtil<SectionShape>'."
-    ],
-    "TS2375": [
-      "packages/canvas/src/format-canvas.tsx:366  Type 'TLComponents' is not assignable to type 'Partial<CanvasComponents>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
-    ],
-    "TS2551": [
-      "packages/canvas/src/ghost-preview.tsx:120  Property 'getIsPointing' does not exist on type 'EditorInputs'. Did you mean 'isPointing'?",
-      "packages/canvas/src/ghost-preview.tsx:125  Property 'getCurrentPagePoint' does not exist on type 'EditorInputs'. Did you mean 'currentPagePoint'?"
-    ],
-    "TS4113": [
-      "packages/canvas/src/section-shape-util.tsx:407  This member cannot have an 'override' modifier because it is not declared in the base class 'BaseFrameLikeShapeUtil<SectionShape>'."
+      "packages/canvas/src/agent-presence.ts:75  Type 'string' is not assignable to type 'UserId'.",
+      "packages/canvas/src/ghost-preview-geometry.ts:196  Type 'ShapeUtil<UnknownShape, TLDefaultDisplayValues> | undefined' is not assignable to type 'ShapeUtil<Shape, TLDefaultDisplayValues> | undefined'."
     ]
   },
-  "filesWithErrors": 38,
+  "filesWithErrors": 4,
   "byCode": {
-    "TS2305": 14,
-    "TS2353": 8,
-    "TS2339": 49,
-    "TS2322": 14,
-    "TS2724": 8,
-    "TS2345": 9,
-    "TS2554": 1,
-    "TS2344": 5,
-    "TS2722": 4,
-    "TS18048": 5,
-    "TS7006": 2,
-    "TS2416": 2,
-    "TS2375": 1,
-    "TS2551": 2,
-    "TS4113": 1
+    "TS2345": 4,
+    "TS2322": 2
   },
   "bySymbol": {
-    "defaultHandleExternalUrlContent": 1,
-    "translations": 1,
-    "{ x: number; y: number; z: number; size: number; }": 6,
-    "onClick": 9,
-    "getPolygonVertices": 2,
-    "defaultShapeTools": 5,
-    "{ children: Element; editor: Editor; }": 1,
-    "assets": 3,
-    "richText": 10,
-    "point": 1,
-    "ShapeId": 1,
-    "rotation": 2,
-    "translate": 5,
-    "Compose": 1,
-    "SectionShape": 5,
-    "{ children: ReactNode; editor: Editor; }": 2,
-    "migrateSnapshot": 2,
-    "StoreSnapshot": 1,
-    "null": 2,
-    "RecordsDiff": 1,
-    "([, record]: [any, any]) => any": 1,
-    "unknown": 1,
-    "getEmbedInfo": 1,
-    "\"embed\"": 1,
-    "NoteShapeOptions": 1,
-    "NoteShapeUtilDisplayValues": 1,
-    "TLShape": 1,
-    "font": 2,
-    "size": 2,
-    "growY": 2,
-    "fontSizeAdjustment": 2,
-    "x": 1,
-    "y": 1,
-    "z": 1,
-    "TLOnMountHandler": 2,
-    "TLEditStartInfo": 2,
-    "FeedPostBlockShapeUtil": 1,
-    "h": 1,
-    "focus": 1,
-    "slotsJson": 1,
-    "TLComponents": 1,
-    "getGeoTypeDefinition": 1,
-    "getIsPointing": 1,
-    "getCurrentPagePoint": 1,
-    "atom": 1,
-    "react": 1,
-    "createComputedCache": 1,
-    "CubicBezier2d": 1,
+    "UnknownShape | null": 1,
     "string": 1,
-    "SectionShapeUtil": 1,
-    "contains": 1,
-    "UnknownShape": 1
+    "(shape: TLShape, source: \"remote\" | \"user\") => TLShape": 1,
+    "(shape: TLShape) => void": 1,
+    "(prev: TLShape, next: TLShape) => void": 1,
+    "ShapeUtil<UnknownShape, TLDefaultDisplayValues> | undefined": 1
   },
   "byFile": {
-    "packages/canvas/src/__tests__/board-paste-external-url.test.ts": 1,
-    "packages/canvas/src/__tests__/board-tool-shortcuts.test.ts": 2,
-    "packages/canvas/src/__tests__/canvas-grid.test.tsx": 6,
-    "packages/canvas/src/__tests__/feed-post-block-shape-util.test.tsx": 5,
-    "packages/canvas/src/__tests__/format-block-shape-util.test.tsx": 4,
-    "packages/canvas/src/__tests__/ghost-preview-geometry.test.ts": 1,
-    "packages/canvas/src/__tests__/ghost-preview.test.tsx": 2,
-    "packages/canvas/src/__tests__/hydrate-canvas-store.test.ts": 3,
-    "packages/canvas/src/__tests__/mol-2045-note-text-normalization.test.ts": 9,
-    "packages/canvas/src/__tests__/mol-921-placement-size-legacy-user.test.ts": 1,
-    "packages/canvas/src/__tests__/mol-921-placement-size.test.tsx": 1,
-    "packages/canvas/src/__tests__/mol-922-note-default-size.test.ts": 1,
-    "packages/canvas/src/__tests__/mol-942-fold-arrange-parity.test.ts": 10,
-    "packages/canvas/src/__tests__/section-shape-util.test.tsx": 16,
-    "packages/canvas/src/__tests__/selection-context.test.ts": 1,
-    "packages/canvas/src/__tests__/sticky-anchor-binding-util.test.ts": 1,
-    "packages/canvas/src/__tests__/tldraw-yjs-binding.test.ts": 1,
+    "packages/canvas/src/__tests__/section-shape-util.test.tsx": 1,
     "packages/canvas/src/agent-presence.ts": 1,
-    "packages/canvas/src/board-derived-materialization.ts": 3,
-    "packages/canvas/src/board-embed-match.ts": 1,
-    "packages/canvas/src/board-external-content.ts": 1,
-    "packages/canvas/src/board-note-size.ts": 18,
-    "packages/canvas/src/campaign-phase-shape-util.tsx": 1,
-    "packages/canvas/src/canvas-grid.tsx": 3,
-    "packages/canvas/src/canvas-readonly-mount.ts": 2,
-    "packages/canvas/src/feed-post-block-shape-util.tsx": 5,
-    "packages/canvas/src/format-canvas.tsx": 2,
-    "packages/canvas/src/ghost-preview-geometry.ts": 3,
-    "packages/canvas/src/ghost-preview.tsx": 2,
-    "packages/canvas/src/hydrate-canvas-store.ts": 1,
-    "packages/canvas/src/local-presence.ts": 2,
-    "packages/canvas/src/pipeline/connection-binding-util.ts": 1,
-    "packages/canvas/src/pipeline/connection-shape-util.tsx": 1,
-    "packages/canvas/src/section-shape-util.tsx": 6,
-    "packages/canvas/src/section-tool.ts": 1,
-    "packages/canvas/src/selection-anchor-point.ts": 4,
-    "packages/canvas/src/selection-context.ts": 1,
-    "packages/canvas/src/sticky-anchor-binding-util.ts": 1
+    "packages/canvas/src/board-note-size.ts": 3,
+    "packages/canvas/src/ghost-preview-geometry.ts": 1
   }
 }

@@ -8,8 +8,9 @@ An infinite-canvas SDK for the web with a familiar `Editor` / `ShapeUtil` /
   memory. The renderer is WebGL2 today, WebGPU next, behind one interface.
 - **Familiar API.** If you have used tldraw, you know the shape of this API:
   records with `shape:` / `page:` ids, `createShapes`, `updateShapes`,
-  `select`, `zoomToFit`, `ShapeUtil`, `StateNode`, `.tldr` files. See
-  [docs/COMPAT.md](docs/COMPAT.md).
+  `select`, `zoomToFit`, `ShapeUtil`, `StateNode`, `.tldr` files. The target is
+  **tldraw 5.4**; [docs/COMPAT.md](docs/COMPAT.md) says exactly how much of it
+  exists, what is deliberately excluded, and where behaviour differs on purpose.
 - **Clean-room, MIT.** Written from scratch. See [docs/CLEAN_ROOM.md](docs/CLEAN_ROOM.md).
 
 ## Install
@@ -88,12 +89,29 @@ render as React components go to a DOM overlay positioned in page space.
 
 ## Status
 
-Phases 1-4 are done: the Rust/WASM engine with textures, clipping and level of
-detail; the document model with `.tldr` load and save; the editor with tools,
-bindings, styles, snapping, groups and history; GPU-textured images and text;
-WebGL2 and WebGPU backends; SVG and PNG export; collaboration; and the default
-shapes, tools and UI.
+2.0.0. The API model is tldraw 5.4 — a different architecture from the 3.x model
+1.x was shaped after, not a rename. Coming from 1.x, read
+[docs/MIGRATION.md](docs/MIGRATION.md).
 
-`docs/BENCHMARK.md` measures mocanvas against the library it is shaped after on
-the same workloads and renders the same document in both for comparison. The
-open items are listed at the end of `docs/ARCHITECTURE.md`.
+About **74% of the documented tldraw 5.4 API surface** exists (1,043 of 1,415
+symbols). Complete: the `Editor` surface, the geometry library, every documented
+React UI component, `@tldraw/store` / `state` / `state-react` / `validate`,
+records and migrations with `.tldr` round-tripping, the shape and binding
+extension points, the default shapes and tools, themes, rich text, export,
+external content and collaboration.
+
+What is missing is concentrated rather than spread thin: the canvas overlay
+painters, the `AssetUtil` subclasses, `PathBuilder` and the stroke helpers, the
+highlight shape and laser tool, and some per-shape schema variables.
+[docs/COMPAT.md](docs/COMPAT.md) breaks it down, and lists what is excluded on
+purpose — the client halves of services tldraw operates, which we would have to
+operate too.
+
+Two known performance defects are written up in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#known-performance-defects): the
+spatial index degenerates when many shapes share a bounding box, and snapping
+rebuilds geometry the engine already holds. Both were found by measurement, both
+have a described fix, neither is done.
+
+[docs/BENCHMARK.md](docs/BENCHMARK.md) measures mocanvas against the library it is
+shaped after, on the same workloads, and renders the same document in both.

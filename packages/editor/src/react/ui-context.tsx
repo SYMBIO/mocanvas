@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, typ
 import type { Editor } from "../editor/Editor"
 import type { ShapeId } from "../records/base"
 import { EditorProvider, useMaybeEditor } from "./EditorContext"
+import { resolveUiMessage } from "./translations"
 import type {
   TLComponents,
   TLComponentsResolved,
@@ -11,7 +12,20 @@ import type {
   TLUiOverrides,
   TLUiToolItem,
   TLUiToolsContextType,
+  TLUiTranslations,
 } from "./ui-types"
+
+/**
+ * The locale to resolve UI strings in.
+ *
+ * Read defensively: the user-preferences manager is wired onto the editor, and
+ * chrome is routinely rendered in tests against a stand-in editor that has no
+ * preferences at all.
+ */
+function getEditorLocale(editor: Editor): string {
+  const user = (editor as { user?: { getLocale?(): string } }).user
+  return user?.getLocale?.() ?? "en"
+}
 
 /**
  * The UI context: one place holding the chrome map and the tool/action lists
@@ -82,10 +96,16 @@ function mergeComponents(defaults: TLComponents, overrides: TLComponents | undef
   return out as TLComponentsResolved
 }
 
-/** The helpers handed to an override callback. */
-function makeHelpers(editor: Editor): TLUiOverrideHelpers {
+/**
+ * The helpers handed to an override callback.
+ *
+ * `translations` is read lazily inside `msg`, so an override that hands its
+ * own dictionary in through the same object it is being merged into still
+ * resolves against it.
+ */
+function makeHelpers(editor: Editor, translations: TLUiTranslations | undefined): TLUiOverrideHelpers {
   return {
-    msg: (id) => id,
+    msg: (id) => resolveUiMessage(translations, getEditorLocale(editor), id),
     insertMedia: () => {
       const doc = editor.getContainer().ownerDocument
       const input = doc.createElement("input")
@@ -114,7 +134,7 @@ export function MocanvasUiProvider(props: MocanvasUiProviderProps) {
   const { editor, components, defaultComponents, overrides, defaultTools, defaultActions, children } = props
 
   const value = useMemo<MocanvasUiContextValue>(() => {
-    const helpers = makeHelpers(editor)
+    const helpers = makeHelpers(editor, overrides?.translations)
     const baseTools = defaultTools ? defaultTools(editor, helpers) : {}
     const baseActions = defaultActions ? defaultActions(editor, helpers) : {}
     return {
@@ -125,7 +145,7 @@ export function MocanvasUiProvider(props: MocanvasUiProviderProps) {
   }, [editor, components, defaultComponents, overrides, defaultTools, defaultActions])
 
   return (
-    <EditorProvider value={editor}>
+    <EditorProvider editor={editor}>
       <MocanvasUiContext.Provider value={value}>{children}</MocanvasUiContext.Provider>
     </EditorProvider>
   )

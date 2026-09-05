@@ -5,17 +5,28 @@ import {
   ShapeUtil,
   STROKE_SIZES,
   Vec,
+  getDefaultDisplayValues,
+  getDisplayValues,
   DefaultColorStyle,
   DefaultDashStyle,
   DefaultFillStyle,
   DefaultFontStyle,
   DefaultLabelColorStyle,
   DefaultSizeStyle,
+  ARROWHEAD_KINDS,
+  ARROW_SHAPE_KINDS,
+  type ArrowShapeKind,
   type BaseShape,
   type BindingCanBindOptions,
   type Geometry2d,
   type ShapeHandle,
+  type ShapeUtilOptions,
   type StyleWords,
+  type TLColorMode,
+  type TLDefaultDisplayValues,
+  type TLFontFace,
+  type TLStyledShape,
+  type TLTheme,
 } from "@mocanvas/editor"
 import type { ReactNode } from "react"
 import {
@@ -29,6 +40,7 @@ import {
 } from "../bindings/arrow-terminals"
 import type { ArrowBinding, ArrowTerminal } from "../bindings/ArrowBindingUtil"
 import { TextLabel } from "../text/TextEditor"
+import { applyPlainTextToRichText, richTextToText, toRichText, type RichText } from "../text/rich-text"
 import { measureLabel, trimTrailingWhitespace } from "../text/text-layout"
 import {
   bodyToGeometry,
@@ -45,10 +57,12 @@ import {
   type ArrowheadKind,
 } from "./arrow-helpers"
 import { ELBOW_CORNER_STROKES, getElbowMidPointFromPoint, getElbowRoute, type ElbowRoute } from "./elbow-helpers"
-import { propsOf, readEnum, readNumber, readPoint, readStyle, readText } from "./prop-access"
-import { getDashId, getStrokeRgba, getTextCssColor } from "./shape-theme"
+import { propsOf, readEnum, readNumber, readPoint, readRichText, readStyle, readText } from "./prop-access"
+import { getDashId, getLabelFontFaces, getStrokeRgba, getThemeColors } from "./shape-theme"
 import { pathWordsToSvgD } from "./svg-path"
 import { svgPath } from "./indicator-paths"
+import { arrowShapeProps } from "./shape-props"
+import { arrowShapeMigrations } from "./shape-migrations"
 
 export type { ArrowheadKind } from "./arrow-helpers"
 
@@ -73,7 +87,10 @@ export interface ArrowShapeProps {
   arrowheadStart: ArrowheadKind
   arrowheadEnd: ArrowheadKind
   font: DefaultFontStyle
-  text: string
+  /** The label as a rich-text document; see `NoteShapeProps.richText`. */
+  richText: RichText
+  /** The label as plain text — optional and derived; see `NoteShapeProps.text`. */
+  text?: string
   labelPosition: number
   scale: number
 }
@@ -83,11 +100,15 @@ export type ArrowShape = BaseShape<"arrow", ArrowShapeProps>
 export const ARROW_LABEL_PADDING = 8
 const LABEL_PADDING = ARROW_LABEL_PADDING
 
-const ARROWHEADS = ["none", "arrow", "triangle", "square", "dot", "diamond", "inverted", "bar", "pipe"] as const
-
-/** Routing kinds an arrow can have. */
-export const ARROW_KINDS = ["arc", "elbow"] as const
-export type ArrowKind = (typeof ARROW_KINDS)[number]
+/**
+ * Routing kinds an arrow can have.
+ *
+ * The list itself lives with the other style vocabularies in the editor, so
+ * that `ArrowShapeKindStyle` and this cannot drift apart; these are the names
+ * the shape has always exported for it.
+ */
+export const ARROW_KINDS = ARROW_SHAPE_KINDS
+export type ArrowKind = ArrowShapeKind
 
 /**
  * The shape with every declared prop present and of the declared type. Terminal
@@ -102,7 +123,16 @@ export function readArrowShape(shape: ArrowShape): ArrowShape {
  * `shape.props` with every declared prop present and of the declared type, so
  * geometry and rendering survive a record that arrived without one.
  */
-export function readArrowProps(shape: { props?: unknown }): ArrowShapeProps {
+/**
+ * {@link ArrowShapeProps} with the *derived* label filled in as well.
+ *
+ * `props.text` is optional on the record — a v5 writer only sets `richText` —
+ * but a util that has run it through {@link readArrowProps} always has both, so
+ * everything downstream can take a plain `string`.
+ */
+export type ResolvedArrowProps = ArrowShapeProps & { text: string; richText: RichText }
+
+export function readArrowProps(shape: { props?: unknown }): ResolvedArrowProps {
   const p = propsOf(shape)
   return {
     kind: readEnum(p, "kind", ARROW_KINDS, "arc"),
@@ -115,17 +145,61 @@ export function readArrowProps(shape: { props?: unknown }): ArrowShapeProps {
     fill: readStyle(p, "fill", DefaultFillStyle),
     dash: readStyle(p, "dash", DefaultDashStyle),
     size: readStyle(p, "size", DefaultSizeStyle),
-    arrowheadStart: readEnum(p, "arrowheadStart", ARROWHEADS, "none"),
-    arrowheadEnd: readEnum(p, "arrowheadEnd", ARROWHEADS, "arrow"),
+    arrowheadStart: readEnum(p, "arrowheadStart", ARROWHEAD_KINDS, "none"),
+    arrowheadEnd: readEnum(p, "arrowheadEnd", ARROWHEAD_KINDS, "arrow"),
     font: readStyle(p, "font", DefaultFontStyle),
+    richText: readRichText(p),
     text: readText(p),
     labelPosition: readNumber(p, "labelPosition", 0.5),
     scale: readNumber(p, "scale", 1),
   }
 }
 
-export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
+/**
+ * What an arrow paints with.
+ *
+ * An arrow is a body, two terminals and a label, and all four are sized by the
+ * shape's own `scale`, which the shared set knows nothing about. The label's
+ * padding is here for the same reason a geo shape's is: anything measuring the
+ * label has to agree with what draws it.
+ */
+export interface ArrowShapeUtilDisplayValues extends TLDefaultDisplayValues {
+  /** The body's width in page units, `scale` applied. */
+  scaledStrokeWidth: number
+  /** The label's font size in page units, `scale` applied. */
+  labelFontSize: number
+  /** Padding between the body and its label, in page units. */
+  labelPadding: number
+  /** The label's CSS font stack. */
+  labelFontFamily: string
+}
+
+/** `ArrowShapeUtil`'s settings; see {@link ShapeUtil.configure}. */
+export interface ArrowShapeOptions extends ShapeUtilOptions<ArrowShape, ArrowShapeUtilDisplayValues> {}
+
+/** Resolve an arrow's display values; see {@link ArrowShapeUtilDisplayValues}. */
+export function getArrowDisplayValues(
+  editor: unknown,
+  shape: { props?: unknown },
+  theme: TLTheme,
+  colorMode: TLColorMode,
+): ArrowShapeUtilDisplayValues {
+  const base = getDefaultDisplayValues(editor, shape as TLStyledShape, theme, colorMode)
+  const scale = readNumber(propsOf(shape), "scale", 1)
+  return {
+    ...base,
+    scaledStrokeWidth: base.strokeWidth * scale,
+    labelFontSize: base.fontSize * scale,
+    labelPadding: ARROW_LABEL_PADDING * scale,
+    labelFontFamily: base.fontFamily,
+  }
+}
+
+export class ArrowShapeUtil extends ShapeUtil<ArrowShape, ArrowShapeUtilDisplayValues> {
   static override type = "arrow" as const
+  static override migrations = arrowShapeMigrations
+  static override options: ArrowShapeOptions = { getDefaultDisplayValues: getArrowDisplayValues }
+  declare readonly options: ArrowShapeOptions
   /**
    * `kind` is deliberately not among these. A style is shared across shape
    * types, remembered for the next shape and applied to a whole selection at
@@ -133,14 +207,7 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
    * declaring it a style would put it in every mixed selection's shared styles
    * (and in the style panel) with nothing else to share it with.
    */
-  static override props = {
-    color: DefaultColorStyle,
-    labelColor: DefaultLabelColorStyle,
-    fill: DefaultFillStyle,
-    dash: DefaultDashStyle,
-    size: DefaultSizeStyle,
-    font: DefaultFontStyle,
-  }
+  static override props = arrowShapeProps
 
   getDefaultProps(): ArrowShapeProps {
     return {
@@ -157,6 +224,7 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
       arrowheadStart: "none",
       arrowheadEnd: "arrow",
       font: "draw",
+      richText: toRichText(""),
       text: "",
       labelPosition: 0.5,
       scale: 1,
@@ -203,24 +271,35 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
     if (endHead) children.push(endHead)
 
     if (text) {
-      const m = measureLabel(text, { font, fontSize: FONT_SIZES[size] * scale, padding: LABEL_PADDING * scale })
+      const m = measureLabel(readRichText(shape.props), {
+        fontFamily: font,
+        fontSize: FONT_SIZES[size] * scale,
+        padding: LABEL_PADDING * scale,
+        editor: this.editor,
+      })
       const c = getPointOnBody(full, Math.max(0, Math.min(1, labelPosition)))
       children.push(new Rectangle2d({ x: c.x - m.w / 2, y: c.y - m.h / 2, width: m.w, height: m.h, isFilled: false, isLabel: true }))
     }
     return new Group2d({ children })
   }
 
+  /** An arrow needs its family's faces only while it carries a label. */
+  override getFontFaces(shape: ArrowShape): TLFontFace[] {
+    return readText(shape.props) ? getLabelFontFaces(readArrowProps(shape).font) : []
+  }
+
   override getRenderStyle(shape: ArrowShape): StyleWords {
     const { color, dash, size, scale } = readArrowProps(shape)
-    const stroke = getStrokeRgba(color)
+    const stroke = getStrokeRgba(color, getThemeColors(this.editor))
     // The body is open so it never fills; closed arrowheads fill with the stroke color.
     return { stroke, strokeWidth: STROKE_SIZES[size] * scale, fill: stroke, dash: getDashId(dash), opacity: 1 }
   }
 
   component(shape: ArrowShape): ReactNode {
-    const { text, font, size, scale, labelColor, labelPosition } = readArrowProps(shape)
+    const { richText, text, font, size, scale, labelPosition } = readArrowProps(shape)
     const isEditing = this.editor.getEditingShapeId() === shape.id
     if (!text && !isEditing) return null
+    const display = getDisplayValues<ArrowShape, ArrowShapeUtilDisplayValues>(this, shape)
     const c = getPointOnBody(this.resolveBody(shape).body, Math.max(0, Math.min(1, labelPosition)))
     return (
       <div
@@ -237,15 +316,29 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
           <TextLabel
             shape={shape}
             text={text}
+            richText={richText}
             isEditing={isEditing}
-            font={font}
+            fontFamily={font}
             fontSize={FONT_SIZES[size] * scale}
-            color={getTextCssColor(labelColor)}
-            align="middle"
+            color={display.labelColor}
+            textAlign="middle"
             verticalAlign="middle"
             wrap={false}
             padding={LABEL_PADDING * scale}
-            onChange={(next) => this.editor.updateShape<ArrowShape>({ id: shape.id, type: "arrow", props: { text: next } })}
+            onChange={(next) =>
+              this.editor.updateShape<ArrowShape>({
+                id: shape.id,
+                type: "arrow",
+                props: { text: next, richText: applyPlainTextToRichText(richText, next) },
+              })
+            }
+            onChangeRichText={(next) =>
+              this.editor.updateShape<ArrowShape>({
+                id: shape.id,
+                type: "arrow",
+                props: { richText: next, text: richTextToText(next) },
+              })
+            }
           />
         </div>
       </div>
@@ -294,7 +387,12 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape> {
   override onEditEnd(shape: ArrowShape): void {
     const text = readText(shape.props)
     const trimmed = trimTrailingWhitespace(text)
-    if (trimmed !== text) this.editor.updateShape<ArrowShape>({ id: shape.id, type: "arrow", props: { text: trimmed } })
+    if (trimmed === text) return
+    this.editor.updateShape<ArrowShape>({
+      id: shape.id,
+      type: "arrow",
+      props: { text: trimmed, richText: applyPlainTextToRichText(readRichText(shape.props), trimmed) },
+    })
   }
 
   /**

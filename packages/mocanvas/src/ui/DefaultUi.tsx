@@ -10,9 +10,10 @@ import {
   type Editor,
   type GeoShapeKind,
   type TLComponents,
+  type TLComponentsResolved,
   type TLUiOverrides,
 } from "@mocanvas/editor"
-import { Fragment, useEffect, useRef, useState, type ReactNode, type Ref } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react"
 import { MocanvasUiMenuItem } from "./DefaultToolbar"
 import { Icon, type IconName } from "./icons"
 import { Popover, UiTooltip } from "./overlays"
@@ -244,17 +245,49 @@ export const defaultComponents: TLComponents = {
   Tooltip: UiTooltip,
 }
 
-/** Reads the merged chrome map and lays the panels out. */
-function Chrome({ showStats }: { showStats: boolean }) {
+/**
+ * Feeds the `Grid` slot the camera it draws from, and mounts it only while the
+ * editor is in grid mode.
+ *
+ * The subscription lives here rather than in the slot so the camera is read
+ * once per frame no matter how many layers want it — and so a grid component
+ * can be a pure function of its props, which is what makes it testable.
+ */
+const GridLayer = track(function GridLayer({ Grid }: { Grid: NonNullable<TLComponentsResolved["Grid"]> }) {
+  const editor = useEditor()
+  if (!editor.getInstanceState().isGridMode) return null
+  const camera = editor.getCamera()
+  return <Grid x={camera.x} y={camera.y} z={camera.z} size={editor.getDocumentSettings().gridSize} />
+})
+
+/**
+ * Reads the merged chrome map and lays the panels out.
+ *
+ * ## Why the canvas is rendered from here
+ * The canvas is a slot like everything else, and it is rendered FIRST, because
+ * some chrome has to *wrap* it: a right-click menu owns the DOM node the
+ * browser fires `contextmenu` at, so it renders `useEditorComponents().Canvas`
+ * inside its own trigger. When a `ContextMenu` slot is filled it therefore
+ * takes over rendering the canvas and the bare `Canvas` slot is skipped —
+ * rendering both would mount two canvases.
+ *
+ * `hidePanels` (mocanvas's `hideUi`) suppresses the panels below and nothing
+ * else: an editor with no chrome still has a canvas, and an app that supplied
+ * its own context menu still gets it.
+ */
+function Chrome({ showStats, hidePanels }: { showStats: boolean; hidePanels: boolean }) {
   const c = useEditorComponents()
   const statsOpen = useValue(debugStatsOpen)
   useEffect(() => {
     debugStatsOpen.set(showStats)
   }, [showStats])
+  const canvas = c.ContextMenu ? <c.ContextMenu /> : c.Canvas ? <c.Canvas /> : null
+  if (hidePanels) return canvas
   return (
     <>
+      {canvas}
       {c.Background ? <c.Background /> : null}
-      {c.Grid ? <c.Grid /> : null}
+      {c.Grid ? <GridLayer Grid={c.Grid} /> : null}
       {c.OnTheCanvas ? <c.OnTheCanvas /> : null}
       {c.Toolbar ? <c.Toolbar /> : null}
       {c.NavigationPanel ? <c.NavigationPanel /> : null}
@@ -266,11 +299,25 @@ function Chrome({ showStats }: { showStats: boolean }) {
       {c.HelperButtons ? <c.HelperButtons /> : null}
       {c.ImageToolbar ? <c.ImageToolbar /> : null}
       {c.VideoToolbar ? <c.VideoToolbar /> : null}
+      {c.RichTextToolbar ? <c.RichTextToolbar /> : null}
       {c.SharePanel ? <c.SharePanel /> : null}
       {c.TopPanel ? <c.TopPanel /> : null}
+      {/* Slots mocanvas ships no default for. They are rendered here so that
+          filling one through `components` puts it on screen, rather than
+          requiring the app to replace the whole chrome to place it. */}
+      {c.MainMenu ? <c.MainMenu /> : null}
+      {c.HelpMenu ? <c.HelpMenu /> : null}
+      {c.Minimap ? <c.Minimap /> : null}
+      {c.PeopleMenu ? <c.PeopleMenu /> : null}
+      {c.UserPresenceEditor ? <c.UserPresenceEditor /> : null}
+      {c.FollowingIndicator ? <c.FollowingIndicator /> : null}
+      {c.CursorChatBubble ? <c.CursorChatBubble /> : null}
+      {c.DebugMenu ? <c.DebugMenu /> : null}
       {statsOpen && c.DebugPanel ? <c.DebugPanel /> : null}
-      {c.ContextMenu ? <c.ContextMenu /> : null}
       {c.InFrontOfTheCanvas ? <c.InFrontOfTheCanvas /> : null}
+      {c.Toasts ? <c.Toasts /> : null}
+      {c.Dialogs ? <c.Dialogs /> : null}
+      {c.A11y ? <c.A11y /> : null}
       {c.Tooltip ? <c.Tooltip /> : null}
       <ToolShortcuts />
     </>
@@ -284,6 +331,17 @@ export interface DefaultUiProps {
   /** Rewrite the tool and action lists the chrome renders from. */
   overrides?: TLUiOverrides
   showStats?: boolean
+  /**
+   * The canvas, which is published as the `Canvas` chrome slot and rendered
+   * through it. Omit it (as tests of the chrome alone do) and the slot stays
+   * empty; an app can still fill it itself.
+   */
+  canvas?: ReactNode
+  /**
+   * Render the canvas and the app's own slots, but none of mocanvas's panels.
+   * `Mocanvas`'s `hideUi`.
+   */
+  hidePanels?: boolean
   /** Rendered inside the UI context, so it can use `useTools()` and friends. */
   children?: ReactNode
 }
@@ -298,17 +356,28 @@ export interface DefaultUiProps {
  * app's own, which is why a custom toolbar can call `useTools()` and get the
  * same list the default one would have used.
  */
-export function DefaultUi({ editor, components, overrides, showStats = true, children }: DefaultUiProps) {
+export function DefaultUi({ editor, components, overrides, showStats = true, canvas, hidePanels = false, children }: DefaultUiProps) {
+  // The canvas node becomes a component so it can live in the slot map, which
+  // is what lets an app's context menu render it from inside its own trigger.
+  // Memoised on the node: a fresh component identity every render would
+  // remount the whole canvas, engine and all.
+  const defaults = useMemo<TLComponents>(() => {
+    if (canvas === undefined) return defaultComponents
+    const CanvasSlot = () => <>{canvas}</>
+    CanvasSlot.displayName = "MocanvasCanvasSlot"
+    return { ...defaultComponents, Canvas: CanvasSlot }
+  }, [canvas])
+
   return (
     <MocanvasUiProvider
       editor={editor}
-      defaultComponents={defaultComponents}
+      defaultComponents={defaults}
       defaultTools={buildDefaultToolItems}
       defaultActions={buildDefaultActionItems}
       {...(components ? { components } : {})}
       {...(overrides ? { overrides } : {})}
     >
-      <Chrome showStats={showStats} />
+      <Chrome showStats={showStats} hidePanels={hidePanels} />
       {children}
     </MocanvasUiProvider>
   )

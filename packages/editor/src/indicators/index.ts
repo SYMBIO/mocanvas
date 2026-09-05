@@ -4,9 +4,16 @@ export type {
   TLIndicatorPath,
   TLIndicatorPathResult,
   TLIndicatorTransform,
-  TLShapeIndicator,
+  TLIndicatorOverlay,
 } from "./types"
-export { OverlayUtil, type OverlayHost } from "./OverlayUtil"
+export { OverlayUtil, type OverlayHost, type OverlayLike, type OverlayUtilOptions } from "./OverlayUtil"
+export {
+  getOverlayDisplayValues,
+  type OverlayOptionsWithDisplayValues,
+  type TLGetCustomOverlayDisplayValues,
+  type TLGetDefaultOverlayDisplayValues,
+  type TLOverlayDisplayValuesSource,
+} from "./overlayDisplayValues"
 export {
   boundsIndicatorPath,
   canBuildIndicatorPaths,
@@ -18,8 +25,8 @@ export {
 } from "./resolve"
 export {
   DEFAULT_SHAPE_INDICATOR_OPTIONS,
-  ShapeIndicatorOverlayUtil,
+  ShapeIndicatorCompositor,
   type IndicatorShapeUtil,
   type TLIndicatorHost,
   type TLShapeIndicatorOptions,
-} from "./ShapeIndicatorOverlayUtil"
+} from "./ShapeIndicatorCompositor"

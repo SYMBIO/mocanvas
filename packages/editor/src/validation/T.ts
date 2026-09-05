@@ -226,34 +226,103 @@ export function setOf<T>(item: Validatable<T>): Validator<Set<T>> {
   })
 }
 
+/**
+ * A validator for an object used as a lookup table: any key the key validator
+ * accepts, every value matching the value validator.
+ *
+ * Both validators are kept as properties so a caller can ask what a dict is
+ * made of — which is how a shape's `static props` map can be walked and
+ * described without re-declaring the same shape twice.
+ */
+export class DictValidator<Key extends string, Value> extends Validator<Record<Key, Value>> {
+  constructor(
+    readonly keyValidator: Validatable<Key>,
+    readonly valueValidator: Validatable<Value>,
+  ) {
+    super((input) => {
+      if (!isPlainObject(input)) fail(`Expected an object, got ${describeValue(input)}`)
+      const result: Record<string, unknown> = {}
+      for (const entryKey of Object.keys(input)) {
+        prefixError(entryKey, () => {
+          keyValidator.validate(entryKey)
+          result[entryKey] = valueValidator.validate(input[entryKey])
+        })
+      }
+      return result as Record<Key, Value>
+    })
+  }
+}
+
 /** An object used as a lookup table: any key, every value matching `value`. */
-export function dict<K extends string, V>(key: Validatable<K>, value: Validatable<V>): Validator<Record<K, V>> {
-  return new Validator<Record<K, V>>((input) => {
-    if (!isPlainObject(input)) fail(`Expected an object, got ${describeValue(input)}`)
-    for (const entryKey of Object.keys(input)) {
-      prefixError(entryKey, () => {
-        key.validate(entryKey)
-        value.validate(input[entryKey])
-      })
-    }
-    return input as Record<K, V>
-  })
+export function dict<K extends string, V>(key: Validatable<K>, value: Validatable<V>): DictValidator<K, V> {
+  return new DictValidator<K, V>(key, value)
+}
+
+/**
+ * The variant table a {@link UnionValidator} is built from: one validator per
+ * value of the discriminant.
+ */
+export type UnionValidatorConfig<Key extends string, Config> = {
+  readonly [Variant in keyof Config]: Validatable<
+    Extract<Config[Variant], object> & { readonly [K in Key]: Variant }
+  >
+}
+
+/**
+ * A discriminated union, dispatched on one property.
+ *
+ * The interesting part is {@link UnionValidator.validateUnknownVariants}: a
+ * document may legitimately contain a shape type this build has never heard of
+ * — one an app registered in a newer version, or one whose util was not passed
+ * to this editor. Rejecting it would delete the user's data on the next save.
+ * With unknown variants allowed, the record passes through untouched instead.
+ */
+export class UnionValidator<
+  Key extends string,
+  Config extends Record<string, Validatable<object>>,
+  UnknownValue = never,
+> extends Validator<TypeOf<Config[keyof Config]> | UnknownValue> {
+  constructor(
+    private readonly key: Key,
+    private readonly config: Config,
+    private readonly unknownValueValidation: ((value: object, variant: string) => UnknownValue) | undefined,
+  ) {
+    const names = listForMessage(Object.keys(config).map((name) => JSON.stringify(name)))
+    super((value) => {
+      if (!isPlainObject(value)) fail(`Expected an object, got ${describeValue(value)}`)
+      const variant = value[key]
+      if (typeof variant !== "string") {
+        throw new ValidationError(`Expected one of ${names}, got ${describeValue(variant)}`, [key])
+      }
+      const member = Object.hasOwn(config, variant) ? config[variant] : undefined
+      if (!member) {
+        if (unknownValueValidation) return unknownValueValidation(value, variant)
+        throw new ValidationError(`Expected one of ${names}, got ${describeValue(variant)}`, [key])
+      }
+      return member.validate(value) as TypeOf<Config[keyof Config]>
+    })
+  }
+
+  /**
+   * The same union, but a variant the config does not name is handed to
+   * `unknownValueValidation` instead of being rejected.
+   *
+   * Pass the identity to keep unknown records verbatim, which is what a store
+   * that must not lose data wants.
+   */
+  validateUnknownVariants<Unknown>(
+    unknownValueValidation: (value: object, variant: string) => Unknown,
+  ): UnionValidator<Key, Config, Unknown> {
+    return new UnionValidator<Key, Config, Unknown>(this.key, this.config, unknownValueValidation)
+  }
 }
 
 /** A discriminated union: pick the member validator by the value of `key`. */
 export function union<Key extends string, Config extends Record<string, Validatable<object>>>(
   key: Key,
   config: Config,
-): Validator<TypeOf<Config[keyof Config]>> {
-  const names = listForMessage(Object.keys(config).map((name) => JSON.stringify(name)))
-  return new Validator<TypeOf<Config[keyof Config]>>((value) => {
-    if (!isPlainObject(value)) fail(`Expected an object, got ${describeValue(value)}`)
-    const variant = value[key]
-    if (typeof variant !== "string" || !Object.hasOwn(config, variant)) {
-      throw new ValidationError(`Expected one of ${names}, got ${describeValue(variant)}`, [key])
-    }
-    return config[variant]!.validate(value) as TypeOf<Config[keyof Config]>
-  })
+): UnionValidator<Key, Config> {
+  return new UnionValidator<Key, Config, never>(key, config, undefined)
 }
 
 /** Either of two shapes, tried in order. Prefer {@link union} when there is a discriminant. */

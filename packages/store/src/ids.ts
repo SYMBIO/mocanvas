@@ -41,8 +41,13 @@ export interface StoreValidator<R extends UnknownRecord> {
    * Optional fast path: validate `newRecord` knowing that `knownGoodVersion`
    * is a valid record of the same type. Implementations may skip the parts
    * that did not change.
+   *
+   * Declared as a property that may be `undefined` rather than as an optional
+   * method, so that a validator carrying an explicit `undefined` — which is
+   * what a class with an optional constructor argument produces — still
+   * satisfies this under `exactOptionalPropertyTypes`.
    */
-  validateUsingKnownGoodVersion?(knownGoodVersion: R, newRecord: unknown): R
+  validateUsingKnownGoodVersion?: ((knownGoodVersion: R, newRecord: unknown) => R) | undefined
 }
 
 /** Keys of `R` that hold data (everything except `id` and `typeName`). */

@@ -54,6 +54,21 @@ export function renderHtmlFromRichTextForMeasurement(editor: Editor | null | und
 }
 
 /**
+ * Render a rich-text value to HTML with an **explicit** extension list.
+ *
+ * The sibling of {@link renderHtmlFromRichTextForMeasurement} for callers that
+ * have no editor to read the extensions off: a server rendering a board's text
+ * into a page, a search indexer, a test. Because the extension list is the
+ * argument rather than something looked up, the same document renders the same
+ * way outside the editor as inside it — which is the point of exporting it.
+ *
+ * Pass `tipTapDefaultExtensions` for the set mocanvas itself uses.
+ */
+export function renderHtmlFromRichTextWithExtensions(richText: RichTextSource, extensions: readonly RichTextExtension[]): string {
+  return richTextToHtml(richText, { extensions })
+}
+
+/**
  * Measure a rich-text value directly: render it, then hand it to the shared
  * measurer. The convenience form of the two calls above.
  */

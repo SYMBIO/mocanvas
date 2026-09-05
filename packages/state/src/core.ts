@@ -19,8 +19,31 @@
  *   like a capture stack through the native call stack (save/restore).
  */
 
+import {
+	HistoryBuffer,
+	isWithDiff,
+	RESET_VALUE,
+	type ComputeDiff,
+	type ResetValue,
+	type WithDiff,
+} from "./diff"
+
 export const UNINITIALIZED: unique symbol = Symbol("UNINITIALIZED")
 export type Uninitialized = typeof UNINITIALIZED
+
+/**
+ * Whether a computed's `prev` argument is the "no previous value yet" marker.
+ *
+ * A derivation that patches its previous result has to tell the first run apart
+ * from every later one; `prev` is {@link UNINITIALIZED} exactly then.
+ *
+ * ```ts
+ * computed('ids', (prev) => (isUninitialized(prev) ? build() : patch(prev)))
+ * ```
+ */
+export function isUninitialized(value: unknown): value is Uninitialized {
+	return value === UNINITIALIZED
+}
 
 export const EMPTY_ARRAY: readonly [] = Object.freeze([]) as unknown as readonly []
 
@@ -28,31 +51,66 @@ export const EMPTY_ARRAY: readonly [] = Object.freeze([]) as unknown as readonly
 // Public types
 // ---------------------------------------------------------------------------
 
-export interface Signal<T> {
+export interface Signal<T, Diff = unknown> {
 	readonly name: string
 	get(): T
 	lastChangedEpoch: number
+	/**
+	 * Every diff this signal recorded after `epoch`, oldest first.
+	 *
+	 * A signal only keeps diffs when it was given a `historyLength`; without
+	 * one — or when the change is further back than the buffer reaches, or was
+	 * never expressible as a diff — the answer is {@link RESET_VALUE}, meaning
+	 * "give up and read the value".
+	 */
+	getDiffSince(epoch: number): Diff[] | ResetValue
 }
 
-export interface Atom<T> extends Signal<T> {
+export interface Atom<T, Diff = unknown> extends Signal<T, Diff> {
 	set(value: T): T
 	update(fn: (prev: T) => T): T
 }
 
-export interface Computed<T> extends Signal<T> {
+export interface Computed<T, Diff = unknown> extends Signal<T, Diff> {
 	/** Epoch at which the cached value was last verified against its parents. */
 	readonly lastCheckedEpoch: number
 }
 
-export interface AtomOptions<T> {
+export interface AtomOptions<T, Diff = unknown> {
 	isEqual?: (a: T, b: T) => boolean
+	/**
+	 * How many recent changes to remember as diffs. Omit — the default — and
+	 * the atom keeps none and always answers `getDiffSince` with
+	 * {@link RESET_VALUE}.
+	 */
+	historyLength?: number
+	/** Derives the diff between two values; see {@link ComputeDiff}. */
+	computeDiff?: ComputeDiff<T, Diff>
 }
 
-export interface ComputedOptions<T> {
+export interface ComputedOptions<T, Diff = unknown> {
 	isEqual?: (a: T, b: T) => boolean
+	/**
+	 * How many recent changes to remember as diffs. The derivation supplies
+	 * each diff itself by returning `withDiff(value, diff)`; a plain return
+	 * value records "this change has no diff".
+	 */
+	historyLength?: number
+	/**
+	 * Derives the diff between two values when the derivation returned a bare
+	 * value rather than a {@link WithDiff}. Optional; see {@link ComputeDiff}.
+	 */
+	computeDiff?: ComputeDiff<T, Diff>
 }
 
-export interface ReactOptions {
+/**
+ * How an effect is (re)scheduled once its dependencies change.
+ *
+ * Shared by `react`, `reactor` and anything else driving an
+ * {@link EffectScheduler}, so a host can batch effect runs per animation frame
+ * instead of running them synchronously inside the write that caused them.
+ */
+export interface EffectSchedulerOptions {
 	/**
 	 * Called whenever the effect needs to (re)run after its first run. The
 	 * default runs `execute` synchronously. Supply e.g. a requestAnimationFrame
@@ -60,6 +118,9 @@ export interface ReactOptions {
 	 */
 	scheduleEffect?: (execute: () => void) => void
 }
+
+/** @see {@link EffectSchedulerOptions} — the name `react()` documents. */
+export type ReactOptions = EffectSchedulerOptions
 
 export interface EffectScheduler {
 	readonly name: string
@@ -81,9 +142,16 @@ export interface Reactor {
 
 /** Anything that records parents while it runs (computeds, effects). */
 interface Dependent {
+	readonly name: string
 	parents: Set<SignalNode>
 	prevParents: Set<SignalNode>
 	__notify(): void
+	/**
+	 * The epoch this dependent's cached work is current as of. A parent whose
+	 * `lastChangedEpoch` is newer than this is a reason the dependent re-ran —
+	 * which is exactly what {@link whyAmIRunning} reports.
+	 */
+	__referenceEpoch(): number
 }
 
 /** An atom as seen by the transaction log (method syntax keeps T bivariant). */
@@ -92,7 +160,7 @@ interface RollbackTarget {
 }
 
 /** Anything that can be read and can have dependents (atoms, computeds). */
-interface SignalNode<T = unknown> extends Signal<T> {
+interface SignalNode<T = unknown> extends Signal<T, any> {
 	__addChild(child: Dependent): void
 	__removeChild(child: Dependent): void
 	/** Bring the value up to date without recording a dependency. */
@@ -180,17 +248,27 @@ export function getWithoutCapture<T>(signal: Signal<T>): T {
 // Atom
 // ---------------------------------------------------------------------------
 
-class AtomImpl<T> implements SignalNode<T>, Atom<T> {
+class AtomImpl<T, Diff = unknown> implements SignalNode<T>, Atom<T, Diff> {
 	readonly name: string
 	lastChangedEpoch: number = globalEpoch
 	readonly children = new Set<Dependent>()
 	private value: T
 	private readonly isEqual: (a: T, b: T) => boolean
+	private readonly history: HistoryBuffer<Diff> | null
+	private readonly computeDiff: ComputeDiff<T, Diff> | null
 
-	constructor(name: string, value: T, isEqual: ((a: T, b: T) => boolean) | undefined) {
+	constructor(
+		name: string,
+		value: T,
+		isEqual: ((a: T, b: T) => boolean) | undefined,
+		historyLength: number | undefined,
+		computeDiff: ComputeDiff<T, Diff> | undefined
+	) {
 		this.name = name
 		this.value = value
 		this.isEqual = isEqual ?? defaultIsEqual
+		this.history = historyLength === undefined ? null : new HistoryBuffer<Diff>(historyLength)
+		this.computeDiff = computeDiff ?? null
 	}
 
 	get(): T {
@@ -201,7 +279,7 @@ class AtomImpl<T> implements SignalNode<T>, Atom<T> {
 	set(value: T): T {
 		if (this.isEqual(this.value, value)) return this.value
 		if (currentTx !== null) currentTx.record(this, this.value)
-		this.__write(value)
+		this.__write(value, this.diffFor(this.value, value))
 		if (currentTx === null) flushPending()
 		return value
 	}
@@ -210,16 +288,33 @@ class AtomImpl<T> implements SignalNode<T>, Atom<T> {
 		return this.set(fn(this.value))
 	}
 
+	getDiffSince(epoch: number): Diff[] | ResetValue {
+		// Reading the diffs is reading the signal: a dependent that patches its
+		// result from them must be woken by the next change just the same.
+		this.get()
+		if (epoch >= this.lastChangedEpoch) return []
+		return this.history === null ? RESET_VALUE : this.history.getChangesSince(epoch)
+	}
+
 	/** Restores a value during rollback; skips the write when already equal. */
 	__restore(value: T): void {
 		if (this.isEqual(this.value, value)) return
-		this.__write(value)
+		// A rollback is not a change anyone can patch towards: the diffs that
+		// led here are being undone, so the history stops being answerable.
+		this.__write(value, RESET_VALUE)
 	}
 
-	private __write(value: T): void {
+	private diffFor(previous: T, next: T): Diff | ResetValue {
+		if (this.history === null || this.computeDiff === null) return RESET_VALUE
+		return this.computeDiff(previous, next, this.lastChangedEpoch, globalEpoch + 1)
+	}
+
+	private __write(value: T, diff: Diff | ResetValue): void {
+		const fromEpoch = this.lastChangedEpoch
 		globalEpoch++
 		this.value = value
 		this.lastChangedEpoch = globalEpoch
+		this.history?.pushEntry(fromEpoch, globalEpoch, diff)
 		for (const child of this.children) child.__notify()
 	}
 
@@ -236,15 +331,25 @@ class AtomImpl<T> implements SignalNode<T>, Atom<T> {
 	}
 }
 
-export function atom<T>(name: string, initialValue: T, options?: AtomOptions<T>): Atom<T> {
-	return new AtomImpl(name, initialValue, options?.isEqual)
+export function atom<T, Diff = unknown>(
+	name: string,
+	initialValue: T,
+	options?: AtomOptions<T, Diff>
+): Atom<T, Diff> {
+	return new AtomImpl<T, Diff>(
+		name,
+		initialValue,
+		options?.isEqual,
+		options?.historyLength,
+		options?.computeDiff
+	)
 }
 
 // ---------------------------------------------------------------------------
 // Computed
 // ---------------------------------------------------------------------------
 
-class ComputedImpl<T> implements SignalNode<T>, Computed<T>, Dependent {
+class ComputedImpl<T, Diff = unknown> implements SignalNode<T>, Computed<T, Diff>, Dependent {
 	readonly name: string
 	lastChangedEpoch = -1
 	lastCheckedEpoch = -1
@@ -260,23 +365,41 @@ class ComputedImpl<T> implements SignalNode<T>, Computed<T>, Dependent {
 	readonly children = new Set<Dependent>()
 	private value: T | Uninitialized = UNINITIALIZED
 	private isComputing = false
-	private readonly fn: (prev: T | Uninitialized) => T
+	private readonly fn: (prev: T | Uninitialized, lastComputedEpoch: number) => T | WithDiff<T, Diff>
 	private readonly isEqual: (a: T, b: T) => boolean
+	private readonly history: HistoryBuffer<Diff> | null
+	private readonly computeDiff: ComputeDiff<T, Diff> | null
 
 	constructor(
 		name: string,
-		fn: (prev: T | Uninitialized) => T,
-		isEqual: ((a: T, b: T) => boolean) | undefined
+		fn: (prev: T | Uninitialized, lastComputedEpoch: number) => T | WithDiff<T, Diff>,
+		isEqual: ((a: T, b: T) => boolean) | undefined,
+		historyLength: number | undefined,
+		computeDiff: ComputeDiff<T, Diff> | undefined
 	) {
 		this.name = name
 		this.fn = fn
 		this.isEqual = isEqual ?? defaultIsEqual
+		this.history = historyLength === undefined ? null : new HistoryBuffer<Diff>(historyLength)
+		this.computeDiff = computeDiff ?? null
 	}
 
 	get(): T {
 		if (activeDependent !== null) activeDependent.parents.add(this)
 		this.__refresh()
 		return this.value as T
+	}
+
+	getDiffSince(epoch: number): Diff[] | ResetValue {
+		// Bring the value up to date first: the diffs being asked for may not
+		// have been produced yet.
+		this.get()
+		if (epoch >= this.lastChangedEpoch) return []
+		return this.history === null ? RESET_VALUE : this.history.getChangesSince(epoch)
+	}
+
+	__referenceEpoch(): number {
+		return this.lastCheckedEpoch
 	}
 
 	__refresh(): void {
@@ -310,17 +433,38 @@ class ComputedImpl<T> implements SignalNode<T>, Computed<T>, Dependent {
 		this.isComputing = true
 		const epoch = globalEpoch
 		const prev = this.value
+		// The epoch this computed's cached value was produced at. A derivation
+		// that patches `prev` asks its parents for the diffs recorded since.
+		const lastComputedEpoch = this.lastCheckedEpoch
 		const outer = beginCapture(this)
-		let next: T
+		let returned: T | WithDiff<T, Diff>
 		try {
-			next = this.fn(prev)
+			returned = this.fn(prev, lastComputedEpoch)
 		} finally {
 			endCapture(this, outer, this.children.size > 0)
 			this.isComputing = false
 		}
+
+		// A derivation that knows how its result changed says so by returning
+		// `withDiff(value, diff)`; a bare value falls back to `computeDiff`,
+		// and failing that records "this change cannot be described".
+		let next: T
+		let diff: Diff | ResetValue = RESET_VALUE
+		if (isWithDiff<T, Diff>(returned)) {
+			next = returned.value
+			diff = returned.diff
+		} else {
+			next = returned
+		}
+
 		if (prev === UNINITIALIZED || !this.isEqual(prev as T, next)) {
+			if (this.history !== null && diff === RESET_VALUE && this.computeDiff !== null && prev !== UNINITIALIZED) {
+				diff = this.computeDiff(prev as T, next, this.lastChangedEpoch, epoch)
+			}
+			const fromEpoch = this.lastChangedEpoch
 			this.value = next
 			this.lastChangedEpoch = epoch
+			this.history?.pushEntry(fromEpoch, epoch, prev === UNINITIALIZED ? RESET_VALUE : diff)
 		}
 		this.lastCheckedEpoch = epoch
 	}
@@ -349,12 +493,18 @@ class ComputedImpl<T> implements SignalNode<T>, Computed<T>, Dependent {
 	}
 }
 
-export function computed<T>(
+export function computed<T, Diff = unknown>(
 	name: string,
-	fn: (prev: T | Uninitialized) => T,
-	options?: ComputedOptions<T>
-): Computed<T> {
-	return new ComputedImpl(name, fn, options?.isEqual)
+	fn: (prev: T | Uninitialized, lastComputedEpoch: number) => T | WithDiff<T, Diff>,
+	options?: ComputedOptions<T, Diff>
+): Computed<T, Diff> {
+	return new ComputedImpl<T, Diff>(
+		name,
+		fn,
+		options?.isEqual,
+		options?.historyLength,
+		options?.computeDiff
+	)
 }
 
 // ---------------------------------------------------------------------------
@@ -374,6 +524,10 @@ abstract class EffectBase implements Dependent {
 
 	__notify(): void {
 		if (this.isActive) pendingEffects.add(this)
+	}
+
+	__referenceEpoch(): number {
+		return this.lastRunEpoch
 	}
 
 	/** Called by the flush loop once per batch of changes. */
@@ -699,4 +853,155 @@ export function isAtom(value: unknown): value is Atom<unknown> {
 
 export function isComputed(value: unknown): value is Computed<unknown> {
 	return value instanceof ComputedImpl
+}
+
+// ---------------------------------------------------------------------------
+// Debugging
+// ---------------------------------------------------------------------------
+
+/**
+ * Log why the computed or effect that is running right now was re-run.
+ *
+ * Drop a call inside a derivation or a `react` body and the next run prints the
+ * dependencies it captured, marking the ones that changed since its previous
+ * run. That is the question a signals bug almost always reduces to — "who woke
+ * this up?" — and it cannot be answered from a breakpoint, because the parent
+ * set only exists while the body is executing.
+ *
+ * Outside a tracked execution it warns and does nothing.
+ */
+export function whyAmIRunning(): void {
+	const dependent = activeDependent
+	if (dependent === null) {
+		console.warn("[state] whyAmIRunning() was called outside of a computed or effect")
+		return
+	}
+	const since = dependent.__referenceEpoch()
+	const changed: string[] = []
+	const unchanged: string[] = []
+	// `parents` is the set captured SO FAR in this run — reads that happen after
+	// this call are not in it yet, which is the honest answer to "what have I
+	// depended on up to here".
+	for (const parent of dependent.parents) {
+		;(parent.lastChangedEpoch > since ? changed : unchanged).push(parent.name)
+	}
+	const lines = [`[state] ${dependent.name} is running because:`]
+	for (const name of changed) lines.push(`  ${name} changed`)
+	for (const name of unchanged) lines.push(`  ${name} (unchanged)`)
+	if (changed.length === 0 && unchanged.length === 0) lines.push("  (no dependencies captured yet)")
+	console.log(lines.join("\n"))
+}
+
+/**
+ * The {@link Computed} that memoizes `object[propertyName]`, creating it on
+ * first use.
+ *
+ * A getter on a class is re-evaluated on every read; wrapping it once per
+ * instance turns it into a cached derivation that other signals can depend on,
+ * without the class having to hold the `Computed` itself. The instance is
+ * remembered per object and per property, so repeated calls return the same
+ * signal and the cache is actually shared.
+ *
+ * ```ts
+ * const $bounds = getComputedInstance(shapeUtil, "bounds")
+ * $bounds.get()
+ * ```
+ *
+ * SEMANTICS-ASSUMED: the docs describe this as fetching the computed instance
+ * behind a property. mocanvas has no `@computed` property decorator, so the
+ * lazily created wrapper is what a decorator would otherwise have installed —
+ * one `Computed` per object/property that reads the property with dependency
+ * capture. The object is held weakly, so this never keeps an editor alive.
+ */
+const computedInstances = new WeakMap<object, Map<PropertyKey, Computed<unknown>>>()
+
+export function getComputedInstance<Obj extends object, Prop extends keyof Obj>(
+	object: Obj,
+	propertyName: Prop
+): Computed<Obj[Prop]> {
+	let byProperty = computedInstances.get(object)
+	if (!byProperty) {
+		byProperty = new Map()
+		computedInstances.set(object, byProperty)
+	}
+	const existing = byProperty.get(propertyName)
+	if (existing) return existing as Computed<Obj[Prop]>
+	const created = computed<Obj[Prop]>(
+		`${object.constructor?.name ?? "object"}.${String(propertyName)}`,
+		() => object[propertyName]
+	)
+	byProperty.set(propertyName, created as Computed<unknown>)
+	return created
+}
+
+// ---------------------------------------------------------------------------
+// Persisted atoms
+// ---------------------------------------------------------------------------
+
+/**
+ * An atom whose value outlives the page: it is read from `localStorage` when
+ * created and written back whenever it changes.
+ *
+ * Use it for preferences the app owns rather than the document — a chosen
+ * theme, whether the debug panel is open. Document state belongs in the store.
+ *
+ * The value is stored as JSON under `key`. When `localStorage` is unavailable
+ * (server rendering, a browser with site data blocked, a private window that
+ * throws on write) this degrades to an ordinary in-memory atom rather than
+ * failing: a preference is never worth breaking a render over.
+ *
+ * SEMANTICS-ASSUMED: values are serialized with `JSON.stringify`, unparseable
+ * stored values fall back to `initialValue`, and a `storage` event from another
+ * tab updates the atom — the behaviour that makes a persisted preference
+ * actually behave like one shared piece of state. The docs name the function
+ * but do not pin the encoding.
+ */
+export function localStorageAtom<T>(key: string, initialValue: T, options?: AtomOptions<T>): Atom<T> {
+	const storage = (): Storage | null => {
+		try {
+			return typeof localStorage === "undefined" ? null : localStorage
+		} catch {
+			return null
+		}
+	}
+
+	let start = initialValue
+	const store = storage()
+	if (store !== null) {
+		try {
+			const raw = store.getItem(key)
+			if (raw !== null) start = JSON.parse(raw) as T
+		} catch {
+			start = initialValue
+		}
+	}
+
+	const result = atom<T>(key, start, options)
+	const write = (value: T): void => {
+		const s = storage()
+		if (s === null) return
+		try {
+			s.setItem(key, JSON.stringify(value))
+		} catch {
+			// Quota exceeded or storage disabled mid-session: keep the in-memory value.
+		}
+	}
+
+	// `react` runs immediately, which also writes the initial value back — so a
+	// key that was never set gets its default persisted, and a later read in
+	// another tab sees the same thing this one does.
+	react(`localStorageAtom(${key})`, () => write(result.get()))
+
+	if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+		window.addEventListener("storage", (event: StorageEvent) => {
+			if (event.key !== key || event.newValue === null) return
+			try {
+				result.set(JSON.parse(event.newValue) as T)
+			} catch {
+				// Another tab wrote something we cannot read; keep ours.
+			}
+		})
+	}
+
+	return result
 }

@@ -5,6 +5,7 @@
  * (`color: "blue"`, `size: "m"`, …) are the file format; a theme only decides
  * what those names look like on screen.
  */
+import type { TLFontFaceSource, TLRemovedDefaultThemeColors } from "./fontFaces"
 import type {
   DefaultColorStyle as ColorValue,
   DefaultDashStyle as DashValue,
@@ -60,8 +61,14 @@ export interface TLDefaultColor {
 /** Which part of a palette entry to read. */
 export type TLDefaultColorVariant = keyof TLDefaultColor
 
-/** The palette: one {@link TLDefaultColor} per style colour name. */
-export type TLThemeDefaultColors = Record<ColorValue, TLDefaultColor>
+/**
+ * The palette: one {@link TLDefaultColor} per style colour name, minus any an
+ * app has removed by augmenting {@link TLRemovedDefaultThemeColors}.
+ *
+ * With no augmentation the subtraction is a no-op, so this is exactly the
+ * built-in palette until an app says otherwise.
+ */
+export type TLThemeDefaultColors = Omit<Record<ColorValue, TLDefaultColor>, keyof TLRemovedDefaultThemeColors>
 
 // SEMANTICS-ASSUMED: which surface colours a ramp carries, and their names.
 // The consumer only ever reads palette entries and iterates the ramp telling
@@ -113,11 +120,14 @@ export interface TLFontFace {
   /** The `font-family` this face is registered under, e.g. `tldraw_draw`. */
   family: string
   /**
-   * The CSS `src` descriptor, verbatim — `url("/f.woff2") format("woff2")`,
-   * or `local("Georgia")` for a face that is already on the machine. It is
-   * handed to `new FontFace(family, src, descriptors)` unchanged.
+   * Where the face comes from.
+   *
+   * Either a CSS `src` descriptor verbatim — `url("/f.woff2") format("woff2")`,
+   * or `local("Georgia")` for a face already on the machine — or a
+   * {@link TLFontFaceSource}, which is the same thing with the URL and the
+   * format kept apart so neither has to be escaped into a string.
    */
-  src: string
+  src: string | TLFontFaceSource
   /** `font-weight` descriptor, e.g. `"normal"`, `"700"`. */
   weight?: string
   /** `font-style` descriptor, e.g. `"normal"`, `"italic"`. */

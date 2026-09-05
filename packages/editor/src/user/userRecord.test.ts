@@ -27,6 +27,18 @@ describe("createUserId", () => {
     expect(createUserId("agent:planner")).toBe(createUserId("agent:planner"))
   })
 
+  it("is idempotent: an id that is already branded comes back unchanged", () => {
+    // `UserId` is branded, so a host that keeps plain strings has to route them
+    // through here. Double-prefixing on a second pass would quietly make a
+    // different person out of the same id.
+    expect(createUserId("user:ada")).toBe("user:ada")
+    expect(createUserId(createUserId("ada"))).toBe(createUserId("ada"))
+  })
+
+  it("does not mistake a bare prefix for a branded id", () => {
+    expect(createUserId("user:")).toBe("user:user:")
+  })
+
   it("mints a unique id when given nothing", () => {
     expect(createUserId()).not.toBe(createUserId())
     expect(isUserId(createUserId())).toBe(true)

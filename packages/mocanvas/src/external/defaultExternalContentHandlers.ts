@@ -1,6 +1,7 @@
 import { AssetRecordType, createShapeId, type Editor, type ExternalContent, type ImageAsset, type ShapeId, type VecLike } from "@mocanvas/editor"
 import type { ImageShape } from "../shapes/ImageShapeUtil"
 import type { TextShape } from "../shapes/TextShapeUtil"
+import { defaultHandleExternalUrlContent, type ExternalUrlContentOptions } from "./urlContent"
 
 export interface ImageSize {
   w: number
@@ -20,6 +21,9 @@ export interface ExternalContentOptions {
   /** Offset between shapes when several are inserted at the same point. */
   stackOffset?: number
 }
+
+/** Everything {@link registerDefaultExternalContentHandlers} accepts. */
+export type DefaultExternalContentOptions = ExternalContentOptions & ExternalUrlContentOptions
 
 export const DEFAULT_MAX_IMAGE_DIMENSION = 1000
 const DEFAULT_FALLBACK_IMAGE_SIZE: ImageSize = { w: 100, h: 100 }
@@ -221,7 +225,7 @@ export function createTextShapeAt(editor: Editor, text: string, point: VecLike |
  * shapes. Types that already have a handler are left alone. Returns a function
  * that removes the handlers this call installed.
  */
-export function registerDefaultExternalContentHandlers(editor: Editor, opts: ExternalContentOptions = {}): () => void {
+export function registerDefaultExternalContentHandlers(editor: Editor, opts: DefaultExternalContentOptions = {}): () => void {
   const o = resolveOptions(opts)
   const disposers: (() => void)[] = []
 
@@ -256,11 +260,13 @@ export function registerDefaultExternalContentHandlers(editor: Editor, opts: Ext
   }
 
   if (!editor.hasExternalContentHandler("url")) {
+    // Embed-or-bookmark, not "a text shape with a url in it": see
+    // `defaultHandleExternalUrlContent`. It degrades to a text shape by itself
+    // on an editor that has neither shape registered.
     disposers.push(
-      editor.registerExternalContentHandler("url", ({ url, point }) => {
-        editor.markHistoryStoppingPoint("insert url")
-        createTextShapeAt(editor, url.trim(), point)
-      }),
+      editor.registerExternalContentHandler("url", ({ url, point }) =>
+        defaultHandleExternalUrlContent(editor, { url, ...(point ? { point } : {}) }, opts),
+      ),
     )
   }
 

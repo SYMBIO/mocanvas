@@ -124,7 +124,7 @@ export class FontManager {
     }
 
     try {
-      const loaded = new realm.FontFace(face.family, face.src, descriptorsFor(face))
+      const loaded = new realm.FontFace(face.family, toCssSrc(face.src), descriptorsFor(face))
       await loaded.load()
       if (this.disposed) return
       doc.fonts.add(loaded)
@@ -161,7 +161,27 @@ function descriptorsFor(face: TLFontFace): FontFaceDescriptors {
  * is routinely rebuilt from a table on each call.
  */
 export function fontKey(face: TLFontFace): string {
-  return [face.family, face.src, face.weight ?? "", face.style ?? "", face.stretch ?? "", face.unicodeRange ?? ""].join(
-    "\u0000",
-  )
+  return [
+    face.family,
+    toCssSrc(face.src),
+    face.weight ?? "",
+    face.style ?? "",
+    face.stretch ?? "",
+    face.unicodeRange ?? "",
+  ].join("\u0000")
+}
+
+/**
+ * A face's source as CSS wants it.
+ *
+ * A `TLFontFaceSource` keeps the URL and the format apart so neither has to be
+ * escaped into a descriptor by hand; `FontFace` only takes the descriptor, so
+ * this is where the two are joined. A source given as a string is already a
+ * descriptor and is passed through — that is how `local("Georgia")` and
+ * multi-source faces stay expressible.
+ */
+export function toCssSrc(src: TLFontFace["src"]): string {
+  if (typeof src === "string") return src
+  const url = `url("${src.url.replace(/"/g, '\\"')}")`
+  return src.format ? `${url} format("${src.format}")` : url
 }

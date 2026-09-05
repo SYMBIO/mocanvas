@@ -16,7 +16,7 @@ function editorWith(manager: ThemeManager | undefined): Editor {
 function harness(editor: Editor, use: () => string): string {
   const Probe = (): string => use()
   return renderToStaticMarkup(
-    <EditorProvider value={editor}>
+    <EditorProvider editor={editor}>
       <Probe />
     </EditorProvider>,
   )

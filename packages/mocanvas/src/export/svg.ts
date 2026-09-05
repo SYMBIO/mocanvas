@@ -6,8 +6,14 @@ import { shapeToBackgroundSvg, shapeToSvg, type SvgExportContext } from "./shape
 import { attrs, matrixAttr, svgNum } from "./svg-utils"
 
 export interface SvgExportOptions {
-  /** Page units added around the shapes' bounds. Default 32. */
-  padding?: number
+  /**
+   * Page units added around the shapes' bounds. Default 32.
+   *
+   * `"auto"` means "whatever frames the drawing sensibly", which for mocanvas
+   * is the default padding: the export bounds already come from geometry
+   * rather than from the culling pad, so there is no slack left to trim back.
+   */
+  padding?: number | "auto"
   /** Paint a full-size background rectangle. Default false. */
   background?: boolean
   /** Multiplier applied to the output `width`/`height`. Default 1. */
@@ -67,7 +73,7 @@ let clipCounter = 0
  * nothing to export.
  */
 export function getSvgString(editor: Editor, ids?: readonly ShapeId[], opts: SvgExportOptions = {}): SvgExportResult | undefined {
-  const padding = opts.padding ?? SVG_EXPORT_DEFAULT_PADDING
+  const padding = typeof opts.padding === "number" ? opts.padding : SVG_EXPORT_DEFAULT_PADDING
   const scale = opts.scale ?? 1
   const darkMode = opts.darkMode ?? false
 

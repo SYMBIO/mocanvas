@@ -10,11 +10,13 @@ pub mod box2d;
 pub mod hit;
 pub mod mat2d;
 pub mod path;
+pub mod shapes;
 pub mod vec2;
 
 pub use box2d::Box2d;
 pub use mat2d::Mat2d;
 pub use path::{Path, PathCmd, PathIter};
+pub use shapes::{catmull_rom_path, geo_path, polyline_path, smooth_freehand, GeoKind};
 pub use vec2::Vec2;
 
 /// Numeric tolerance used across the crate for degenerate-case checks.

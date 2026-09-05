@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest"
 import type { UnknownShape } from "../records/base"
-import { ShapeIndicatorOverlayUtil, type IndicatorShapeUtil, type TLIndicatorHost } from "./ShapeIndicatorOverlayUtil"
+import { ShapeIndicatorCompositor, type IndicatorShapeUtil, type TLIndicatorHost } from "./ShapeIndicatorCompositor"
 import { getIndicatorSource, getShapeIndicatorPath, normalizeIndicatorPath } from "./resolve"
 import type { TLIndicatorPathResult } from "./types"
 
@@ -19,7 +19,7 @@ class FakePath2D {
   }
 }
 
-/** Every call a `ShapeIndicatorOverlayUtil.render` may make, in order. */
+/** Every call a `ShapeIndicatorCompositor.render` may make, in order. */
 class FakeCtx {
   readonly calls: string[] = []
   private depth = 0
@@ -176,11 +176,11 @@ describe("getShapeIndicatorPath", () => {
   })
 })
 
-describe("ShapeIndicatorOverlayUtil.getIndicators", () => {
+describe("ShapeIndicatorCompositor.getIndicators", () => {
   it("strokes a hinted shape heavier than a selected one", () => {
     const a = makeShape("shape:a")
     const b = makeShape("shape:b")
-    const overlay = new ShapeIndicatorOverlayUtil(makeHost({ shapes: [a, b], selected: ["shape:a"], hinting: ["shape:b"] }))
+    const overlay = new ShapeIndicatorCompositor(makeHost({ shapes: [a, b], selected: ["shape:a"], hinting: ["shape:b"] }))
     const byId = Object.fromEntries(overlay.getIndicators().map((i) => [i.shapeId, i]))
     expect(byId["shape:a"]!.lineWidth).toBe(1.5)
     expect(byId["shape:b"]!.lineWidth).toBe(2.5)
@@ -189,7 +189,7 @@ describe("ShapeIndicatorOverlayUtil.getIndicators", () => {
 
   it("draws a shape that is both selected and hinted once, as the drop target", () => {
     const a = makeShape("shape:a")
-    const overlay = new ShapeIndicatorOverlayUtil(makeHost({ shapes: [a], selected: ["shape:a"], hinting: ["shape:a"] }))
+    const overlay = new ShapeIndicatorCompositor(makeHost({ shapes: [a], selected: ["shape:a"], hinting: ["shape:a"] }))
     const indicators = overlay.getIndicators()
     expect(indicators).toHaveLength(1)
     expect(indicators[0]!.context).toBe("hinting")
@@ -198,31 +198,31 @@ describe("ShapeIndicatorOverlayUtil.getIndicators", () => {
 
   it("takes the selection colour from the live theme", () => {
     const a = makeShape("shape:a")
-    const overlay = new ShapeIndicatorOverlayUtil(makeHost({ shapes: [a], selected: ["shape:a"] }))
+    const overlay = new ShapeIndicatorCompositor(makeHost({ shapes: [a], selected: ["shape:a"] }))
     expect(overlay.getIndicators()[0]!.color).toBe(SELECT_STROKE)
   })
 
   it("hovers only with a fine pointer, and only under the select tool", () => {
     const a = makeShape("shape:a")
-    const fine = new ShapeIndicatorOverlayUtil(makeHost({ shapes: [a], hovered: "shape:a" }))
+    const fine = new ShapeIndicatorCompositor(makeHost({ shapes: [a], hovered: "shape:a" }))
     expect(fine.getIndicators().map((i) => i.context)).toEqual(["hovered"])
 
-    const coarse = new ShapeIndicatorOverlayUtil(makeHost({ shapes: [a], hovered: "shape:a", coarsePointer: true }))
+    const coarse = new ShapeIndicatorCompositor(makeHost({ shapes: [a], hovered: "shape:a", coarsePointer: true }))
     expect(coarse.getIndicators()).toEqual([])
 
-    const drawing = new ShapeIndicatorOverlayUtil(makeHost({ shapes: [a], hovered: "shape:a", tool: "draw" }))
+    const drawing = new ShapeIndicatorCompositor(makeHost({ shapes: [a], hovered: "shape:a", tool: "draw" }))
     expect(drawing.getIndicators()).toEqual([])
   })
 
   it("lets a lone selected shape suppress its own outline", () => {
     const a = makeShape("shape:a", "quiet")
     const utils = { quiet: { ...boxUtil, hideSelectionBoundsFg: () => true } }
-    const alone = new ShapeIndicatorOverlayUtil(makeHost({ shapes: [a], utils, selected: ["shape:a"] }))
+    const alone = new ShapeIndicatorCompositor(makeHost({ shapes: [a], utils, selected: ["shape:a"] }))
     expect(alone.getIndicators()).toEqual([])
 
     // With more than one selected there is no other cue, so it is drawn anyway.
     const b = makeShape("shape:b", "quiet")
-    const many = new ShapeIndicatorOverlayUtil(makeHost({ shapes: [a, b], utils, selected: ["shape:a", "shape:b"] }))
+    const many = new ShapeIndicatorCompositor(makeHost({ shapes: [a, b], utils, selected: ["shape:a", "shape:b"] }))
     expect(many.getIndicators()).toHaveLength(2)
   })
 
@@ -236,12 +236,12 @@ describe("ShapeIndicatorOverlayUtil.getIndicators", () => {
         },
       },
     }
-    const overlay = new ShapeIndicatorOverlayUtil(makeHost({ shapes: [a, b], utils, selected: ["shape:a", "shape:b"] }))
+    const overlay = new ShapeIndicatorCompositor(makeHost({ shapes: [a, b], utils, selected: ["shape:a", "shape:b"] }))
     expect(overlay.getIndicators().map((i) => i.shapeId)).toEqual(["shape:b"])
   })
 
   it("skips shapes a subclass hides", () => {
-    class OnlySelected extends ShapeIndicatorOverlayUtil {
+    class OnlySelected extends ShapeIndicatorCompositor {
       override shouldShowIndicator(_shape: UnknownShape, context: string): boolean {
         return context === "selected"
       }
@@ -253,28 +253,28 @@ describe("ShapeIndicatorOverlayUtil.getIndicators", () => {
   })
 })
 
-describe("ShapeIndicatorOverlayUtil.configure", () => {
+describe("ShapeIndicatorCompositor.configure", () => {
   it("returns a subclass with the new weights and nothing else changed", () => {
-    const Heavy = ShapeIndicatorOverlayUtil.configure({ lineWidth: 3 })
+    const Heavy = ShapeIndicatorCompositor.configure({ lineWidth: 3 })
     const a = makeShape("shape:a")
     const heavy = new Heavy(makeHost({ shapes: [a], selected: ["shape:a"] }))
     expect(heavy.getIndicators()[0]!.lineWidth).toBe(3)
     // The omitted key keeps its value...
     expect(heavy.options.hintedLineWidth).toBe(2.5)
     // ...and the base class is untouched.
-    expect(ShapeIndicatorOverlayUtil.options.lineWidth).toBe(1.5)
+    expect(ShapeIndicatorCompositor.options.lineWidth).toBe(1.5)
   })
 
   it("layers when configured twice", () => {
-    const both = ShapeIndicatorOverlayUtil.configure({ lineWidth: 3 }).configure({ hintedLineWidth: 9 })
+    const both = ShapeIndicatorCompositor.configure({ lineWidth: 3 }).configure({ hintedLineWidth: 9 })
     expect(both.options).toEqual({ lineWidth: 3, hintedLineWidth: 9 })
   })
 })
 
-describe("ShapeIndicatorOverlayUtil.render", () => {
+describe("ShapeIndicatorCompositor.render", () => {
   function render(opts: HostOptions, utils?: Record<string, IndicatorShapeUtil>): FakeCtx {
     const ctx = new FakeCtx()
-    const overlay = new ShapeIndicatorOverlayUtil(makeHost({ ...opts, ...(utils ? { utils } : {}) }))
+    const overlay = new ShapeIndicatorCompositor(makeHost({ ...opts, ...(utils ? { utils } : {}) }))
     overlay.render(ctx as unknown as CanvasRenderingContext2D)
     return ctx
   }

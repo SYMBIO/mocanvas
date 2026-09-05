@@ -3,7 +3,7 @@
  * a React tree.
  *
  * A util returns geometry in *shape-local* coordinates and says nothing about
- * paint: the compositor ({@link ShapeIndicatorOverlayUtil}) applies the shape's
+ * paint: the compositor ({@link ShapeIndicatorCompositor}) applies the shape's
  * page transform, picks the stroke colour out of the live theme and sets a
  * zoom-independent stroke width. That split is what lets indicators be drawn in
  * one canvas pass instead of one DOM node per selected shape.
@@ -75,12 +75,12 @@ export interface TLIndicatorTransform {
  * One indicator, fully resolved: the paths to stroke, the page transform to
  * stroke them under, and the paint to use.
  *
- * Produced by {@link ShapeIndicatorOverlayUtil.getIndicators} and consumed by
+ * Produced by {@link ShapeIndicatorCompositor.getIndicators} and consumed by
  * its `render`. Keeping the two apart is what makes the compositor testable
  * without a canvas: the interesting decisions (which shapes, which weight,
  * which colour) all land in this record.
  */
-export interface TLShapeIndicator {
+export interface TLIndicatorOverlay {
   /** The shape this outline belongs to. */
   shapeId: string
   /** Why it is being drawn. */

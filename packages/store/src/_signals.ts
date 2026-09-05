@@ -9,10 +9,14 @@
 export {
   atom,
   computed,
+  isUninitialized,
   react,
   transact,
   unsafe__withoutCapture,
+  withDiff,
+  RESET_VALUE,
   type Atom,
   type Computed,
+  type ResetValue,
   type Signal,
 } from "@mocanvas/state"

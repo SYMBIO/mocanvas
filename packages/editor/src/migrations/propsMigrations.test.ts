@@ -136,7 +136,7 @@ describe("toMigrationSequence", () => {
 
   it("refuses ids belonging to another type", () => {
     expect(() => toMigrationSequence({ typeName: "shape", type: "format" }, sectionMigrations)).toThrow(
-      "was created for another type",
+      'does not name shape "format"',
     )
   })
 
@@ -168,9 +168,12 @@ describe("createPropsMigrationSequences", () => {
         },
       ],
     })
+    // "format" is deliberately absent: its sequence is empty, and an empty
+    // sequence is not registered. Claiming an id at version 0 would refuse any
+    // document carrying that id at a higher version, and there is nothing to
+    // migrate in exchange. See `emptySequence.test.ts`.
     expect(sequences.map((s) => s.sequenceId)).toEqual([
       "com.tldraw.shape.section",
-      "com.tldraw.shape.format",
       "com.tldraw.binding.stickyAnchor",
     ])
   })

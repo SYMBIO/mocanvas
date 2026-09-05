@@ -6,8 +6,10 @@ import {
   type MigrationResult,
   type MigrationSequence,
   type SerializedSchema,
+  type SerializedSchemaV2,
   type SerializedStore,
 } from "./migrate"
+import { isSerializedSchemaV1 } from "./legacy"
 import type { Store } from "./Store"
 
 export type StoreValidationPhase = "initialize" | "createRecord" | "updateRecord" | "tests"
@@ -126,8 +128,8 @@ export class StoreSchema<R extends UnknownRecord, Props = unknown> {
     }
   }
 
-  /** The current version of every sequence. */
-  serialize(): SerializedSchema {
+  /** The current version of every sequence. Always the v2 shape — mocanvas never writes v1. */
+  serialize(): SerializedSchemaV2 {
     const sequences: Record<string, number> = {}
     for (const sequence of Object.values(this.migrations)) {
       sequences[sequence.sequenceId] = sequence.sequence.length
@@ -136,7 +138,7 @@ export class StoreSchema<R extends UnknownRecord, Props = unknown> {
   }
 
   /** A schema at version 0 of every sequence (all migrations still pending). */
-  serializeEarliestVersion(): SerializedSchema {
+  serializeEarliestVersion(): SerializedSchemaV2 {
     const sequences: Record<string, number> = {}
     for (const sequence of Object.values(this.migrations)) sequences[sequence.sequenceId] = 0
     return { schemaVersion: 2, sequences }
@@ -148,14 +150,29 @@ export class StoreSchema<R extends UnknownRecord, Props = unknown> {
    * do not are ignored with a warning.
    */
   getMigrationsSince(persistedSchema: SerializedSchema): MigrationResult<Migration[]> {
+    // A pre-sequence schema records one version number per record type and
+    // says nothing about which of today's sequences have run. There is no
+    // sound mapping from that to sequence versions, and guessing would
+    // re-apply migrations that had already been applied — so this is refused
+    // rather than migrated. `SerializedSchemaV1` exists so such a file can be
+    // *recognised* and reported, not silently corrupted.
+    if (isSerializedSchemaV1(persistedSchema)) {
+      return {
+        type: "error",
+        reason:
+          "Schema version 1 (per-record-type versions) predates migration sequences and cannot be migrated automatically",
+      }
+    }
     if (persistedSchema.schemaVersion !== 2) {
       return {
         type: "error",
         reason: `Unsupported schema version ${String((persistedSchema as { schemaVersion: unknown }).schemaVersion)}`,
       }
     }
-    const persisted = persistedSchema.sequences ?? {}
+    return this.migrationsSince(persistedSchema.sequences ?? {})
+  }
 
+  private migrationsSince(persisted: { [sequenceId: string]: number }): MigrationResult<Migration[]> {
     for (const sequenceId of Object.keys(persisted)) {
       if (!this.migrations[sequenceId]) {
         console.warn(`[store] ignoring unknown migration sequence "${sequenceId}" in persisted schema`)

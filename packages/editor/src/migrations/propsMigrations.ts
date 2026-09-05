@@ -63,6 +63,25 @@ export const SHAPE_MIGRATION_SEQUENCE_PREFIX = "com.tldraw.shape"
 /** The `sequenceId` of binding type `type`'s props migrations. */
 export const BINDING_MIGRATION_SEQUENCE_PREFIX = "com.tldraw.binding"
 
+/**
+ * The prefix for migrations on shapes **this library ships**.
+ *
+ * Deliberately NOT `com.tldraw.shape`. A `.tldr` written by the reference
+ * implementation carries its own sequence for every built-in — `geo` was at
+ * version 12 when this was written — and a schema that registers the same
+ * sequence id is claiming to be that migration line. Registering ours at
+ * version 1 made every real file fail to load with "data comes from a newer
+ * version"; leaving the id unclaimed makes the file's sequence unknown, which
+ * is ignored with a warning and the props load as written.
+ *
+ * An app's own custom shape types keep {@link SHAPE_MIGRATION_SEQUENCE_PREFIX}:
+ * nothing else claims those names, and a document records its progress under
+ * them.
+ */
+export const BUILTIN_SHAPE_MIGRATION_SEQUENCE_PREFIX = "com.mocanvas.shape"
+/** As {@link BUILTIN_SHAPE_MIGRATION_SEQUENCE_PREFIX}, for built-in bindings. */
+export const BUILTIN_BINDING_MIGRATION_SEQUENCE_PREFIX = "com.mocanvas.binding"
+
 // SEMANTICS-ASSUMED: the `com.tldraw.` prefix is deliberate and load-bearing
 // for compatibility, not a leftover. A persisted `.tldr` file records how far
 // each sequence had run under ITS id, and files written by tldraw-shaped
@@ -93,6 +112,32 @@ export function createShapePropsMigrationIds<const Type extends string, const Ve
   versions: Versions,
 ): { readonly [K in keyof Versions]: `${typeof SHAPE_MIGRATION_SEQUENCE_PREFIX}.${Type}/${Versions[K]}` } {
   return createMigrationIds(shapePropsMigrationSequenceId(shapeType) as `${typeof SHAPE_MIGRATION_SEQUENCE_PREFIX}.${Type}`, versions)
+}
+
+/**
+ * Migration ids for a shape type **this library ships**, under
+ * {@link BUILTIN_SHAPE_MIGRATION_SEQUENCE_PREFIX}. Use
+ * {@link createShapePropsMigrationIds} for an app's own shape types.
+ */
+export function createBuiltInShapePropsMigrationIds<const Type extends string, const Versions extends Record<string, number>>(
+  shapeType: Type,
+  versions: Versions,
+): { readonly [K in keyof Versions]: `${typeof BUILTIN_SHAPE_MIGRATION_SEQUENCE_PREFIX}.${Type}/${Versions[K]}` } {
+  return createMigrationIds(
+    `${BUILTIN_SHAPE_MIGRATION_SEQUENCE_PREFIX}.${shapeType}` as `${typeof BUILTIN_SHAPE_MIGRATION_SEQUENCE_PREFIX}.${Type}`,
+    versions,
+  )
+}
+
+/** As {@link createBuiltInShapePropsMigrationIds}, for a built-in binding type. */
+export function createBuiltInBindingPropsMigrationIds<const Type extends string, const Versions extends Record<string, number>>(
+  bindingType: Type,
+  versions: Versions,
+): { readonly [K in keyof Versions]: `${typeof BUILTIN_BINDING_MIGRATION_SEQUENCE_PREFIX}.${Type}/${Versions[K]}` } {
+  return createMigrationIds(
+    `${BUILTIN_BINDING_MIGRATION_SEQUENCE_PREFIX}.${bindingType}` as `${typeof BUILTIN_BINDING_MIGRATION_SEQUENCE_PREFIX}.${Type}`,
+    versions,
+  )
 }
 
 /** Migration ids for a binding type; see {@link createShapePropsMigrationIds}. */
@@ -171,8 +216,23 @@ function isPlainObject(value: unknown): value is MigratableProps {
  * validator downstream is the right place for that complaint.
  */
 export function toMigrationSequence(target: PropsMigrationTarget, migrations: PropsMigrations): MigrationSequence {
-  const sequenceId =
+  // The sequence id is whatever the migrations themselves declare. A shape this
+  // library ships uses `com.mocanvas.shape.*` so it does not claim the reference
+  // implementation's migration line — see
+  // {@link BUILTIN_SHAPE_MIGRATION_SEQUENCE_PREFIX} for why that matters — while
+  // an app's own type uses the default prefix. An empty sequence declares
+  // nothing, so it falls back to the default.
+  const fallback =
     target.typeName === "shape" ? shapePropsMigrationSequenceId(target.type) : bindingPropsMigrationSequenceId(target.type)
+  const first = migrations.sequence[0]
+  const sequenceId = first ? parseMigrationId(first.id).sequenceId : fallback
+  // Whatever the prefix, the id must still name this type, or the steps would
+  // silently run against the wrong records.
+  if (!sequenceId.endsWith(`.${target.type}`)) {
+    throw new Error(
+      `Migration sequence "${sequenceId}" does not name ${target.typeName} "${target.type}"; ids must end in ".${target.type}"`,
+    )
+  }
 
   const matches = (record: UnknownRecord): boolean =>
     record.typeName === target.typeName && (record as { type?: unknown }).type === target.type
@@ -240,6 +300,20 @@ export function createPropsMigrationSequences(options: {
       if (!isPropsMigrations(migrations)) {
         throw new Error(`${typeName} "${util.type}" has a \`migrations\` that is neither a props nor a store migration sequence`)
       }
+      // An EMPTY sequence is not registered at all.
+      //
+      // Registering one claims its id at version 0, so a document that carries
+      // the same id at a higher version then fails to load with "data comes
+      // from a newer version" — which is exactly how claiming the reference
+      // implementation's `com.tldraw.shape.geo` line broke every real `.tldr`.
+      // An empty sequence migrates nothing, so leaving the id unclaimed is
+      // otherwise identical: an unknown sequence is ignored with a warning and
+      // the props load as written.
+      //
+      // `createShapePropsMigrationSequence({ sequence: [] })` stays legal —
+      // consumers author it as the placeholder a first migration will go into,
+      // and read `sequence[0]` off the object they authored, which is untouched.
+      if (migrations.sequence.length === 0) continue
       out.push(toMigrationSequence({ typeName, type: util.type }, migrations))
     }
   }

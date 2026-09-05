@@ -8,7 +8,10 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "bench": "node scripts/bench.mjs",
-    "fixture": "node scripts/make-fixture.mjs"
+    "fixture": "node scripts/make-fixture.mjs",
+    "shape-fixtures": "node ../../node_modules/.pnpm/vite-node@*/node_modules/vite-node/vite-node.mjs scripts/dump-shape-fixtures.mts",
+    "geo-microbench": "node ../../node_modules/.pnpm/vite-node@*/node_modules/vite-node/vite-node.mjs scripts/geo-microbench.mts",
+    "snap-cost": "node ../../node_modules/.pnpm/vite-node@*/node_modules/vite-node/vite-node.mjs scripts/snap-cost.mts"
   },
   "dependencies": {
     "@mocanvas/editor": "workspace:*",

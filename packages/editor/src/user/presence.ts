@@ -13,6 +13,7 @@ import {
   type InstancePresenceId,
 } from "../records/presence"
 import type { EditorStore } from "../editor/createStore"
+import type { UserId } from "./userRecord"
 
 /**
  * The identity half of a presence record: everything the derivation cannot read
@@ -22,7 +23,8 @@ import type { EditorStore } from "../editor/createStore"
  * `{ id, name, color }` a host already has from its own session.
  */
 export interface PresenceUser {
-  id: string
+  /** A branded {@link UserId} — this is what lands on `InstancePresence.userId`. */
+  id: UserId
   name?: string
   color?: string
   meta?: JsonObject
@@ -34,7 +36,37 @@ export interface PointLike {
   y: number
 }
 
-export interface PresenceStateDerivationOptions {
+/**
+ * What one client broadcasts about itself, minus the record's own identity.
+ *
+ * The presence *record* has an `id` (this tab) and a `typeName`; neither is
+ * something a host decides, so a custom `getUserPresence` never has to produce
+ * them. Everything else — where the cursor is, what is selected, which page —
+ * is the state, and this is its type.
+ */
+export type TLPresenceStateInfo = Omit<InstancePresence, "id" | "typeName">
+
+/**
+ * Options for {@link createPresenceStateDerivation}, under the documented name.
+ *
+ * {@link getUserPresence} is the override point: replace it to broadcast
+ * something other than the default reading of the store — an agent that has a
+ * selection but no cursor, a viewer whose camera should stay private, a host
+ * that wants to attach its own `meta`. Return `null` to broadcast nothing at
+ * all this tick, which is how a client goes quiet without disconnecting.
+ */
+export interface CreatePresenceStateDerivationOpts {
+  /**
+   * The id to publish under. Defaults to a fresh one per derivation, which is
+   * the right thing: presence is per *instance*, so a second tab belonging to
+   * the same person is a second cursor.
+   */
+  instanceId?: InstancePresenceId
+  /** Override how presence state is read out of the store. */
+  getUserPresence?(store: EditorStore, user: PresenceUser): TLPresenceStateInfo | null
+}
+
+export interface PresenceStateDerivationOptions extends CreatePresenceStateDerivationOpts {
   /**
    * The id to publish under. Defaults to a fresh one per derivation, which is
    * the right thing: presence is per *instance*, so a second tab belonging to
@@ -75,10 +107,16 @@ export function createPresenceStateDerivation<U extends PresenceUser>(
 ): (store: EditorStore) => Signal<InstancePresence | null> {
   const now = options.now ?? (() => Date.now())
   return (store: EditorStore) => {
-    const id = options.id ?? InstancePresenceRecordType.createId()
+    const id = options.id ?? options.instanceId ?? InstancePresenceRecordType.createId()
     return computed<InstancePresence | null>(`presence:${id}`, () => {
       const user = $user.get()
       if (!user) return null
+
+      if (options.getUserPresence) {
+        const state = options.getUserPresence(store, user)
+        return state === null ? null : InstancePresenceRecordType.create({ id, ...state })
+      }
+
       const instance = store.get(INSTANCE_ID)
       if (!instance) return null
 
@@ -145,4 +183,42 @@ export function trackPointer(source: PointerSource): { pointer: Signal<PointLike
     $pointer.set(last)
   })
   return { pointer: $pointer, stop }
+}
+
+/**
+ * Read this client's presence state out of the store: the default
+ * {@link CreatePresenceStateDerivationOpts.getUserPresence}.
+ *
+ * Exported so a host that only wants to *adjust* the default — blank the
+ * cursor, add some `meta` — can call it and edit the result, rather than
+ * reimplementing the store reads and drifting out of step with them.
+ *
+ * Returns `null` before the store has an `instance` record, i.e. before the
+ * editor has finished starting up: there is nothing meaningful to broadcast
+ * about a client that is not looking at anything yet.
+ */
+export function getDefaultUserPresence(store: EditorStore, user: PresenceUser): TLPresenceStateInfo | null {
+  const instance = store.get(INSTANCE_ID)
+  if (!instance) return null
+
+  const pageId: PageId = instance.currentPageId
+  const suffix = pageId.slice("page:".length)
+  const camera = store.get(CameraRecordType.createId(suffix))
+  const pageState = store.get(InstancePageStateRecordType.createId(suffix))
+
+  return {
+    userId: user.id,
+    userName: user.name ?? "",
+    color: user.color || PRESENCE_COLORS[0],
+    currentPageId: pageId,
+    cursor: { x: 0, y: 0, type: instance.cursor.type, rotation: instance.cursor.rotation },
+    camera: camera ? { x: camera.x, y: camera.y, z: camera.z } : { x: 0, y: 0, z: 1 },
+    selectedShapeIds: pageState ? [...pageState.selectedShapeIds] : [],
+    brush: instance.brush ? { ...instance.brush } : null,
+    scribbles: instance.scribbles.map((scribble) => ({ ...scribble, points: [...scribble.points] })),
+    followingUserId: instance.followingUserId,
+    lastActivityTimestamp: Date.now(),
+    chatMessage: "",
+    meta: user.meta ?? {},
+  }
 }

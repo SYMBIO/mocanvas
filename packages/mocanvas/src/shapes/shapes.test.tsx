@@ -16,6 +16,7 @@ import {
   type UnknownShape,
 } from "@mocanvas/editor"
 import type { IndexKey } from "@mocanvas/store"
+import { toRichText } from "../text/rich-text"
 import {
   ArrowShapeUtil,
   DrawShapeUtil,
@@ -122,14 +123,15 @@ function expectWellFormedStyle(style: { fill: number; stroke: number; strokeWidt
 }
 
 describe("defaultShapeUtils", () => {
-  it("registers twelve distinct types with the required members", () => {
-    expect(defaultShapeUtils).toHaveLength(12)
+  it("registers thirteen distinct types with the required members", () => {
+    expect(defaultShapeUtils).toHaveLength(13)
     const types = defaultShapeUtils.map((U) => U.type)
-    expect(new Set(types).size).toBe(12)
+    expect(new Set(types).size).toBe(13)
     expect(types).toEqual([
       "group",
       "geo",
       "draw",
+      "highlight",
       "line",
       "arrow",
       "text",
@@ -198,6 +200,10 @@ describe("GeoShapeUtil", () => {
       fill: "none",
       dash: "draw",
       size: "m",
+      // Both spellings of an empty label: the document the store keeps, and its
+      // flattened form. `toRichText("")` is one empty paragraph, not an empty
+      // document — see `readRichText`.
+      richText: toRichText(""),
       font: "draw",
       align: "middle",
       verticalAlign: "middle",
@@ -205,6 +211,8 @@ describe("GeoShapeUtil", () => {
       url: "",
       text: "",
       scale: 1,
+      flipX: false,
+      flipY: false,
     })
   })
 

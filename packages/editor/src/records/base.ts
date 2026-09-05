@@ -1,6 +1,7 @@
 import type { IndexKey, RecordId } from "@mocanvas/store"
 import { createRecordType } from "@mocanvas/store"
-import type { ShapePropsForType } from "./props"
+import type { RegisteredShapeType, ShapePropsForType } from "./props"
+import type { UserId } from "../user/userRecord"
 
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
@@ -14,6 +15,10 @@ export interface Document {
   meta: JsonObject
 }
 export type DocumentId = RecordId<Document>
+/** Whether `record` is the document record. Narrows to {@link Document}. */
+export function isDocument(record: { typeName?: string } | null | undefined): record is Document {
+  return record?.typeName === "document"
+}
 export const DocumentRecordType = createRecordType<Document>("document", { scope: "document" }).withDefaultProperties(
   () => ({ gridSize: 10, name: "", meta: {} }),
 )
@@ -30,6 +35,11 @@ export type PageId = RecordId<Page>
 export const PageRecordType = createRecordType<Page>("page", { scope: "document" }).withDefaultProperties(() => ({
   meta: {},
 }))
+/** Whether `record` is a page record. Narrows to {@link Page}. */
+export function isPage(record: { typeName?: string } | null | undefined): record is Page {
+  return record?.typeName === "page"
+}
+
 export function isPageId(id: string): id is PageId {
   return id.startsWith("page:")
 }
@@ -54,7 +64,8 @@ export interface Instance {
   readonly id: InstanceId
   readonly typeName: "instance"
   currentPageId: PageId
-  followingUserId: string | null
+  /** The person whose camera we are mirroring, or `null`. See `Editor.startFollowingUser`. */
+  followingUserId: UserId | null
   isFocusMode: boolean
   isDebugMode: boolean
   isToolLocked: boolean
@@ -169,7 +180,25 @@ export type UnknownShape = BaseShape<string, object>
  * shape registered in `TLGlobalShapePropsMap`, while a bare `Shape` (or a type
  * nobody registered) keeps the open `object` props it always had.
  */
-export type Shape<Type extends string = string> = BaseShape<Type, ShapePropsForType<Type>>
+/**
+ * One shape record, with its props resolved from {@link TLGlobalShapePropsMap}.
+ *
+ * With no argument this is the union of every REGISTERED shape type, and the
+ * conditional distributes over that union — so `Shape` is discriminated and
+ * `shape.type === "note"` narrows `shape.props` to the note's props.
+ *
+ * Registered types only, deliberately: an open `string` member would be
+ * assignable from every literal and would survive the narrowing, defeating the
+ * whole point. For a shape whose type is not known statically, use
+ * {@link UnknownShape}. Until something registers a type — `@mocanvas/editor`
+ * on its own ships no shapes — this falls back to `UnknownShape` so the
+ * package is usable alone.
+ */
+export type Shape<Type extends string = RegisteredShapeType> = [RegisteredShapeType] extends [never]
+  ? UnknownShape
+  : Type extends string
+    ? BaseShape<Type, ShapePropsForType<Type>>
+    : never
 export type ShapeId = RecordId<UnknownShape>
 export type ParentId = PageId | ShapeId
 

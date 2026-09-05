@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import type { Editor } from "../editor/Editor"
-import type { ClickEventInfo, PointerEventInfo, PointerTarget, WheelEventInfo } from "../editor/events"
+import type { PointerEventInfo, PointerTarget, WheelEventInfo } from "../editor/events"
 import { hitTestSelectionBounds, hitTestSelectionHandles, HANDLE_HIT_RADIUS } from "../editor/selectionHandles"
 
 import { Vec } from "../geometry"
@@ -22,9 +22,16 @@ function localPoint(editor: Editor, e: { clientX: number; clientY: number }): { 
   return { x: e.clientX - rect.left, y: e.clientY - rect.top, z: 0.5 }
 }
 
-/** Resolve what is under the pointer for the event target. */
+/**
+ * Resolve what is under the pointer for the event target.
+ *
+ * `point` is container-relative (see {@link localPoint}), so it converts with
+ * `viewportToPage`. `screenToPage` would additionally subtract the container's
+ * position on the page — subtracting it twice, and putting every hit test off
+ * by the container's offset on any page where the canvas is not at 0,0.
+ */
 function resolveTarget(editor: Editor, point: { x: number; y: number }): PointerTarget {
-  const page = editor.screenToPage(point)
+  const page = editor.viewportToPage(point)
   if (editor.getCurrentToolId() === "select") {
     const selHandle = hitTestSelectionHandles(editor, point)
     if (selHandle) return { target: "selection", handle: selHandle }
@@ -64,9 +71,6 @@ function resolveTarget(editor: Editor, point: { x: number; y: number }): Pointer
 /** DOM handlers that translate browser events into editor events. */
 export function useCanvasEvents(editor: Editor) {
   return useMemo(() => {
-    let lastDownTime = 0
-    let clickCount = 0
-    let lastDownPoint = { x: 0, y: 0 }
 
     const pointerInfo = (e: PointerEvent | React.PointerEvent, name: PointerEventInfo["name"]): PointerEventInfo => {
       const point = localPoint(editor, e)
@@ -82,8 +86,20 @@ export function useCanvasEvents(editor: Editor) {
       }
     }
 
+    /**
+     * Whether a shape's own DOM already dealt with this event.
+     *
+     * A shape body that handles its own pointer (a text caret, an embedded
+     * iframe, a card's button) calls `editor.markEventAsHandled(e)`; the mark
+     * is advisory, and this is the check that honours it. Without it the mark
+     * did nothing and the canvas would start a selection or a drag underneath
+     * an interaction the shape had already consumed.
+     */
+    const isHandled = (e: { nativeEvent?: unknown } | Event) => editor.isEventHandled(e)
+
     return {
       onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+        if (isHandled(e)) return
         if (e.button === 2) {
           editor.dispatch(pointerInfo(e, "right_click"))
           return
@@ -93,15 +109,16 @@ export function useCanvasEvents(editor: Editor) {
         }
         ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
         editor.getContainer().focus({ preventScroll: true })
-        const now = performance.now()
-        const p = localPoint(editor, e)
-        if (now - lastDownTime < 400 && Math.hypot(p.x - lastDownPoint.x, p.y - lastDownPoint.y) < 8) clickCount++
-        else clickCount = 1
-        lastDownTime = now
-        lastDownPoint = p
-        editor.dispatch(pointerInfo(e, "pointer_down"))
+        const down = pointerInfo(e, "pointer_down")
+        // Double-click detection lives in `editor.click`, not here. This used
+        // to keep its own timer and distance test, which made
+        // `editor.click.cancelDoubleClick()` — a public method — silently do
+        // nothing, because it cancelled a gesture no one was tracking.
+        editor.click.handlePointerEvent(down)
+        editor.dispatch(down)
       },
       onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+        if (isHandled(e)) return
         if (e.pointerType === "mouse" && e.buttons === 0 && editor.inputs.isPointing) {
           // Missed a pointer up (e.g. released outside the window).
           editor.dispatch(pointerInfo(e, "pointer_up"))
@@ -110,31 +127,23 @@ export function useCanvasEvents(editor: Editor) {
         editor.dispatch(pointerInfo(e, "pointer_move"))
       },
       onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+        if (isHandled(e)) return
         if (e.button === 2) return
         const el = e.currentTarget as HTMLElement
         if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
-        editor.dispatch(pointerInfo(e, "pointer_up"))
-        if (clickCount >= 2) {
-          const name: ClickEventInfo["name"] = clickCount === 2 ? "double_click" : clickCount === 3 ? "triple_click" : "quadruple_click"
-          const point = localPoint(editor, e)
-          editor.dispatch({
-            type: "click",
-            name,
-            phase: "up",
-            point,
-            pointerId: e.pointerId,
-            button: e.button,
-            isPen: e.pointerType === "pen",
-            ...modifiers(e),
-            ...resolveTarget(editor, point),
-          })
-        }
+        const up = pointerInfo(e, "pointer_up")
+        editor.dispatch(up)
+        // The manager dispatches the click itself, in all three phases
+        // (`down`, `up`, `settle`) — a handler decides which it cares about.
+        editor.click.handlePointerEvent(up)
       },
       onPointerCancel(e: React.PointerEvent<HTMLDivElement>) {
+        if (isHandled(e)) return
         editor.dispatch(pointerInfo(e, "pointer_up"))
         editor.cancel()
       },
       onWheel(e: WheelEvent) {
+        if (isHandled(e)) return
         e.preventDefault()
         const point = localPoint(editor, e)
         const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1
@@ -151,11 +160,11 @@ export function useCanvasEvents(editor: Editor) {
         e.preventDefault()
       },
       onKeyDown(e: KeyboardEvent) {
-        if (isEditableTarget(e.target)) return
+        if (isHandled(e) || isEditableTarget(e.target)) return
         editor.dispatch({ type: "keyboard", name: e.repeat ? "key_repeat" : "key_down", key: e.key, code: e.code, ...modifiers(e) })
       },
       onKeyUp(e: KeyboardEvent) {
-        if (isEditableTarget(e.target)) return
+        if (isHandled(e) || isEditableTarget(e.target)) return
         editor.dispatch({ type: "keyboard", name: "key_up", key: e.key, code: e.code, ...modifiers(e) })
       },
     }

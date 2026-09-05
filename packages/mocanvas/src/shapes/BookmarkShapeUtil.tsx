@@ -1,15 +1,21 @@
 import {
   BaseBoxShapeUtil,
   Rectangle2d,
+  createShapeId,
   type AssetId,
   type BaseShape,
   type BookmarkAsset,
   type Editor,
   type Geometry2d,
+  type ShapeUtilOptions,
   type StyleWords,
+  type TLDefaultDisplayValues,
+  type VecLike,
 } from "@mocanvas/editor"
 import type { CSSProperties, ReactNode } from "react"
 import { propsOf, readNumber, readString } from "./prop-access"
+import { bookmarkShapeProps } from "./shape-props"
+import { bookmarkShapeMigrations } from "./shape-migrations"
 import { rectPath } from "./indicator-paths"
 
 export interface BookmarkShapeProps {
@@ -158,8 +164,58 @@ function readBookmarkBox(shape: { props?: unknown }): { w: number; h: number } {
 
 const ELLIPSIS: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis" }
 
+/**
+ * What a bookmark card paints with.
+ *
+ * A type alias rather than an interface with members of its own: a bookmark's
+ * card is chrome, not a styled shape — its colours are the card's, fixed by
+ * {@link BOOKMARK_FILL} and friends rather than resolved from the palette — so
+ * there is nothing beyond the shared set for it to add.
+ */
+export type BookmarkShapeUtilDisplayValues = TLDefaultDisplayValues
+
+/** `BookmarkShapeUtil`'s settings; see {@link ShapeUtil.configure}. */
+export interface BookmarkShapeOptions extends ShapeUtilOptions<BookmarkShape, BookmarkShapeUtilDisplayValues> {
+  /** The width a new card is created at, in page units. */
+  cardWidth?: number
+  /** The height a new card is created at, in page units. */
+  cardHeight?: number
+}
+
+/**
+ * Create a bookmark card for `url` with no asset behind it yet.
+ *
+ * The card is a valid card without one — it renders the host and the url and
+ * nothing else — so this is the half of "paste a link" that does not need a
+ * network round trip, and the half that is safe to do optimistically while an
+ * unfurl is still in flight. Attaching the preview afterwards is a matter of
+ * setting `props.assetId`.
+ *
+ * `point` is the card's *centre* in page space, defaulting to the middle of the
+ * viewport, which is where a paste with no pointer position belongs.
+ */
+export function createEmptyBookmarkShape(editor: Editor, url: string, point?: VecLike): BookmarkShape {
+  const centre = point ?? editor.getViewportPageBounds().center
+  const id = createShapeId()
+  editor.run(() => {
+    editor.markHistoryStoppingPoint("insert bookmark")
+    editor.createShape<BookmarkShape>({
+      id,
+      type: "bookmark",
+      x: centre.x - BOOKMARK_WIDTH / 2,
+      y: centre.y - BOOKMARK_HEIGHT / 2,
+      props: { w: BOOKMARK_WIDTH, h: BOOKMARK_HEIGHT, url, assetId: null },
+    })
+    editor.setSelectedShapes([id])
+  })
+  return editor.getShape<BookmarkShape>(id)!
+}
+
 export class BookmarkShapeUtil extends BaseBoxShapeUtil<BookmarkShape> {
   static override type = "bookmark" as const
+  static override props = bookmarkShapeProps
+  static override migrations = bookmarkShapeMigrations
+  declare readonly options: BookmarkShapeOptions
 
   getDefaultProps(): BookmarkShapeProps {
     return { w: BOOKMARK_WIDTH, h: BOOKMARK_HEIGHT, assetId: null, url: "" }

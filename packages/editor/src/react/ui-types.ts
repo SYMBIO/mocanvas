@@ -1,5 +1,6 @@
-import type { ComponentType } from "react"
+import type { ComponentType, ReactNode } from "react"
 import type { Editor } from "../editor/Editor"
+import type { ShapeId } from "../records/base"
 
 /**
  * The UI override surface: the types an app uses to replace mocanvas's chrome
@@ -51,8 +52,17 @@ export interface TLComponents {
   Canvas?: TLUiComponentSlot
   /** Behind the canvas: the page's backdrop plate. */
   Background?: TLUiComponentSlot
-  /** Behind the shapes, in page space: a grid, a guide layer. */
-  Grid?: TLUiComponentSlot
+  /**
+   * Behind the shapes, in page space: a grid, a guide layer.
+   *
+   * Rendered only while the editor is in grid mode
+   * (`instanceState.isGridMode`), and given the camera plus the document's
+   * grid step — see {@link TLGridProps}. It gets the camera as props rather
+   * than reading it itself because it is redrawn on every pan and zoom, and a
+   * slot that subscribed to the camera on its own would be a second
+   * subscription doing the same work.
+   */
+  Grid?: TLUiComponentSlot<TLGridProps>
   /** Behind the shapes, in page space, above the grid. */
   OnTheCanvas?: TLUiComponentSlot
   /** Above the shapes, in container space: pins, badges, floating bars. */
@@ -93,10 +103,109 @@ export interface TLComponents {
   LoadingScreen?: TLUiComponentSlot
   /** The tooltip layer. */
   Tooltip?: TLUiComponentSlot
+
+  // ---- rendering slots -----------------------------------------------------
+  // Filled by the canvas rather than by the chrome, but declared here so an
+  // app configures the whole editor through one map instead of two.
+
+  /** Another person's pointer, drawn in the editor. */
+  CollaboratorCursor?: TLUiComponentSlot<TLCursorSlotProps>
+  /** The element a shape's DOM body is rendered into. */
+  ShapeWrapper?: TLUiComponentSlot<TLShapeWrapperSlotProps>
+  /** Rendered in place of the whole editor once it has thrown. */
+  ErrorFallback?: TLUiComponentSlot<TLErrorSlotProps>
+  /** Rendered in place of one shape whose body has thrown. */
+  ShapeErrorFallback?: TLUiComponentSlot<TLErrorSlotProps>
+  /** The indeterminate progress mark. */
+  Spinner?: TLUiComponentSlot
+  /** The document-level `<defs>` a shape can put a shared gradient in. */
+  SvgDefs?: TLUiComponentSlot
+
+  // ---- chrome ---------------------------------------------------------------
+
+  /** The live region the canvas announces selection changes through. */
+  A11y?: TLUiComponentSlot
+  /** The top-left menu. */
+  MainMenu?: TLUiComponentSlot
+  /** The help menu. */
+  HelpMenu?: TLUiComponentSlot
+  /** The debug menu. Shown only in debug mode. */
+  DebugMenu?: TLUiComponentSlot
+  /** The minimap inside the navigation panel. */
+  Minimap?: TLUiComponentSlot
+  /** The formatting bar over a text shape being edited. */
+  RichTextToolbar?: TLUiComponentSlot
+  /** The toast stack. */
+  Toasts?: TLUiComponentSlot
+  /** The dialog stack. */
+  Dialogs?: TLUiComponentSlot
+  /** The collaborator list. */
+  PeopleMenu?: TLUiComponentSlot
+  /** One collaborator's avatar. */
+  PeopleMenuAvatar?: TLUiComponentSlot
+  /** The stacked avatars on the people menu's trigger. */
+  PeopleMenuFacePile?: TLUiComponentSlot
+  /** One row in the collaborator list. */
+  PeopleMenuItem?: TLUiComponentSlot
+  /** The local person's name and colour editor. */
+  UserPresenceEditor?: TLUiComponentSlot
+  /** The banner shown while following another person's camera. */
+  FollowingIndicator?: TLUiComponentSlot
+  /** The chat bubble on the local cursor. */
+  CursorChatBubble?: TLUiComponentSlot
 }
 
-/** The chrome map after mocanvas's defaults have been merged in. */
-export type TLComponentsResolved = { [K in keyof TLComponents]-?: ComponentType | null }
+/** What a {@link TLComponents.CollaboratorCursor} slot is rendered with. */
+export interface TLCursorSlotProps {
+  /** The cursor kind, as `editor.getCursor()` reports it. */
+  type: string
+  /** Rotation in radians — a resize cursor follows the shape it will resize. */
+  rotation: number
+  /** The collaborator's colour. */
+  color?: string
+  /** The collaborator's name, drawn beside the arrow. */
+  name?: string | null
+  /** Screen-space position. */
+  point?: { x: number; y: number } | null
+}
+
+/** What a {@link TLComponents.ShapeWrapper} slot is rendered with. */
+export interface TLShapeWrapperSlotProps {
+  shape: { id: ShapeId; type: string }
+  children?: ReactNode
+}
+
+/** What an error-fallback slot is rendered with. */
+export interface TLErrorSlotProps {
+  /** What was thrown. Not necessarily an `Error`. */
+  error: unknown
+  /** Re-mount the subtree. Undefined when the boundary was told not to retry. */
+  resetError?(): void
+}
+
+/**
+ * What the `Grid` slot is rendered with.
+ *
+ * `x`/`y` are the camera's page offset and `z` its zoom — the same numbers
+ * `editor.getCamera()` carries — so a screen-space position is
+ * `(page + {x, y}) * z`. `size` is the document's grid step, in page units.
+ */
+export interface TLGridProps {
+  x: number
+  y: number
+  z: number
+  size: number
+}
+
+/**
+ * The chrome map after mocanvas's defaults have been merged in: every slot
+ * present, `null` where it was removed.
+ *
+ * Each slot keeps the props of its own declaration, so `useEditorComponents()`
+ * hands back a `Grid` that still wants a camera and a `Canvas` that wants
+ * nothing.
+ */
+export type TLComponentsResolved = { [K in keyof TLComponents]-?: NonNullable<TLComponents[K]> | null }
 
 // ---------------------------------------------------------------------------
 // Tools
@@ -184,9 +293,10 @@ export type TLUiActionsContextType = Record<string, TLUiActionItem>
  */
 export interface TLUiOverrideHelpers {
   /**
-   * Resolve a UI string id to its display text. An id mocanvas does not know
-   * passes through unchanged, so a localized literal is always safe to use as
-   * a label.
+   * Resolve a UI string id to its display text, through
+   * {@link TLUiOverrides.translations} for the editor's current locale. An id
+   * with no entry passes through unchanged, so a localized literal is always
+   * safe to use as a label.
    */
   msg(id: string): string
   /**
@@ -214,4 +324,23 @@ export interface TLUiOverrides {
   tools?(editor: Editor, tools: TLUiToolsContextType, helpers: TLUiOverrideHelpers): TLUiToolsContextType
   /** Rewrite the action list. */
   actions?(editor: Editor, actions: TLUiActionsContextType, helpers: TLUiOverrideHelpers): TLUiActionsContextType
+  /**
+   * Extra UI strings, keyed by locale and then by string id. What
+   * {@link TLUiOverrideHelpers.msg} resolves against.
+   *
+   * ```ts
+   * translations: { en: { "tool.comment": "Comment" }, cs: { "tool.comment": "Komentář" } }
+   * ```
+   *
+   * mocanvas ships no strings of its own — an item's `label` is already
+   * display text — so this map is purely additive: it exists so an app whose
+   * own chrome asks `msg(id)` gets one dictionary rather than two.
+   */
+  translations?: TLUiTranslations
 }
+
+/**
+ * UI strings by locale, then by string id. A locale is whatever
+ * `editor.user.getLocale()` returns, so the keys are the app's own locale tags.
+ */
+export type TLUiTranslations = Record<string, Record<string, string>>

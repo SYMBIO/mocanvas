@@ -13,6 +13,7 @@ import {
 } from "../records/base"
 import type { InstancePresence, InstancePresenceId } from "../records/presence"
 import { createPresenceStateDerivation, trackPointer, type PointerSource, type PresenceUser } from "./presence"
+import { createUserId } from "./userRecord"
 
 const PAGE_ID = PageRecordType.createId("p1")
 const OTHER_PAGE_ID = PageRecordType.createId("p2")
@@ -41,7 +42,7 @@ function setSelection(store: EditorStore, ids: ShapeId[], page = "p1"): void {
   store.update(id, (state) => ({ ...state, selectedShapeIds: ids }))
 }
 
-const user: PresenceUser = { id: "user:ada", name: "Ada", color: "#ff0000" }
+const user: PresenceUser = { id: createUserId("ada"), name: "Ada", color: "#ff0000" }
 
 function derive(
   store: EditorStore,
@@ -141,7 +142,7 @@ describe("createPresenceStateDerivation", () => {
       ...instance,
       brush: { x: 0, y: 0, w: 10, h: 10 },
       cursor: { type: "grabbing", rotation: 0.5 },
-      followingUserId: "user:grace",
+      followingUserId: createUserId("grace"),
     }))
 
     expect($presence.get()?.brush).toEqual({ x: 0, y: 0, w: 10, h: 10 })
@@ -155,7 +156,7 @@ describe("createPresenceStateDerivation", () => {
     const $presence = derive(store, $user)
     expect($presence.get()?.userName).toBe("Ada")
 
-    $user.set({ id: "user:ada", name: "Ada Lovelace", color: "#00ff00" })
+    $user.set({ id: createUserId("ada"), name: "Ada Lovelace", color: "#00ff00" })
 
     expect($presence.get()?.userName).toBe("Ada Lovelace")
     expect($presence.get()?.color).toBe("#00ff00")

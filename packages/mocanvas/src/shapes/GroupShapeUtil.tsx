@@ -1,14 +1,27 @@
 import { Rectangle2d, ShapeUtil, type BaseShape, type Geometry2d, type StyleWords, type TLIndicatorPath } from "@mocanvas/editor"
 import { boxPath } from "./indicator-paths"
+import { groupShapeProps } from "./shape-props"
+import { groupShapeMigrations } from "./shape-migrations"
 
 /** Dash pattern of a group's outline, in screen px: 4 on, 4 off. */
 const GROUP_INDICATOR_DASH = [4, 4] as const
 
-export type GroupShape = BaseShape<"group", Record<string, never>>
+/**
+ * A group's props: none. Named so an app can spell the empty bag the same way
+ * the other shapes' props are spelled.
+ */
+export type GroupShapeProps = Record<string, never>
+
+/** The `@tldraw/tlschema` spelling of {@link GroupShapeProps}. */
+export type TLGroupShapeProps = GroupShapeProps
+
+export type GroupShape = BaseShape<"group", GroupShapeProps>
 
 /** A container with no visuals of its own; its bounds are the union of its children. */
 export class GroupShapeUtil extends ShapeUtil<GroupShape> {
   static override type = "group" as const
+  static override props = groupShapeProps
+  static override migrations = groupShapeMigrations
 
   getDefaultProps(): GroupShape["props"] {
     return {}
