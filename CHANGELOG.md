@@ -1,5 +1,66 @@
 # Changelog
 
+## 3.0.0
+
+A rendering release. Three things were visibly wrong on the canvas — each one
+found by putting mocanvas and tldraw side by side in `apps/bench` — and fixing
+the third needed a change to how the engine composites a translucent shape. The
+breaking surface is small and confined to the highlighter's configuration and to
+one internal buffer that `@mocanvas/wasm` describes.
+
+### Breaking
+
+- **`HIGHLIGHT_STROKE_SCALE` is gone**, replaced by `HIGHLIGHT_STROKE_SIZES`: a
+  width per `size` rather than one multiple of `STROKE_SIZES`. No single
+  multiplier can reproduce the widths tldraw draws — the ratio to a pen of the
+  same size falls from about 10x at `s` to 4.9x at `xl` — so the model had to
+  become a table. `HighlightShapeUtil`'s `strokeScale` option now multiplies that
+  table and defaults to `1`, where it used to default to `3.2` and multiply
+  `STROKE_SIZES`.
+- **`Batch` carries an `isolate` field and `BATCH_WORDS` is 8**, not 7. Code that
+  reads batches through `readBatch`, `readBatches` or `forEachDrawBatch` is
+  unaffected; code that builds a `Batch` literal has one more field to supply.
+
+### Fixed
+
+- **The highlighter was far too narrow and washed out.** It drew at 3.2x the pen
+  of the same size where it should draw at roughly 7.7x, and at 32% opacity where
+  it should be 82%, which turned a saturated `#fddd00` into pale cream over white
+  paper. Both numbers were guesses — the source said so — and both are now
+  measured off the rendered result.
+- **An x-box's diagonals spiked through its own outline.** The host has always
+  pulled the X's ends back by half a stroke so the round cap lands on the corner,
+  but only in the geometry it keeps for hit testing: a built-in geo is *drawn*
+  from a path the engine generates, and that copy ran corner to corner. The
+  engine is now told the stroke width, and the parity fixture captures geo paths
+  at three widths instead of only at zero, which is the check that would have
+  caught it.
+- **A translucent stroke darkened wherever it crossed itself.** Shape opacity is
+  baked into vertex alpha, so an overlapping ribbon blended twice; every other
+  renderer treats it as a group — rasterize the mark, then make it see-through.
+  A single-colour translucent shape now gets an isolation group and the WebGL2
+  backend covers each of its pixels once, via the stencil buffer. A shape with a
+  fill under its stroke is a group of two and keeps the per-triangle blend.
+
+### Changed
+
+- `Editor.updateViewportScreenBounds` accepts an `HTMLElement` as well as a box,
+  which is both what a host has to hand and what tldraw accepts.
+- `SET_GEO` carries a stroke width (7 words, was 6) and the frame's batch records
+  carry an isolation group (8 words, was 7). Both are documented in
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+### Also in this release
+
+Work from earlier sessions that had not been released yet: the hand-drawn outline
+generator reworked around anchors and a wobble field, tessellation tolerance made
+zoom-aware (a fixed *screen*-pixel error at every magnification, with a separate
+coarser tolerance for sketched outlines), fills restricted to a path's closed
+subpaths, selection indicators that follow the sketched outline rather than the
+true one, arrow indicator and selection-frame fixes, rich-text label editing on a
+TipTap surface behind a replaceable seam, and a gallery page in `apps/bench` that
+renders every element through both libraries for comparison.
+
 ## 2.0.0
 
 The API model moved from tldraw 3.x to **tldraw 5.4**. That is a different
