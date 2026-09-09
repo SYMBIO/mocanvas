@@ -41,23 +41,27 @@ import { highlightShapeProps } from "./shape-props"
 import { highlightShapeMigrations } from "./shape-migrations"
 
 /**
- * How much wider a highlight is drawn than a draw stroke of the same `size`.
+ * How wide a highlight is drawn, per `size`, at `scale: 1`.
  *
- * SEMANTICS-ASSUMED: the docs describe the shape as a highlighter and pin no
- * number. A physical highlighter's chisel tip is several times a pen's, and a
- * stroke that does not comfortably cover a line of text is not a highlighter,
- * so the multiple is chosen to make the smallest size cover the smallest label.
+ * MEASURED, replacing a guess: these are tldraw 5.4's painted stroke widths,
+ * read off the rendered element in `apps/bench` at each of the four sizes.
+ *
+ * A table rather than a multiple of `STROKE_SIZES`, because the two do not run
+ * in step — the ratio falls from ~10x at `s` to ~4.9x at `xl`, so no single
+ * multiplier reproduces them. The previous 3.2x of `STROKE_SIZES` came out
+ * between 1.5x and 3.2x too narrow depending on the size.
  */
-export const HIGHLIGHT_STROKE_SCALE = 3.2
+export const HIGHLIGHT_STROKE_SIZES: typeof STROKE_SIZES = { s: 20.16, m: 26.88, l: 40.32, xl: 49.28 }
 
 /**
  * How see-through a highlight is.
  *
- * SEMANTICS-ASSUMED: not pinned by the docs. Low enough that text under it
- * stays readable, high enough that the mark is unmistakable over the paper
- * colour; overlapping strokes therefore darken, the way real ink does.
+ * MEASURED, replacing a guess: tldraw paints the highlight at this opacity over
+ * the palette's highlight ink, which is the same token mocanvas already carries.
+ * The old 0.32 washed a saturated `#fddd00` out to a pale cream over white
+ * paper — the mark read as a smudge rather than as a highlighter.
  */
-export const HIGHLIGHT_OPACITY = 0.32
+export const HIGHLIGHT_OPACITY = 0.82
 
 export interface HighlightShapeProps {
   /** The recorded pen movement, in the same encoding a draw shape uses. */
@@ -99,7 +103,7 @@ export interface HighlightShapeUtilDisplayValues extends TLDefaultDisplayValues 
 
 /** `HighlightShapeUtil`'s settings; see {@link ShapeUtil.configure}. */
 export interface HighlightShapeOptions extends ShapeUtilOptions<HighlightShape, HighlightShapeUtilDisplayValues> {
-  /** How much wider than a draw stroke a highlight is; see {@link HIGHLIGHT_STROKE_SCALE}. */
+  /** A multiplier on {@link HIGHLIGHT_STROKE_SIZES}; `1` draws the standard width. */
   strokeScale?: number
   /** How see-through a highlight is, `0..1`; see {@link HIGHLIGHT_OPACITY}. */
   opacity?: number
@@ -121,7 +125,7 @@ export function getHighlightDisplayValues(
   return {
     ...base,
     highlightColor: getColorValue(colors, readStyle(p, "color", DefaultColorStyle), "highlightSrgb"),
-    highlightStrokeWidth: STROKE_SIZES[size] * (options.strokeScale ?? HIGHLIGHT_STROKE_SCALE) * scale,
+    highlightStrokeWidth: HIGHLIGHT_STROKE_SIZES[size] * (options.strokeScale ?? 1) * scale,
     highlightOpacity: options.opacity ?? HIGHLIGHT_OPACITY,
   }
 }
@@ -201,7 +205,7 @@ export class HighlightShapeUtil extends ShapeUtil<HighlightShape, HighlightShape
     const scale = readNumber(p, "scale", 1)
     return {
       stroke: hexToRgba(getColorValue(colors, readStyle(p, "color", DefaultColorStyle), "highlightSrgb")),
-      strokeWidth: STROKE_SIZES[size] * (this.options.strokeScale ?? HIGHLIGHT_STROKE_SCALE) * scale,
+      strokeWidth: HIGHLIGHT_STROKE_SIZES[size] * (this.options.strokeScale ?? 1) * scale,
       fill: 0,
       // Never `draw`: the points are already a recorded hand movement, and
       // running them through the hand-drawn generator a second time only adds

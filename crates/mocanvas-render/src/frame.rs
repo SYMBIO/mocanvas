@@ -6,8 +6,9 @@ use mocanvas_scene::{unpack_rgba, Scene, ShapeRef, Slot, FLAG_LABEL, FLAG_OVERLA
 
 /// Floats per vertex: `x y u v r g b a`.
 pub const VERTEX_FLOATS: usize = 8;
-/// `u32` words per batch: `first_index index_count texture clip_minx clip_miny clip_maxx clip_maxy`.
-pub const BATCH_WORDS: usize = 7;
+/// `u32` words per batch: `first_index index_count texture clip_minx clip_miny
+/// clip_maxx clip_maxy isolate`.
+pub const BATCH_WORDS: usize = 8;
 /// `u32` words per overlay entry: `handle x y w h rot clip_minx clip_miny clip_maxx clip_maxy`.
 pub const OVERLAY_WORDS: usize = 10;
 
@@ -20,8 +21,10 @@ pub struct FrameOutput {
     /// Triangle indices.
     pub indices: Vec<u32>,
     /// [`BATCH_WORDS`] words per batch: `first_index, index_count, texture, clip_minx,
-    /// clip_miny, clip_maxx, clip_maxy` (clip words are f32 bits; all four zero = no clip).
-    /// Texture 0 = solid color. A new batch starts whenever texture or clip changes.
+    /// clip_miny, clip_maxx, clip_maxy, isolate` (clip words are f32 bits; all four zero
+    /// = no clip). Texture 0 = solid color. `isolate` is 0 for an ordinary batch and
+    /// otherwise the group id described on [`Batcher`]. A new batch starts whenever the
+    /// texture, the clip rect or the group changes.
     pub batches: Vec<u32>,
     /// Overlay shapes, [`OVERLAY_WORDS`] words per entry in draw order:
     /// `handle, x, y, w, h, rot, clip_minx, clip_miny, clip_maxx, clip_maxy` (floats as
@@ -50,6 +53,9 @@ impl FrameOutput {
 struct BatchKey {
     texture: u32,
     clip: [u32; 4],
+    /// 0 for an ordinary batch; otherwise the shape's isolation group, which the
+    /// backend paints once per pixel. See [`isolation_group`].
+    isolate: u32,
 }
 
 /// Clip rect as four f32-bit words; all zero when unclipped.
@@ -87,9 +93,10 @@ impl Batcher {
     fn flush(&mut self, out: &mut FrameOutput) {
         let total = out.indices.len() as u32;
         if total > self.start {
-            let key = self.key.unwrap_or(BatchKey { texture: 0, clip: [0; 4] });
+            let key = self.key.unwrap_or(BatchKey { texture: 0, clip: [0; 4], isolate: 0 });
             out.batches.extend_from_slice(&[self.start, total - self.start, key.texture]);
             out.batches.extend_from_slice(&key.clip);
+            out.batches.push(key.isolate);
             self.start = total;
         }
     }
@@ -236,6 +243,8 @@ impl Renderer {
             self.lod_quad.resize(cap, false);
         }
         let mut tess_used = 0usize;
+        // Isolation groups are numbered from 1 within the frame; see `isolation_group`.
+        let mut isolate_next = 0u32;
         let mut deferred = 0usize;
 
         for &slot in &self.visible {
@@ -279,8 +288,12 @@ impl Renderer {
                 }
                 continue;
             }
+            // Re-tessellate when the geometry changed OR when the camera has moved
+            // into a different zoom bucket: curves are flattened to a screen-space
+            // tolerance, so a mesh built for one bucket is visibly faceted in a
+            // closer one.
             let needs = match &self.meshes[i] {
-                Some(m) => m.geom_version != sh.geom_version,
+                Some(m) => m.geom_version != sh.geom_version || m.zoom_bucket != bucket,
                 None => true,
             };
             if needs {
@@ -295,21 +308,27 @@ impl Renderer {
                     }
                     continue;
                 }
-                self.meshes[i] = Some(tessellate(sh.path, sh.style, sh.geom_version));
+                self.meshes[i] = Some(tessellate(sh.path, sh.style, sh.geom_version, bucket_zoom(bucket), bucket));
                 tess_used += 1;
             }
             let mesh = self.meshes[i].as_ref().unwrap();
             let xf = *sh.page_transform;
             let op = sh.style.opacity;
             if sh.style.has_texture() {
-                self.batcher.begin(&mut self.out, BatchKey { texture: sh.style.texture, clip: clip_bits });
+                self.batcher.begin(&mut self.out, BatchKey { texture: sh.style.texture, clip: clip_bits, isolate: 0 });
                 append_textured_quad(&mut self.out, &sh, &xf, [1.0, 1.0, 1.0, op]);
             } else if !mesh.fill.is_empty() {
-                self.batcher.begin(&mut self.out, BatchKey { texture: 0, clip: clip_bits });
+                self.batcher.begin(&mut self.out, BatchKey { texture: 0, clip: clip_bits, isolate: 0 });
                 append(&mut self.out, &mesh.fill, &xf, unpack_rgba(sh.style.fill, op));
             }
             if !mesh.stroke.is_empty() {
-                self.batcher.begin(&mut self.out, BatchKey { texture: 0, clip: clip_bits });
+                let isolate = if isolation_group(&sh, mesh) {
+                    isolate_next += 1;
+                    isolate_next
+                } else {
+                    0
+                };
+                self.batcher.begin(&mut self.out, BatchKey { texture: 0, clip: clip_bits, isolate });
                 append(&mut self.out, &mesh.stroke, &xf, unpack_rgba(sh.style.stroke, op));
             }
             self.out.drawn += 1;
@@ -354,12 +373,39 @@ fn zoom_bucket(zoom: f32) -> i32 {
     (zoom.log2() * 2.0).floor() as i32
 }
 
+/// The zoom a bucket is tessellated for: its upper end, so the mesh is fine
+/// enough everywhere inside the bucket rather than only at its coarse edge.
+fn bucket_zoom(bucket: i32) -> f32 {
+    2f32.powf((bucket + 1) as f32 / 2.0)
+}
+
+/// Whether this shape's stroke has to be painted once per pixel rather than
+/// blended per triangle.
+///
+/// Every other renderer treats a shape's opacity as a *group*: the mark is
+/// rasterized whole, then made see-through. We bake the alpha into the vertices
+/// instead, so wherever a stroke ribbon crosses itself the pixel is blended
+/// twice and the crossing comes out darker than the stroke around it. On a
+/// 3.5-unit pen nobody notices; on a highlighter, whose whole job is a wide even
+/// wash, every kink in the stroke shows as a dark knot.
+///
+/// Only a mark that is a *single* colour can be fixed this way, which is what
+/// the conditions below come to: painting each pixel once is the same as
+/// compositing the group exactly when the group has one member. A stroke over a
+/// fill is a group of two, and painting once would drop the stroke wherever it
+/// covers its own fill instead of laying it on top — so a filled shape keeps the
+/// per-triangle blend, and its overlaps stay as they were.
+#[inline]
+fn isolation_group(sh: &ShapeRef<'_>, mesh: &MeshCache) -> bool {
+    sh.style.opacity < 1.0 && mesh.fill.is_empty() && !sh.style.has_texture()
+}
+
 /// Append one flat quad over the shape's page bounds in its dominant color.
 #[inline]
 fn lod_quad_for(batcher: &mut Batcher, out: &mut FrameOutput, sh: &ShapeRef<'_>, pb: &Box2d, clip_bits: [u32; 4]) {
     let color = if sh.style.has_fill() { sh.style.fill } else { sh.style.stroke };
     let rgba = unpack_rgba(color, sh.style.opacity);
-    batcher.begin(out, BatchKey { texture: 0, clip: clip_bits });
+    batcher.begin(out, BatchKey { texture: 0, clip: clip_bits, isolate: 0 });
     append_quad(out, pb, rgba);
     out.drawn += 1;
 }
@@ -428,8 +474,13 @@ mod tests {
     }
 
     fn batch(first: u32, count: u32, texture: u32, clip: [u32; 4]) -> Vec<u32> {
+        batch_in_group(first, count, texture, clip, 0)
+    }
+
+    fn batch_in_group(first: u32, count: u32, texture: u32, clip: [u32; 4], isolate: u32) -> Vec<u32> {
         let mut v = vec![first, count, texture];
         v.extend_from_slice(&clip);
+        v.push(isolate);
         v
     }
 
@@ -490,6 +541,40 @@ mod tests {
     }
 
     #[test]
+    fn a_translucent_stroke_is_given_its_own_isolation_group() {
+        // Three stroke-only shapes: opaque, translucent, translucent. Only the two
+        // translucent ones ask to be painted once per pixel, and they ask under
+        // different group numbers so the backend keeps them apart.
+        let mut sc = Scene::new();
+        for h in 1..=3u32 {
+            sc.upsert(h, 1, 0, ZKey(h as u64), 0, h as f32 * 200.0, 50.0, 0.0, 100.0, 100.0);
+            sc.set_geometry(h, Path::rect(&Box2d::from_xywh(0.0, 0.0, 100.0, 100.0)));
+            let opacity = if h == 1 { 1.0 } else { 0.5 };
+            sc.set_style(h, Style { fill: 0, stroke: 0x000000ff, stroke_width: 4.0, opacity, ..Style::default() });
+        }
+        let mut r = Renderer::new();
+        let out = r.frame(&mut sc, &Box2d::from_xywh(0.0, 0.0, 1000.0, 1000.0), 1.0, usize::MAX);
+        assert_eq!(out.drawn, 3);
+        let groups: Vec<u32> = out.batches.chunks(BATCH_WORDS).map(|b| b[BATCH_WORDS - 1]).collect();
+        assert_eq!(groups, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn a_filled_shape_keeps_the_per_triangle_blend() {
+        // A stroke over a fill is a group of two; painting each pixel once would
+        // drop the stroke wherever it covers its own fill.
+        let mut sc = Scene::new();
+        sc.upsert(1, 1, 0, ZKey(1), 0, 0.0, 0.0, 0.0, 100.0, 100.0);
+        sc.set_geometry(1, Path::rect(&Box2d::from_xywh(0.0, 0.0, 100.0, 100.0)));
+        sc.set_style(1, Style { fill: 0xff0000ff, stroke: 0x000000ff, stroke_width: 4.0, opacity: 0.5, ..Style::default() });
+        let mut r = Renderer::new();
+        let out = r.frame(&mut sc, &Box2d::from_xywh(0.0, 0.0, 1000.0, 1000.0), 1.0, usize::MAX);
+        for b in out.batches.chunks(BATCH_WORDS) {
+            assert_eq!(b[BATCH_WORDS - 1], 0);
+        }
+    }
+
+    #[test]
     fn textured_shape_emits_uv_quad_and_splits_batches() {
         let mut sc = Scene::new();
         // solid, textured (with stroke), solid — in draw order
@@ -504,12 +589,17 @@ mod tests {
         assert_eq!(out.drawn, 3);
         // batches: solid(1) | textured quad(2) | stroke(2) + solid(3)
         assert_eq!(out.batches.len(), 3 * BATCH_WORDS);
-        assert_eq!(&out.batches[0..7], &batch(0, 6, 0, NO_CLIP)[..]);
-        assert_eq!(&out.batches[7..14], &batch(6, 6, 42, NO_CLIP)[..]);
-        assert_eq!(out.batches[14], 12);
-        assert_eq!(out.batches[16], 0);
+        assert_eq!(&out.batches[0..8], &batch(0, 6, 0, NO_CLIP)[..]);
+        assert_eq!(&out.batches[8..16], &batch(6, 6, 42, NO_CLIP)[..]);
+        assert_eq!(out.batches[16], 12);
+        assert_eq!(out.batches[18], 0);
         let total = out.indices.len() as u32;
-        assert_eq!(out.batches[14] + out.batches[15], total);
+        assert_eq!(out.batches[16] + out.batches[17], total);
+        // A textured shape is never isolated, translucent or not: the quad and the
+        // stroke are two members, so painting once would drop one of them.
+        assert_eq!(out.batches[7], 0);
+        assert_eq!(out.batches[15], 0);
+        assert_eq!(out.batches[23], 0);
         // the textured quad: 4 vertices with uv corners, white × opacity
         let quad = &out.vertices[4 * VERTEX_FLOATS..8 * VERTEX_FLOATS];
         let v = |k: usize| &quad[k * VERTEX_FLOATS..(k + 1) * VERTEX_FLOATS];
@@ -699,19 +789,25 @@ mod tests {
         let vp = Box2d::from_xywh(0.0, 0.0, 100_000.0, 100_000.0);
         // 100 page units: 5 px at zoom 0.05 — between the two thresholds.
         // Coming from a mesh (large) state it stays a mesh…
+        // Index counts are compared against the 6 of a quad rather than against each
+        // other: meshes are flattened per zoom bucket now, so two mesh states at
+        // different zooms legitimately differ in triangle count. What this test is
+        // about is which *state* the shape is in, not how finely it was tessellated.
         let mesh = r.frame(&mut sc, &vp, 1.0, usize::MAX).indices.len();
         assert!(mesh > 6);
-        assert_eq!(r.frame(&mut sc, &vp, 0.05, usize::MAX).indices.len(), mesh, "5 px must not enter quad LOD");
+        assert!(r.frame(&mut sc, &vp, 0.05, usize::MAX).indices.len() > 6, "5 px must not enter quad LOD");
         // …but once below 4 px it becomes a quad and stays one at 5 px.
         assert_eq!(r.frame(&mut sc, &vp, 0.03, usize::MAX).indices.len(), 6);
         assert_eq!(r.frame(&mut sc, &vp, 0.05, usize::MAX).indices.len(), 6, "5 px must not leave quad LOD");
-        // Above 6 px it goes back to the mesh — and the mesh was never invalidated,
-        // so no shape had to be re-tessellated to get there.
-        assert_eq!(r.frame(&mut sc, &vp, 0.08, usize::MAX).indices.len(), mesh);
-        assert!(!r.tessellation_pending());
+        // Above 6 px it goes back to being a mesh…
         let reborn = r.frame(&mut sc, &vp, 0.08, usize::MAX).indices.len();
+        assert!(reborn > 6);
+        assert!(!r.tessellation_pending());
+        // …and staying at that zoom reuses it: the second frame is not dirty and
+        // draws the same triangles. (It is not compared to `mesh`, which was built
+        // for a different zoom bucket and is legitimately a different size.)
+        assert_eq!(r.frame(&mut sc, &vp, 0.08, usize::MAX).indices.len(), reborn);
         assert!(!r.frame_dirty());
-        assert_eq!(reborn, mesh);
     }
 
     #[test]

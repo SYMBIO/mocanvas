@@ -308,6 +308,18 @@ export interface HitTestOptions {
 const RAD_PER_DEG = Math.PI / 180
 
 /**
+ * Largest `deltaY` one wheel event may zoom by, in the browser's own units.
+ *
+ * A trackpad pinch arrives as a stream of small deltas and never reaches this; a
+ * mouse detent arrives as a single ±100, which uncapped is a 2.7× jump per click.
+ * Half a detent is a comfortable step and leaves the trackpad untouched.
+ */
+const WHEEL_ZOOM_DELTA_CAP = 50
+
+/** `PointerEvent.button` for the middle button. */
+const MIDDLE_BUTTON = 1
+
+/**
  * How long a collaborator may go without refreshing their presence record
  * before they stop being drawn. Long enough that a slow tool call or a tab
  * switch does not blink someone out; short enough that a closed laptop does.
@@ -1232,6 +1244,29 @@ export class Editor extends EventEmitter<EditorEvents> {
     let bits = 0
     if (opts.hitLocked) bits |= 1
     return bits
+  }
+
+  /**
+   * The outline a shape is *drawn* with when the hand-drawn style is on, as path
+   * words in shape space — or `null` for every other style.
+   *
+   * The draw style does not stroke a shape's geometry. It strokes a perturbed,
+   * corner-rounded sketch of it, made in the renderer from the shape's own seed,
+   * and until now that curve existed only on the GPU. Anything here that wanted
+   * to trace what the user can see had nothing but the mathematical outline, and
+   * disagreed with the drawing wherever the two differ — most visibly at a
+   * corner, which the sketch rounds and the geometry does not.
+   *
+   * `null` is the honest answer for a solid, dashed or dotted shape: those *are*
+   * stroked along their geometry, so there is no second curve to ask about.
+   */
+  getShapeSketchPath(shape: UnknownShape | ShapeId): number[] | null {
+    const id = typeof shape === "string" ? shape : shape.id
+    this.flushEngine()
+    const handle = this.handles.handle(id as ShapeId)
+    if (!handle) return null
+    const words = this.engine.sketchPath(handle)
+    return words && words.length ? Array.from(words) : null
   }
 
   getShapeAtPoint(point: VecLike, opts: HitTestOptions = {}): UnknownShape | undefined {
@@ -2403,9 +2438,21 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this.getViewportPageBounds().center
   }
 
-  updateViewportScreenBounds(bounds: Box | BoxLike, center = false): this {
+  /**
+   * Tell the editor how big its viewport is on screen.
+   *
+   * Takes the element as well as a box, because that is the call every host
+   * actually makes — it has the container to hand, not a measured rectangle —
+   * and because tldraw accepts one, so a drop-in host that passes its `ref`
+   * would otherwise fail on a `getBoundingClientRect` that was never there.
+   */
+  updateViewportScreenBounds(bounds: Box | BoxLike | HTMLElement, center = false): this {
     const prev = this.getViewportScreenBounds()
-    const next = Box.From(bounds)
+    const measured =
+      typeof HTMLElement !== "undefined" && bounds instanceof HTMLElement
+        ? (({ x, y, width, height }) => ({ x, y, w: width, h: height }))(bounds.getBoundingClientRect())
+        : (bounds as Box | BoxLike)
+    const next = Box.From(measured)
     if (prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h) return this
     this.run(
       () => {
@@ -2620,6 +2667,14 @@ export class Editor extends EventEmitter<EditorEvents> {
         // tools may still observe wheel
         break
       }
+      case "cancel":
+      case "interrupt": {
+        // A gesture that never gets its pointer-up — the window loses focus, a
+        // dialog steals the pointer — must not leave the canvas panning with
+        // every mouse move, nor stranded on a grabbing cursor.
+        this.endMiddleButtonPan()
+        break
+      }
       default:
         break
     }
@@ -2647,9 +2702,18 @@ export class Editor extends EventEmitter<EditorEvents> {
         inputs.isDragging = false
         inputs.originScreenPoint = screen.clone()
         inputs.originPagePoint = page.clone()
+        // Dragging with the middle button pans, whatever tool is selected. It is
+        // handled here and not in a tool for the same reason the wheel is: the
+        // camera is the editor's, and every tool would otherwise have to
+        // reimplement it — which is how it came to work in none of them, since
+        // each one only ever looked at button 0.
+        if (info.button === MIDDLE_BUTTON) this.startMiddleButtonPan()
         break
       }
       case "pointer_move": {
+        if (this.isPanningWithMiddleButton) {
+          this.pan(Vec.Sub(inputs.currentScreenPoint, inputs.previousScreenPoint))
+        }
         if (inputs.isPointing && !inputs.isDragging) {
           const d2 = Vec.Dist2(inputs.originScreenPoint, screen)
           if (d2 > this.options.dragDistanceSquared * (info.isPen ? 0.25 : 1)) inputs.isDragging = true
@@ -2660,6 +2724,7 @@ export class Editor extends EventEmitter<EditorEvents> {
         inputs.buttons.delete(info.button)
         inputs.isPointing = false
         inputs.isDragging = false
+        if (info.button === MIDDLE_BUTTON) this.endMiddleButtonPan()
         break
       }
       default:
@@ -2667,14 +2732,59 @@ export class Editor extends EventEmitter<EditorEvents> {
     }
   }
 
+  /**
+   * Wheel and trackpad. Ctrl/meta zooms about the pointer; anything else follows
+   * `wheelBehavior`.
+   *
+   * The exponent is `1/100` because that is the mapping the browser already used
+   * on the way in: a trackpad pinch arrives as a ctrl-wheel event whose `deltaY`
+   * is about `-100·ln(scale)`, so undoing it with `exp(-deltaY/100)` returns the
+   * scale the fingers actually asked for and the canvas tracks the gesture 1:1.
+   * It was a quarter of that, which is why one pinch moved so little: the zoom
+   * was running at a quarter speed of the hand.
+   *
+   * A mouse notch is a different animal — one detent is ±100, a whole pinch in a
+   * single event — so the per-event delta is capped. A trackpad's deltas are far
+   * below the cap and pass through untouched; the cap only stops a discrete wheel
+   * from leaping almost three-fold per click.
+   */
+  /** True between a middle-button press and its release: the drag pans. */
+  private isPanningWithMiddleButton = false
+  /**
+   * The cursor to put back when that pan ends.
+   *
+   * Tools own the cursor and set it on entering a state; the pan borrows it for
+   * the length of the gesture and hands it back, so a tool that was showing a
+   * crosshair still shows one afterwards. Remembering the value rather than
+   * assuming `default` is what makes that true.
+   */
+  private cursorBeforeMiddleButtonPan: Instance["cursor"] | null = null
+
+  private startMiddleButtonPan(): void {
+    if (this.isPanningWithMiddleButton) return
+    this.isPanningWithMiddleButton = true
+    this.cursorBeforeMiddleButtonPan = { ...this.getCursor() }
+    this.setCursor({ type: "grabbing", rotation: 0 })
+  }
+
+  private endMiddleButtonPan(): void {
+    if (!this.isPanningWithMiddleButton) return
+    this.isPanningWithMiddleButton = false
+    const previous = this.cursorBeforeMiddleButtonPan
+    this.cursorBeforeMiddleButtonPan = null
+    if (previous) this.setCursor(previous)
+  }
+
   private handleWheel(info: WheelEventInfo): void {
-    if (info.ctrlKey || info.metaKey) {
-      // zoom about the pointer; delta.y in pixels → multiplicative factor
+    const opts = this.getCameraOptions()
+    if (info.ctrlKey || info.metaKey || opts.wheelBehavior === "zoom") {
+      if (opts.wheelBehavior === "none" && !(info.ctrlKey || info.metaKey)) return
       const cam = this.getCamera()
-      const factor = Math.exp(-info.delta.y * 0.0025)
+      const dy = Math.max(-WHEEL_ZOOM_DELTA_CAP, Math.min(WHEEL_ZOOM_DELTA_CAP, info.delta.y))
+      const factor = Math.exp((-dy / 100) * opts.zoomSpeed)
       this.zoomToPointAt(info.point, cam.z * factor)
-    } else {
-      this.pan({ x: -info.delta.x, y: -info.delta.y })
+    } else if (opts.wheelBehavior === "pan") {
+      this.pan({ x: -info.delta.x * opts.panSpeed, y: -info.delta.y * opts.panSpeed })
     }
   }
 
@@ -2844,7 +2954,7 @@ export class Editor extends EventEmitter<EditorEvents> {
         let f = 0
         if (g.flipX) f |= GEO_FLAG.FLIP_X
         if (g.flipY) f |= GEO_FLAG.FLIP_Y
-        cmd.setGeo(handle, g.kind, g.w, g.h, f)
+        cmd.setGeo(handle, g.kind, g.w, g.h, f, g.strokeWidth ?? 0)
         break
       }
       case "spline":

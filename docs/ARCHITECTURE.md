@@ -89,7 +89,7 @@ SET_GEOMETRY   op=3  handle nwords [path command words...]                  (3+n
 SET_STYLE      op=4  handle fill stroke stroke_w_f32 dash opacity_f32 seed (8 words)
 CLEAR          op=5                                                         (1 word)
 SET_TEXTURE    op=6  handle texture                                         (3 words)
-SET_GEO        op=7  handle kind flags w_f32 h_f32                          (6 words)
+SET_GEO        op=7  handle kind flags w_f32 h_f32 stroke_w_f32             (7 words)
 SET_SPLINE     op=8  handle flags npoints [x y (f32)]...                    (4+2n words)
 SET_POLY       op=9  handle flags npoints [x y (f32)]...                    (4+2n words)
 SET_DRAW       op=10 handle flags nsegs [segflags npoints (x y f32)...]...
@@ -99,6 +99,11 @@ Word counts include the opcode.
 
 `geo_flag` bits: `FLIP_X=1`, `FLIP_Y=2` on `SET_GEO`; `CLOSED=1` on
 `SET_SPLINE` / `SET_POLY` / `SET_DRAW`; `FREEHAND=1` per `SET_DRAW` segment.
+
+`SET_GEO`'s stroke width reaches only the open marks drawn *inside* an outline —
+the X of an x-box, whose ends sit on the corners and whose round caps would
+otherwise spike half a stroke through the box. The outline itself does not move
+with it, and a kind with no such marks ignores it.
 
 **Opcodes 7-10 are the parametric fast path.** A built-in shape sends the
 numbers that *describe* its outline and the engine generates it, instead of the
@@ -154,10 +159,21 @@ engine.frame_pending() -> bool  // shapes still queued behind the budget
 - `vertices: f32[]` interleaved `x y u v r g b a` (8 floats, 32-byte stride);
   solid geometry has `u = v = 0`
 - `indices: u32[]`
-- `batches: u32[]`, 7 words each:
-  `first_index index_count texture clip_minx clip_miny clip_maxx clip_maxy`.
-  The clip words are page-space f32 bits; all four zero = unclipped. A new
-  batch starts whenever the texture or the clip rect changes.
+- `batches: u32[]`, 8 words each:
+  `first_index index_count texture clip_minx clip_miny clip_maxx clip_maxy
+  isolate`. The clip words are page-space f32 bits; all four zero = unclipped.
+  A new batch starts whenever the texture, the clip rect or the isolation group
+  changes.
+
+  `isolate` is 0 for an ordinary batch. Non-zero means the batch is one
+  translucent shape's whole mark and the backend must cover each of its pixels
+  once — the engine bakes opacity into vertex alpha, so a stroke crossing itself
+  would blend twice and show the crossing as a dark knot, where every other
+  renderer treats shape opacity as a group. Only a mark that is a single colour
+  gets a group (a stroke with no fill and no texture): painting once equals
+  compositing the group exactly when the group has one member. The number is
+  unique per frame and rises in draw order; the WebGL2 backend uses it as a
+  stencil reference, and clears the stencil when 8 bits of it wrap.
 - `overlay: u32[]`, 10 words each, for visible shapes that need the DOM
   overlay, in z-order: `handle x y w h rot clip_minx clip_miny clip_maxx
   clip_maxy` as f32 bits, with `x y w h` the page-space bounds and the clip

@@ -44,7 +44,18 @@ export async function startPreview(port = 5182) {
  * lands on ANGLE/SwiftShader whatever GPU flags it is given, so every frame is
  * rasterised on the CPU — which penalises a WebGL2 renderer far more than a DOM
  * one and makes the frame-time columns unrepresentative. Headed gets the real
- * Metal device. The pixel-comparison numbers are unaffected either way.
+ * Metal device.
+ *
+ * It is NOT neutral for the pixel comparison, which was the first thing assumed
+ * about it and is wrong. Interior IoU holds (99.2% in both modes), but the
+ * stroke-band figure moves a lot — measured on identical code, the straight
+ * arrow reads 2.83px p95 headless and 108px headed, and the whole-fixture p95
+ * goes 4.24 -> 10.00. The band matches stroke pixels *by colour* within a
+ * tolerance, and hardware MSAA softens a thin stroke's edge pixels differently
+ * from SwiftShader, so edge pixels stop matching and read as unpaired.
+ *
+ * So: quote frame times from a headed run and the pixel comparison from a
+ * headless one, and never mix the two in the same table without saying so.
  */
 export async function launchBrowser({ chromium }, previewUrl, { headed = false } = {}) {
   const attempts = [

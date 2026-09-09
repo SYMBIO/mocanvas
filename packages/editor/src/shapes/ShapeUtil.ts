@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import type { StyleWords } from "@mocanvas/wasm"
 import type { Editor } from "../editor/Editor"
-import type { Geometry2d, VecLike } from "../geometry"
+import { Rectangle2d, type Geometry2d, type VecLike } from "../geometry"
 import type { ShapeHandle, SelectionHandle } from "../editor/events"
 import type { UnknownShape, Shape, ShapeCreate } from "../records/base"
 import type { Asset } from "../records/asset"
@@ -159,7 +159,18 @@ export interface ShapeUtilClass {
  * See {@link ShapeUtil.getEngineGeometry}.
  */
 export type EngineGeometry = { w: number; h: number; isClosed: boolean; isFilled: boolean } & (
-  | { type: "geo"; kind: number; flipX?: boolean; flipY?: boolean }
+  | {
+      type: "geo"
+      kind: number
+      flipX?: boolean
+      flipY?: boolean
+      /**
+       * The width the outline will be stroked at, for the marks drawn inside it;
+       * see `CommandWriter.setGeo`. Omitted is the same as 0, which is right for
+       * every kind that has no such marks.
+       */
+      strokeWidth?: number
+    }
   | { type: "spline" | "poly"; points: ArrayLike<number>; closed?: boolean }
   | { type: "draw"; segments: readonly { points: ArrayLike<number>; freehand: boolean }[]; closed?: boolean }
 )
@@ -577,6 +588,19 @@ export abstract class ShapeUtil<T extends UnknownShape = UnknownShape, D extends
 
 /** Shapes with `w` and `h` props. */
 export abstract class BaseBoxShapeUtil<T extends UnknownShape & { props: { w: number; h: number } }> extends ShapeUtil<T> {
+  /**
+   * The box the shape's own `w`/`h` describe.
+   *
+   * Supplying it is the greater half of what this base class is for: a subclass
+   * that draws its own body — a card of HTML, an embedded widget — has nothing to
+   * add here, and without it the shape has no geometry at all, so hit-testing,
+   * bounds and selection fail on first use rather than misbehaving visibly.
+   * Override it where the drawn body is not the full box.
+   */
+  override getGeometry(shape: T): Geometry2d {
+    return new Rectangle2d({ width: Math.max(1, shape.props.w), height: Math.max(1, shape.props.h), isFilled: true })
+  }
+
   override onResize(shape: T, info: ResizeInfo<T>): Partial<T> {
     const { scaleX, scaleY, initialShape, newPoint } = info
     const w = Math.max(1, Math.abs(initialShape.props.w * scaleX))

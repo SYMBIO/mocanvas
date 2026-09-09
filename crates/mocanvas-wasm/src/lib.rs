@@ -9,7 +9,7 @@
 
 use mocanvas_geo::shapes::{catmull_rom_path, geo_path, polyline_path, smooth_freehand, GeoKind};
 use mocanvas_geo::{Box2d, Path, Vec2};
-use mocanvas_render::Renderer;
+use mocanvas_render::{dash, draw_passes_with_tremor, Renderer};
 use mocanvas_scene::{BoxQueryMode, Handle, HitFilter, Scene, Style, ZKey};
 use wasm_bindgen::prelude::*;
 
@@ -181,18 +181,22 @@ impl Engine {
                     i += 8;
                 }
                 op::SET_GEO => {
-                    if i + 6 > len {
+                    if i + 7 > len {
                         return self.fail(count, "truncated SET_GEO");
                     }
-                    let c = &self.cmd[i..i + 6];
+                    let c = &self.cmd[i..i + 7];
                     match GeoKind::from_u32(c[2]) {
                         Some(kind) => {
+                            // The stroke width only reaches the marks drawn inside
+                            // an outline (see `geo_decorations`); the outline itself
+                            // does not move with it.
                             let path = geo_path(
                                 kind,
                                 f32::from_bits(c[4]),
                                 f32::from_bits(c[5]),
                                 c[3] & geo_flag::FLIP_X != 0,
                                 c[3] & geo_flag::FLIP_Y != 0,
+                                f32::from_bits(c[6]),
                             );
                             self.scene.set_geometry(c[1], path);
                         }
@@ -202,7 +206,7 @@ impl Engine {
                         // leave the shape's previous outline alone.
                         None => self.last_error = Some(format!("unknown geo kind {} for handle {}", c[2], c[1])),
                     }
-                    i += 6;
+                    i += 7;
                 }
                 op::SET_SPLINE | op::SET_POLY => {
                     if i + 4 > len {
@@ -464,6 +468,40 @@ impl Engine {
         }
     }
 
+    /// The outline a `dash: "draw"` shape is actually drawn with, as path words
+    /// → `f32_ptr()`. Returns the word count, or `0` when the shape is missing
+    /// or is not drawn in that style.
+    ///
+    /// The hand-drawn style does not stroke the shape's geometry; it strokes a
+    /// perturbed, corner-rounded sketch of it, built here and never shared. So
+    /// anything on the host side that wants to trace what the user can *see* —
+    /// a selection outline, above all — had only the mathematical outline to go
+    /// on and disagreed with the drawing at every corner.
+    ///
+    /// It is the same call the renderer makes, from the same path, style and
+    /// seed, so the words that come back describe the very curve on screen and
+    /// not a second guess at it.
+    pub fn sketch_path(&mut self, handle: Handle) -> u32 {
+        let words = match self.scene.get(handle) {
+            Some(sh) if sh.style.dash == dash::DRAW => {
+                let mut w: Vec<f32> = Vec::new();
+                // No tremor: the outline traces where the drawing *is* — its
+                // rounded corners, its overshoot — without the hand-shake, which
+                // a hairline would turn into a row of kinks.
+                for (p, _) in draw_passes_with_tremor(sh.path, sh.style, 0.0) {
+                    w.extend_from_slice(&p.to_wire());
+                }
+                w
+            }
+            _ => return 0,
+        };
+        if self.f32_out.len() < words.len() {
+            self.f32_out.resize(words.len(), 0.0);
+        }
+        self.f32_out[..words.len()].copy_from_slice(&words);
+        words.len() as u32
+    }
+
     /// Union of all geometry bounds → `f32_ptr()`. Returns false if the scene is empty.
     pub fn all_geometry_bounds(&mut self) -> bool {
         let b = self.scene.all_geometry_bounds();
@@ -494,7 +532,7 @@ impl Engine {
 
 /// Decode interleaved `x y` f32 bit patterns into points.
 fn read_points(words: &[u32]) -> Vec<Vec2> {
-    words.chunks_exact(2).map(|c| Vec2::new(f32::from_bits(c[0]), f32::from_bits(c[1]))).collect()
+    words.as_chunks::<2>().0.iter().map(|c| Vec2::new(f32::from_bits(c[0]), f32::from_bits(c[1]))).collect()
 }
 
 /// Library version.
@@ -543,7 +581,7 @@ mod tests {
     #[test]
     fn set_geo_builds_the_same_outline_as_an_uploaded_path() {
         let mut e = engine_with_one_shape();
-        let applied = write_and_apply(&mut e, &[op::SET_GEO, 1, GeoKind::Hexagon as u32, 0, b(100.0), b(60.0)]);
+        let applied = write_and_apply(&mut e, &[op::SET_GEO, 1, GeoKind::Hexagon as u32, 0, b(100.0), b(60.0), b(0.0)]);
         assert_eq!(applied, 1);
         assert_eq!(e.take_error(), None);
         let bounds = e.bounds(1);
@@ -552,7 +590,7 @@ mod tests {
 
         // The same shape, uploaded the old way.
         let mut reference = engine_with_one_shape();
-        let words = geo_path(GeoKind::Hexagon, 100.0, 60.0, false, false).to_wire();
+        let words = geo_path(GeoKind::Hexagon, 100.0, 60.0, false, false, 0.0).to_wire();
         let mut cmd = vec![op::SET_GEOMETRY, 1, words.len() as u32];
         cmd.extend(words.iter().map(|w| w.to_bits()));
         write_and_apply(&mut reference, &cmd);
@@ -566,7 +604,7 @@ mod tests {
         let mut e = engine_with_one_shape();
         write_and_apply(
             &mut e,
-            &[op::SET_GEO, 1, GeoKind::Triangle as u32, geo_flag::FLIP_Y, b(100.0), b(60.0)],
+            &[op::SET_GEO, 1, GeoKind::Triangle as u32, geo_flag::FLIP_Y, b(100.0), b(60.0), b(0.0)],
         );
         assert_eq!(e.take_error(), None);
         let path = e.scene.get(1).map(|s| s.path.clone()).unwrap();
@@ -575,9 +613,36 @@ mod tests {
     }
 
     #[test]
+    fn set_geo_pulls_an_x_boxs_diagonals_back_by_half_a_stroke() {
+        // Corner to corner, the round cap on each end reaches half a stroke past
+        // the outline and shows as a spike through it. The ends come back in by
+        // exactly that much, so the cap lands on the corner.
+        let mut e = engine_with_one_shape();
+        write_and_apply(&mut e, &[op::SET_GEO, 1, GeoKind::XBox as u32, 0, b(100.0), b(100.0), b(0.0)]);
+        let square = e.scene.get(1).map(|s| s.path.clone()).unwrap();
+        let mut f = engine_with_one_shape();
+        write_and_apply(&mut f, &[op::SET_GEO, 1, GeoKind::XBox as u32, 0, b(100.0), b(100.0), b(10.0)]);
+        let inset = f.scene.get(1).map(|s| s.path.clone()).unwrap();
+
+        // The outline is untouched: only the marks inside move.
+        assert_eq!(square.cmds()[0], inset.cmds()[0]);
+        // Half of a 10-wide stroke, spread along a 45° diagonal.
+        let want = 100.0 * (5.0 / (100.0f32 * 100.0 + 100.0 * 100.0).sqrt());
+        let first_mark = inset.cmds().iter().skip_while(|c| !matches!(c, PathCmd::Close)).nth(1).copied();
+        match first_mark {
+            Some(PathCmd::MoveTo(v)) => {
+                assert!((v.x - want).abs() < 1e-4 && (v.y - want).abs() < 1e-4, "diagonal starts at {v:?}, wanted ({want}, {want})");
+            }
+            other => panic!("expected the X to start after the outline, got {other:?}"),
+        }
+        // Without a width it runs corner to corner, as it always did.
+        assert!(square.cmds().contains(&PathCmd::MoveTo(Vec2::new(0.0, 0.0))));
+    }
+
+    #[test]
     fn an_unknown_geo_kind_is_reported_and_skipped() {
         let mut e = engine_with_one_shape();
-        let applied = write_and_apply(&mut e, &[op::SET_GEO, 1, 999, 0, b(100.0), b(60.0)]);
+        let applied = write_and_apply(&mut e, &[op::SET_GEO, 1, 999, 0, b(100.0), b(60.0), b(0.0)]);
         // The command is consumed — one bad kind must not desynchronise the stream.
         assert_eq!(applied, 1);
         assert!(e.take_error().unwrap().contains("unknown geo kind 999"));

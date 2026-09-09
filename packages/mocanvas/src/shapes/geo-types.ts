@@ -33,6 +33,16 @@ export interface GeoPathOptions {
   /** Whether the interior is painted, and so whether it is hit-testable. */
   isFilled?: boolean
   /**
+   * The width the outline will be stroked at, when the type needs it.
+   *
+   * Only a mark that *ends on* the outline does: a stroke is centred on its
+   * path and its round cap reaches half a width past the last point, so a line
+   * drawn corner to corner of the box pokes out beyond the very outline it is
+   * supposed to sit inside. The x-box's diagonals are the case. A type whose
+   * marks stay clear of the edge can ignore it.
+   */
+  strokeWidth?: number
+  /**
    * Mirror the silhouette left-to-right inside its own box. The box, the
    * bounds and the label do not move; only the outline turns over.
    *
@@ -84,7 +94,7 @@ export const DEFAULT_GEO_TYPE_DEFINITIONS: Readonly<Record<GeoShapeKind, GeoType
       kind,
       {
         id: kind,
-        getPath: (w, h, opts) => getGeoGeometry(kind, w, h, opts?.isFilled ?? false, { flipX: opts?.flipX, flipY: opts?.flipY }),
+        getPath: (w, h, opts) => getGeoGeometry(kind, w, h, opts?.isFilled ?? false, { flipX: opts?.flipX, flipY: opts?.flipY }, opts?.strokeWidth ?? 0),
         snapType: BLOBBY_KINDS.has(kind) ? "blobby" : "polygon",
         // The icon set names its geo icons after the kind itself.
         icon: `geo-${kind}`,

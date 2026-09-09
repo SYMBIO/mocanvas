@@ -266,9 +266,12 @@ describe("ArrowBindingUtil", () => {
     expect(handles[1]!.x).toBeGreaterThan(terminals.start.x)
     expect(handles[1]!.x).toBeLessThan(terminals.end.x)
     expect(util.canBind({ fromShape: shape, toShape: shape, bindingType: "arrow" })).toBe(false)
+    // No box and nothing to rotate — but the arrow's own outline is drawn, which
+    // is the only cue a selected arrow has now that the frame is gone.
     expect(util.hideSelectionBoundsBg(shape)).toBe(true)
-    expect(util.hideSelectionBoundsFg(shape)).toBe(true)
+    expect(util.hideSelectionBoundsFg(shape)).toBe(false)
     expect(util.hideResizeHandles(shape)).toBe(true)
+    expect(util.hideRotateHandle(shape)).toBe(true)
   })
 
   it("drops bindings to unselected shapes when the arrow starts moving on its own", () => {

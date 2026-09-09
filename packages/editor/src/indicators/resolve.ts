@@ -5,7 +5,48 @@
  * canvas overlay draws a util's `getIndicatorPath`, the (deprecated) SVG layer
  * draws a util's `indicator`, and exactly one of them claims each shape.
  */
+import { PATH_OP } from "@mocanvas/wasm"
 import type { TLIndicatorPath, TLIndicatorPathResult } from "./types"
+
+/**
+ * Path words — the flat `op, args…` encoding the engine speaks — as a `Path2D`.
+ *
+ * Used for the outline the hand-drawn style actually strokes, which comes back
+ * from the renderer in this form and has no `Geometry2d` behind it to ask.
+ */
+export function sketchIndicatorPath(words: readonly number[]): Path2D {
+  const p = new Path2D()
+  let i = 0
+  while (i < words.length) {
+    switch (words[i]) {
+      case PATH_OP.MOVE:
+        p.moveTo(words[i + 1]!, words[i + 2]!)
+        i += 3
+        break
+      case PATH_OP.LINE:
+        p.lineTo(words[i + 1]!, words[i + 2]!)
+        i += 3
+        break
+      case PATH_OP.QUAD:
+        p.quadraticCurveTo(words[i + 1]!, words[i + 2]!, words[i + 3]!, words[i + 4]!)
+        i += 5
+        break
+      case PATH_OP.CUBIC:
+        p.bezierCurveTo(words[i + 1]!, words[i + 2]!, words[i + 3]!, words[i + 4]!, words[i + 5]!, words[i + 6]!)
+        i += 7
+        break
+      case PATH_OP.CLOSE:
+        p.closePath()
+        i += 1
+        break
+      default:
+        // An opcode this build does not know: stop rather than walk off into
+        // the arguments and draw nonsense.
+        return p
+    }
+  }
+  return p
+}
 
 /** The two members of a shape util this module cares about. */
 export interface IndicatorPathSource<T = never> {

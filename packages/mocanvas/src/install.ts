@@ -8,6 +8,7 @@ import {
 } from "@mocanvas/editor"
 import { exportToBlob, getSvgString } from "./export"
 import { getTextMeasure } from "./text"
+import { installDefaultRichTextEditor } from "./text/tiptap-editor"
 
 /**
  * `@mocanvas/editor` declares `Editor.getSvgString`, `Editor.toImage` and
@@ -32,6 +33,18 @@ registerExportImplementation({
 })
 
 registerTextMeasureImplementation(getTextMeasure)
+
+/**
+ * …and the surface a label is edited in. Without one, editing falls back to a
+ * plain `<textarea>` over the text projection of the document: no formatting
+ * commands, and a visible jump on entering edit mode because a textarea lays
+ * text out differently from the HTML the static label is.
+ *
+ * Registered here rather than left to the app because a label that cannot be
+ * emboldened is a missing feature, not a configuration. A host with its own
+ * TipTap registers over it through the same seam.
+ */
+installDefaultRichTextEditor()
 
 /**
  * Let `new Editor({ ... })` be constructed without threading the engine

@@ -17,4 +17,4 @@ mod frame;
 mod tess;
 
 pub use frame::{FrameOutput, Renderer, BATCH_WORDS, DEFAULT_TESS_BUDGET, DEFAULT_VIEWPORT_PAD, LOD_MESH_PX, LOD_MIN_PX, LOD_QUAD_PX, OVERLAY_WORDS, VERTEX_FLOATS};
-pub use tess::{dash, dash_path, dash_pattern, draw_passes, tessellate, MeshCache, MeshPart, DRAW_MAX_DEVIATION};
+pub use tess::{dash, dash_path, dash_pattern, draw_passes, draw_passes_with_tremor, tessellate, MeshCache, MeshPart, DRAW_MAX_DEVIATION};

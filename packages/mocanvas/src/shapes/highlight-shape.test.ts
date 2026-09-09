@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { DEFAULT_THEME, Polyline2d, getColorValue, hexToRgba } from "@mocanvas/editor"
 import {
   HIGHLIGHT_OPACITY,
-  HIGHLIGHT_STROKE_SCALE,
+  HIGHLIGHT_STROKE_SIZES,
   HighlightShapeUtil,
   getHighlightDisplayValues,
   getHighlightOutlinePoints,
@@ -82,15 +82,17 @@ describe("HighlightShapeUtil", () => {
 
   it("reports the widened, scaled stroke through its display values", () => {
     const display = getHighlightDisplayValues(null, shape({ scale: 2 }), DEFAULT_THEME, "light")
-    expect(display.highlightStrokeWidth).toBeCloseTo(display.strokeWidth * HIGHLIGHT_STROKE_SCALE * 2)
+    expect(display.highlightStrokeWidth).toBeCloseTo(HIGHLIGHT_STROKE_SIZES.m * 2)
+    // Far wider than the pen of the same size, which is what `strokeWidth` reports.
+    expect(display.highlightStrokeWidth).toBeGreaterThan(display.strokeWidth * 4)
     expect(display.highlightOpacity).toBe(HIGHLIGHT_OPACITY)
     // The shared set is still there, unchanged.
     expect(display.color).toBe(getColorValue(DEFAULT_THEME.colors.light, "black", "solid"))
   })
 
   it("honours a configured width and opacity", () => {
-    const display = getHighlightDisplayValues(null, shape(), DEFAULT_THEME, "light", { strokeScale: 1, opacity: 0.5 })
-    expect(display.highlightStrokeWidth).toBeCloseTo(display.strokeWidth)
+    const display = getHighlightDisplayValues(null, shape(), DEFAULT_THEME, "light", { strokeScale: 0.5, opacity: 0.5 })
+    expect(display.highlightStrokeWidth).toBeCloseTo(HIGHLIGHT_STROKE_SIZES.m / 2)
     expect(display.highlightOpacity).toBe(0.5)
   })
 

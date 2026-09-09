@@ -278,6 +278,47 @@ export function getArrowheadGeometry(kind: ArrowheadKind, tip: VecLike, dir: Vec
   }
 }
 
+/**
+ * The stretch of `body`, as a parameter range, that runs inside `box` — the gap
+ * the *selection outline* leaves around a label.
+ *
+ * Only the outline needs it. The arrow itself is drawn end to end and the label's
+ * opaque box covers the stretch under the text, which is what keeps the stroke
+ * there to be clicked. The indicator is painted on top of the label, though, so
+ * without this it draws a line straight through the words.
+ *
+ * Sampled rather than solved: the three body kinds are a segment, an arc and a
+ * polyline, and an exact intersection for each is three separate cases to get
+ * wrong for an answer that is then rounded to a pixel anyway. The range runs from
+ * the first sample inside the box to the last, so a body that enters twice — a
+ * tight arc passing its own label on the way out and back — is cut once, across
+ * the whole excursion.
+ *
+ * `null` when the body never enters the box, or when the gap would swallow it
+ * whole: a label wider than its own arrow leaves the outline alone.
+ */
+export function labelGapOnBody(body: ArrowBody, box: { x: number; y: number; w: number; h: number }): { from: number; to: number } | null {
+  const SAMPLES = 192
+  const minX = box.x
+  const maxX = box.x + box.w
+  const minY = box.y
+  const maxY = box.y + box.h
+  let from = -1
+  let to = -1
+  for (let i = 0; i <= SAMPLES; i++) {
+    const t = i / SAMPLES
+    const p = getPointOnBody(body, t)
+    if (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY) continue
+    if (from < 0) from = t
+    to = t
+  }
+  if (from < 0) return null
+  const half = 0.5 / SAMPLES
+  const gap = { from: Math.max(0, from - half), to: Math.min(1, to + half) }
+  if (gap.to - gap.from > 0.9) return null
+  return gap
+}
+
 /** Signed bend for a dragged midpoint handle at `point`. */
 export function getBendFromPoint(start: VecLike, end: VecLike, point: VecLike): number {
   const chord = Vec.Sub(end, start)

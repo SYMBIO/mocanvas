@@ -506,7 +506,7 @@ export class EmbedShapeUtil extends BaseBoxShapeUtil<EmbedShape> {
     return typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0 ? ratio : undefined
   }
 
-  getGeometry(shape: EmbedShape): Geometry2d {
+  override getGeometry(shape: EmbedShape): Geometry2d {
     const { w, h } = readEmbedBox(shape)
     return new Rectangle2d({ width: Math.max(1, w), height: Math.max(1, h), isFilled: true })
   }
@@ -570,7 +570,14 @@ export class EmbedShapeUtil extends BaseBoxShapeUtil<EmbedShape> {
           width={w}
           height={h}
           sandbox={EMBED_SANDBOX}
-          referrerPolicy="no-referrer"
+          // The origin, and nothing more. `no-referrer` is the stricter setting and
+          // was the obvious one to reach for, but a player that has to check which
+          // domain is embedding it cannot: YouTube answers a refererless embed with
+          // "error 153" and refuses to play. This sends the scheme and host — what
+          // the check needs — and never the path or query of the page the canvas is
+          // on, and sends nothing at all when a secure page is embedded by an
+          // insecure one.
+          referrerPolicy="strict-origin-when-cross-origin"
           loading="lazy"
           allowFullScreen
           style={{ display: "block", width: "100%", height: "100%", border: 0, pointerEvents: isEditing ? "auto" : "none" }}
@@ -584,9 +591,20 @@ export class EmbedShapeUtil extends BaseBoxShapeUtil<EmbedShape> {
     return rectPath(w, h, EMBED_RADIUS)
   }
 
-  /** There is nothing to type into an embed; the shape has no text of its own. */
+  /**
+   * "Editing" an embed is not typing into it — the shape has no text of its own.
+   * It is the state in which the embedded page takes the pointer, and it is the
+   * state the iframe above waits for.
+   *
+   * Saying no here left that state unreachable, so the frame stayed inert for
+   * good and the embed was a picture of a page rather than a page: a video that
+   * would not play, a map that would not pan. Saying yes gives an embed the same
+   * two-step every canvas uses for something that wants the pointer for itself —
+   * one click selects the shape and its handles, a double click hands the
+   * pointer over, and clicking away takes it back.
+   */
   override canEdit(_shape: EmbedShape): boolean {
-    return false
+    return true
   }
 
   /**

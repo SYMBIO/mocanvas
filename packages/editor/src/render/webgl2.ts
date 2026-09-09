@@ -1,6 +1,14 @@
 import { VERTEX_FLOATS, type CameraState, type FrameBuffers } from "@mocanvas/wasm"
 import type { DrawOptions, RenderBackend, TextureOptions, TextureSource } from "./backend"
-import { forEachDrawBatch } from "./clip"
+import { forEachDrawBatch, type DrawBatch } from "./clip"
+
+/**
+ * Distinct stencil reference values available to isolated batches.
+ *
+ * The stencil buffer is 8 bits and 0 means "nothing drawn here", so the usable
+ * values are 1..255.
+ */
+const STENCIL_REFS = 255
 
 const VERT = `#version 300 es
 precision highp float;
@@ -59,6 +67,30 @@ function sourceSize(source: TextureSource): [number, number] {
 }
 
 /** WebGL2 backend: one interleaved VBO, one IBO, one program, one draw call per batch. */
+/**
+ * Redraw a decoded image into a 2D canvas, so the GPU sees plain pixels instead
+ * of the file they came from. Returns `null` when there is nothing to gain —
+ * the source is already pixels — or when no canvas is available.
+ */
+function repaintThroughCanvas(source: unknown, w: number, h: number): HTMLCanvasElement | null {
+  if (w <= 0 || h <= 0) return null
+  if (typeof document === "undefined") return null
+  const drawable = source as CanvasImageSource
+  if (typeof HTMLCanvasElement !== "undefined" && drawable instanceof HTMLCanvasElement) return null
+  try {
+    const c = document.createElement("canvas")
+    c.width = w
+    c.height = h
+    const ctx = c.getContext("2d")
+    if (!ctx) return null
+    ctx.clearRect(0, 0, w, h)
+    ctx.drawImage(drawable, 0, 0, w, h)
+    return c
+  } catch {
+    return null
+  }
+}
+
 export class WebGL2Backend implements RenderBackend {
   readonly kind = "webgl2" as const
   private readonly gl: WebGL2RenderingContext
@@ -91,6 +123,8 @@ export class WebGL2Backend implements RenderBackend {
     const gl = canvas.getContext("webgl2", {
       antialias: options.antialias ?? true,
       premultipliedAlpha: true,
+      // For isolated batches; see `drawIsolated`.
+      stencil: true,
       alpha: true,
       preserveDrawingBuffer: false,
       powerPreference: "high-performance",
@@ -152,6 +186,7 @@ export class WebGL2Backend implements RenderBackend {
     gl.disable(gl.DEPTH_TEST)
     gl.disable(gl.CULL_FACE)
     gl.disable(gl.SCISSOR_TEST)
+    gl.disable(gl.STENCIL_TEST)
   }
 
   resize(width: number, height: number, dpr: number): void {
@@ -190,6 +225,35 @@ export class WebGL2Backend implements RenderBackend {
     gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource)
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0)
+    // `texImage2D` reports by raising the error flag, not by throwing, and a
+    // source it refuses leaves the texture unallocated — which samples as opaque
+    // black, silently.
+    //
+    // A file the image decoder accepted is not necessarily one the driver will
+    // take: a PNG whose IDAT carries the wrong CRC is the case that found this,
+    // and it is not hypothetical — decoders ignore chunk CRCs, so such a file
+    // displays perfectly in an `<img>` and a DOM-rendered canvas shows it
+    // without complaint. Refusing it here would make us worse at a real file
+    // than a renderer that never touches the GPU.
+    //
+    // So the pixels are laundered: the browser has already decoded the image, and
+    // painting it into a 2D canvas yields a source with no provenance left to
+    // object to. Only if that is refused too is the source genuinely unusable.
+    // A lost context is not the source's fault and is left alone — everything
+    // re-uploads when the context comes back.
+    let err = gl.getError()
+    if (err !== gl.NO_ERROR && !gl.isContextLost()) {
+      const laundered = repaintThroughCanvas(source, w, h)
+      if (laundered) {
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, opts.premultiplied ? 0 : 1)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, laundered)
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0)
+        err = gl.getError()
+      }
+      if (err !== gl.NO_ERROR && !gl.isContextLost()) {
+        throw new Error(`mocanvas: the GPU refused a texture source (gl error ${err})`)
+      }
+    }
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, smooth ? gl.LINEAR : gl.NEAREST)
@@ -214,7 +278,12 @@ export class WebGL2Backend implements RenderBackend {
     const [r, g, b, a] = options.background
     gl.disable(gl.SCISSOR_TEST)
     gl.clearColor(r * a, g * a, b * a, a)
-    gl.clear(gl.COLOR_BUFFER_BIT)
+    gl.clearStencil(0)
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT)
+    // Reference values are 8 bits, so a frame with more than `STENCIL_REFS`
+    // isolated shapes wraps and starts reusing them; `drawIsolated` clears the
+    // buffer when it does, so a reused value never meets its own leftovers.
+    let lastRef = 0
     if (frame.indices.length === 0) return
 
     gl.useProgram(this.program)
@@ -264,10 +333,51 @@ export class WebGL2Backend implements RenderBackend {
         gl.bindTexture(gl.TEXTURE_2D, tex)
         boundTex = tex
       }
-      gl.drawElements(gl.TRIANGLES, b.count, gl.UNSIGNED_INT, b.first * 4)
+      if (b.isolate === 0) {
+        gl.drawElements(gl.TRIANGLES, b.count, gl.UNSIGNED_INT, b.first * 4)
+      } else {
+        lastRef = this.drawIsolated(b, lastRef)
+      }
     })
+    gl.disable(gl.STENCIL_TEST)
     if (scissoring) gl.disable(gl.SCISSOR_TEST)
     gl.bindVertexArray(null)
+  }
+
+  /**
+   * Draw one isolated batch, covering each pixel exactly once.
+   *
+   * The engine bakes a shape's opacity into its vertex alpha, so a stroke that
+   * crosses itself is blended over itself and the crossing comes out darker than
+   * the stroke either side of it. Every other renderer treats shape opacity as a
+   * group — rasterize the mark, then make the result see-through — and a
+   * highlighter is where the difference stops being subtle: its whole point is a
+   * wide even wash, and at a highlighter's width a stroke crosses itself at
+   * every kink.
+   *
+   * The stencil buffer is what makes it one coat: the first fragment to reach a
+   * pixel writes this batch's reference value, and the test rejects every later
+   * one that finds its own value already there. Values are per shape, so two
+   * highlights still blend with each other the way two separate marks should.
+   *
+   * Returns the reference value used, for the caller to carry into the next one.
+   */
+  private drawIsolated(b: DrawBatch, lastRef: number): number {
+    const gl = this.gl
+    const ref = (b.isolate % STENCIL_REFS) + 1
+    // Wrapped: the values from here on were used earlier in this same frame, and
+    // a shape must not be masked by an older shape's coverage.
+    if (ref <= lastRef) {
+      gl.clearStencil(0)
+      gl.clear(gl.STENCIL_BUFFER_BIT)
+    }
+    gl.enable(gl.STENCIL_TEST)
+    gl.stencilFunc(gl.NOTEQUAL, ref, 0xff)
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE)
+    gl.stencilMask(0xff)
+    gl.drawElements(gl.TRIANGLES, b.count, gl.UNSIGNED_INT, b.first * 4)
+    gl.disable(gl.STENCIL_TEST)
+    return ref
   }
 
   dispose(): void {

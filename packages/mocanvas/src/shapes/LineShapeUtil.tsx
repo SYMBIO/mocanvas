@@ -182,6 +182,34 @@ export class LineShapeUtil extends ShapeUtil<LineShape, LineShapeUtilDisplayValu
     return svgPath(pathWordsToSvgD(this.getGeometry(shape).toPathWords()))
   }
 
+  /**
+   * A selected line shows its own outline and its points, and nothing else — the
+   * same selection an arrow gets, and for the same reason: a line *is* its
+   * points, so a box around them is chrome with nothing to do. Turning it means
+   * moving the points, and resizing it means moving the points, so neither the
+   * rotate handle nor the resize handles have any work either.
+   *
+   * All four answers matter together. `selectionHandles` only drops the frame
+   * when resize *and* rotate are both hidden, and `hideSelectionBoundsFg` must
+   * stay false or the shape loses its own outline as well and a selected line
+   * shows nothing at all.
+   */
+  override hideSelectionBoundsBg(_shape: LineShape): boolean {
+    return true
+  }
+
+  override hideSelectionBoundsFg(_shape: LineShape): boolean {
+    return false
+  }
+
+  override hideResizeHandles(_shape: LineShape): boolean {
+    return true
+  }
+
+  override hideRotateHandle(_shape: LineShape): boolean {
+    return true
+  }
+
   override getHandles(shape: LineShape): ShapeHandle[] {
     const points = getLinePoints(shape)
     const handles: ShapeHandle[] = []

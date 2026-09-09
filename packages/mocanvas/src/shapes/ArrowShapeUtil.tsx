@@ -41,7 +41,7 @@ import {
 import type { ArrowBinding, ArrowTerminal } from "../bindings/ArrowBindingUtil"
 import { TextLabel } from "../text/TextEditor"
 import { applyPlainTextToRichText, richTextToText, toRichText, type RichText } from "../text/rich-text"
-import { measureLabel, trimTrailingWhitespace } from "../text/text-layout"
+import { getLabelOpticalLift, measureLabel, trimTrailingWhitespace } from "../text/text-layout"
 import {
   bodyToGeometry,
   getArrowBody,
@@ -52,6 +52,7 @@ import {
   getBodyLength,
   getPointOnBody,
   getTangentOnBody,
+  labelGapOnBody,
   shortenBody,
   type ArrowBody,
   type ArrowheadKind,
@@ -255,7 +256,32 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape, ArrowShapeUtilDisplayV
     return { props, terminals, body: { kind: "elbow", points: route.points }, route }
   }
 
-  getGeometry(shape: ArrowShape): Geometry2d {
+  /**
+   * The label's box in shape space, or `null` when there is no label.
+   *
+   * Three things need it and they must agree: the geometry (which is what gets
+   * hit-tested), the DOM element that paints the text, and the indicator that
+   * outlines it on selection. They were computing it separately.
+   */
+  private labelBox(shape: ArrowShape): { x: number; y: number; w: number; h: number } | null {
+    const { text, labelPosition, font, size, scale } = readArrowProps(shape)
+    if (!text) return null
+    const m = measureLabel(readRichText(shape.props), {
+      fontFamily: font,
+      fontSize: FONT_SIZES[size] * scale,
+      padding: LABEL_PADDING * scale,
+      editor: this.editor,
+    })
+    const c = getPointOnBody(this.resolveBody(shape).body, Math.max(0, Math.min(1, labelPosition)))
+    return { x: c.x - m.w / 2, y: c.y - m.h / 2, w: m.w, h: m.h }
+  }
+
+  /**
+   * `gapAtLabel` splits the body around the label's box. Only the selection
+   * outline asks for it; the geometry the editor hit-tests keeps the body whole,
+   * so the stroke the label covers is still there to be clicked.
+   */
+  getGeometry(shape: ArrowShape, opts?: { gapAtLabel: { x: number; y: number; w: number; h: number } }): Geometry2d {
     const { props, terminals, body: full } = this.resolveBody(shape)
     const { arrowheadStart, arrowheadEnd, size, scale, text, labelPosition, font } = props
     const { start, end } = terminals
@@ -264,21 +290,29 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape, ArrowShapeUtilDisplayV
     const headLength = getArrowheadLength(strokeWidth, length)
     const body = shortenBody(full, getArrowheadInset(arrowheadStart, headLength), getArrowheadInset(arrowheadEnd, headLength))
 
-    const children: Geometry2d[] = [bodyToGeometry(body)]
+    // The body is drawn whole, label or no label. The label is an opaque box laid
+    // over it in `component`, which is both simpler than cutting the line and the
+    // only version that stays clickable: cut the stroke out from under the label
+    // and there is nothing left there to hit, since hit-testing runs on this
+    // geometry and the label's own rectangle is excluded from it.
+    const children: Geometry2d[] = []
+    const gap = opts?.gapAtLabel ? labelGapOnBody(body, opts.gapAtLabel) : null
+    if (gap) {
+      const len = getBodyLength(body)
+      if (gap.from > 0) children.push(bodyToGeometry(shortenBody(body, 0, len * (1 - gap.from))))
+      if (gap.to < 1) children.push(bodyToGeometry(shortenBody(body, len * gap.to, 0)))
+    } else {
+      children.push(bodyToGeometry(body))
+    }
+
     const startHead = getArrowheadGeometry(arrowheadStart, start, Vec.Mul(getTangentOnBody(full, 0), -1), headLength)
     if (startHead) children.push(startHead)
     const endHead = getArrowheadGeometry(arrowheadEnd, end, getTangentOnBody(full, 1), headLength)
     if (endHead) children.push(endHead)
 
-    if (text) {
-      const m = measureLabel(readRichText(shape.props), {
-        fontFamily: font,
-        fontSize: FONT_SIZES[size] * scale,
-        padding: LABEL_PADDING * scale,
-        editor: this.editor,
-      })
-      const c = getPointOnBody(full, Math.max(0, Math.min(1, labelPosition)))
-      children.push(new Rectangle2d({ x: c.x - m.w / 2, y: c.y - m.h / 2, width: m.w, height: m.h, isFilled: false, isLabel: true }))
+    const label = this.labelBox(shape)
+    if (label) {
+      children.push(new Rectangle2d({ x: label.x, y: label.y, width: label.w, height: label.h, isFilled: false, isLabel: true }))
     }
     return new Group2d({ children })
   }
@@ -300,19 +334,40 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape, ArrowShapeUtilDisplayV
     const isEditing = this.editor.getEditingShapeId() === shape.id
     if (!text && !isEditing) return null
     const display = getDisplayValues<ArrowShape, ArrowShapeUtilDisplayValues>(this, shape)
-    const c = getPointOnBody(this.resolveBody(shape).body, Math.max(0, Math.min(1, labelPosition)))
+    // Positioned from the measured box, not by `translate(-50%, -50%)`: the label
+    // inside is absolutely positioned, so this wrapper has no size of its own and
+    // a percentage translate resolves against zero — the label hung off the body
+    // point by its own width and height instead of sitting on it.
+    //
+    // Opaque, in the page colour, and laid straight over the line. The arrow does
+    // not know or care that a label is on it — it is drawn end to end and this
+    // covers the stretch under the text. Painting over rather than cutting a gap
+    // is also what keeps the label clickable: the stroke is still there
+    // underneath, so a click near the text lands on the arrow's own geometry.
+    const box = this.labelBox(shape) ?? { x: 0, y: 0, w: 0, h: 0 }
+    const background = getThemeColors(this.editor).background
     return (
       <div
         style={{
           position: "absolute",
-          left: c.x,
-          top: c.y,
-          transform: "translate(-50%, -50%)",
-          width: "max-content",
+          left: box.x,
+          top: box.y,
+          width: box.w,
+          height: box.h,
+          background,
+          borderRadius: LABEL_PADDING * scale * 0.5,
           pointerEvents: "none",
         }}
       >
-        <div style={{ position: "relative", width: "max-content" }}>
+        {/* The box stays where the geometry puts it — centred on the line — and only
+            the letters move, by the amount that face needs to *look* centred. */}
+        <div
+          style={{
+            position: "relative",
+            width: "max-content",
+            transform: `translateY(${-getLabelOpticalLift({ fontFamily: font, fontSize: FONT_SIZES[size] * scale })}px)`,
+          }}
+        >
           <TextLabel
             shape={shape}
             text={text}
@@ -346,7 +401,29 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape, ArrowShapeUtilDisplayV
   }
 
   override getIndicatorPath(shape: ArrowShape): Path2D {
-    return svgPath(pathWordsToSvgD(this.getGeometry(shape).toPathWords()))
+    const label = this.labelBox(shape)
+    const labelRadius = () => Math.min(LABEL_PADDING * readArrowProps(shape).scale * 0.5, label!.w / 2, label!.h / 2)
+
+    // While the label is being edited it is the only thing indicated. The arrow is
+    // not what is being worked on, and outlining it as well reads as "both are
+    // selected" when only the text box takes input.
+    if (label && this.editor.getEditingShapeId() === shape.id) {
+      const p = new Path2D()
+      p.roundRect(label.x, label.y, label.w, label.h, labelRadius())
+      return p
+    }
+
+    // The outline stops at the label and picks up on the far side. The arrow's own
+    // geometry runs straight through — that stroke is what a click under the text
+    // lands on — but the outline is drawn over the label, and a line ruled across
+    // the words is exactly what it should not be.
+    const words = label ? this.getGeometry(shape, { gapAtLabel: label }).toPathWords() : this.getGeometry(shape).toPathWords()
+    const p = svgPath(pathWordsToSvgD(words))
+    // The one box a selected arrow does draw. Everything else about the selection
+    // is the curve and its three handles — but the label is a box the pointer can
+    // grab, so it says so.
+    if (label) p.roundRect(label.x, label.y, label.w, label.h, labelRadius())
+    return p
   }
 
   /** The GPU keeps drawing the arrow while its label is edited. */
@@ -372,11 +449,29 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape, ArrowShapeUtilDisplayV
     return true
   }
 
+  /**
+   * …but the arrow's *own* outline is drawn. This flag suppresses a lone selected
+   * shape's indicator, and the arrow used to set it because the selection frame
+   * was the cue instead. With the frame gone there was no cue at all — a selected
+   * arrow showed nothing. Its indicator is the curve and the label's box, which
+   * is the cue worth having.
+   */
   override hideSelectionBoundsFg(_shape: ArrowShape): boolean {
-    return true
+    return false
   }
 
   override hideResizeHandles(_shape: ArrowShape): boolean {
+    return true
+  }
+
+  /**
+   * …and no rotate handle either, which is what actually suppresses the box.
+   * `selectionHandles` only drops the frame when resize *and* rotate are both
+   * hidden, so hiding one of the two left a selected arrow wrapped in a
+   * rectangle with a lone rotate dot above it. An arrow has nothing to rotate
+   * about: its ends are the two handles, and turning it means moving them.
+   */
+  override hideRotateHandle(_shape: ArrowShape): boolean {
     return true
   }
 
@@ -408,11 +503,15 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape, ArrowShapeUtilDisplayV
     if (route) {
       if (route.midLeg) {
         const mid = Vec.Lrp(route.midLeg[0], route.midLeg[1], 0.5)
-        handles.push({ id: "midpoint", type: "virtual", index: "a2", x: mid.x, y: mid.y })
+        handles.push({ id: "midpoint", type: "vertex", index: "a2", x: mid.x, y: mid.y })
       }
     } else {
       const mid = getPointOnBody(body, 0.5)
-      handles.push({ id: "bend", type: "virtual", index: "a2", x: mid.x, y: mid.y })
+      // A vertex, not a "virtual" handle: virtual means the faint dot that *becomes*
+      // a point when dragged, which is what a line's midpoints are. An arrow's bend
+      // is a permanent handle, and drawing it as the faint kind made it read as an
+      // afterthought next to its own two ends.
+      handles.push({ id: "bend", type: "vertex", index: "a2", x: mid.x, y: mid.y })
     }
     handles.push({ id: "end", type: "vertex", index: "a3", x: end.x, y: end.y })
     return handles
