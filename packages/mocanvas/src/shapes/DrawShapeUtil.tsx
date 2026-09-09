@@ -1,15 +1,18 @@
 import {
-  type EngineGeometry,
-  Polygon2d,
-  Polyline2d,
-  ShapeUtil,
-  STROKE_SIZES,
+  b64Vecs,
   DefaultColorStyle,
   DefaultDashStyle,
   DefaultFillStyle,
   DefaultSizeStyle,
+  DIM_2D,
+  DIM_3D,
   getDefaultDisplayValues,
+  Polygon2d,
+  Polyline2d,
+  ShapeUtil,
+  STROKE_SIZES,
   type BaseShape,
+  type EngineGeometry,
   type Geometry2d,
   type ResizeInfo,
   type ShapeUtilOptions,
@@ -61,13 +64,37 @@ export type DrawShape = BaseShape<"draw", DrawShapeProps>
 const SEGMENT_TYPES = ["free", "straight"] as const
 
 /**
- * The shape's segments in a usable form. A segment that carries no decoded
- * `points` array — an encoding the load path could not read, say — reads as an
- * empty run and contributes nothing, rather than throwing.
+ * The shape's segments in a usable form.
+ *
+ * `points` comes in two shapes and both are ours. A document written long-hand
+ * carries an array of `{x, y, z}`; a compressed one carries the packed base64
+ * string that {@link b64Vecs} produces and that `TLDrawShapeSegment` declares —
+ * which is what `compressLegacySegments` writes and what a `.tldr` file holds.
+ *
+ * Only the array was read. The string fell through the array reader as empty,
+ * so a compressed segment contributed no points, and a draw shape written by
+ * this very library came back with no geometry and drew nothing at all —
+ * silently, because an unreadable segment is meant to cost its own run and not
+ * throw. Failing soft is right; failing soft on a format we author ourselves is
+ * not, and that is what hid it.
+ *
+ * A segment that is neither still reads as an empty run.
  */
 export function readDrawSegments(shape: { props?: unknown }): DrawSegment[] {
   const out: DrawSegment[] = []
   for (const seg of readArray(propsOf(shape), "segments")) {
+    const packed = (seg as { points?: unknown } | null)?.points
+    if (typeof packed === "string") {
+      // `dim` says how many floats a point took; 3 (x, y, pressure) unless the
+      // writer said otherwise.
+      const dim = readNumber(seg, "dim", DIM_3D)
+      const decoded =
+        dim === DIM_2D
+          ? b64Vecs.decodePoints2D(packed).map((p) => ({ x: p.x, y: p.y }) as DrawPoint)
+          : b64Vecs.decodePoints(packed).map((p) => ({ x: p.x, y: p.y, z: p.z }) as DrawPoint)
+      out.push({ type: readEnum(seg, "type", SEGMENT_TYPES, "free"), points: decoded })
+      continue
+    }
     const points: DrawPoint[] = readArray(seg, "points").map((p) => {
       const point: DrawPoint = { x: readNumber(p, "x", 0), y: readNumber(p, "y", 0) }
       // Pressure stays absent when the stored point has none, so a round trip

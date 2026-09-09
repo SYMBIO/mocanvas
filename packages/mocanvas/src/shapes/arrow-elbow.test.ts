@@ -155,7 +155,13 @@ describe("arc arrows are untouched by elbow support", () => {
 
   it.each(Object.keys(BEFORE))("%s serializes to the same path words as before", (name) => {
     const shape = makeArrow(BEFORE[name]!.props)
-    expect(util.getGeometry(shape).toPathWords()).toEqual(BEFORE[name]!.words)
+    const got = util.getGeometry(shape).toPathWords()
+    // `REGEN=1 vitest run src/shapes/arrow-elbow.test.ts` prints the current words
+    // for each case. A golden table with no way to regenerate it is a table nobody
+    // updates correctly — but read the diff before pasting, since the whole point
+    // of these is that they are not supposed to move.
+    if (process.env["REGEN"]) console.log(`REGEN ${name} ${JSON.stringify(got)}`)
+    expect(got).toEqual(BEFORE[name]!.words)
   })
 
   it("defaults to the arc kind, so a document without `kind` is unaffected", () => {
@@ -226,7 +232,10 @@ describe("elbow arrows", () => {
     const handles = util.getHandles(shape)
     expect(handles.map((h) => h.id)).toEqual(["start", "midpoint", "end"])
     const midpoint = handles[1]!
-    expect(midpoint.type).toBe("virtual")
+    // A vertex like the two terminals: "virtual" is the faint dot that turns into
+    // a new point when dragged, which an elbow's midpoint is not — it is always
+    // there and it writes `elbowMidPoint`.
+    expect(midpoint.type).toBe("vertex")
     expect(midpoint.x).toBeCloseTo(100)
     expect(midpoint.y).toBeCloseTo(40)
     const drag = (x: number, y: number) => util.onHandleDrag(shape, { handle: { ...midpoint, x, y }, isPrecise: false })

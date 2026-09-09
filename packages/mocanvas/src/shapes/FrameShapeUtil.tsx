@@ -107,7 +107,7 @@ export class FrameShapeUtil extends BaseFrameLikeShapeUtil<FrameShape> {
     return { w: 160, h: 90, name: "" }
   }
 
-  getGeometry(shape: FrameShape): Geometry2d {
+  override getGeometry(shape: FrameShape): Geometry2d {
     const p = propsOf(shape)
     return new Rectangle2d({ width: readNumber(p, "w", 160), height: readNumber(p, "h", 90), isFilled: true })
   }

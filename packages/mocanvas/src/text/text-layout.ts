@@ -76,6 +76,61 @@ export function measureLabel(source: RichTextSource, opts: LabelMeasureOptions):
   })
 }
 
+/**
+ * How far to lift a label so it reads as centred, as a fraction of the font size.
+ *
+ * Centring the *line box* is geometrically right and optically wrong: a line box
+ * reserves room for descenders whether or not the text has any, so the ink of a
+ * typical word sits in its lower half and the word looks like it has sunk. What
+ * the eye centres on is the letters themselves — somewhere between the middle of
+ * the capitals and the middle of the x-height, depending on the word — so that is
+ * what gets put on the centre line instead.
+ *
+ * Measured from the font rather than assumed: a face with a tall x-height needs a
+ * different correction from one with a small one, and the value is only stable
+ * per family, not across the stack. Cached per family, since it scales with the
+ * em and so does not depend on the size.
+ */
+const OPTICAL_LIFT_CACHE = new Map<string, number>()
+
+/** The lift in px for a label, given the same options `measureLabel` takes. */
+export function getLabelOpticalLift(opts: Pick<LabelMeasureOptions, "font" | "fontFamily"> & { fontSize: number }): number {
+  return getOpticalCentreLift(getFontFamily(labelFontStyle(opts))) * opts.fontSize
+}
+
+function getOpticalCentreLift(fontFamily: string): number {
+  const cached = OPTICAL_LIFT_CACHE.get(fontFamily)
+  if (cached !== undefined) return cached
+  let lift = 0
+  try {
+    const ctx = document.createElement("canvas").getContext("2d")
+    if (ctx) {
+      const em = 100
+      ctx.font = `${em}px ${fontFamily}`
+      const caps = ctx.measureText("H")
+      const ex = ctx.measureText("x")
+      const capHeight = caps.actualBoundingBoxAscent
+      const xHeight = ex.actualBoundingBoxAscent
+      const ascent = caps.fontBoundingBoxAscent
+      const descent = caps.fontBoundingBoxDescent
+      if (capHeight > 0 && xHeight > 0 && ascent > 0) {
+        const lineHeight = LINE_HEIGHT * em
+        const baseline = (lineHeight - (ascent + descent)) / 2 + ascent
+        // Halfway between the capitals' midpoint and the x-height's midpoint.
+        const optical = baseline - (capHeight + xHeight) / 4
+        lift = (optical - lineHeight / 2) / em
+      }
+    }
+  } catch {
+    // No canvas (SSR, a test environment): centring the line box is the fallback,
+    // which is what every label did before this existed.
+  }
+  // A correction this large is a measurement gone wrong, not a font.
+  if (!Number.isFinite(lift) || lift < 0 || lift > 0.25) lift = 0
+  OPTICAL_LIFT_CACHE.set(fontFamily, lift)
+  return lift
+}
+
 /** Minimum width of an auto-sized text shape so an empty one still shows a caret area. */
 export const TEXT_SHAPE_MIN_WIDTH = 8
 

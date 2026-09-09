@@ -42,6 +42,8 @@ export interface DrawBatch {
   texture: number
   /** Device-space scissor, or `null` for the whole canvas. */
   scissor: DeviceRect | null
+  /** Isolation group, 0 for an ordinary batch. See `Batch.isolate`. */
+  isolate: number
 }
 
 /**
@@ -50,7 +52,7 @@ export interface DrawBatch {
  * batches. Pure: no GPU calls, so both backends and the tests share it.
  */
 export function forEachDrawBatch(batches: Uint32Array, camera: CameraState, dpr: number, canvasW: number, canvasH: number, visit: (batch: DrawBatch) => void): void {
-  const out: DrawBatch = { first: 0, count: 0, texture: 0, scissor: null }
+  const out: DrawBatch = { first: 0, count: 0, texture: 0, scissor: null, isolate: 0 }
   for (let i = 0; i + BATCH_WORDS <= batches.length; i += BATCH_WORDS) {
     const count = batches[i + 1]!
     if (count === 0) continue
@@ -64,6 +66,7 @@ export function forEachDrawBatch(batches: Uint32Array, camera: CameraState, dpr:
     out.count = count
     out.texture = batches[i + 2]!
     out.scissor = scissor
+    out.isolate = batches[i + 7]!
     visit(out)
   }
 }

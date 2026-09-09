@@ -221,7 +221,7 @@ export class BookmarkShapeUtil extends BaseBoxShapeUtil<BookmarkShape> {
     return { w: BOOKMARK_WIDTH, h: BOOKMARK_HEIGHT, assetId: null, url: "" }
   }
 
-  getGeometry(shape: BookmarkShape): Geometry2d {
+  override getGeometry(shape: BookmarkShape): Geometry2d {
     const { w, h } = readBookmarkBox(shape)
     return new Rectangle2d({ width: Math.max(1, w), height: Math.max(1, h), isFilled: true })
   }

@@ -212,7 +212,7 @@ export class ImageShapeUtil extends BaseBoxShapeUtil<ImageShape> {
     return { w: 100, h: 100, assetId: null, playing: true, url: "", crop: null, flipX: false, flipY: false, altText: "" }
   }
 
-  getGeometry(shape: ImageShape): Geometry2d {
+  override getGeometry(shape: ImageShape): Geometry2d {
     const { w, h } = readImageBox(shape)
     return new Rectangle2d({ width: Math.max(1, w), height: Math.max(1, h), isFilled: true })
   }

@@ -290,9 +290,31 @@ fn geo_polygon_points(kind: GeoKind, w: f64, h: f64) -> Option<Vec<P>> {
 
 /// Open polylines drawn inside the outline: the X of an x-box, the tick of a
 /// check-box. Empty for every other kind.
-fn geo_decorations(kind: GeoKind, w: f64, h: f64) -> Vec<Vec<P>> {
+///
+/// `stroke_width` shortens the marks that end *on* the outline. A stroke is
+/// centred on its path and its round cap reaches half a width beyond the last
+/// point, so diagonals running corner to corner of the box come out as four
+/// spikes sticking through the very outline they belong inside. Pulling each end
+/// back by half a width lands the cap on the corner instead of past it. The
+/// check-box's tick sits well clear of the edge and is left alone.
+///
+/// This mirrors the host's `getGeoDecorations`, which has always done it —- but
+/// only for the geometry it keeps for hit testing. A built-in geo travels to the
+/// engine as `(kind, w, h)` and is *drawn* from the path built here, so until
+/// this took the width too, the spikes were on screen in every x-box.
+fn geo_decorations(kind: GeoKind, w: f64, h: f64, stroke_width: f64) -> Vec<Vec<P>> {
     match kind {
-        GeoKind::XBox => vec![vec![p(0.0, 0.0), p(w, h)], vec![p(w, 0.0), p(0.0, h)]],
+        GeoKind::XBox => {
+            // Along the diagonal, not along an axis: the cap sticks out the way
+            // the line is pointing.
+            let d = (w * w + h * h).sqrt();
+            let t = if d > 0.0 { (stroke_width / 2.0 / d).min(0.4) } else { 0.0 };
+            let (dx, dy) = (w * t, h * t);
+            vec![
+                vec![p(dx, dy), p(w - dx, h - dy)],
+                vec![p(w - dx, dy), p(dx, h - dy)],
+            ]
+        }
         GeoKind::CheckBox => vec![vec![p(w * 0.25, h * 0.52), p(w * 0.43, h * 0.72), p(w * 0.76, h * 0.3)]],
         _ => Vec::new(),
     }
@@ -448,7 +470,7 @@ fn push_spline(path: &mut Path, segments: &[Seg], close: bool) {
 /// source points and control points rather than to the finished outline, so a
 /// curved shape keeps its curves instead of being flattened into a mirrored
 /// polygon. An ellipse ignores them, being its own mirror image on both axes.
-pub fn geo_path(kind: GeoKind, w: f32, h: f32, flip_x: bool, flip_y: bool) -> Path {
+pub fn geo_path(kind: GeoKind, w: f32, h: f32, flip_x: bool, flip_y: bool, stroke_width: f32) -> Path {
     let (wd, hd) = (w as f64, h as f64);
     let mut path = Path::with_capacity(16);
     match kind {
@@ -487,7 +509,7 @@ pub fn geo_path(kind: GeoKind, w: f32, h: f32, flip_x: bool, flip_y: bool) -> Pa
                 *q = mirror(*q, wd, hd, flip_x, flip_y);
             }
             push_polygon(&mut path, &points, true);
-            for line in geo_decorations(kind, wd, hd) {
+            for line in geo_decorations(kind, wd, hd, stroke_width as f64) {
                 let marks: Vec<P> = line.into_iter().map(|q| mirror(q, wd, hd, flip_x, flip_y)).collect();
                 push_polygon(&mut path, &marks, false);
             }
@@ -582,7 +604,7 @@ mod tests {
 
     #[test]
     fn rectangle_is_the_box() {
-        let path = geo_path(GeoKind::Rectangle, 100.0, 60.0, false, false);
+        let path = geo_path(GeoKind::Rectangle, 100.0, 60.0, false, false, 0.0);
         assert_eq!(
             path.cmds(),
             &[
@@ -599,7 +621,7 @@ mod tests {
     fn every_kind_fills_its_box() {
         for i in 0..20 {
             let kind = GeoKind::from_u32(i).unwrap();
-            let path = geo_path(kind, 120.0, 80.0, false, false);
+            let path = geo_path(kind, 120.0, 80.0, false, false, 0.0);
             let b = path.bounds(0.01);
             assert!((b.min.x).abs() < 0.2, "{kind:?} min.x {}", b.min.x);
             assert!((b.min.y).abs() < 0.2, "{kind:?} min.y {}", b.min.y);
@@ -613,7 +635,7 @@ mod tests {
         for i in 0..20 {
             let kind = GeoKind::from_u32(i).unwrap();
             for (fx, fy) in [(true, false), (false, true), (true, true)] {
-                let b = geo_path(kind, 120.0, 80.0, fx, fy).bounds(0.01);
+                let b = geo_path(kind, 120.0, 80.0, fx, fy, 0.0).bounds(0.01);
                 assert!(b.min.x > -0.2 && b.max.x < 120.2, "{kind:?} {fx} {fy}");
                 assert!(b.min.y > -0.2 && b.max.y < 80.2, "{kind:?} {fx} {fy}");
             }
@@ -629,7 +651,7 @@ mod tests {
     fn degenerate_boxes_do_not_panic() {
         for kind in [GeoKind::Star, GeoKind::Cloud, GeoKind::Oval, GeoKind::Heart, GeoKind::Hexagon] {
             for (w, h) in [(0.0, 0.0), (0.0, 50.0), (50.0, 0.0)] {
-                let path = geo_path(kind, w, h, false, false);
+                let path = geo_path(kind, w, h, false, false, 0.0);
                 assert!(!path.is_empty(), "{kind:?} {w}x{h}");
                 for c in path.cmds() {
                     if let PathCmd::MoveTo(v) | PathCmd::LineTo(v) = *c {

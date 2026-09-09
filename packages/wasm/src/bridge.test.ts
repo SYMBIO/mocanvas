@@ -44,8 +44,8 @@ describe("EngineBridge", () => {
     // solid geometry: u = v = 0
     expect(Array.from(f.vertices.subarray(2, 4))).toEqual([0, 0])
     expect(f.batches.length).toBe(BATCH_WORDS)
-    expect(Array.from(f.batches)).toEqual([0, 30, 0, 0, 0, 0, 0])
-    expect(EngineBridge.readBatches(f.batches)).toEqual([{ firstIndex: 0, indexCount: 30, texture: 0 }])
+    expect(Array.from(f.batches)).toEqual([0, 30, 0, 0, 0, 0, 0, 0])
+    expect(EngineBridge.readBatches(f.batches)).toEqual([{ firstIndex: 0, indexCount: 30, texture: 0, isolate: 0 }])
 
     expect(bridge.hitTest(250, 50, 1)).toBe(1)
     expect(bridge.hitTest(150, 50, 1)).toBe(0)
@@ -87,9 +87,9 @@ describe("EngineBridge", () => {
     const f = bridge.frame({ x: 0, y: 0, z: 1 }, 1000, 1000)
     expect(f.drawn).toBe(3)
     expect(EngineBridge.readBatches(f.batches)).toEqual([
-      { firstIndex: 0, indexCount: 6, texture: 0 },
-      { firstIndex: 6, indexCount: 6, texture: 42 },
-      { firstIndex: 12, indexCount: 6, texture: 0 },
+      { firstIndex: 0, indexCount: 6, texture: 0, isolate: 0 },
+      { firstIndex: 6, indexCount: 6, texture: 42, isolate: 0 },
+      { firstIndex: 12, indexCount: 6, texture: 0, isolate: 0 },
     ])
     // quad corners in page space with uv 0..1, colour white × opacity
     const quad = Array.from(f.vertices.subarray(4 * VERTEX_FLOATS, 8 * VERTEX_FLOATS))
@@ -106,7 +106,21 @@ describe("EngineBridge", () => {
     expect(EngineBridge.readBatches(bridge.frame({ x: 0, y: 0, z: 1 }, 1000, 1000).batches).map((b) => b.texture)).toEqual([0, 42, 0])
     bridge.cmd.setTexture(2, 0)
     bridge.cmd.flush()
-    expect(EngineBridge.readBatches(bridge.frame({ x: 0, y: 0, z: 1 }, 1000, 1000).batches)).toEqual([{ firstIndex: 0, indexCount: 18, texture: 0 }])
+    expect(EngineBridge.readBatches(bridge.frame({ x: 0, y: 0, z: 1 }, 1000, 1000).batches)).toEqual([{ firstIndex: 0, indexCount: 18, texture: 0, isolate: 0 }])
+  })
+
+  it("gives a translucent stroke its own isolation group", () => {
+    bridge.cmd.clear()
+    // Two stroke-only shapes, one opaque and one not. Only the translucent one
+    // needs painting once per pixel, and the group number is what says so.
+    for (const h of [1, 2]) {
+      bridge.cmd.upsert(h, 1, 0, h, 0, 0, h * 200, 0, 0, 100, 100)
+      bridge.cmd.setGeometry(h, rectPath(100, 100))
+      bridge.cmd.setStyle(h, { fill: 0, stroke: 0x000000ff, strokeWidth: 4, dash: 0, opacity: h === 1 ? 1 : 0.5 })
+    }
+    bridge.cmd.flush()
+    const f = bridge.frame({ x: 0, y: 0, z: 1 }, 1000, 1000)
+    expect(EngineBridge.readBatches(f.batches).map((b) => b.isolate)).toEqual([0, 1])
   })
 
   it("clip shapes clip their descendants and split batches", () => {
@@ -144,9 +158,9 @@ describe("EngineBridge", () => {
     const frameClip = [200, 0, 500, 300]
     // root + frame | frame's children (3 and the nested frame 4) | grandchild 5 (intersection)
     expect(EngineBridge.readBatches(f.batches)).toEqual([
-      { firstIndex: 0, indexCount: 12, texture: 0 },
-      { firstIndex: 12, indexCount: 12, texture: 0, clip: frameClip },
-      { firstIndex: 24, indexCount: 6, texture: 0, clip: [300, 100, 500, 300] },
+      { firstIndex: 0, indexCount: 12, texture: 0, isolate: 0 },
+      { firstIndex: 12, indexCount: 12, texture: 0, clip: frameClip, isolate: 0 },
+      { firstIndex: 24, indexCount: 6, texture: 0, clip: [300, 100, 500, 300], isolate: 0 },
     ])
     expect(EngineBridge.readOverlay(f.overlay)).toEqual([{ handle: 6, x: 210, y: 10, w: 20, h: 20, rotation: 0, clip: frameClip }])
   })
@@ -321,7 +335,7 @@ describe("EngineBridge", () => {
       bridge.cmd.setGeo(1, GEO_KIND["cloud"]!, 400, 300)
       const parametric = bridge.cmd.pending
       bridge.cmd.flush()
-      expect(parametric).toBe(6)
+      expect(parametric).toBe(7)
 
       // The same silhouette as an uploaded path: a move, twelve cubics and a
       // close, which is what the host used to build and copy for every cloud.

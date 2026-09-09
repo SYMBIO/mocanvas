@@ -170,30 +170,26 @@ export class SelectionForegroundOverlayUtil extends OverlayUtil<Editor, Selectio
       c.fillStyle = display.fill
       c.lineWidth = lineWidth
 
-      if (bounds) {
+      // `info` is null exactly when a lone selected shape hides both its resize and
+      // its rotate handles — which is how a util says it draws its own selection
+      // chrome. The box was drawn from `bounds` alone and never asked, so such a
+      // shape got the frame anyway: a selected arrow, which has no box to speak of,
+      // came up wrapped in one.
+      // One shape needs no box: it already has an outline of its own, drawn by the
+      // indicator layer along the shape itself. Stroking the bounds as well put a
+      // second line beside the first — near enough to read as a mistake, and it
+      // cannot be made to coincide, because a hand-drawn outline genuinely does
+      // not run along its own geometry. The handles below still mark where the
+      // box is, and the corners are where the two differ visibly: the outline
+      // rounds, the handle sits out on the true corner.
+      //
+      // Several shapes are the other case. There is no single outline to stand in
+      // for the selection, so the union box is the only thing that says what the
+      // gesture will act on.
+      if (bounds && info) {
         const selected = editor.getSelectedShapes()
         const single = selected.length === 1 ? selected[0] : undefined
-        if (single) {
-          // A single selection's box follows the shape's own rotation, so it is
-          // traced through the shape's page transform rather than round its
-          // axis-aligned page bounds — a rotated note would otherwise get a box
-          // conspicuously larger than the note.
-          const local = editor.getShapeGeometryBounds(single)
-          const m = editor.getShapePageTransform(single)
-          if (local) {
-            const corners = [
-              { x: local.x, y: local.y },
-              { x: local.x + local.w, y: local.y },
-              { x: local.x + local.w, y: local.y + local.h },
-              { x: local.x, y: local.y + local.h },
-            ].map((p) => editor.pageToViewport({ x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f }))
-            c.beginPath()
-            c.moveTo(corners[0]!.x, corners[0]!.y)
-            for (let i = 1; i < corners.length; i++) c.lineTo(corners[i]!.x, corners[i]!.y)
-            c.closePath()
-            c.stroke()
-          }
-        } else {
+        if (!single) {
           const topLeft = editor.pageToViewport({ x: bounds.x, y: bounds.y })
           const bottomRight = editor.pageToViewport({ x: bounds.maxX, y: bounds.maxY })
           c.beginPath()

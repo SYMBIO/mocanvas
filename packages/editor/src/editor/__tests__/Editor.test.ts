@@ -18,7 +18,7 @@ class BoxUtil extends BaseBoxShapeUtil<BoxShape> {
   getDefaultProps() {
     return { w: 100, h: 100, color: 0xff0000ff }
   }
-  getGeometry(shape: BoxShape) {
+  override getGeometry(shape: BoxShape) {
     return new Rectangle2d({ width: shape.props.w, height: shape.props.h, isFilled: true })
   }
   component() {
@@ -313,7 +313,7 @@ describe("Editor groups", () => {
     getDefaultProps() {
       return { w: 1, h: 1, color: 0 }
     }
-    getGeometry(shape: BaseShape<"group", { w: number; h: number; color: number }>) {
+    override getGeometry(shape: BaseShape<"group", { w: number; h: number; color: number }>) {
       const kids = this.editor.getSortedChildIdsForParent(shape.id).map((id) => this.editor.getShape(id)!)
       const maxX = Math.max(1, ...kids.map((k) => k.x + (k.props as { w: number }).w))
       const maxY = Math.max(1, ...kids.map((k) => k.y + (k.props as { h: number }).h))
@@ -367,7 +367,7 @@ class BrokenUtil extends BaseBoxShapeUtil<BrokenShape> {
   getDefaultProps() {
     return { w: 100, h: 100, color: 0xff0000ff }
   }
-  getGeometry(shape: BrokenShape) {
+  override getGeometry(shape: BrokenShape) {
     if (shape.props.color === BROKEN_COLOR) throw new TypeError("Cannot read properties of undefined (reading 'trim')")
     return new Rectangle2d({ width: shape.props.w, height: shape.props.h, isFilled: true })
   }

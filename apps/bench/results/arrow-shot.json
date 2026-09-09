@@ -1,0 +1,9 @@
+{
+  "shape": "ellipse",
+  "zoom": 5,
+  "gpu": {
+    "webgl2": true,
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+    "vendor": "Google Inc. (Apple)"
+  }
+}

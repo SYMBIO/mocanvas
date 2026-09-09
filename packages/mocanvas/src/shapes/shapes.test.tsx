@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 import {
   Box,
+  compressLegacySegments,
   createShapeId,
   FONT_SIZES,
   GEO_SHAPE_KINDS,
@@ -289,6 +290,31 @@ describe("DrawShapeUtil", () => {
   const util = new DrawShapeUtil(editor)
   const zig = Array.from({ length: 8 }, (_, i) => ({ x: i * 10, y: i % 2 ? 10 : 0 }))
 
+  it("reads the packed segment encoding it writes, not only the long-hand one", () => {
+    // The round trip this library performs on its own documents: the writer packs
+    // the points into base64, and the reader has to get the same shape back. It
+    // did not — the packed string fell through the array reader as empty, so a
+    // compressed draw shape had no geometry and drew nothing, silently, because
+    // an unreadable segment is meant to cost its own run rather than throw.
+    const packed = compressLegacySegments([{ type: "free", points: zig.map((p) => ({ ...p, z: 0.5 })) }])
+    expect(typeof packed[0]!.points).toBe("string")
+
+    // Cast on purpose. `DrawShapeProps.segments` describes what is *stored*, and
+    // that is always long-hand — a document arriving packed is decoded by
+    // `normalize` before it reaches the store. The packed form is an input the
+    // reader tolerates, from a caller that builds a shape record by hand, so the
+    // only way to hand one to it is to step outside the stored type.
+    const asStored = packed as unknown as DrawShape["props"]["segments"]
+
+    const fromPacked = util.getGeometry(makeShape<DrawShape>("draw", { ...util.getDefaultProps(), segments: asStored }))
+    const fromPlain = util.getGeometry(makeShape<DrawShape>("draw", { ...util.getDefaultProps(), segments: [{ type: "free", points: zig }] }))
+
+    expect(fromPacked.vertices.length).toBe(fromPlain.vertices.length)
+    expect(fromPacked.vertices.length).toBeGreaterThan(1)
+    expect(fromPacked.bounds.w).toBeCloseTo(fromPlain.bounds.w, 3)
+    expect(fromPacked.bounds.h).toBeCloseTo(fromPlain.bounds.h, 3)
+  })
+
   it("concatenates and smooths free segments into a polyline", () => {
     const shape = makeShape<DrawShape>("draw", {
       ...util.getDefaultProps(),
@@ -500,15 +526,21 @@ describe("ArrowShapeUtil", () => {
     expect(drag({ ...handles[1]!, id: "nope" })).toBeUndefined()
   })
 
-  it("label rect is added and excluded from path words", () => {
+  it("label rect is added, is not drawn, and leaves the body whole", () => {
     const plain = makeShape<ArrowShape>("arrow", base())
     const labelled = makeShape<ArrowShape>("arrow", { ...base(), text: "go" })
     const g = util.getGeometry(labelled) as Group2d
     expect(g.children.at(-1)!.isLabel).toBe(true)
-    expect(g.toPathWords()).toEqual(util.getGeometry(plain).toPathWords())
     expect(g.children.at(-1)!.center.x).toBeCloseTo(100)
     expect(util.component(plain)).toBeNull()
     expect(util.component(labelled)).not.toBeNull()
+
+    // The label neither draws its own rectangle nor cuts the line: it is an opaque
+    // box laid over a body that runs end to end. That is what keeps it clickable —
+    // hit-testing runs on these path words, and the label's rectangle is not in
+    // them, so the only thing under the text to hit is the stroke itself.
+    const words = g.toPathWords()
+    expect(words).toEqual(util.getGeometry(plain).toPathWords())
   })
 })
 

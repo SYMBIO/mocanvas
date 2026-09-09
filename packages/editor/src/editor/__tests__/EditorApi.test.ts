@@ -26,7 +26,7 @@ class BoxUtil extends BaseBoxShapeUtil<BoxShape> {
   getDefaultProps() {
     return { w: 100, h: 100 }
   }
-  getGeometry(shape: BoxShape) {
+  override getGeometry(shape: BoxShape) {
     return new Rectangle2d({ width: shape.props.w, height: shape.props.h, isFilled: true })
   }
   component() {
@@ -46,7 +46,7 @@ class PinUtil extends BaseBoxShapeUtil<PinShape> {
   getDefaultProps() {
     return { w: 40, h: 40 }
   }
-  getGeometry(shape: PinShape) {
+  override getGeometry(shape: PinShape) {
     return new Rectangle2d({ width: shape.props.w, height: shape.props.h, isFilled: true })
   }
   component() {

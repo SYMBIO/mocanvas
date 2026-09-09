@@ -311,17 +311,35 @@ export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
     if (this.options.customGeoTypes?.[geo]) return undefined
     const kind = GEO_KIND[geo]
     if (kind === undefined) return undefined
-    const { w, h, growY, fill, flipX, flipY } = readGeoProps(shape)
+    const { w, h, growY, fill, flipX, flipY, size, scale } = readGeoProps(shape)
     // The label rect is always clamped inside the body box, so the group's
     // bounds stay exactly `w x (h + growY)` whether or not there is text.
-    return { type: "geo", kind, w, h: h + growY, isClosed: true, isFilled: fill !== "none", flipX, flipY }
+    return {
+      type: "geo",
+      kind,
+      w,
+      h: h + growY,
+      isClosed: true,
+      isFilled: fill !== "none",
+      flipX,
+      flipY,
+      // Only the marks inside an outline use it — the X of an x-box, whose ends
+      // sit on the corners. `getGeometry` has always shortened them by this; the
+      // engine draws its own copy of the path and needs to be told the same.
+      strokeWidth: STROKE_SIZES[size] * scale,
+    }
   }
 
-  getGeometry(shape: GeoShape): Geometry2d {
+  override getGeometry(shape: GeoShape): Geometry2d {
     const props = readGeoProps(shape)
-    const { w, h, growY, fill, text, flipX, flipY } = props
+    const { w, h, growY, fill, text, flipX, flipY, size, scale } = props
     const height = h + growY
-    const body = this.getGeoTypeDefinition(this.getGeoValue(shape)).getPath(w, height, { isFilled: fill !== "none", flipX, flipY })
+    const body = this.getGeoTypeDefinition(this.getGeoValue(shape)).getPath(w, height, {
+      isFilled: fill !== "none",
+      flipX,
+      flipY,
+      strokeWidth: STROKE_SIZES[size] * scale,
+    })
     if (!text) return body
     return new Group2d({ children: [body, this.getLabelRect(props)] })
   }

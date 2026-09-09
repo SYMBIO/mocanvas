@@ -1,4 +1,7 @@
-import { createShapeId, loadMocanvasFile, Mocanvas, type Editor, type ShapeCreate } from "@mocanvas/mocanvas"
+import { compressLegacySegments, createShapeId, loadMocanvasFile, Mocanvas, type Editor, type ShapeCreate } from "@mocanvas/mocanvas"
+
+import { BaseBoxShapeUtil, HTMLContainer } from "@mocanvas/editor"
+import { makeGalleryCardUtil } from "../gallery-card"
 import {
   buildSpecs,
   cameraAt,
@@ -116,6 +119,7 @@ function install(editor: Editor): BenchApi {
     isReady: () => !editor.getIsDisposed(),
     shapeCount: () => editor.getCurrentPageShapeIds().size,
     gpuInfo,
+    compressSegments: (segments) => compressLegacySegments(segments as never) as unknown[],
     fitCamera,
 
     shapeBoxes(): ShapeBox[] {
@@ -225,10 +229,19 @@ function install(editor: Editor): BenchApi {
   return api
 }
 
+/**
+ * Built once. The same factory runs on both pages against each library's own
+ * primitives, so the gallery's custom row is a like-for-like test of the two
+ * extension points rather than of two different shapes.
+ */
+const galleryCardUtil = makeGalleryCardUtil({ BaseBoxShapeUtil, HTMLContainer } as never) as never
+;(globalThis as { __GALLERY_HAS_CUSTOM__?: boolean }).__GALLERY_HAS_CUSTOM__ = true
+
 export default function MocanvasPage() {
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       <Mocanvas
+        shapeUtils={[galleryCardUtil]}
         hideUi
         showStats={false}
         options={{ maxShapesPerPage: 1_000_000 }}

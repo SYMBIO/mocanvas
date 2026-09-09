@@ -1,5 +1,8 @@
 // tldraw is used here only through its public, documented API (see docs/BENCHMARK.md).
 import "tldraw/tldraw.css"
+
+import { BaseBoxShapeUtil, HTMLContainer } from "tldraw"
+import { makeGalleryCardUtil } from "../gallery-card"
 import {
   compressLegacySegments,
   createBindingId,
@@ -220,6 +223,7 @@ function install(editor: Editor): BenchApi {
     isReady: () => !editor.isDisposed,
     shapeCount: () => editor.getCurrentPageShapeIds().size,
     gpuInfo,
+    compressSegments: (segments) => compressLegacySegments(segments as never) as unknown[],
     fitCamera,
 
     shapeBoxes(): ShapeBox[] {
@@ -360,10 +364,19 @@ function install(editor: Editor): BenchApi {
   return api
 }
 
+/**
+ * Built once. The same factory runs on both pages against each library's own
+ * primitives, so the gallery's custom row is a like-for-like test of the two
+ * extension points rather than of two different shapes.
+ */
+const galleryCardUtil = makeGalleryCardUtil({ BaseBoxShapeUtil, HTMLContainer } as never) as never
+;(globalThis as { __GALLERY_HAS_CUSTOM__?: boolean }).__GALLERY_HAS_CUSTOM__ = true
+
 export default function TldrawPage() {
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       <Tldraw
+        shapeUtils={[galleryCardUtil]}
         hideUi
         colorScheme="light"
         options={{ maxShapesPerPage: 1_000_000 }}

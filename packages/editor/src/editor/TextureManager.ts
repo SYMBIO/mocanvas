@@ -281,8 +281,18 @@ export class TextureManager {
     try {
       this.backend.uploadTexture(entry.id, entry.source, entry.opts)
     } catch {
-      // A backend that cannot take the source (lost context, disposed) leaves
-      // the entry ready but unbound; it draws white until the next upload.
+      // The backend would not take this source. Left "ready" the entry keeps a
+      // texture id that was never filled, and an unfilled texture samples as
+      // opaque black — so the shape drew a black box and nothing anywhere said
+      // why. Marking it failed hands out id `0` instead, which is the white
+      // 1×1, and lets a shape that watches its texture state show whatever it
+      // shows for an asset it could not load.
+      //
+      // Only the source is condemned, not the backend: a lost or disposed
+      // context throws too, and `setBackend` re-uploads everything still ready
+      // when a new one arrives.
+      entry.state = "error"
+      this.options.onChange?.([entry.key])
     }
   }
 

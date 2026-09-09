@@ -117,6 +117,16 @@ export interface BenchApi {
    * shimmed. It is a bench-side convenience, not part of mocanvas.
    */
   downconvert?(json: unknown): Promise<unknown>
+  /**
+   * Encode legacy `{ points }` draw segments into the `{ path }` form the record
+   * validators want, using whichever library this page is running.
+   *
+   * Exposed because it is the one place the gallery cannot be written once and
+   * run on both: tldraw 5 rejects a draw shape whose segments carry `points`,
+   * while mocanvas still accepts the legacy shape. Each page passes its own
+   * `compressLegacySegments`, so the gallery code itself stays identical.
+   */
+  compressSegments?(segments: unknown[]): unknown[]
 }
 
 declare global {

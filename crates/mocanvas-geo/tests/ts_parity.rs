@@ -78,16 +78,20 @@ fn assert_words_eq(label: &str, got: &[f32], want: &[f32]) {
 fn geo_paths_match_the_typescript_word_for_word() {
     let mut seen = 0;
     for r in records("geo") {
-        // fields: kindIndex flipX flipY nWords; floats: w h then the path words.
+        // fields: kindIndex flipX flipY nWords; floats: w h strokeWidth then the path words.
         let kind = GeoKind::from_u32(r.fields[0]).expect("fixture names a kind this build knows");
         let flip_x = r.fields[1] == 1;
         let flip_y = r.fields[2] == 1;
         let n = r.fields[3] as usize;
-        let (w, h) = (r.floats[0], r.floats[1]);
-        let want = &r.floats[2..];
+        let (w, h, stroke_width) = (r.floats[0], r.floats[1], r.floats[2]);
+        let want = &r.floats[3..];
         assert_eq!(want.len(), n, "fixture word count disagrees with its own header");
-        let got = to_words(&geo_path(kind, w, h, flip_x, flip_y));
-        assert_words_eq(&format!("{kind:?} {w}x{h} flip({flip_x},{flip_y})"), &got, want);
+        let got = to_words(&geo_path(kind, w, h, flip_x, flip_y, stroke_width));
+        assert_words_eq(
+            &format!("{kind:?} {w}x{h} flip({flip_x},{flip_y}) stroke {stroke_width}"),
+            &got,
+            want,
+        );
         seen += 1;
     }
     assert!(seen >= 100, "only {seen} geo cases in the fixture — is it stale?");

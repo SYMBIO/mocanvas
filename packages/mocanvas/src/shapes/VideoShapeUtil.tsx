@@ -222,7 +222,7 @@ export class VideoShapeUtil extends BaseBoxShapeUtil<VideoShape> {
     return { w: VIDEO_WIDTH, h: VIDEO_HEIGHT, assetId: null, time: 0, playing: true, url: "", altText: "" }
   }
 
-  getGeometry(shape: VideoShape): Geometry2d {
+  override getGeometry(shape: VideoShape): Geometry2d {
     const { w, h } = readVideoBox(shape)
     return new Rectangle2d({ width: Math.max(1, w), height: Math.max(1, h), isFilled: true })
   }

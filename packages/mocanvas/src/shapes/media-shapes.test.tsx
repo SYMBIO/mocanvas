@@ -305,7 +305,10 @@ describe("EmbedShapeUtil", () => {
     expectWellFormedPath(g.toPathWords())
     expect([g.bounds.w, g.bounds.h]).toEqual([400, 300])
     expect(util.getRenderStyle(shape)).toBeNull()
-    expect(util.canEdit(shape)).toBe(false)
+    // Editable, which for an embed means "can be handed the pointer": a double
+    // click activates the frame, and until then it is inert so the canvas keeps
+    // its own drags and wheel.
+    expect(util.canEdit(shape)).toBe(true)
   })
 
   it("sandboxes an embed to scripts, same-origin and popups only", () => {

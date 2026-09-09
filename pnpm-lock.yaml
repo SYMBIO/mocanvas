@@ -159,6 +159,15 @@ importers:
       '@mocanvas/store':
         specifier: workspace:*
         version: link:../store
+      '@tiptap/core':
+        specifier: ^3.0.0
+        version: 3.31.2(@tiptap/pm@3.31.2)
+      '@tiptap/pm':
+        specifier: ^3.0.0
+        version: 3.31.2
+      '@tiptap/starter-kit':
+        specifier: ^3.0.0
+        version: 3.31.2
     devDependencies:
       '@types/react':
         specifier: ^19.1.0

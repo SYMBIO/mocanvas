@@ -170,20 +170,36 @@ export function getGeoPolygonPoints(kind: GeoShapeKind, w: number, h: number): V
   }
 }
 
-/** Open polylines drawn inside the outline (the X of an x-box, the tick of a check-box). */
-export function getGeoDecorations(kind: GeoShapeKind, w: number, h: number): VecLike[][] {
+/**
+ * Open polylines drawn inside the outline (the X of an x-box, the tick of a
+ * check-box).
+ *
+ * `strokeWidth` shortens the marks that end *on* the outline. A stroke is
+ * centred on its path and its round cap reaches half a width beyond the last
+ * point, so diagonals running corner to corner of the box came out as four
+ * spikes sticking through the very outline they belong inside. Pulling each end
+ * back by half a width lands the cap on the corner instead of past it. The
+ * check-box's tick sits well clear of the edge and is left alone.
+ */
+export function getGeoDecorations(kind: GeoShapeKind, w: number, h: number, strokeWidth = 0): VecLike[][] {
   switch (kind) {
-    case "x-box":
+    case "x-box": {
+      // Along the diagonal, not along an axis: the cap sticks out the way the
+      // line is pointing.
+      const d = Math.hypot(w, h)
+      const t = d > 0 ? Math.min(strokeWidth / 2 / d, 0.4) : 0
+      const [dx, dy] = [w * t, h * t]
       return [
         [
-          { x: 0, y: 0 },
-          { x: w, y: h },
+          { x: dx, y: dy },
+          { x: w - dx, y: h - dy },
         ],
         [
-          { x: w, y: 0 },
-          { x: 0, y: h },
+          { x: w - dx, y: dy },
+          { x: dx, y: h - dy },
         ],
       ]
+    }
     case "check-box":
       return [
         [
@@ -313,7 +329,7 @@ export function mirrorSegmentsInBox(segments: readonly CubicSegment[], w: number
  * geometry, so a curved outline keeps its curves instead of being flattened
  * into a mirrored polygon.
  */
-export function getGeoGeometry(kind: GeoShapeKind, w: number, h: number, isFilled: boolean, flip?: GeoFlip): Geometry2d {
+export function getGeoGeometry(kind: GeoShapeKind, w: number, h: number, isFilled: boolean, flip?: GeoFlip, strokeWidth = 0): Geometry2d {
   switch (kind) {
     case "ellipse":
       // An axis-aligned ellipse is its own mirror image on both axes.
@@ -329,7 +345,7 @@ export function getGeoGeometry(kind: GeoShapeKind, w: number, h: number, isFille
     default: {
       const points = mirrorPointsInBox(getGeoPolygonPoints(kind, w, h) ?? [], w, h, flip)
       const body = new Polygon2d({ points, isFilled })
-      const decorations = getGeoDecorations(kind, w, h)
+      const decorations = getGeoDecorations(kind, w, h, strokeWidth)
       if (decorations.length === 0) return body
       return new Group2d({
         children: [body, ...decorations.map((points) => new Polyline2d({ points: mirrorPointsInBox(points, w, h, flip) }))],

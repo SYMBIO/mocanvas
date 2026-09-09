@@ -5,7 +5,7 @@
 import type { UnknownShape } from "../records/base"
 import type { TLThemeHost } from "../theme/types"
 import { OverlayUtil, type OverlayHost } from "./OverlayUtil"
-import { getShapeIndicatorPath, type IndicatorPathSource } from "./resolve"
+import { getShapeIndicatorPath, sketchIndicatorPath, type IndicatorPathSource } from "./resolve"
 import type { TLIndicatorContext, TLIndicatorTransform, TLIndicatorOverlay } from "./types"
 
 /** The subset of a shape util the compositor reads. */
@@ -26,6 +26,12 @@ export interface TLIndicatorHost extends OverlayHost {
   getShapeUtil(shape: UnknownShape): IndicatorShapeUtil
   getShapePageTransform(shape: UnknownShape): TLIndicatorTransform
   getShapeGeometryBounds(shape: UnknownShape): { x: number; y: number; w: number; h: number } | undefined
+  /**
+   * The outline the hand-drawn style really strokes, or `null` for a shape drawn
+   * along its geometry. Optional, so a host that has no renderer behind it — a
+   * test double, most of them — simply falls back to the util's own outline.
+   */
+  getShapeSketchPath?(shape: UnknownShape): number[] | null
   getInstanceState(): { isCoarsePointer: boolean }
   getCurrentToolId(): string
   getCamera(): { x: number; y: number; z: number }
@@ -123,7 +129,18 @@ export class ShapeIndicatorCompositor<H extends TLIndicatorHost = TLIndicatorHos
       const util = editor.getShapeUtil(shape)
       let paths
       try {
-        paths = getShapeIndicatorPath(util, shape, editor.getShapeGeometryBounds(shape))
+        // The hand-drawn style strokes a sketch of the shape, not the shape, so
+        // an outline traced from the geometry is an outline of something the
+        // user cannot see — square where the drawing is round, straight where it
+        // wavers. Where the renderer has such a sketch, that is what gets
+        // traced; `null` means this shape is stroked along its geometry after
+        // all and the util's own answer is the right one.
+        //
+        // Asked here rather than in each util because it is true of every shape
+        // the style applies to, and a rule that holds for all of them belongs in
+        // one place.
+        const sketch = editor.getShapeSketchPath?.(shape) ?? null
+        paths = sketch ? { path: sketchIndicatorPath(sketch) } : getShapeIndicatorPath(util, shape, editor.getShapeGeometryBounds(shape))
       } catch {
         // FAIL-SOFT: one util throwing must not take the whole overlay down —
         // every other selected shape would lose its outline with it.
