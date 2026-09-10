@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.1.1
+
+Packaging only; no code change.
+
+The repository is private, so the links every published README carried into it
+were 404s for whoever read them on npm — and with no website yet, there was
+nowhere else to point. The `repository`, `homepage` and `bugs` fields are gone
+from all seven manifests, the fourteen links are replaced by what they pointed
+at, and each package now ships the whole `docs/` set in its tarball, copied at
+`prepack`. The flagship README carries the compatibility figures and the
+clean-room statement outright rather than by reference.
+
 ## 3.1.0
 
 Every symbol the tldraw 5.4 reference documents now exists under the same name:
