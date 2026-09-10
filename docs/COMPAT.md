@@ -12,45 +12,96 @@ places, not a rename. If you are coming from mocanvas 1.x, read
 
 ## How much of the API exists
 
-Measured against an enumeration of the public reference documentation, not
-against a feeling. Regenerate the enumeration from `tldraw.dev` and re-diff
-whenever you want the current figure.
+Counted, not estimated:
+
+```
+pnpm --filter bench api-coverage -- --members --list
+```
+
+That enumerates both surfaces from their `.d.ts` declarations and diffs them. It
+lives in `apps/bench` because that is the only place the clean-room policy lets
+tldraw's declarations be read at all — see [CLEAN_ROOM.md](CLEAN_ROOM.md). The
+denominator is every symbol the packages *export*, which is a harder target than
+the reference site's index: measuring against declarations can understate
+coverage but never flatter it.
+
+### Reach — is the name there
 
 | | |
 | :--- | ---: |
-| Documented symbols, six SDK packages | 1,415 |
-| Exported by mocanvas | **1,043 (73.7%)** |
-| Still missing | 372 |
-| Excluded on purpose (see below) | ~60 symbols + 3 packages |
+| Distinct symbols across the seven SDK packages | 1,485 |
+| Exported by mocanvas under the same name | **1,389 (93.5%)** |
+| Missing only as a `TL*` alias | 49 |
+| Genuinely absent | 47 |
 
-Where the remainder is:
+| Package | Symbols | Covered |
+| :--- | ---: | ---: |
+| `tldraw` (umbrella, re-exports the rest) | 1,485 | 93.5% |
+| `@tldraw/editor` | 840 | 89.2% |
+| `@tldraw/tlschema` | 286 | 87.8% |
+| `@tldraw/store` | 65 | 100% |
+| `@tldraw/state` | 27 | 100% |
+| `@tldraw/state-react` | 7 | 100% |
+| `@tldraw/validate` | 7 | 100% |
 
-| Area | State |
+The 49 alias gaps are `TL*` spellings of types mocanvas already exports
+unprefixed — `TLGeoShapeProps` for `GeoShapeProps`, `TLImageShape` for
+`ImageShape`, and so on. That is a hole in `@mocanvas/compat`, whose whole job is
+carrying those spellings, rather than a missing capability.
+
+The 47 that are genuinely absent are mostly `@tldraw/utils`, which the umbrella
+re-exports: `debounce`, `throttle`, `modulate`, `invLerp`, `isEqual`, `dedupe`,
+`rng`, `sortById`, the `getHashFor*` helpers, `Result` / `OkResult` /
+`ErrorResult`, `FileHelpers`, `MediaHelpers`, `PngHelpers`, `LruCache`,
+`WeakCache`, and type utilities like `Expand`, `RecursivePartial` and
+`Awaitable`. The remainder is a short list of real items: `ContextMenu`,
+`PeopleMenu` and `PeopleMenuProps`, `TldrawProps`, `TldrawEditorStoreProps`,
+`PerformanceTracker`, `FpsScheduler`, and the `DEFAULT_SUPPORTED_MEDIA_TYPE*`
+constants.
+
+### Depth — does the name carry its members
+
+Reach flatters: a class counts above if the name exists, whatever shape it is in.
+The same script measures the members of every symbol both sides share, which is
+the number to trust when the question is whether real code will run.
+
+| Package | Members of shared symbols | Present |
+| :--- | ---: | ---: |
+| `@tldraw/store` | 502 | 94.6% |
+| `@tldraw/tlschema` | 2,829 | 88.4% |
+| `@tldraw/editor` | 8,360 | 85.7% |
+| `@tldraw/state` | 72 | 80.6% |
+| `@tldraw/validate` | 100 | 72.0% |
+| `tldraw` (umbrella) | 14,576 | 69.8% |
+
+The types most code actually touches, checked one by one:
+
+| Type | Members |
 | :--- | :--- |
-| `Editor` | **complete** — all 298 documented members |
-| `Vec` / `Box` / `Mat` / `Geometry2d` | **complete** — 107 / 58 / 38 / 37 members |
-| Geometry classes, intersections, angle and arc helpers | complete |
-| React UI components | **complete** — all 233, each reachable through the components map |
-| `@tldraw/store`, `@tldraw/state`, `@tldraw/state-react`, `@tldraw/validate` | complete |
-| Records, migrations, `.tldr` IO, custom record types | substantially complete |
-| `ShapeUtil` / `BindingUtil` / `StateNode` extension points | substantially complete |
-| Shapes, tools, export, external content, rich text, themes | substantially complete |
+| `Vec` / `Box` / `Mat` | complete — 45 / 43 / 22 |
+| `Editor` | 304 of 313 |
+| `ShapeUtil` | 52 of 77 |
 
-The 372 that remain are concentrated in a few places rather than spread thin:
-the canvas **overlay utils** (`BrushOverlayUtil`, `ScribbleOverlayUtil`, the
-collaborator set — the `OverlayUtil` base class and `OverlayManager` they plug
-into exist, the painters do not); the **`AssetUtil` subclasses**
-(`ImageAssetUtil`, `BookmarkAssetUtil`); **`PathBuilder`** and the stroke
-helpers; the **highlight** shape and the **laser** tool; the **elbow-arrow**
-types; and about 48 `@tldraw/tlschema` symbols, mostly per-shape props and
-migration variables.
+`Editor` is nine short: `getCameraForFollowing`,
+`getViewportPageBoundsForFollowing`, `getIsShapeHiddenCache`,
+`getChangesToTranslateShape`, `animatingShapes`, and four `EventEmitter` members.
+`ShapeUtil` is the thinner of the two — 25 hooks are absent, mostly the `can*`
+predicates (`canTabTo`, `canResizeChildren`, `canBeLaidOut`, `canCull`,
+`canEditInReadonly`, …) and `createShapeForAsset`.
 
 An app that drives the canvas through the `Editor` API, or through the default
-chrome, is well served. What it may still miss is a specific painter, asset util
-or shape from the list above.
+chrome, is well served. What it is most likely to trip over is a `ShapeUtil` hook
+it overrides, a `TL*` alias that is not re-exported yet, or a `@tldraw/utils`
+helper it imported from `tldraw` rather than writing itself.
+
+> Earlier revisions of this document reported 1,043 of 1,415 symbols (73.7%), and
+> the 2.0.0 changelog reported about 88%. Both predate the script above and are
+> superseded by it. The old figure also listed the highlight shape, the laser
+> tool, `PathBuilder`, the overlay utils and the asset utils as missing; all of
+> them exist.
 
 You can measure a real application against this surface rather than trusting the
-table: `scripts/compat-parity.mjs` type-checks a consumer app with `tldraw`
+tables: `scripts/compat-parity.mjs` type-checks a consumer app with `tldraw`
 remapped onto `@mocanvas/compat` and reports what breaks, grouped by symbol.
 
 ## Packages
