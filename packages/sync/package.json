@@ -4,15 +4,6 @@
   "description": "Multiplayer for a mocanvas store: record diffs over a transport, plus presence and cursors.",
   "license": "MIT",
   "author": "Symbio Digital",
-  "homepage": "https://github.com/SYMBIO/mocanvas/tree/main/packages/sync#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/SYMBIO/mocanvas.git",
-    "directory": "packages/sync"
-  },
-  "bugs": {
-    "url": "https://github.com/SYMBIO/mocanvas/issues"
-  },
   "keywords": [
     "multiplayer",
     "collaboration",
@@ -29,7 +20,14 @@
     "scripts",
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "ARCHITECTURE.md",
+    "BENCHMARK.md",
+    "CLEAN_ROOM.md",
+    "COMPAT.md",
+    "CUSTOM_SHAPES.md",
+    "MIGRATION.md",
+    "UI.md"
   ],
   "sideEffects": false,
   "main": "./src/index.ts",
@@ -55,7 +53,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "relay": "node scripts/relay.mjs",
-    "prepack": "pnpm run build"
+    "prepack": "node ../../scripts/bundle-docs.mjs ARCHITECTURE.md BENCHMARK.md CLEAN_ROOM.md COMPAT.md CUSTOM_SHAPES.md MIGRATION.md UI.md && pnpm run build"
   },
   "dependencies": {
     "@mocanvas/editor": "workspace:*",

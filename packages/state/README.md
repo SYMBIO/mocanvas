@@ -1,6 +1,6 @@
 # @mocanvas/state
 
-The signals library behind [mocanvas](https://github.com/SYMBIO/mocanvas):
+The signals library behind mocanvas:
 atoms, computed values, transactions, reactors, and optional React bindings.
 No dependencies.
 
@@ -42,8 +42,9 @@ function OtherCount() {
 }
 ```
 
-ESM only. See the [repository](https://github.com/SYMBIO/mocanvas) for the
-rest of the packages.
+ESM only. The rest of the family: `@mocanvas/mocanvas` (the batteries-included
+canvas), `@mocanvas/editor`, `@mocanvas/store`, `@mocanvas/wasm`,
+`@mocanvas/sync` and `@mocanvas/compat`.
 
 ## License
 

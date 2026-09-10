@@ -1,6 +1,6 @@
 # @mocanvas/editor
 
-The editor core of [mocanvas](https://github.com/SYMBIO/mocanvas), without the
+The editor core of mocanvas, without the
 default shapes, tools and UI: the `Editor` facade, `ShapeUtil` and
 `BindingUtil`, the `StateNode` tool state machine, geometry, snapping, history,
 textures, and the `<Canvas />` React renderer with its WebGL2 backend.
@@ -53,8 +53,8 @@ export function MyCanvas() {
 }
 ```
 
-Writing a shape util and its tool is covered in
-[docs/CUSTOM_SHAPES.md](https://github.com/SYMBIO/mocanvas/blob/main/docs/CUSTOM_SHAPES.md).
+Writing a shape util and its tool is covered in `CUSTOM_SHAPES.md`, shipped
+inside this package.
 
 ESM only. The WebAssembly engine is loaded from `@mocanvas/wasm`; see that
 package's README for how the `.wasm` file is resolved by your bundler.

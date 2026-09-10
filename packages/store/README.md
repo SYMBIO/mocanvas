@@ -1,6 +1,6 @@
 # @mocanvas/store
 
-The document model behind [mocanvas](https://github.com/SYMBIO/mocanvas): a
+The document model behind mocanvas: a
 reactive record store with a typed schema, migrations, record diffs and
 `.tldr` file IO. Built on `@mocanvas/state`; no React.
 
@@ -29,8 +29,9 @@ store.put([BookRecord.create({ title: "Dune" })])
 Records are reactive: `store.query` exposes signals you can read from
 `@mocanvas/state` computeds and React components.
 
-ESM only. See the [repository](https://github.com/SYMBIO/mocanvas) for the
-rest of the packages.
+ESM only. The rest of the family: `@mocanvas/mocanvas` (the batteries-included
+canvas), `@mocanvas/editor`, `@mocanvas/state`, `@mocanvas/wasm`,
+`@mocanvas/sync` and `@mocanvas/compat`.
 
 ## License
 

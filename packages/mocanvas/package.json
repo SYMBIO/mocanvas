@@ -4,15 +4,6 @@
   "description": "An infinite-canvas SDK for the web: React component, default shapes, tools and UI, on a Rust/WebAssembly engine.",
   "license": "MIT",
   "author": "Symbio Digital",
-  "homepage": "https://github.com/SYMBIO/mocanvas/tree/main/packages/mocanvas#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/SYMBIO/mocanvas.git",
-    "directory": "packages/mocanvas"
-  },
-  "bugs": {
-    "url": "https://github.com/SYMBIO/mocanvas/issues"
-  },
   "keywords": [
     "canvas",
     "infinite-canvas",
@@ -35,7 +26,14 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "ARCHITECTURE.md",
+    "BENCHMARK.md",
+    "CLEAN_ROOM.md",
+    "COMPAT.md",
+    "CUSTOM_SHAPES.md",
+    "MIGRATION.md",
+    "UI.md"
   ],
   "sideEffects": [
     "*.css",
@@ -64,7 +62,7 @@
     "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepack": "pnpm run build"
+    "prepack": "node ../../scripts/bundle-docs.mjs ARCHITECTURE.md BENCHMARK.md CLEAN_ROOM.md COMPAT.md CUSTOM_SHAPES.md MIGRATION.md UI.md && pnpm run build"
   },
   "dependencies": {
     "@mocanvas/editor": "workspace:*",

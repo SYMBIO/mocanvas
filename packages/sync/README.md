@@ -5,7 +5,7 @@ cursors and selections travel as presence records. Conflicting edits are merged
 field by field by a small CRDT (`src/crdt.ts`), so two people editing different
 properties of one shape both keep their work and every replica converges.
 
-Part of [mocanvas](https://github.com/SYMBIO/mocanvas).
+Part of mocanvas; the canvas itself is `@mocanvas/mocanvas`.
 
 ## Install
 
