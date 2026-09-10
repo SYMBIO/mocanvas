@@ -10,8 +10,9 @@ members = [
 [workspace.package]
 version = "0.0.1"
 edition = "2021"
-license = "MIT"
-repository = "https://github.com/symbio/mocanvas"
+# Not an SPDX licence: see LICENSE at the repository root. `LicenseRef-` is the
+# SPDX form for exactly this, and the crates inherit it with `license.workspace`.
+license = "LicenseRef-mocanvas"
 
 [workspace.dependencies]
 mocanvas-geo = { path = "crates/mocanvas-geo" }

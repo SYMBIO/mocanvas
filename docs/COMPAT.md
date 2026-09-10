@@ -1,6 +1,6 @@
 # Compatibility with tldraw 5.4
 
-mocanvas reimplements the tldraw API from scratch, under MIT, without reading
+mocanvas reimplements the tldraw API from scratch, without reading
 tldraw's source — see [CLEAN_ROOM.md](CLEAN_ROOM.md). This document says what
 that covers today, what it deliberately does not, and where the two libraries
 behave differently on purpose.
@@ -199,7 +199,7 @@ services tldraw operates", which was wrong about sync — see below.
 
 | | Why |
 | :--- | :--- |
-| Licensing, watermark, license telemetry | mocanvas is MIT; there is no licence to check. `licenseKey` is accepted and ignored. |
+| Licensing, watermark, license telemetry | mocanvas's own licence is a written agreement, not a key the canvas checks at runtime, so there is nothing to verify and no watermark to draw. `licenseKey` is accepted and ignored. |
 | `useSyncDemo` | Points at demo servers tldraw hosts. The only symbol in `@tldraw/sync` that genuinely does. |
 | The tldraw asset CDN defaults | The asset mechanism is kept; the host is not. Supply your own `AssetStore`. |
 | Third-party embed unfurling and integrations | Each is a call to somebody's API. `EmbedShapeUtil.configure({ embedConfig })` lets an app supply its own. |

@@ -1,8 +1,8 @@
 {
   "name": "@mocanvas/state",
-  "version": "3.1.1",
+  "version": "4.0.0",
   "description": "Signals for mocanvas: atoms, computed values, transactions and React bindings.",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",
   "keywords": [
     "signals",

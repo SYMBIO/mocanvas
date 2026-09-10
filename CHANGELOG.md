@@ -1,5 +1,33 @@
 # Changelog
 
+## 4.0.0
+
+**The licence has changed. mocanvas is no longer MIT.**
+
+### Breaking: licence
+
+mocanvas is now source-available. It stays free for personal and non-commercial
+projects, for non-profit organisations, for development, evaluation, testing and
+staging — including inside a for-profit company, so you can try it and build
+against it — and for teaching and research.
+
+Shipping it in a commercial product, service or website now requires a written
+agreement: **mocanvas@symbio.agency**.
+
+Versions released under MIT remain available under MIT, on the terms they were
+released with. This applies to 4.0.0 and later. The full text is in `LICENSE`,
+which every package ships.
+
+### Added
+
+- The README now leads with what the library is, why it exists — we built on
+  tldraw, ran out of headroom, and wanted a migration rather than a rewrite —
+  what the performance actually measures, and what of tldraw is supported. Each
+  of those was previously somewhere further down or in a linked file.
+- Measured performance tables against tldraw 5.4, with the caveat they need:
+  the run had no hardware GPU, so the interaction figures are close to a worst
+  case for mocanvas.
+
 ## 3.1.1
 
 Packaging only; no code change.

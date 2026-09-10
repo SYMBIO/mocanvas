@@ -1,21 +1,115 @@
-MIT License
+mocanvas License
+Copyright (c) 2026 Symbio Digital. All rights reserved.
 
-Copyright (c) 2026 Symbio Digital
+This software is source-available, not open source. It is free for the uses
+listed in section 2. Commercial Use requires a separate written agreement with
+Symbio Digital: contact mocanvas@symbio.agency.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. DEFINITIONS
+
+"Software" means mocanvas — the packages published under the @mocanvas scope,
+their source code, compiled artefacts, documentation and accompanying files.
+
+"You" means the individual or legal entity exercising the rights granted below.
+
+"Commercial Use" means any use of the Software in, or in the development or
+operation of, a product, service, website, application or internal tool that is:
+
+  (a) sold, licensed, rented or otherwise offered for a fee;
+  (b) used to generate revenue directly or indirectly, including through
+      advertising, sponsorship, subscription or transaction fees; or
+  (c) used in the ordinary business operations of a for-profit entity.
+
+"Non-Profit Organisation" means an entity organised and operated for charitable,
+educational, scientific, cultural, religious or similar purposes, which does not
+distribute profits to owners or shareholders, and which is recognised as such
+under the law of its jurisdiction.
+
+"Development Use" means use on a developer's own machine, or in evaluation,
+testing, continuous integration, review or staging environments, where the
+result is not offered to the public and is not used to operate a product or
+service.
+
+
+2. GRANT
+
+Subject to the terms of this Licence, Symbio Digital grants You a worldwide,
+royalty-free, non-exclusive, non-transferable, revocable licence to use, copy,
+modify and create derivative works of the Software, solely for:
+
+  (a) personal use that is not Commercial Use;
+  (b) use by a Non-Profit Organisation in pursuit of its non-profit purposes;
+  (c) Development Use, including by a for-profit entity evaluating the Software;
+  (d) teaching, study and academic research.
+
+You may distribute the Software, or a derivative work of it, only if the
+recipient receives it under this Licence, unmodified, with the notices in
+section 4 intact, and only for the purposes above.
+
+
+3. COMMERCIAL USE
+
+Commercial Use is not granted by this Licence. It requires a separate written
+agreement with Symbio Digital.
+
+Development Use under section 2(c) is permitted before such an agreement is in
+place, so that a for-profit entity may evaluate the Software and build against
+it — but shipping, deploying or operating the result as part of a commercial
+product, service or website is Commercial Use and requires the agreement first.
+
+To obtain one, contact:
+
+    mocanvas@symbio.agency
+
+
+4. CONDITIONS
+
+You must retain, in all copies and derivative works of the Software, this
+Licence text, the copyright notice above, and any notices identifying Symbio
+Digital as the author.
+
+You may not sublicense the Software, remove or alter its licence notices, or
+represent that the Software is available under different terms.
+
+
+5. THIRD-PARTY COMPONENTS
+
+The Software depends on third-party components distributed under their own
+licences. Those licences govern those components, and nothing in this Licence
+limits rights You have under them.
+
+
+6. NO WARRANTY
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+
+7. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL SYMBIO
+DIGITAL BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+8. TERMINATION
+
+This Licence terminates automatically if You breach it. On termination You must
+stop using the Software and destroy all copies in Your possession. Sections 5
+through 7 survive termination.
+
+
+9. PRIOR RELEASES
+
+Versions of the Software released under the MIT Licence remain available under
+that licence, on the terms under which they were released. This Licence governs
+this version and later ones.
+
+
+10. CONTACT
+
+    mocanvas@symbio.agency
+    Symbio Digital

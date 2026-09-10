@@ -1,7 +1,7 @@
 {
   "name": "mocanvas-monorepo",
   "private": true,
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "packageManager": "pnpm@10.27.0",
   "scripts": {
     "build": "pnpm -r --filter \"./packages/*\" build",

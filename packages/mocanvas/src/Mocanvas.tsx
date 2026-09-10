@@ -121,7 +121,8 @@ export interface MocanvasProps {
    */
   assetUrls?: TLAssetUrls
   /**
-   * Accepted and ignored. mocanvas is MIT and has no licence to check; the
+   * Accepted and ignored. mocanvas's licence is a written agreement rather
+   * than a key the canvas verifies at runtime, so there is nothing to check; the
    * prop exists so an app migrating from a licensed canvas does not have to
    * strip it from every mount, and so that leaving it in place stays a no-op
    * rather than becoming a type error.
