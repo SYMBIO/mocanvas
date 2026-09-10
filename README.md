@@ -11,7 +11,8 @@ An infinite-canvas SDK for the web with a familiar `Editor` / `ShapeUtil` /
   `select`, `zoomToFit`, `ShapeUtil`, `StateNode`, `.tldr` files. The target is
   **tldraw 5.4**; [docs/COMPAT.md](docs/COMPAT.md) says exactly how much of it
   exists, what is deliberately excluded, and where behaviour differs on purpose.
-- **Clean-room, MIT.** Written from scratch. See [docs/CLEAN_ROOM.md](docs/CLEAN_ROOM.md).
+- **Clean-room, MIT.** Written from scratch, never by reading tldraw's source —
+  only its public documentation. See [Clean room](#clean-room).
 
 ## Install
 
@@ -87,6 +88,21 @@ engine as a compact command stream; the engine culls, tessellates and batches;
 the canvas uploads buffers by pointer and draws one call per batch. Shapes that
 render as React components go to a DOM overlay positioned in page space.
 
+## Clean room
+
+**mocanvas has never been built by reading tldraw's source.** Not the repository,
+not a copy in `node_modules`, not a fork. The compatibility described above was
+built against the public API reference and guides on tldraw.dev, sample `.tldr`
+documents, and first-principles implementation — and it is *measured* against
+that same reference, from an enumeration of the documented symbol names.
+
+Names are not copyrightable expression (*Google v. Oracle*, 2021); the
+implementation behind them is original work under MIT. The full policy, including
+the single bounded exception for the private benchmark harness, is
+[docs/CLEAN_ROOM.md](docs/CLEAN_ROOM.md).
+
+mocanvas is not affiliated with or endorsed by tldraw.
+
 ## Status
 
 3.0.0. The API model is tldraw 5.4 — a different architecture from the 3.x model
@@ -96,20 +112,42 @@ render as React components go to a DOM overlay positioned in page space.
 **Every symbol tldraw 5.4's reference documents exists under the same name** —
 1,420 of 1,420 across the seven packages this project maps, held there by
 `pnpm --filter bench api-coverage -- --reference`, which fails if one regresses.
-Four documented packages are excluded on purpose (`@tldraw/sync-core`,
-`@tldraw/mermaid`, `@tldraw/sync`, `@tldraw/driver`).
+Four documented packages are not implemented; see *What is not covered*.
 
 Names are not behaviour, though. Across the symbols both sides share, 86.4% of
 `@tldraw/editor`'s members are present: `Vec`, `Box` and `Mat` are complete,
 `Editor` has 304 of 313 members, `ShapeUtil` 52 of 77.
 [docs/COMPAT.md](docs/COMPAT.md) has the breakdown and names what is missing.
 
-What is missing is concentrated rather than spread thin: the canvas overlay
-painters, the `AssetUtil` subclasses, `PathBuilder` and the stroke helpers, the
-highlight shape and laser tool, and some per-shape schema variables.
-[docs/COMPAT.md](docs/COMPAT.md) breaks it down, and lists what is excluded on
-purpose — the client halves of services tldraw operates, which we would have to
-operate too.
+### What is not covered
+
+Four packages the reference documents are not implemented. None of them is a
+capability mocanvas cannot have; the reasons differ and are worth stating
+separately.
+
+| Package | Why not | |
+| :--- | :--- | :--- |
+| `@tldraw/mermaid` | Mermaid text to shapes on the canvas. Self-contained, nothing blocks it. | **Wanted** |
+| `@tldraw/driver` | An imperative API over the editor for tests, automation and REPLs, built on public editor calls. Nothing blocks it either. | **Wanted** |
+| `@tldraw/sync` / `@tldraw/sync-core` | A different multiplayer architecture, not a missing one — see below. | **By design** |
+
+**On sync, precisely.** mocanvas *has* multiplayer: `@mocanvas/sync`, with its own
+transport and a field-level CRDT. What it does not have is tldraw's sync API —
+`useSync`, `TLSocketRoom`, `TLSyncClient` and the storage wrappers around them.
+That is an architecture choice, not a service dependency: tldraw's sync server is
+one you run yourself, on Node, Cloudflare Durable Objects, Bun or any WebSocket
+server, and only `useSyncDemo` points at a host tldraw operates. So an app that
+wants collaboration is served; an app that wants to keep its existing tldraw sync
+*server* is not, and would have to move to `@mocanvas/sync`.
+
+Genuinely tied to services tldraw runs, and therefore never coming: licensing and
+watermark checks, `useSyncDemo`, the asset CDN defaults, and third-party embed
+unfurling. Each has a seam to supply your own.
+
+Beyond the packages, 45 symbols that the packages export but the reference does
+not document are also absent — almost all `@tldraw/utils` helpers such as
+`debounce`, `modulate` and `FileHelpers`. `import { debounce } from "tldraw"`
+fails today. They are deliberately not written from guessed semantics.
 
 Two known performance defects are written up in
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#known-performance-defects): the

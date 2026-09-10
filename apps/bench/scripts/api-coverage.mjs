@@ -197,10 +197,12 @@ const wantList = process.argv.includes("--list")
 const wantReference = process.argv.includes("--reference")
 
 /**
- * Packages the reference documents that COMPAT.md excludes on purpose: two
- * separate libraries, and the client half of the sync service tldraw operates.
+ * Packages the reference documents that mocanvas does not implement, and which
+ * the in-scope figure therefore leaves out. They are not one category — sync is
+ * a different multiplayer architecture, mermaid and driver are simply not built
+ * yet — so COMPAT.md's *Not implemented* section is what explains them.
  */
-const EXCLUDED_PACKAGES = new Set(["driver", "mermaid", "sync", "sync-core"])
+const NOT_IMPLEMENTED_PACKAGES = new Set(["driver", "mermaid", "sync", "sync-core"])
 
 /** `package/Symbol` lines from the reference enumeration, grouped by package. */
 function referenceSymbols() {
@@ -246,8 +248,8 @@ if (wantReference) {
   console.log("| :--- | ---: | ---: | ---: | ---: |")
   for (const [pkg, syms] of [...byPackage].sort((a, b) => b[1].size - a[1].size)) {
     const covered = [...syms].filter((n) => ours.names.has(n)).length
-    const excluded = EXCLUDED_PACKAGES.has(pkg)
-    console.log(`| \`${pkg}\`${excluded ? " *(excluded on purpose)*" : ""} | ${syms.size} | ${covered} | ${syms.size - covered} | ${((covered / syms.size) * 100).toFixed(1)}% |`)
+    const excluded = NOT_IMPLEMENTED_PACKAGES.has(pkg)
+    console.log(`| \`${pkg}\`${excluded ? " *(not implemented)*" : ""} | ${syms.size} | ${covered} | ${syms.size - covered} | ${((covered / syms.size) * 100).toFixed(1)}% |`)
     if (excluded) continue
     inTotal += syms.size
     inCovered += covered
