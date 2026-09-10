@@ -25,8 +25,19 @@
  * exists with half its methods still counts. `--members` adds the depth check for
  * the classes and interfaces both sides share.
  *
+ * ## The two denominators
+ *
+ * `--reference` measures against the symbols tldraw.dev/reference actually
+ * documents, enumerated in `fixtures/tldraw-reference.txt`. That is the
+ * compatibility promise COMPAT.md makes, and the number to quote.
+ *
+ * The default measures against every symbol the packages *export*, which is a
+ * larger set: it includes `@tldraw/utils` helpers the umbrella re-exports but the
+ * reference does not list. Useful as a stricter check — code that imported one of
+ * those from `tldraw` still breaks — but it is not the documented surface.
+ *
  * Usage, from the repo root, after `pnpm build`:
- *   node apps/bench/scripts/api-coverage.mjs [--members] [--list]
+ *   node apps/bench/scripts/api-coverage.mjs [--reference] [--members] [--list]
  */
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
@@ -183,6 +194,29 @@ function membersOf(entry) {
 
 const wantMembers = process.argv.includes("--members")
 const wantList = process.argv.includes("--list")
+const wantReference = process.argv.includes("--reference")
+
+/**
+ * Packages the reference documents that COMPAT.md excludes on purpose: two
+ * separate libraries, and the client half of the sync service tldraw operates.
+ */
+const EXCLUDED_PACKAGES = new Set(["driver", "mermaid", "sync", "sync-core"])
+
+/** `package/Symbol` lines from the reference enumeration, grouped by package. */
+function referenceSymbols() {
+  const file = path.join(ROOT, "apps/bench/fixtures/tldraw-reference.txt")
+  const byPackage = new Map()
+  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+    const l = line.trim()
+    if (!l || l.startsWith("#")) continue
+    const slash = l.indexOf("/")
+    if (slash < 0) continue
+    const pkg = l.slice(0, slash)
+    if (!byPackage.has(pkg)) byPackage.set(pkg, new Set())
+    byPackage.get(pkg).add(l.slice(slash + 1))
+  }
+  return byPackage
+}
 
 const compatEntry = declarationEntry(COMPAT)
 if (!compatEntry) {
@@ -201,6 +235,28 @@ for (const dir of fs.readdirSync(path.join(ROOT, "packages"))) {
   for (const [k, v] of e.symbols) if (!ours.symbols.has(k)) ours.symbols.set(k, v)
 }
 console.log(`mocanvas exports ${ours.names.size} distinct names across its published packages.`)
+
+if (wantReference) {
+  const byPackage = referenceSymbols()
+  let inTotal = 0
+  let inCovered = 0
+  const missing = []
+  console.log("\nSymbols documented at tldraw.dev/reference, and how many mocanvas exports under the same name.\n")
+  console.log("| package | documented | covered | missing | coverage |")
+  console.log("| :--- | ---: | ---: | ---: | ---: |")
+  for (const [pkg, syms] of [...byPackage].sort((a, b) => b[1].size - a[1].size)) {
+    const covered = [...syms].filter((n) => ours.names.has(n)).length
+    const excluded = EXCLUDED_PACKAGES.has(pkg)
+    console.log(`| \`${pkg}\`${excluded ? " *(excluded on purpose)*" : ""} | ${syms.size} | ${covered} | ${syms.size - covered} | ${((covered / syms.size) * 100).toFixed(1)}% |`)
+    if (excluded) continue
+    inTotal += syms.size
+    inCovered += covered
+    for (const n of syms) if (!ours.names.has(n)) missing.push(`${pkg}/${n}`)
+  }
+  console.log(`\n**In scope (the seven packages COMPAT.md maps): ${inCovered} of ${inTotal} — ${((inCovered / inTotal) * 100).toFixed(1)}%.**`)
+  if (missing.length) console.log(`\nMissing:\n\n${missing.sort().join("\n")}`)
+  process.exit(missing.length === 0 ? 0 : 1)
+}
 
 let totalDocumented = 0
 let totalCovered = 0

@@ -93,13 +93,14 @@ render as React components go to a DOM overlay positioned in page space.
 1.x was shaped after, not a rename. Coming from 1.x, read
 [docs/MIGRATION.md](docs/MIGRATION.md).
 
-**93.5% of tldraw 5.4's exported API surface** exists under the same name (1,389
-of 1,485 symbols, counted by `pnpm --filter bench api-coverage`). Of the 96 that
-do not, 49 are `TL*` spellings of types mocanvas already exports unprefixed and
-47 are genuinely absent, mostly `@tldraw/utils` helpers.
+**Every symbol tldraw 5.4's reference documents exists under the same name** —
+1,420 of 1,420 across the seven packages this project maps, held there by
+`pnpm --filter bench api-coverage -- --reference`, which fails if one regresses.
+Four documented packages are excluded on purpose (`@tldraw/sync-core`,
+`@tldraw/mermaid`, `@tldraw/sync`, `@tldraw/driver`).
 
-Reach is not depth: across the symbols both sides share, 85.7% of
-`@tldraw/editor`'s members are present. `Vec`, `Box` and `Mat` are complete,
+Names are not behaviour, though. Across the symbols both sides share, 86.4% of
+`@tldraw/editor`'s members are present: `Vec`, `Box` and `Mat` are complete,
 `Editor` has 304 of 313 members, `ShapeUtil` 52 of 77.
 [docs/COMPAT.md](docs/COMPAT.md) has the breakdown and names what is missing.
 

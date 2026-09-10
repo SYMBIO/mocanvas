@@ -68,8 +68,56 @@ import type {
   User,
   UserPreferencesState,
   UserStore,
+  ArrowBindingProps,
+  ArrowBindings,
+  ArrowShapeProps,
+  AssetContext,
+  AssetPartial,
+  BaseAsset,
+  BaseEventInfo,
+  BindingCreate,
+  BookmarkAsset,
+  BookmarkShape,
+  BookmarkShapeProps,
+  CancelEventInfo,
+  CompleteEventInfo,
+  DrawShapeProps,
+  EditorOptions,
+  EditorStoreProps,
+  EmbedShape,
+  EmbedShapeProps,
+  EventHandlers,
+  ExternalContent,
+  FrameShapeProps,
+  GeoShapeProps,
+  ImageAsset,
+  ImageShape,
+  ImageShapeProps,
+  InstanceId,
+  InstancePageStateId,
+  InterruptEventInfo,
+  KeyboardEventName,
+  LineShapeProps,
+  MocanvasProps,
+  NoteShapeProps,
+  PinchEventInfo,
+  PointerEventName,
+  PropsMigration,
+  PropsMigrations,
+  ResizeShapeOptions,
+  RichText,
+  Scribble,
+  SvgExportOptions,
+  TLSchema,
+  TextShapeProps,
+  TickEventInfo,
+  UserId,
+  VideoAsset,
+  VideoShape,
+  VideoShapeProps,
 } from "@mocanvas/mocanvas"
-import { Mocanvas, createSchema, createStore, Canvas, Editor, useCurrentUser } from "@mocanvas/mocanvas"
+import { Mocanvas, createSchema, createStore, Canvas, Editor, useCurrentUser, DOCUMENT_ID, INSTANCE_ID } from "@mocanvas/mocanvas"
+import type { SerializedStore } from "@mocanvas/store"
 
 // ---- records ----------------------------------------------------------------
 export type TLRecord = EditorRecord
@@ -162,6 +210,77 @@ export const useTldrawCurrentUser = useCurrentUser
 
 // ---- embeds -----------------------------------------------------------------
 export type TLEmbedDefinition = EmbedDefinition
+
+
+// ---- the documented `TL*` spellings ------------------------------------------
+//
+// Everything below is a name tldraw's reference documents and this package did
+// not carry. Each is a pure alias of a type mocanvas already exports unprefixed:
+// the capability was never missing, only the spelling a migrating codebase
+// imports it by. Kept in step by `pnpm --filter bench api-coverage`.
+
+// ---- events the tools and the editor emit ------------------------------------
+export type TLBaseEventInfo = BaseEventInfo
+export type TLCancelEventInfo = CancelEventInfo
+export type TLCompleteEventInfo = CompleteEventInfo
+export type TLEventHandlers = EventHandlers
+export type TLInterruptEventInfo = InterruptEventInfo
+export type TLKeyboardEventName = KeyboardEventName
+export type TLPinchEventInfo = PinchEventInfo
+export type TLPointerEventName = PointerEventName
+export type TLTickEventInfo = TickEventInfo
+
+// ---- per-shape props ---------------------------------------------------------
+export type TLArrowShapeProps = ArrowShapeProps
+export type TLBookmarkShapeProps = BookmarkShapeProps
+export type TLDrawShapeProps = DrawShapeProps
+export type TLEmbedShapeProps = EmbedShapeProps
+export type TLFrameShapeProps = FrameShapeProps
+export type TLGeoShapeProps = GeoShapeProps
+export type TLImageShapeProps = ImageShapeProps
+export type TLLineShapeProps = LineShapeProps
+export type TLNoteShapeProps = NoteShapeProps
+export type TLTextShapeProps = TextShapeProps
+export type TLVideoShapeProps = VideoShapeProps
+
+// ---- shapes ------------------------------------------------------------------
+export type TLBookmarkShape = BookmarkShape
+export type TLEmbedShape = EmbedShape
+export type TLImageShape = ImageShape
+export type TLVideoShape = VideoShape
+
+// ---- assets ------------------------------------------------------------------
+export type TLAssetContext = AssetContext
+export type TLAssetPartial<A extends Asset = Asset> = AssetPartial<A>
+export type TLBaseAsset<Type extends string, Props extends object> = BaseAsset<Type, Props>
+export type TLBookmarkAsset = BookmarkAsset
+export type TLImageAsset = ImageAsset
+export type TLVideoAsset = VideoAsset
+
+// ---- records and their ids ---------------------------------------------------
+export type TLBindingCreate<B extends UnknownBinding = UnknownBinding> = BindingCreate<B>
+export const TLDOCUMENT_ID = DOCUMENT_ID
+export const TLINSTANCE_ID = INSTANCE_ID
+export type TLInstanceId = InstanceId
+export type TLInstancePageStateId = InstancePageStateId
+export type TLPropsMigration = PropsMigration
+export type TLPropsMigrations = PropsMigrations
+export type TLRichText = RichText
+export type TLScribble = Scribble
+export type TLSerializedStore = SerializedStore<EditorRecord>
+export type TLStoreSchema = TLSchema
+export type TLUnknownBinding = UnknownBinding
+export type TLUserId = UserId
+
+// ---- options, props and the rest ----------------------------------------
+export type TLArrowBindingProps = ArrowBindingProps
+export type TLArrowBindings = ArrowBindings
+export type TldrawEditorStoreProps = EditorStoreProps
+export type TldrawProps = MocanvasProps
+export type TLEditorOptions = EditorOptions
+export type TLExternalContent = ExternalContent
+export type TLResizeShapeOptions = ResizeShapeOptions
+export type TLSvgExportOptions = SvgExportOptions
 
 // `TldrawUiMenuItem` used to be aliased here, back when the flagship only had
 // `MocanvasUiMenuItem`. The UI layer now exports the documented name itself, and
