@@ -1,6 +1,6 @@
 {
   "name": "@mocanvas/mocanvas",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "An infinite-canvas SDK for the web: React component, default shapes, tools and UI, on a Rust/WebAssembly engine.",
   "license": "MIT",
   "author": "Symbio Digital",

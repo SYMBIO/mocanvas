@@ -1,5 +1,53 @@
 # Changelog
 
+## 3.1.0
+
+Every symbol the tldraw 5.4 reference documents now exists under the same name:
+1,420 of 1,420, across the seven packages this project maps.
+
+### Added
+
+- The 51 `TL*` spellings that were still missing, all in `@mocanvas/compat`.
+  Each is an alias of a type mocanvas already exported unprefixed —
+  `TLGeoShapeProps` for `GeoShapeProps`, `TLImageShape` for `ImageShape` — so
+  nothing was missing but the name a migrating codebase imports it by. The two
+  that are concrete in tldraw rather than generic are written out as such:
+  `TLSerializedStore` is `SerializedStore<EditorRecord>`, `TLStoreSchema` is
+  `TLSchema`.
+- `apps/bench/fixtures/tldraw-reference.txt`, the 1,491 `package/Symbol` names
+  the reference documents, and `api-coverage --reference` to measure against it.
+  It exits non-zero on a regression, so it can hold the line in CI instead of
+  being re-derived by hand.
+
+### Documentation
+
+- The README now carries the clean-room statement outright: mocanvas has never
+  been built by reading tldraw's source, the compatibility is built against the
+  public reference, and it is measured against that same reference.
+- What is *not* covered is stated in the README rather than only in COMPAT.md,
+  split by reason rather than lumped together.
+- COMPAT.md's rationale for the four unimplemented packages was wrong and is
+  corrected. It filed `@tldraw/sync-core` under "client halves of services
+  tldraw operates"; `TLSocketRoom` is in fact self-hosted — Node, Cloudflare
+  Durable Objects, Bun, any WebSocket server — and only `useSyncDemo` points at
+  a host tldraw runs. Not implementing tldraw's sync stack is an architecture
+  choice against `@mocanvas/sync`'s own transport and field-level CRDT, not a
+  service dependency. `@tldraw/mermaid` and `@tldraw/driver` are recorded as
+  wanted and unbuilt, with what each would be.
+
+### Still not covered, and said plainly
+
+- Four documented packages are excluded on purpose: `@tldraw/sync-core` (42
+  symbols), `@tldraw/mermaid` (17), `@tldraw/sync` (9) and `@tldraw/driver` (3).
+- 45 exported-but-undocumented symbols, almost all `@tldraw/utils` helpers the
+  umbrella re-exports (`debounce`, `modulate`, `Result`, `FileHelpers`,
+  `LruCache`). `import { debounce } from "tldraw"` still fails. They are not
+  written from guessed semantics: a helper that behaves almost-right is worse
+  than one the compiler reports as absent.
+- Names are not behaviour. Across shared symbols `@tldraw/editor` is at 86.4% of
+  members, `ShapeUtil` has 52 of 77 and `Editor` 304 of 313.
+  [docs/COMPAT.md](docs/COMPAT.md) has the breakdown.
+
 ## 3.0.0
 
 A rendering release. Three things were visibly wrong on the canvas — each one
