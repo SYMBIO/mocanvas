@@ -93,12 +93,15 @@ render as React components go to a DOM overlay positioned in page space.
 1.x was shaped after, not a rename. Coming from 1.x, read
 [docs/MIGRATION.md](docs/MIGRATION.md).
 
-About **74% of the documented tldraw 5.4 API surface** exists (1,043 of 1,415
-symbols). Complete: the `Editor` surface, the geometry library, every documented
-React UI component, `@tldraw/store` / `state` / `state-react` / `validate`,
-records and migrations with `.tldr` round-tripping, the shape and binding
-extension points, the default shapes and tools, themes, rich text, export,
-external content and collaboration.
+**93.5% of tldraw 5.4's exported API surface** exists under the same name (1,389
+of 1,485 symbols, counted by `pnpm --filter bench api-coverage`). Of the 96 that
+do not, 49 are `TL*` spellings of types mocanvas already exports unprefixed and
+47 are genuinely absent, mostly `@tldraw/utils` helpers.
+
+Reach is not depth: across the symbols both sides share, 85.7% of
+`@tldraw/editor`'s members are present. `Vec`, `Box` and `Mat` are complete,
+`Editor` has 304 of 313 members, `ShapeUtil` 52 of 77.
+[docs/COMPAT.md](docs/COMPAT.md) has the breakdown and names what is missing.
 
 What is missing is concentrated rather than spread thin: the canvas overlay
 painters, the `AssetUtil` subclasses, `PathBuilder` and the stroke helpers, the
