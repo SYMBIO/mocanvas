@@ -153,7 +153,7 @@ mocanvas is not affiliated with or endorsed by tldraw.
 
 ## Status
 
-4.0.0. The API model is tldraw 5.4 — a different architecture from the 3.x model
+4.0.1. The API model is tldraw 5.4 — a different architecture from the 3.x model
 1.x was shaped after, not a rename. Coming from 1.x, read
 [docs/MIGRATION.md](docs/MIGRATION.md).
 
@@ -225,6 +225,4 @@ To arrange one, or if you are unsure which side of the line you are on, write to
 **mocanvas@symbio.agency** — we would rather answer the question than have you
 guess.
 
-The full terms are in `LICENSE`, at the repository root. Versions released
-earlier under MIT stay available under MIT, on the terms they were released
-with.
+The full terms are in `LICENSE`, at the repository root.

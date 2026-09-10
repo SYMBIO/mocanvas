@@ -266,6 +266,4 @@ To arrange one, or if you are unsure which side of the line you are on, write to
 **mocanvas@symbio.agency** — we would rather answer the question than have you
 guess.
 
-The full terms are in `LICENSE`, shipped in this package. Versions released
-earlier under MIT stay available under MIT, on the terms they were released
-with.
+The full terms are in `LICENSE`, shipped in this package.
