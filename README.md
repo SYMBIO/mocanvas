@@ -105,7 +105,7 @@ mocanvas is not affiliated with or endorsed by tldraw.
 
 ## Status
 
-3.0.0. The API model is tldraw 5.4 — a different architecture from the 3.x model
+3.1.0. The API model is tldraw 5.4 — a different architecture from the 3.x model
 1.x was shaped after, not a rename. Coming from 1.x, read
 [docs/MIGRATION.md](docs/MIGRATION.md).
 
