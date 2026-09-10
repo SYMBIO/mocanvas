@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.1
+
+Wording only. The licence sections no longer close by noting that versions
+released under MIT stay available under MIT. It remains true, and `LICENSE`
+section 9 still says so — a licence that quietly dropped it would read as if old
+grants were being withdrawn, which is not something this or any licence can do.
+It simply does not belong in the pitch.
+
 ## 4.0.0
 
 **The licence has changed. mocanvas is no longer MIT.**
