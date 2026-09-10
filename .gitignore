@@ -14,3 +14,12 @@ apps/bench/results/*.png
 
 # TypeScript incremental build state
 *.tsbuildinfo
+
+# Guides copied into packages at prepack; docs/ holds the only edited version.
+packages/*/ARCHITECTURE.md
+packages/*/BENCHMARK.md
+packages/*/CLEAN_ROOM.md
+packages/*/COMPAT.md
+packages/*/CUSTOM_SHAPES.md
+packages/*/MIGRATION.md
+packages/*/UI.md

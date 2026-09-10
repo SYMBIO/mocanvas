@@ -4,15 +4,6 @@
   "description": "Typed loader and zero-copy bridge over the mocanvas Rust/WebAssembly engine.",
   "license": "MIT",
   "author": "Symbio Digital",
-  "homepage": "https://github.com/SYMBIO/mocanvas/tree/main/packages/wasm#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/SYMBIO/mocanvas.git",
-    "directory": "packages/wasm"
-  },
-  "bugs": {
-    "url": "https://github.com/SYMBIO/mocanvas/issues"
-  },
   "keywords": [
     "webassembly",
     "wasm",
@@ -30,7 +21,14 @@
     "dist",
     "pkg",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "ARCHITECTURE.md",
+    "BENCHMARK.md",
+    "CLEAN_ROOM.md",
+    "COMPAT.md",
+    "CUSTOM_SHAPES.md",
+    "MIGRATION.md",
+    "UI.md"
   ],
   "sideEffects": false,
   "main": "./src/index.ts",
@@ -56,6 +54,6 @@
     "build:wasm": "wasm-pack build ../../crates/mocanvas-wasm --release --target web --out-dir ../../packages/wasm/pkg --out-name mocanvas",
     "build:dev": "wasm-pack build ../../crates/mocanvas-wasm --dev --target web --out-dir ../../packages/wasm/pkg --out-name mocanvas && node scripts/prepare-pkg.mjs",
     "typecheck": "tsc --noEmit",
-    "prepack": "pnpm run build"
+    "prepack": "node ../../scripts/bundle-docs.mjs ARCHITECTURE.md BENCHMARK.md CLEAN_ROOM.md COMPAT.md CUSTOM_SHAPES.md MIGRATION.md UI.md && pnpm run build"
   }
 }

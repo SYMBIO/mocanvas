@@ -4,15 +4,6 @@
   "description": "Signals for mocanvas: atoms, computed values, transactions and React bindings.",
   "license": "MIT",
   "author": "Symbio Digital",
-  "homepage": "https://github.com/SYMBIO/mocanvas/tree/main/packages/state#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/SYMBIO/mocanvas.git",
-    "directory": "packages/state"
-  },
-  "bugs": {
-    "url": "https://github.com/SYMBIO/mocanvas/issues"
-  },
   "keywords": [
     "signals",
     "reactive",
@@ -28,7 +19,14 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "ARCHITECTURE.md",
+    "BENCHMARK.md",
+    "CLEAN_ROOM.md",
+    "COMPAT.md",
+    "CUSTOM_SHAPES.md",
+    "MIGRATION.md",
+    "UI.md"
   ],
   "sideEffects": false,
   "main": "./src/index.ts",
@@ -58,7 +56,7 @@
     "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepack": "pnpm run build"
+    "prepack": "node ../../scripts/bundle-docs.mjs ARCHITECTURE.md BENCHMARK.md CLEAN_ROOM.md COMPAT.md CUSTOM_SHAPES.md MIGRATION.md UI.md && pnpm run build"
   },
   "devDependencies": {
     "@types/react": "^19.1.0",

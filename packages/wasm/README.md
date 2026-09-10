@@ -1,6 +1,6 @@
 # @mocanvas/wasm
 
-The Rust/WebAssembly engine behind [mocanvas](https://github.com/SYMBIO/mocanvas)
+The Rust/WebAssembly engine behind mocanvas
 and its TypeScript bridge. The engine owns the scene: it holds shape geometry,
 maintains a spatial index, hit-tests, culls to the viewport, tessellates and
 batches, and writes vertex/index/batch buffers into linear memory that the host

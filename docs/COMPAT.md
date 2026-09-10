@@ -27,7 +27,7 @@ be read at all — see [CLEAN_ROOM.md](CLEAN_ROOM.md).
 
 Every symbol the reference documents, in the packages this project maps, exists
 under the same name. The enumeration is
-[`apps/bench/fixtures/tldraw-reference.txt`](../apps/bench/fixtures/tldraw-reference.txt),
+`apps/bench/fixtures/tldraw-reference.txt` in the repository,
 taken from the site's own sitemap; `--reference` exits non-zero if anything
 regresses, so it can hold the line in CI.
 
