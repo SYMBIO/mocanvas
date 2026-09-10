@@ -1,0 +1,115 @@
+# Publish the packages to npm.
+#
+# Authentication is npm Trusted Publishing (OIDC): npm trusts this workflow, in
+# this repository, and mints a short-lived credential for it. There is no token
+# in the repository, in a secret, or on anyone's laptop — which is the point,
+# and why this exists instead of an automation token.
+#
+# Trusted publishing only works from a CI provider's own runners, so this cannot
+# be run locally. It replaces publishing by hand.
+#
+# Before the first run, each package needs a trusted publisher configured at
+# npmjs.com → package → Settings → Trusted Publisher: GitHub Actions,
+# SYMBIO/mocanvas, workflow `release.yml`.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  # So a tag that already exists can be published without inventing a new one.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and pack, but do not publish"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  # Required: this is what lets npm verify the workflow's identity.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - uses: actions/setup-node@v4
+        with:
+          # Trusted publishing wants Node >= 22.14 and npm >= 11.5.1.
+          node-version: "22.14.0"
+          registry-url: "https://registry.npmjs.org"
+
+      # setup-node pins an npm older than trusted publishing needs.
+      - run: npm install -g npm@latest
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: latest
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ hashFiles('Cargo.lock') }}
+
+      - run: pnpm install --frozen-lockfile
+
+      # The gates that decide whether this is publishable at all. A release that
+      # fails them should never reach the registry, and finding out here is much
+      # cheaper than unpublishing — which npm mostly does not allow.
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: cargo test --workspace
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # The published API must still cover what tldraw's reference documents.
+      - run: pnpm build
+      - run: node apps/bench/scripts/api-coverage.mjs --reference
+
+      - name: Check the tag matches the version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./packages/mocanvas/package.json').version")
+          if [ "$tag" != "$pkg" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package version $pkg"
+            exit 1
+          fi
+
+      - name: Publish
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
+        # `--provenance` records where this build came from; trusted publishing
+        # is what makes that attestation trustworthy.
+        run: pnpm -r --filter "./packages/*" publish --access public --no-git-checks --provenance
+
+      - name: Pack only (dry run)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: pnpm -r --filter "./packages/*" pack --pack-destination /tmp/packs && ls -la /tmp/packs
+
+      # Publishing seven packages has twice left the set half-updated when a
+      # credential expired mid-run. This fails the job if that happens again,
+      # rather than leaving a broken dependency graph for someone to find.
+      - name: Verify every package published the same version
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
+        run: |
+          want=$(node -p "require('./packages/mocanvas/package.json').version")
+          fail=0
+          for p in mocanvas editor state store sync compat wasm; do
+            got=$(npm view "@mocanvas/$p" dist-tags.latest 2>/dev/null || echo "missing")
+            printf '%-24s %s\n' "@mocanvas/$p" "$got"
+            [ "$got" = "$want" ] || fail=1
+          done
+          [ "$fail" = "0" ] || { echo "::error::not every package is at $want"; exit 1; }
