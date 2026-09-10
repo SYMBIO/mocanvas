@@ -11,8 +11,56 @@ An infinite-canvas SDK for the web with a familiar `Editor` / `ShapeUtil` /
   `select`, `zoomToFit`, `ShapeUtil`, `StateNode`, `.tldr` files. The target is
   **tldraw 5.4**; [docs/COMPAT.md](docs/COMPAT.md) says exactly how much of it
   exists, what is deliberately excluded, and where behaviour differs on purpose.
-- **Clean-room, MIT.** Written from scratch, never by reading tldraw's source —
-  only its public documentation. See [Clean room](#clean-room).
+- **Clean-room.** Written from scratch, never by reading tldraw's source — only
+  its public documentation. See [Clean room](#clean-room).
+- **Free unless you sell it.** Free for non-commercial use, non-profit
+  organisations, and development and evaluation; shipping it commercially needs
+  an agreement. See [License](#license).
+
+## Why this exists
+
+We built products on [tldraw](https://tldraw.dev), and it is a genuinely
+excellent library — the API model here is shaped after it because we think they
+got that design right. What we ran out of was headroom: our canvases grew past
+the point where a DOM-and-SVG renderer kept up, and the work we needed off the
+main thread had nowhere to go.
+
+mocanvas is that same shape of API with a different engine underneath, built so
+an existing tldraw app can come across rather than be rewritten.
+[docs/MIGRATION.md](docs/MIGRATION.md) walks through the move;
+`@mocanvas/compat` supplies the `TL`-prefixed spellings so imports can change
+first and names later.
+
+## Performance
+
+Creating shapes, median milliseconds — lower is better:
+
+| Scene | mocanvas | tldraw 5.4 | |
+| :--- | ---: | ---: | ---: |
+| 1,000 geo shapes | 15.1 ms | 37.8 ms | **2.5× faster** |
+| 5,000 geo shapes | 40.1 ms | 120.0 ms | **3.0× faster** |
+| 20,000 geo shapes | 134.2 ms | 433.2 ms | **3.2× faster** |
+| 20,000 mixed | 249.4 ms | 753.7 ms | **3.0× faster** |
+
+Dragging a selection, median milliseconds per frame:
+
+| Scene | mocanvas | tldraw 5.4 | |
+| :--- | ---: | ---: | ---: |
+| 1,000 geo shapes | 33.0 ms | 25.1 ms | tldraw ahead |
+| 5,000 geo shapes | 116.6 ms | 150.0 ms | **1.3× faster** |
+| 20,000 geo shapes | 400.0 ms | 858.4 ms | **2.1× faster** |
+
+mocanvas scales: ~3× on building a scene at every size, and the interaction gap
+opens as the scene grows. On small scenes tldraw's renderer is ahead.
+
+**With their caveats.** Measured 2026-09-04 on an Apple M3 Pro in headless
+Chromium **with no hardware GPU** — Chromium fell back to software
+rasterisation, which penalises mocanvas's WebGL2 renderer far more than
+tldraw's DOM one, so the interaction numbers are close to a worst case for
+mocanvas. Default settings on both sides, and it is our own benchmark of our own
+library. [docs/BENCHMARK.md](docs/BENCHMARK.md) has the method, the full tables,
+the rest of the caveats, and a rendering-fidelity comparison at 99.2% interior
+IoU.
 
 ## Install
 
@@ -97,7 +145,7 @@ documents, and first-principles implementation — and it is *measured* against
 that same reference, from an enumeration of the documented symbol names.
 
 Names are not copyrightable expression (*Google v. Oracle*, 2021); the
-implementation behind them is original work under MIT. The full policy, including
+implementation behind them is original work. The full policy, including
 the single bounded exception for the private benchmark harness, is
 [docs/CLEAN_ROOM.md](docs/CLEAN_ROOM.md).
 
@@ -105,7 +153,7 @@ mocanvas is not affiliated with or endorsed by tldraw.
 
 ## Status
 
-3.1.1. The API model is tldraw 5.4 — a different architecture from the 3.x model
+4.0.0. The API model is tldraw 5.4 — a different architecture from the 3.x model
 1.x was shaped after, not a rename. Coming from 1.x, read
 [docs/MIGRATION.md](docs/MIGRATION.md).
 
@@ -157,3 +205,26 @@ have a described fix, neither is done.
 
 [docs/BENCHMARK.md](docs/BENCHMARK.md) measures mocanvas against the library it is
 shaped after, on the same workloads, and renders the same document in both.
+
+## License
+
+**Source-available, not open source.** Free to use for:
+
+- personal, non-commercial projects;
+- non-profit organisations;
+- development, evaluation, testing and staging — including inside a for-profit
+  company, so you can try it and build against it before committing;
+- teaching and academic research.
+
+**Shipping it in a commercial product, service or website needs a written
+agreement with us.** That includes anything sold, anything that earns revenue
+directly or through advertising, and internal tools running a for-profit
+business.
+
+To arrange one, or if you are unsure which side of the line you are on, write to
+**mocanvas@symbio.agency** — we would rather answer the question than have you
+guess.
+
+The full terms are in `LICENSE`, at the repository root. Versions released
+earlier under MIT stay available under MIT, on the terms they were released
+with.

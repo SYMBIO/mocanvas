@@ -1,6 +1,6 @@
 # Clean-room policy
 
-mocanvas is an original work licensed under MIT. It is *shaped like* tldraw so
+mocanvas is an original work. It is *shaped like* tldraw so
 that projects can migrate, but it is not derived from it.
 
 ## Rules for contributors (human or agent)

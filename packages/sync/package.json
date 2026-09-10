@@ -1,8 +1,8 @@
 {
   "name": "@mocanvas/sync",
-  "version": "3.1.1",
+  "version": "4.0.0",
   "description": "Multiplayer for a mocanvas store: record diffs over a transport, plus presence and cursors.",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",
   "keywords": [
     "multiplayer",
