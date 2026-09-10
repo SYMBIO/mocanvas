@@ -42,11 +42,12 @@ regresses, so it can hold the line in CI.
 | `@tldraw/validate` | 7 | **100%** |
 | **In scope** | **1,420** | **1,420 (100%)** |
 
-The reference also documents four packages this project excludes on purpose —
+The reference documents four more packages that mocanvas does not implement:
 `@tldraw/sync-core` (42 symbols), `@tldraw/mermaid` (17), `@tldraw/sync` (9, of
-which 2 exist) and `@tldraw/driver` (3). Those are separate libraries and the
-client half of a service tldraw operates; see *Deliberately not implemented*
-below. Counting them, the whole reference site is 1,422 of 1,491.
+which 2 exist) and `@tldraw/driver` (3). The reasons differ — one is a different
+multiplayer architecture, two are simply not built yet, and only a single symbol
+among them is tied to a service tldraw runs. See *Not implemented* below.
+Counting all eleven packages, the whole reference site is 1,422 of 1,491.
 
 ### The stricter count: 97.0%
 
@@ -188,18 +189,46 @@ importing `@mocanvas/mocanvas` registers a provider that supplies whatever
 `loadEngine()` last produced. Pass one explicitly to run two editors on separate
 engines. Without either, construction fails with a message naming both fixes.
 
-## Deliberately not implemented
+## Not implemented
 
-Client halves of services tldraw operates, which we would have to operate too:
+Three different reasons, kept apart because they have different futures. An
+earlier revision of this section filed all of them under "client halves of
+services tldraw operates", which was wrong about sync — see below.
+
+### Tied to a service tldraw runs — not coming
 
 | | Why |
 | :--- | :--- |
 | Licensing, watermark, license telemetry | mocanvas is MIT; there is no licence to check. `licenseKey` is accepted and ignored. |
-| tldraw's hosted sync and demo servers, `@tldraw/sync-core` | `@mocanvas/sync` is the multiplayer layer, with its own transport and a field-level CRDT. |
+| `useSyncDemo` | Points at demo servers tldraw hosts. The only symbol in `@tldraw/sync` that genuinely does. |
 | The tldraw asset CDN defaults | The asset mechanism is kept; the host is not. Supply your own `AssetStore`. |
 | Third-party embed unfurling and integrations | Each is a call to somebody's API. `EmbedShapeUtil.configure({ embedConfig })` lets an app supply its own. |
 | tldraw.com UI chrome | Product UI, not SDK surface. |
-| `@tldraw/driver`, `@tldraw/mermaid`, `@tldraw/commenting`, `@tldraw/mentions` | Separate libraries. Out of scope for 2.0.0, not ruled out later. |
+
+### A different architecture, not a missing one
+
+`@tldraw/sync` (9 documented symbols) and `@tldraw/sync-core` (42) are tldraw's
+multiplayer stack: `useSync` on the client, `TLSocketRoom`, `TLSyncClient` and
+the SQLite storage wrappers on the server.
+
+It is worth being accurate about what that is. `TLSocketRoom` is **self-hosted** —
+it runs on Node, Cloudflare Durable Objects, Bun, or any WebSocket server, and
+you own the infrastructure and the data. It is not a client half of anything.
+
+mocanvas does not implement it because `@mocanvas/sync` is a different answer to
+the same problem: its own transport and a field-level CRDT, rather than tldraw's
+diff-and-rebase protocol. Two wire protocols in one library would be two things
+to keep correct. The consequence for a migrating app is specific: collaboration
+works, but an existing tldraw sync *server* does not, and the app would move to
+`@mocanvas/sync`.
+
+### Wanted, not yet built
+
+| | What it is |
+| :--- | :--- |
+| `@tldraw/mermaid` (17 symbols) | Mermaid diagram text laid out as shapes on the canvas — `createMermaidDiagram`, the blueprint types, the node render mapper. Self-contained; nothing about the architecture blocks it. |
+| `@tldraw/driver` (3 symbols) | `Driver`, an imperative API over an editor for tests, automation and REPL use — `click`, `keyPress`, `pointerMove`, `translateSelection` and so on, built on public editor calls only. Nothing blocks it either. |
+| `@tldraw/commenting`, `@tldraw/mentions` | Separate libraries, not in the 5.4 reference index. |
 
 Not excluded, despite looking infrastructural: attribution, presence primitives,
 local persistence, and `onUiEvent`. Those are canvas features.
