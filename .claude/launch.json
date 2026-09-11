@@ -38,6 +38,18 @@
         "127.0.0.1"
       ],
       "port": 5181
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "/Users/martin.cajthaml/Sites/symbio/mocanvas-web",
+        "dev",
+        "--port",
+        "3100"
+      ],
+      "port": 3100
     }
   ]
 }

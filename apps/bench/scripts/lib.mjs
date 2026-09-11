@@ -17,6 +17,14 @@ export const VIEWPORT = { width: 1200, height: 800 }
 const GPU_ARGS = ["--ignore-gpu-blocklist", "--enable-gpu-rasterization", "--enable-zero-copy"]
 /** Chromium args that force ANGLE's SwiftShader software rasteriser. */
 const SWIFTSHADER_ARGS = ["--use-gl=angle", "--use-angle=swiftshader"]
+/**
+ * Chromium args that name the platform's hardware ANGLE backend explicitly.
+ * Without these, headless Chromium picks SwiftShader on macOS even with
+ * `--ignore-gpu-blocklist`; naming the backend gets the Metal device. `null`
+ * on a platform where we have no verified hardware backend to ask for, in
+ * which case "hardware" degrades to the plain GPU args.
+ */
+const HARDWARE_ANGLE_ARGS = process.platform === "darwin" ? ["--use-gl=angle", "--use-angle=metal"] : null
 /** Always on: deterministic-ish timing plus `window.gc` for the heap metric. */
 const BASE_ARGS = ["--js-flags=--expose-gc", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows", "--hide-scrollbars", "--force-color-profile=srgb", "--font-render-hinting=none"]
 
@@ -36,32 +44,49 @@ export async function startPreview(port = 5182) {
 }
 
 /**
- * Launch Chromium. Tries GPU args first; if the page cannot get a WebGL2
- * context, relaunches forcing SwiftShader. Returns the browser plus a `mode`
- * string ("gpu" | "swiftshader") for the report.
+ * Launch Chromium. Returns the browser plus a `mode` string
+ * ("hardware" | "gpu" | "swiftshader") and a `software` boolean read back from
+ * the WebGL2 renderer string, so the report states what it actually got rather
+ * than what it asked for.
  *
- * `headed: true` opens a real window. That matters: headless Chromium on macOS
- * lands on ANGLE/SwiftShader whatever GPU flags it is given, so every frame is
- * rasterised on the CPU — which penalises a WebGL2 renderer far more than a DOM
- * one and makes the frame-time columns unrepresentative. Headed gets the real
- * Metal device.
+ * `gl` picks the rasteriser:
  *
- * It is NOT neutral for the pixel comparison, which was the first thing assumed
- * about it and is wrong. Interior IoU holds (99.2% in both modes), but the
- * stroke-band figure moves a lot — measured on identical code, the straight
- * arrow reads 2.83px p95 headless and 108px headed, and the whole-fixture p95
- * goes 4.24 -> 10.00. The band matches stroke pixels *by colour* within a
- * tolerance, and hardware MSAA softens a thin stroke's edge pixels differently
+ *   - `"hardware"` names the platform's ANGLE backend (`--use-angle=metal` on
+ *     macOS). This is the one to use for frame times. Plain `--ignore-gpu-
+ *     blocklist` is *not* enough in headless Chromium on macOS: it still lands
+ *     on SwiftShader. Naming the backend gets the Metal device with no window,
+ *     measured on this machine — headless ANGLE-Metal and a headed window both
+ *     report `ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro)`.
+ *   - `"software"` forces SwiftShader. This is the one to use for the pixel
+ *     comparison (see below).
+ *   - `"auto"` (default) keeps the historical behaviour: ask for the GPU, fall
+ *     back to SwiftShader, and report whichever turned up.
+ *
+ * Rasterisation is NOT neutral for the pixel comparison, which was the first
+ * thing assumed about it and is wrong. Interior IoU holds, but the stroke-band
+ * figure moves a lot, because the band matches stroke pixels *by colour* within
+ * a tolerance and hardware MSAA softens a thin stroke's edge pixels differently
  * from SwiftShader, so edge pixels stop matching and read as unpaired.
  *
- * So: quote frame times from a headed run and the pixel comparison from a
- * headless one, and never mix the two in the same table without saying so.
+ * So: quote frame times from a hardware run and the pixel comparison from a
+ * software one, and never mix the two in one table without saying so. That is
+ * what `bench.mjs --gl=hardware` does — it opens a second, software browser for
+ * the comparison and labels both in the report.
+ *
+ * `headed: true` opens a real window. It also gets the hardware device, but its
+ * `requestAnimationFrame` cadence is locked to the display's refresh, which
+ * floors every frame delta at ~16.7 ms and hides any difference below that;
+ * headless ANGLE-Metal drives frames at ~8.3 ms and so measures more of the
+ * actual work. Headed is kept as a cross-check, not as the default.
  */
-export async function launchBrowser({ chromium }, previewUrl, { headed = false } = {}) {
-  const attempts = [
-    { mode: "gpu", args: [...BASE_ARGS, ...GPU_ARGS] },
-    { mode: "swiftshader", args: [...BASE_ARGS, ...SWIFTSHADER_ARGS] },
-  ]
+export async function launchBrowser({ chromium }, previewUrl, { headed = false, gl = "auto" } = {}) {
+  const hardware = { mode: "hardware", args: [...BASE_ARGS, ...GPU_ARGS, ...(HARDWARE_ANGLE_ARGS ?? [])] }
+  const attempts =
+    gl === "software"
+      ? [{ mode: "swiftshader", args: [...BASE_ARGS, ...SWIFTSHADER_ARGS] }]
+      : gl === "hardware"
+        ? [hardware]
+        : [{ mode: "gpu", args: [...BASE_ARGS, ...GPU_ARGS] }, { mode: "swiftshader", args: [...BASE_ARGS, ...SWIFTSHADER_ARGS] }]
   let lastErr
   for (const attempt of attempts) {
     let browser
@@ -85,10 +110,15 @@ export async function launchBrowser({ chromium }, previewUrl, { headed = false }
         await browser.close()
         continue
       }
-      // Even the "gpu" arg set usually lands on ANGLE/SwiftShader in headless
-      // Chromium; say so rather than claiming hardware acceleration.
+      // What we asked for and what we got are different questions: the plain
+      // "gpu" arg set lands on ANGLE/SwiftShader in headless Chromium. Decide
+      // from the renderer string rather than from the flags.
       const software = /swiftshader|llvmpipe|software/i.test(`${gpu.renderer} ${gpu.vendor}`)
-      return { browser, mode: attempt.mode, software, gpu, args: attempt.args, version: browser.version() }
+      if (gl === "hardware" && software) {
+        await browser.close()
+        throw new Error(`--gl=hardware asked for the hardware ANGLE backend but got a software renderer: ${gpu.renderer}`)
+      }
+      return { browser, mode: attempt.mode, software, headed, gpu, args: attempt.args, version: browser.version() }
     } catch (e) {
       lastErr = e
       await browser?.close().catch(() => {})

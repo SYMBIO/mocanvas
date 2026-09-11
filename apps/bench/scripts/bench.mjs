@@ -60,6 +60,12 @@ function runNote(rev) {
 const PREVIOUS = {
   date: "2026-09-04 09:26:29 UTC",
   git: "15b670a-dirty",
+  /**
+   * Which rasteriser produced these. Every published run up to and including
+   * this one was SwiftShader, so a hardware run must not be diffed against it —
+   * see `comparableToPrevious` in `renderDoc`.
+   */
+  software: true,
   createMs: { "1000:geo": 15.1, "5000:geo": 40.1, "20000:geo": 134.2, "1000:mixed": 25.7, "5000:mixed": 67.8, "20000:mixed": 249.4 },
   tldrawCreateMs: { "1000:geo": 37.8, "5000:geo": 120.0, "20000:geo": 433.2, "1000:mixed": 76.0, "5000:mixed": 241.5, "20000:mixed": 753.7 },
   panP95: { "1000:geo": 24.5, "5000:geo": 66.6, "20000:geo": 116.7, "1000:mixed": 42.3, "5000:mixed": 108.3, "20000:mixed": 208.3 },
@@ -117,7 +123,7 @@ const HISTORY = [
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const opts = { ns: [1000, 5000, 20000], kinds: ["geo", "mixed"], repeats: 3, perf: true, compare: true }
+  const opts = { ns: [1000, 5000, 20000], kinds: ["geo", "mixed"], repeats: 3, perf: true, compare: true, gl: "hardware", compareGl: "software" }
   for (const a of argv) {
     const [k, v] = a.replace(/^--/, "").split("=")
     if (k === "n") opts.ns = v.split(",").map(Number)
@@ -127,6 +133,11 @@ function parseArgs(argv) {
     else if (k === "skip-compare") opts.compare = false
     else if (k === "report-only") opts.reportOnly = true
     else if (k === "headed") opts.headed = true
+    // Which rasteriser each half of the run gets: "hardware" | "software" | "auto".
+    // Frame times want hardware; the pixel comparison wants software, because
+    // hardware MSAA changes which stroke edge pixels pair up. See launchBrowser.
+    else if (k === "gl") opts.gl = v
+    else if (k === "compare-gl") opts.compareGl = v
   }
   return opts
 }
@@ -366,7 +377,24 @@ const SHAPE_LABELS = {
   "fx-frame-child-1": "rectangle (in frame)",
   "fx-frame-child-2": "ellipse (in frame)",
 }
+/** Small counts read better as words in prose: "Two rows", not "2 rows". */
+const countWord = (n) => ["zero","one","Two","Three","Four","Five","Six","Seven","Eight","Nine"][n] ?? String(n)
+
 const shapeLabel = (s) => SHAPE_LABELS[String(s.id).replace(/^shape:/, "")] ?? s.geo ?? s.type
+
+/**
+ * Diagnosed causes for regions whose stroke band is genuinely displaced, keyed
+ * by fixture id. A region that lands on that list without an entry here is
+ * reported as undiagnosed rather than given a borrowed explanation — the point
+ * of the list is to say which differences are understood.
+ */
+const BAND_NOTES = {
+  "shape:fx-arrow-bent":
+    "tldraw stops the arrow short of the rectangle it is bound to; mocanvas runs it to the shape's edge. A binding difference, not a stroke one.",
+  "shape:fx-text":
+    "font weight: tldraw's face is heavier and slightly wider, so the glyphs drift apart along the line even though the baseline and size agree.",
+  "shape:fx-note": "the note's drop shadow spreads further in mocanvas than in tldraw; the body itself matches.",
+}
 
 const px = (v) => (v == null || !Number.isFinite(v) ? "—" : `${v.toFixed(2)} px`)
 
@@ -458,18 +486,32 @@ function comparisonSection(compare, versions) {
     md.push("")
     const worstIoU = interior.perShape.filter((v) => v.interior).sort((x, y) => x.interior.iouPercent - y.interior.iouPercent).slice(0, 3)
     md.push(`**What is left is not a wrong outline.** The lowest rows are now ${worstIoU.map((v) => `${shapeLabel(v)} (${fmt(v.interior.iouPercent, 1)}%)`).join(", ")}, and they`)
-    md.push("have two different causes, neither of them shape geometry.")
+    md.push(`${worstIoU.length > 1 ? "have causes" : "has a cause"} that ${worstIoU.length > 1 ? "are" : "is"} not shape geometry.`)
     md.push("")
-    md.push("The note is the one large region on that list, and what this metric scores there is not its body but its")
-    md.push("silhouette, which includes the drop shadow. The body matches: 214 px wide in both renders, same gradient")
-    md.push("values at both ends. The shadow does not — mocanvas's spreads about 7 px further on each side and 7 px")
-    md.push("higher than tldraw's — and that spread is most of the missing 10 points.")
-    md.push("")
-    md.push("The star and the triangle are simply the two smallest interiors in the fixture (8,666 and 8,897 px). A 6 px")
-    md.push("erosion takes a fixed bite out of every silhouette and zoom-to-fit lands mocanvas's ink a pixel or two off")
-    md.push("tldraw's (see Visible differences); both cost a small region proportionally far more than a large one. The")
-    md.push("frame, the largest region here, scores 98.8% under exactly the same treatment.")
-    md.push("")
+    // Which of those rows is small-region erosion and which is the note's
+    // shadow depends on the run. This used to name the note and the triangle
+    // unconditionally and kept saying so after both had left the list.
+    {
+      const scoredByArea = interior.perShape.filter((s) => s.interior).sort((a, b) => a.interior.pixelsTldraw - b.interior.pixelsTldraw)
+      const smallest = new Set(scoredByArea.slice(0, 2).map((s) => s.id))
+      const onListSmall = worstIoU.filter((v) => smallest.has(v.id))
+      const largest = scoredByArea[scoredByArea.length - 1]
+      const noteOnList = worstIoU.some((v) => v.id === "shape:fx-note")
+      if (noteOnList) {
+        md.push("The note is the one large region on that list, and what this metric scores there is not its body but its")
+        md.push("silhouette, which includes the drop shadow. The body matches at both ends of its gradient; the shadow")
+        md.push("spreads further in mocanvas, and that spread is most of what the row is missing.")
+        md.push("")
+      }
+      if (onListSmall.length) {
+        md.push(`${onListSmall.map((v) => `The ${shapeLabel(v)}`).join(" and ")} ${onListSmall.length > 1 ? "are" : "is"} simply among the smallest interiors in the fixture`)
+        md.push(`(${onListSmall.map((v) => `${int(v.interior.pixelsTldraw)} px`).join(", ")}). A 6 px erosion takes a fixed bite out of every silhouette and`)
+        md.push("zoom-to-fit lands mocanvas's ink a pixel or two off tldraw's (see Visible differences); both cost a small")
+        md.push("region proportionally far more than they cost a large one. The")
+        md.push(`${shapeLabel(largest)}, the largest region here, scores ${fmt(largest.interior.iouPercent, 1)}% under exactly the same treatment.`)
+        md.push("")
+      }
+    }
     const skipped = interior.perShape.filter((s) => !s.interior).map((s) => shapeLabel(s))
     md.push(`Not scored here: the ${skipped.slice(0, -1).join(", the ")} and the ${skipped[skipped.length - 1]}. An open shape encloses nothing, and its box overlaps shapes that`)
     md.push("do — measuring \"its interior\" would silently be measuring theirs. The stroke band distance below is the")
@@ -504,22 +546,49 @@ function comparisonSection(compare, versions) {
       const q = byId(scored, suffix)?.band?.symmetric
       return q ? `${px(q.medianPx)} median / ${px(q.p95Px)} p95` : "—"
     }
+    // Which region owns the worst pixel, and which rows actually stand out, are
+    // facts about this run's table. They used to be asserted in prose ("on a
+    // glyph", "the two rows that stand out are the bent arrow and the text
+    // shape") and went stale the moment another row overtook them, leaving the
+    // paragraph contradicting the table directly above it. Derive them.
+    const worst = scored.reduce((a, b) => (b.band.symmetric.maxPx > a.band.symmetric.maxPx ? b : a))
     md.push("**This is the number that says the hand-drawn stroke is working.** Half of mocanvas's stroke pixels are")
     md.push(`within ${px(band.overall.symmetric.medianPx)} of a reference stroke pixel of the same colour, and the worst pixel anywhere in the fixture is`)
-    md.push(`${px(band.overall.symmetric.maxPx)} out — about ${fmt(band.overall.symmetric.maxPx / sw, 1)} stroke widths, on a glyph. ${tight} of the ${scored.length} scored regions sit at a median of`)
+    md.push(`${px(band.overall.symmetric.maxPx)} out — about ${fmt(band.overall.symmetric.maxPx / sw, 1)} stroke widths, on the ${shapeLabel(worst)}. ${tight} of the ${scored.length} scored regions sit at a median of`)
     md.push(`half a stroke width or better. Two outlines that a pixel diff scores as largely disjoint are, measured as a`)
     md.push("distance, running within a stroke width of each other nearly everywhere.")
     md.push("")
-    md.push("The two rows that stand out are the differences worth having a name for, and neither is stroke")
-    md.push("randomness:")
-    md.push("")
-    md.push(`- **bent arrow, ${quote("fx-arrow-bent")}** — tldraw stops the arrow short of the rectangle it is bound`)
-    md.push("  to; mocanvas runs it to the shape's edge. A binding difference, and the only region left in the fixture")
-    md.push("  whose median is more than half a stroke width out.")
-    md.push(`- **text shape, ${quote("fx-text")}** — font weight: tldraw's face is heavier and slightly wider, so the`)
-    md.push("  glyphs drift apart along the line even though the baseline and size agree. It also owns the fixture's")
-    md.push("  worst single pixel.")
-    md.push("")
+
+    // A region whose median is ~0 but whose p95 is many stroke widths out is
+    // not a displaced outline: almost every pixel coincides exactly, and a
+    // minority have no same-colour partner at all. That is the signature of a
+    // colour class that exists in one render and not the other — an antialiased
+    // edge landing in a different bucket — rather than of geometry.
+    const unpaired = scored.filter((s) => s.band.symmetric.medianPx <= sw / 2 && s.band.symmetric.p95Px > sw * 4)
+    const displaced = scored.filter((s) => s.band.symmetric.medianPx > sw / 2)
+
+    if (displaced.length) {
+      md.push(`${displaced.length === 1 ? "One row stands out" : `${countWord(displaced.length)} rows stand out`} on the median — the outline itself runs somewhere else, and that is not stroke`)
+      md.push("randomness:")
+      md.push("")
+      for (const s of displaced) {
+        const known = BAND_NOTES[s.id]
+        md.push(`- **${shapeLabel(s)}, ${quote(s.id.replace(/^shape:/, ""))}**${known ? ` — ${known}` : " — not yet diagnosed; see the screenshots in `apps/bench/results/`."}`)
+      }
+      md.push("")
+    }
+
+    if (unpaired.length) {
+      md.push(`${unpaired.length === 1 ? "One row has" : `${countWord(unpaired.length)} rows have`} a median at or below half a stroke width but a 95th percentile many stroke widths out`)
+      md.push(`(${unpaired.map((s) => `**${shapeLabel(s)}**, ${px(s.band.symmetric.medianPx)} median / ${px(s.band.symmetric.p95Px)} p95`).join("; ")}). That profile is`)
+      md.push("not a displaced outline — almost every pixel coincides *exactly*, and then a minority are stranded. It is the")
+      md.push("signature of a colour class present in one render and absent from the other: this metric pairs stroke pixels")
+      md.push("by colour, so an antialiased edge that quantises into a different bucket on one side has no partner at any")
+      md.push("distance, and sets the percentile by itself. Read those two numbers as a question to investigate against the")
+      md.push("screenshots, not as a measured distance between two outlines.")
+      md.push("")
+    }
+
     md.push(`The star (${quote("fx-star")}) and the hexagon (${quote("fx-hexagon")}) were on this list in the previous run, at 2.83 px`)
     md.push("and 6.71 px median against a ~4 px stroke. `2ef11f1` corrected the outlines behind both, and they now sit at")
     md.push("the fixture median.")
@@ -632,18 +701,28 @@ function summarySection(data) {
   // Only say something about the smaller sizes when they were actually run;
   // this paragraph used to be unconditional and printed `Infinity×` for a
   // single-N run.
+  // Why the small-N frame figures look the way they do depends on what
+  // rasterised them, so this paragraph has to read the environment rather than
+  // assert one. It used to say "this machine has no GPU" unconditionally.
+  const noGpu = data.browser?.software !== false
+  const rasterReason = noGpu
+    ? "this machine has no GPU, so mocanvas's WebGL2 output is rasterised on the CPU, where 4× MSAA alone accounts for roughly 70% of the frame; and "
+    : "at these sizes both libraries finish a frame inside the browser's frame cadence, so the deltas are floored by the cadence rather than by either library's work; and "
   const smallRatios = ratios("panP50", small)
   if (smallRatios.length > 0) {
-    md.push(`At the smaller sizes it is slower per frame — ${span(smallRatios.map((v) => 1 / v))} on the median pan/zoom frame — for two`)
-    md.push("reasons set out in the caveats: this machine has no GPU, so mocanvas's WebGL2 output is rasterised on the")
-    md.push("CPU, where 4× MSAA alone accounts for roughly 70% of the frame; and the pan/zoom metric counts only")
+    const slower = smallRatios.filter((v) => v < 1)
+    md.push(
+      slower.length
+        ? `At the smaller sizes it is slower per frame — ${span(slower.map((v) => 1 / v))} on the median pan/zoom frame — for two`
+        : "At the smaller sizes the two converge on the median pan/zoom frame, for two",
+    )
+    md.push(`reasons set out in the caveats: ${rasterReason}the pan/zoom metric counts only`)
     md.push("main-thread work, which tldraw largely avoids by panning with a CSS transform on the compositor. The")
     md.push("`selectAllDrag` tables are the fairer frame comparison.")
   } else {
-    md.push("This run measured 20,000 shapes only. The caveats below matter for reading the frame figures: this")
-    md.push("machine has no GPU, so mocanvas's WebGL2 output is rasterised on the CPU, and the pan/zoom metric")
-    md.push("counts only main-thread work, which tldraw largely avoids by panning with a CSS transform on the")
-    md.push("compositor. The `selectAllDrag` tables are the fairer frame comparison.")
+    md.push(`This run measured 20,000 shapes only. The caveats below matter for reading the frame figures: ${rasterReason}the`)
+    md.push("pan/zoom metric counts only main-thread work, which tldraw largely avoids by panning with a CSS transform")
+    md.push("on the compositor. The `selectAllDrag` tables are the fairer frame comparison.")
   }
   if (compare?.ok && !compare.diff?.error && compare.regions) {
     const i = compare.regions.interior?.overall
@@ -655,8 +734,8 @@ function summarySection(data) {
       md.push(`IoU at ${i.colourAgreementPercent.toFixed(1)}% colour agreement, and half its stroke pixels land within ${b.medianPx.toFixed(2)} px of a tldraw stroke`)
       md.push(`pixel of the same colour (95th percentile ${b.p95Px.toFixed(2)} px, against a stroke about ${sw?.toFixed(0) ?? "4"} px wide). ${compare.diff.diffPercent.toFixed(2)}% of the`)
       md.push("canvas differs pixel-for-pixel, most of it two hand-drawn outlines that miss each other by roughly a stroke")
-      md.push("width. The differences that are not stroke randomness are a bound arrow that runs to the shape's edge where")
-      md.push("tldraw stops short of it, and a lighter font.")
+      md.push("width. The largest differences that are not stroke randomness are a bound arrow that runs to the shape's")
+      md.push("edge where tldraw stops short of it, and a lighter font; the stroke-band section lists the rest.")
     }
   }
   md.push("")
@@ -664,7 +743,10 @@ function summarySection(data) {
 }
 
 function renderDoc(data) {
-  const { machine, browser, matrix, ns, kinds, repeats, compare, versions, date } = data
+  const { machine, browser, compareBrowser, matrix, ns, kinds, repeats, compare, versions, date } = data
+  /** The browser the pixel comparison actually ran in — its own, or the perf one. */
+  const cmpBrowser = compareBrowser ?? browser
+  const raster = (b) => (b.software ? "software (SwiftShader, CPU)" : "hardware")
   const md = []
   md.push("# Benchmark: mocanvas vs tldraw")
   md.push("")
@@ -676,7 +758,25 @@ function renderDoc(data) {
   md.push("camera path, and the same hit-test sample points. Frame times are frame-to-frame `requestAnimationFrame`")
   md.push("deltas recorded while a camera animation runs (zoom to fit → zoom in 4× → horizontal pan sweep → zoom back out).")
   md.push("")
-  if (matrix?.mocanvas) {
+  // The trend section is only meaningful when both runs were rasterised the
+  // same way. PREVIOUS is a SwiftShader run; against a hardware run its tables
+  // would read a 10× rasteriser change as a code change, and its hand-written
+  // prose ("this machine was much slower", "the drag ratio moved against
+  // mocanvas in all six cells") would contradict the numbers printed directly
+  // above it. Say that it was dropped, rather than printing it and hoping.
+  const comparableToPrevious = matrix?.mocanvas && PREVIOUS.software === browser.software
+  if (matrix?.mocanvas && !comparableToPrevious) {
+    md.push("## What changed since the previous run")
+    md.push("")
+    md.push(`**Not shown for this run.** The previously published performance numbers (${PREVIOUS.date}, git \`${PREVIOUS.git}\`) were`)
+    md.push(`measured with ${PREVIOUS.software ? "software (SwiftShader) rasterisation" : "hardware rasterisation"}, and this run used`)
+    md.push(`${browser.software ? "software (SwiftShader) rasterisation" : "hardware rasterisation"}. A before/after table across that change would`)
+    md.push("read the rasteriser as if it were a code change — the effect is larger than anything in the diff between")
+    md.push("the two revisions — so it is omitted rather than printed with a warning attached. The next run measured the")
+    md.push("same way as this one will restore the section; update `PREVIOUS` in `apps/bench/scripts/bench.mjs` then.")
+    md.push("")
+  }
+  if (comparableToPrevious) {
     md.push("## What changed since the previous run")
     md.push("")
     md.push(`Three changes to what mocanvas draws landed between the previous published performance numbers (${PREVIOUS.date}, git \`${PREVIOUS.git}\`) and this run:`)
@@ -780,11 +880,19 @@ function renderDoc(data) {
   md.push(`| Machine | ${machine.cpu}, ${machine.cores} cores, ${machine.memoryGB} GB |`)
   md.push(`| OS | ${machine.os} |`)
   md.push(`| Node | ${machine.node} |`)
-  md.push(`| Browser | headless Chromium ${browser.version} (Playwright ${versions.playwright}) |`)
+  md.push(`| Browser | ${browser.headed ? "headed" : "headless"} Chromium ${browser.version} (Playwright ${versions.playwright}) |`)
   md.push(`| Chromium flags | \`${browser.args.join(" ")}\` |`)
   md.push(`| GL mode attempted | ${browser.mode} |`)
   md.push(`| WebGL2 renderer | ${browser.gpu.renderer} |`)
-  md.push(`| Rasterisation | ${browser.software ? "**software (SwiftShader)** — no hardware GPU in this environment" : "hardware"} |`)
+  md.push(
+    `| Rasterisation | ${browser.software ? "**software (SwiftShader)** — no hardware GPU in this environment" : `**hardware** — the machine's own GPU, through ANGLE${browser.headed ? "" : ", headless"}`} |`,
+  )
+  if (compareBrowser) {
+    // Two browsers, two rasterisers, and the report must not let a reader
+    // assume one number came from the other's environment.
+    md.push(`| Pixel-comparison browser | ${compareBrowser.headed ? "headed" : "headless"} Chromium, ${raster(compareBrowser)} |`)
+    md.push(`| Pixel-comparison renderer | ${compareBrowser.gpu.renderer} |`)
+  }
   md.push(`| tldraw | ${versions.tldraw} |`)
   md.push(`| mocanvas | ${versions.mocanvas} (this repo, ${versions.git}) |`)
   md.push(`| Builds | production (\`vite build\`, minified, \`NODE_ENV=production\`) for both |`)
@@ -819,6 +927,23 @@ function renderDoc(data) {
     md.push("")
     md.push(metricTable(matrix, ns, kinds, (r) => r.panP50, (v) => `${fmt(v, 2)} ms`))
     md.push("")
+    {
+      // On a hardware rasteriser mocanvas finishes most of these frames inside
+      // the browser's own frame cadence, so the cell reports the cadence and
+      // not the work. Count the pinned cells rather than describing them, so
+      // this note cannot drift away from the table above it.
+      const cells = Object.values(matrix.mocanvas).map((r) => r.panP50).filter((v) => Number.isFinite(v))
+      const floor = Math.min(...cells)
+      const pinned = cells.filter((v) => v <= floor + 0.05).length
+      if (cells.length && pinned >= Math.ceil(cells.length / 2)) {
+        md.push(`**${pinned} of these ${cells.length} mocanvas cells sit at ${fmt(floor, 2)} ms, which is this browser's frame cadence, not a measurement of`)
+        md.push("mocanvas.** A frame that finishes before the next animation callback is due reports the cadence however")
+        md.push("early it finished, so those cells are an upper bound: mocanvas's real pan cost at those sizes is *somewhere")
+        md.push("below* the number printed, and the ratio against tldraw is a lower bound on how much faster it is. Quote")
+        md.push("them as \"at least\", never as the measured cost.")
+        md.push("")
+      }
+    }
     md.push("95th-percentile frame (the stutter you actually feel):")
     md.push("")
     md.push(metricTable(matrix, ns, kinds, (r) => r.panP95, (v) => `${fmt(v, 2)} ms`))
@@ -854,8 +979,11 @@ function renderDoc(data) {
     md.push("### JS heap after the run (`memoryMB()`)")
     md.push("")
     md.push("`performance.memory.usedJSHeapSize` after a forced GC (`--js-flags=--expose-gc`). This is JS heap only —")
-    md.push("it does not include GPU buffers (mocanvas) or the DOM/layout memory of the render tree (tldraw), so it")
-    md.push("understates both, differently. Treat it as a rough signal, not a memory benchmark.")
+    md.push("it does not include GPU buffers or **WebAssembly linear memory** (mocanvas), or the DOM/layout memory of")
+    md.push("the render tree (tldraw), so it understates both, and it understates mocanvas by more: mocanvas keeps the")
+    md.push("scene in its Rust core, which is WASM memory and therefore outside this number entirely, while tldraw's")
+    md.push("store is JS objects and is counted in full. Treat it as a rough signal, not a memory benchmark, and do")
+    md.push("not quote the ratio as \"mocanvas uses N× less memory\".")
     md.push("")
     md.push(metricTable(matrix, ns, kinds, (r) => r.memoryMB, (v) => `${fmt(v, 1)} MB`, { words: ["less", "more"] }))
     md.push("")
@@ -888,6 +1016,13 @@ function renderDoc(data) {
     md.push("a bent arrow bound to the rectangle, a straight arrow, a line, a note with text, a text shape, and a frame")
     md.push("with two children. Both pages load that same file, zoom to fit at 1200×800 and are screenshotted.")
     md.push("")
+    if (compareBrowser) {
+      md.push(`These screenshots were taken in a **separate ${raster(cmpBrowser)}-rasterised** browser, not the one that produced the frame times`)
+      md.push("above. The stroke-band metric pairs stroke pixels by colour, and hardware MSAA resolves a thin stroke's edge")
+      md.push("pixels differently from SwiftShader, so a hardware render scores a band difference that is antialiasing rather")
+      md.push("than geometry. Holding the rasteriser fixed here keeps these figures comparable with every earlier run.")
+      md.push("")
+    }
     md.push(`- \`apps/bench/results/compare-tldraw.png\` — tldraw (${compare.loads.tldraw.shapes} shapes from ${compare.fixtureRecords} records)`)
     md.push(`- \`apps/bench/results/compare-mocanvas.png\` — mocanvas (${compare.loads.mocanvas.shapes} shapes from ${compare.fixtureRecords} records)`)
     md.push("- `apps/bench/results/compare-diff.png` — differing pixels in red")
@@ -958,6 +1093,20 @@ function renderDoc(data) {
     md.push("_Written by hand from looking at the two screenshots, and kept in")
     md.push("`apps/bench/results/visible-differences.md` so that re-running the bench does not overwrite it._")
     md.push("")
+    // Precisely because re-running does not overwrite it, this section can be
+    // older than the tables above and quote figures they contradict. Say so
+    // rather than letting a reader assume the whole page was measured together.
+    {
+      const io = compare?.regions?.interior?.overall
+      const bo = compare?.regions?.stroke?.overall?.symmetric
+      const figures = [
+        io ? `interior IoU **${fmt(io.iouPercent, 1)}%**` : null,
+        bo ? `stroke band **${px(bo.medianPx)} median / ${px(bo.p95Px)} p95**` : null,
+        compare?.diff?.diffPercent != null ? `whole-image diff **${fmt(compare.diff.diffPercent, 2)}%**` : null,
+      ].filter(Boolean)
+      md.push(`> **This section is not regenerated.** It was written against an earlier run, so where a figure here disagrees with the measured tables above${figures.length ? ` (${figures.join(", ")})` : ""}, the tables are the measurement and this is the commentary. Re-review it against the current screenshots before quoting it.`)
+    }
+    md.push("")
     md.push(data.visibleDifferences ?? "_Not yet reviewed._")
     md.push("")
   }
@@ -981,9 +1130,12 @@ function renderDoc(data) {
 
   md.push("## Caveats — please read before quoting these numbers")
   md.push("")
-  md.push("- **Headless, software-rasterised GPU.** " + (browser.software
-    ? "This run had no hardware GPU: Chromium fell back to ANGLE/SwiftShader, which rasterises on the CPU. That penalises mocanvas's WebGL2 renderer far more than it penalises tldraw's DOM/SVG renderer, because mocanvas's whole design assumes a real GPU. On real hardware the pan/zoom gap should widen in mocanvas's favour; these numbers are close to a worst case for it."
-    : "Hardware acceleration was available, but a headless Chromium GPU stack is still not a user's browser."))
+  if (browser.software) {
+    md.push("- **Headless, software-rasterised GPU.** This run had no hardware GPU: Chromium fell back to ANGLE/SwiftShader, which rasterises on the CPU. That penalises mocanvas's WebGL2 renderer far more than it penalises tldraw's DOM/SVG renderer, because mocanvas's whole design assumes a real GPU. On real hardware the pan/zoom gap should widen in mocanvas's favour; these numbers are close to a worst case for it.")
+  } else {
+    md.push(`- **Hardware GPU, ${browser.headed ? "headed" : "headless"} Chromium.** The frame times above were rasterised by this machine's own GPU (\`${browser.gpu.renderer}\`), not by SwiftShader. ${browser.headed ? "A headed window" : "Headless Chromium with the platform's ANGLE backend named explicitly (`--use-angle=metal`; `--ignore-gpu-blocklist` alone is not enough and still lands on SwiftShader)"} gets the real device. It is still an automated browser rather than a user's, and the GPU process is shared with nothing else, which a real desktop's is not.`)
+    md.push("- **Frame times and pixel metrics come from two different browsers, on purpose.** The rasteriser is not neutral for the pixel comparison: hardware MSAA resolves a thin stroke's edge pixels differently from SwiftShader, and the stroke-band metric pairs stroke pixels *by colour*, so a hardware render scores a band difference that is antialiasing rather than geometry. The frame-time tables therefore come from the hardware browser and the [rendering comparison](#rendering-comparison) from a software one; both are named in the Environment table. Do not read a row from one as if it had been measured in the other.")
+  }
   const probe = glCostProbe()
   if (probe && browser.software) {
     md.push("- **4× MSAA dominates a software-rasterised frame, so these frame times mostly measure SwiftShader, not")
@@ -998,7 +1150,7 @@ function renderDoc(data) {
     md.push("  it measures the rasteriser rather than mocanvas — no mocanvas code runs in it — so it does not need")
     md.push("  re-measuring with the rest of the report.")
   }
-  if (matrix?.tldraw && PREVIOUS?.tldrawPanP95) {
+  if (comparableToPrevious && PREVIOUS?.tldrawPanP95) {
     md.push("- **Run-to-run spread is very wide here, and was unusually wide between this run and the last.** tldraw's code did not")
     md.push("  change between this run and the previous one, and it still came out 26–57% slower on shape creation,")
     md.push("  27–69% slower on hit testing and up to 234% slower on the 95th-percentile pan/zoom frame (see \"What")
@@ -1097,9 +1249,10 @@ async function main() {
   const server = await startPreview()
   console.log(`preview at ${server.url}`)
 
-  const launched = await launchBrowser({ chromium }, server.url, { headed: opts.headed === true })
-  console.log(`chromium ${launched.version} — mode=${launched.mode} software=${launched.software}`)
-  console.log(`renderer: ${launched.gpu.renderer}`)
+  const describe = (b) => `${b.headed ? "headed" : "headless"} chromium ${b.version} — mode=${b.mode} software=${b.software}\n  renderer: ${b.gpu.renderer}`
+
+  const launched = await launchBrowser({ chromium }, server.url, { headed: opts.headed === true, gl: opts.gl })
+  console.log(`perf browser: ${describe(launched)}`)
 
   const matrix = { mocanvas: {}, tldraw: {} }
   const raw = []
@@ -1126,11 +1279,24 @@ async function main() {
     }
   }
 
+  // The pixel comparison gets its own browser whenever the perf browser's
+  // rasteriser is not the one the comparison is calibrated against. Hardware
+  // MSAA resolves a thin stroke's edge pixels differently from SwiftShader, and
+  // the stroke-band metric pairs stroke pixels by colour, so a hardware render
+  // scores a large band difference that is antialiasing rather than geometry.
+  // Frame times therefore come from one browser and the pixel metrics from
+  // another, and both are named in the report.
+  let compareLaunched = launched
+  if (opts.compare && opts.compareGl !== "same" && (opts.compareGl === "software") !== launched.software) {
+    compareLaunched = await launchBrowser({ chromium }, server.url, { gl: opts.compareGl })
+    console.log(`compare browser: ${describe(compareLaunched)}`)
+  }
+
   let compare = { ok: false, error: "skipped (--skip-compare)" }
   if (opts.compare) {
     console.log("\nrendering comparison…")
     try {
-      compare = await compareRendering(launched.browser, server.url)
+      compare = await compareRendering(compareLaunched.browser, server.url)
       if (compare.ok && !compare.diff.error) {
         console.log(`  pixel diff: ${compare.diff.diffPercent.toFixed(2)}%  (ink overlap ${compare.diff.inkOverlapPercent.toFixed(1)}%)`)
         console.log(`  mocanvas load: ok=${compare.loads.mocanvas.ok} shapes=${compare.loads.mocanvas.shapes} warnings=${compare.loads.mocanvas.warnings.length}`)
@@ -1144,13 +1310,17 @@ async function main() {
     }
   }
 
+  const snapshot = (b) => ({ version: b.version, mode: b.mode, software: b.software, headed: Boolean(b.headed), gpu: b.gpu, args: b.args })
+
+  if (compareLaunched !== launched) await compareLaunched.browser.close()
   await launched.browser.close()
   await server.close()
 
   const data = {
     date: new Date().toISOString().slice(0, 19).replace("T", " ") + " UTC",
     machine: machineInfo(),
-    browser: { version: launched.version, mode: launched.mode, software: launched.software, gpu: launched.gpu, args: launched.args },
+    browser: snapshot(launched),
+    compareBrowser: compareLaunched === launched ? null : snapshot(compareLaunched),
     versions: {
       tldraw: pkgVersion("tldraw"),
       playwright: pkgVersion("playwright"),
