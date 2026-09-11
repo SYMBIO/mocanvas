@@ -19,10 +19,23 @@ on:
   # So a tag that already exists can be published without inventing a new one.
   workflow_dispatch:
     inputs:
+      mode:
+        description: "What to do"
+        type: choice
+        options: [publish, deprecate]
+        default: publish
       dry_run:
-        description: "Build and pack, but do not publish"
+        description: "publish: build and pack, but do not publish"
         type: boolean
         default: false
+      deprecate_range:
+        description: "deprecate: which versions, as a semver range"
+        type: string
+        default: "<4.0.0"
+      deprecate_message:
+        description: "deprecate: the notice npm shows on install (empty string clears it)"
+        type: string
+        default: "Superseded by 4.0.0. Versions before 4.0.0 were released under the MIT licence; from 4.0.0 mocanvas is source-available and commercial use requires an agreement - mocanvas@symbio.agency"
 
 permissions:
   contents: read
@@ -31,6 +44,7 @@ permissions:
 
 jobs:
   publish:
+    if: ${{ github.event_name == 'push' || inputs.mode == 'publish' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -129,3 +143,36 @@ jobs:
           done
           echo "::error::not every package reached $want:$missing"
           exit 1
+
+  # Deprecating is a write to the registry like publishing, so it needs the same
+  # credential — and npm ties a trusted publisher to a workflow *file*, not a job.
+  # Hence a second job here rather than a second workflow: a `deprecate.yml` would
+  # be an untrusted stranger and would need its own seven configurations.
+  deprecate:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'deprecate' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm install -g npm@latest
+
+      - name: Deprecate
+        run: |
+          fail=0
+          for p in mocanvas editor state store sync compat wasm; do
+            echo "--- @mocanvas/$p@${{ inputs.deprecate_range }}"
+            npm deprecate "@mocanvas/$p@${{ inputs.deprecate_range }}" "${{ inputs.deprecate_message }}" || fail=1
+          done
+          [ "$fail" = "0" ] || { echo "::error::at least one deprecate failed"; exit 1; }
+
+      - name: Show what each package now reports
+        run: |
+          for p in mocanvas editor state store sync compat wasm; do
+            echo "--- @mocanvas/$p"
+            npm view "@mocanvas/$p" deprecated --json 2>/dev/null || echo "(none)"
+          done
