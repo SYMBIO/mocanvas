@@ -69,6 +69,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Build first: `packages/wasm/pkg` is wasm-pack output and is not in the
+      # repository, so typecheck cannot resolve `@mocanvas/wasm` until it exists.
+      - run: pnpm build
+
       # The gates that decide whether this is publishable at all. A release that
       # fails them should never reach the registry, and finding out here is much
       # cheaper than unpublishing — which npm mostly does not allow.
@@ -78,7 +82,6 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
       # The published API must still cover what tldraw's reference documents.
-      - run: pnpm build
       - run: node apps/bench/scripts/api-coverage.mjs --reference
 
       - name: Check the tag matches the version
