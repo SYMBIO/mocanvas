@@ -144,10 +144,19 @@ jobs:
           echo "::error::not every package reached $want:$missing"
           exit 1
 
-  # Deprecating is a write to the registry like publishing, so it needs the same
-  # credential — and npm ties a trusted publisher to a workflow *file*, not a job.
-  # Hence a second job here rather than a second workflow: a `deprecate.yml` would
-  # be an untrusted stranger and would need its own seven configurations.
+  # Deprecating needs a credential the publish job does not have. Trusted
+  # publishing mints an OIDC credential scoped to *publishing*: `npm deprecate`
+  # with it returns 404 on the PUT, which is how the registry says "or you do not
+  # have permission" without revealing whether a package exists. There is no OIDC
+  # path for deprecate, so this job wants an `NPM_TOKEN` repository secret — a
+  # granular token limited to the @mocanvas scope with read/write.
+  #
+  # Publishing stays tokenless. This is the one operation that cannot be, and it
+  # runs a few times a year.
+  #
+  # Still a job in this file rather than its own workflow: npm ties a trusted
+  # publisher to a workflow *file*, and splitting it would cost seven more
+  # configurations on npmjs.com for no gain.
   deprecate:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'deprecate' }}
     runs-on: ubuntu-latest
@@ -161,7 +170,16 @@ jobs:
 
       - run: npm install -g npm@latest
 
+      - name: Check the token is there
+        run: |
+          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "::error::NPM_TOKEN secret is not set — see the comment above this job"
+            exit 1
+          fi
+
       - name: Deprecate
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           fail=0
           for p in mocanvas editor state store sync compat wasm; do
@@ -171,6 +189,8 @@ jobs:
           [ "$fail" = "0" ] || { echo "::error::at least one deprecate failed"; exit 1; }
 
       - name: Show what each package now reports
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for p in mocanvas editor state store sync compat wasm; do
             echo "--- @mocanvas/$p"
