@@ -37,30 +37,42 @@ Creating shapes, median milliseconds — lower is better:
 
 | Scene | mocanvas | tldraw 5.4 | |
 | :--- | ---: | ---: | ---: |
-| 1,000 geo shapes | 15.1 ms | 37.8 ms | **2.5× faster** |
-| 5,000 geo shapes | 40.1 ms | 120.0 ms | **3.0× faster** |
-| 20,000 geo shapes | 134.2 ms | 433.2 ms | **3.2× faster** |
-| 20,000 mixed | 249.4 ms | 753.7 ms | **3.0× faster** |
+| 1,000 geo shapes | 17 ms | 44 ms | **2.6× faster** |
+| 5,000 geo shapes | 43 ms | 131 ms | **3.1× faster** |
+| 20,000 geo shapes | 145 ms | 387 ms | **2.7× faster** |
+| 1,000 mixed | 29 ms | 70 ms | **2.4× faster** |
+| 5,000 mixed | 80 ms | 191 ms | **2.4× faster** |
+| 20,000 mixed | 234 ms | 609 ms | **2.6× faster** |
 
 Dragging a selection, median milliseconds per frame:
 
 | Scene | mocanvas | tldraw 5.4 | |
 | :--- | ---: | ---: | ---: |
-| 1,000 geo shapes | 33.0 ms | 25.1 ms | tldraw ahead |
-| 5,000 geo shapes | 116.6 ms | 150.0 ms | **1.3× faster** |
-| 20,000 geo shapes | 400.0 ms | 858.4 ms | **2.1× faster** |
+| 1,000 geo shapes | 9.2 ms | 16.7 ms | **1.8× faster** |
+| 5,000 geo shapes | 58.3 ms | 108.3 ms | **1.9× faster** |
+| 20,000 geo shapes | 233.3 ms | 541.6 ms | **2.3× faster** |
+| 1,000 mixed | 16.6 ms | 16.8 ms | a tie, at the frame floor |
+| 5,000 mixed | 66.6 ms | 116.4 ms | **1.8× faster** |
+| 20,000 mixed | 280.9 ms | 608.4 ms | **2.2× faster** |
 
-mocanvas scales: ~3× on building a scene at every size, and the interaction gap
-opens as the scene grows. On small scenes tldraw's renderer is ahead.
+mocanvas scales: about 2.6× on building a scene at every size, and the
+interaction gap widens as the scene grows — 1.8× at a thousand shapes, 2.3× at
+twenty thousand.
 
-**With their caveats.** Measured 2026-09-04 on an Apple M3 Pro in headless
-Chromium **with no hardware GPU** — Chromium fell back to software
-rasterisation, which penalises mocanvas's WebGL2 renderer far more than
-tldraw's DOM one, so the interaction numbers are close to a worst case for
-mocanvas. Default settings on both sides, and it is our own benchmark of our own
-library. [docs/BENCHMARK.md](docs/BENCHMARK.md) has the method, the full tables,
-the rest of the caveats, and a rendering-fidelity comparison at 99.2% interior
-IoU.
+**With their caveats.** Measured on an Apple M3 Pro, headless Chromium on the
+Metal backend, default settings on both sides. Two things count against
+mocanvas and are worth knowing: every shape here uses the hand-drawn stroke,
+which is its most expensive path, and pan and zoom is left out entirely because
+mocanvas sits at the harness's own frame floor in every case — it cannot be
+measured, so it is not claimed. It is our own benchmark of our own library.
+
+An earlier version of this table was measured under software rasterisation and
+was wrong in both directions: it flattered mocanvas on creation (~3× where the
+truth is ~2.6×) and reported a loss at a thousand shapes that turned out to be an
+artefact of the CPU rasteriser rather than anything either library did.
+
+[docs/BENCHMARK.md](docs/BENCHMARK.md) has the method, the full tables, the rest of the caveats, and a
+rendering-fidelity comparison against tldraw at 99.2% interior IoU.
 
 ## Install
 
@@ -153,7 +165,7 @@ mocanvas is not affiliated with or endorsed by tldraw.
 
 ## Status
 
-4.0.1. The API model is tldraw 5.4 — a different architecture from the 3.x model
+4.0.2. The API model is tldraw 5.4 — a different architecture from the 3.x model
 1.x was shaped after, not a rename. Coming from 1.x, read
 [docs/MIGRATION.md](docs/MIGRATION.md).
 

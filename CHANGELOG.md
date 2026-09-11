@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.0.2
+
+Corrects the benchmark. No code change.
+
+The published figures were measured under software rasterisation — the harness
+assumed headless Chromium on macOS always falls back to SwiftShader, which is
+wrong. On a real GPU the numbers move in both directions: creating shapes is
+about 2.6× rather than the ~3× claimed, and dragging a thousand shapes is 1.8×
+faster rather than the loss that was reported. "tldraw is ahead on small scenes"
+was an artefact of the CPU rasteriser and is gone.
+
+Pan and zoom is no longer quoted at all: mocanvas sits at the harness's own frame
+floor in every case, so it cannot be measured and is not claimed.
+
 ## 4.0.1
 
 Wording only. The licence sections no longer close by noting that versions
