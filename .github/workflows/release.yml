@@ -111,10 +111,21 @@ jobs:
         if: ${{ github.event_name == 'push' || !inputs.dry_run }}
         run: |
           want=$(node -p "require('./packages/mocanvas/package.json').version")
-          fail=0
-          for p in mocanvas editor state store sync compat wasm; do
-            got=$(npm view "@mocanvas/$p" dist-tags.latest 2>/dev/null || echo "missing")
-            printf '%-24s %s\n' "@mocanvas/$p" "$got"
-            [ "$got" = "$want" ] || fail=1
+          # The registry takes a minute or two to serve a freshly published
+          # version, and not evenly across packages — the first run of this check
+          # failed while six of seven were already live and the seventh appeared
+          # forty seconds later. Poll rather than read once, and ask the registry
+          # directly so a stale npm cache cannot answer for it.
+          for attempt in $(seq 1 20); do
+            missing=""
+            for p in mocanvas editor state store sync compat wasm; do
+              got=$(curl -sS "https://registry.npmjs.org/@mocanvas%2f$p" \
+                | node -p "JSON.parse(require('fs').readFileSync(0,'utf8'))['dist-tags'].latest" 2>/dev/null || echo missing)
+              [ "$got" = "$want" ] || missing="$missing $p($got)"
+            done
+            [ -n "$missing" ] || { echo "all seven packages are at $want"; exit 0; }
+            echo "attempt $attempt — still waiting for:$missing"
+            sleep 15
           done
-          [ "$fail" = "0" ] || { echo "::error::not every package is at $want"; exit 1; }
+          echo "::error::not every package reached $want:$missing"
+          exit 1
