@@ -41,11 +41,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # Trusted publishing wants Node >= 22.14 and npm >= 11.5.1.
-          node-version: "22.14.0"
+          # Trusted publishing wants Node >= 22.14 and npm >= 11.5.1. Node 24
+          # rather than 22.14 exactly, because current npm needs ^22.22 || ^24.15
+          # and pinning the floor of one requirement broke the other.
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      # setup-node pins an npm older than trusted publishing needs.
+      # setup-node ships an npm older than trusted publishing needs.
       - run: npm install -g npm@latest
 
       - uses: dtolnay/rust-toolchain@stable
