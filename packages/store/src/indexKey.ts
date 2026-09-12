@@ -120,13 +120,39 @@ export function getIndicesBelow(above: IndexKey | undefined, n: number): IndexKe
 }
 
 /**
- * Generate `n` sorted keys, the first of which is `start` (default `a0`).
- * Useful when creating `n` items at once.
+ * The key a run of indices starts from when the caller names none.
+ *
+ * `a1`, not {@link ZERO_INDEX_KEY}. `a0` is the bottom of the key space — the
+ * thing you generate *above* — and handing it out as a real index leaves
+ * nothing underneath to insert before. Every other first-index path in this
+ * workspace settled on the `a1` bucket; this was the last one that had not.
  */
-export function getIndices(n: number, start: IndexKey = ZERO_INDEX_KEY): IndexKey[] {
-  if (n <= 0) return []
+export const START_INDEX_KEY = "a1" as IndexKey
+
+/**
+ * `start`, followed by `n` freshly generated keys above it.
+ *
+ * **`n` counts the NEW keys, so the array is `n + 1` long.** `start` is an
+ * index you already have and is echoed back verbatim — unjittered, because it
+ * is an input rather than something this generated:
+ *
+ * ```ts
+ * getIndices(3, "a1") // ["a1", "a2…", "a3…", "a4…"]
+ * getIndices(0)       // ["a1"] — a start and nothing after it
+ * ```
+ *
+ * This used to return `n` keys of which `start` was the first, so
+ * `getIndices(1)` generated nothing at all, and the default start was `a0`. Both
+ * were wrong against the helper of this name that migrating code is written
+ * against, in the quiet way: same name, same argument shape, an answer one
+ * bucket off and one element short. COMPAT.md's rule for exactly this case is
+ * that an undocumented helper behaving almost-right is worse than one that is
+ * absent and reported by the compiler.
+ */
+export function getIndices(n: number, start: IndexKey = START_INDEX_KEY): IndexKey[] {
   validateIndexKey(start)
-  return [start, ...getIndicesAbove(start, n - 1)]
+  if (n <= 0) return [start]
+  return [start, ...getIndicesAbove(start, n)]
 }
 
 /** Return a sorted copy of `items` ordered by their `index` (stable). */

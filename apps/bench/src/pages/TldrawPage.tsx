@@ -120,7 +120,8 @@ function createFixture(editor: Editor): void {
     const t = k / 39
     return { x: t * 260, y: 40 + 30 * Math.sin(t * Math.PI * 3), z: 0.5 }
   })
-  const [i1, i2, i3] = getIndices(3)
+  // `n` counts the keys generated ABOVE the start, so three indices is n=2.
+  const [i1, i2, i3] = getIndices(2)
   const shapes: AnyCreate[] = [
     {
       id: rect,

@@ -30,6 +30,7 @@ export {
   isIndexKey,
   sortByIndex,
   validateIndexKey,
+  START_INDEX_KEY,
   ZERO_INDEX_KEY,
   type IndexKey,
 } from "./indexKey"

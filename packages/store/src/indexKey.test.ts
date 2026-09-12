@@ -10,6 +10,7 @@ import {
   getIndicesBetween,
   isIndexKey,
   sortByIndex,
+  START_INDEX_KEY,
   validateIndexKey,
   ZERO_INDEX_KEY,
   type IndexKey,
@@ -69,15 +70,39 @@ describe("fractional index keys", () => {
     expect(() => getIndexBetween("a1" as IndexKey, "a1" as IndexKey)).toThrow()
   })
 
-  it("getIndices returns n sorted keys starting at start", () => {
-    expect(getIndices(0)).toEqual([])
+  it("getIndices returns the start plus n NEW keys, so n + 1 in all", () => {
+    // `n` counts what is generated, not what comes back: `start` is an index
+    // the caller already has. The old contract returned `n` keys *including*
+    // start, which made `getIndices(1)` generate nothing at all.
     const keys = getIndices(5)
-    expect(keys).toHaveLength(5)
-    expect(keys[0]).toBe(ZERO_INDEX_KEY)
+    expect(keys).toHaveLength(6)
+    expect(keys[0]).toBe(START_INDEX_KEY)
     expect(isStrictlySorted(keys)).toBe(true)
+
     const fromB = getIndices(3, "b10" as IndexKey)
+    expect(fromB).toHaveLength(4)
     expect(fromB[0]).toBe("b10")
     expect(isStrictlySorted(fromB)).toBe(true)
+  })
+
+  it("starts at a1 by default, not at the bottom of the key space", () => {
+    // `a0` is what you generate above; handing it out as a real index leaves
+    // nothing underneath to insert before.
+    expect(START_INDEX_KEY).toBe("a1")
+    expect(getIndices(2)[0]).toBe("a1")
+    expect(getIndexBelow(getIndices(2)[0]!) < "a1").toBe(true)
+  })
+
+  it("returns just the start when nothing is asked for", () => {
+    expect(getIndices(0)).toEqual([START_INDEX_KEY])
+    expect(getIndices(-1)).toEqual([START_INDEX_KEY])
+    expect(getIndices(0, "b10" as IndexKey)).toEqual(["b10"])
+  })
+
+  it("echoes the start verbatim rather than jittering it", () => {
+    // It is an input, not something this generated — and a caller matching it
+    // against the index it passed in must find it unchanged.
+    for (let i = 0; i < 50; i++) expect(getIndices(3, "a1V" as IndexKey)[0]).toBe("a1V")
   })
 
   it("getIndicesBetween / Above / Below", () => {
