@@ -1,5 +1,93 @@
 # Changelog
 
+## 4.2.0
+
+A consumer re-measured 4.1.1 against their migration and confirmed the asset and
+overlay fixes. Of what remained, one report was right where I had argued back
+and got it wrong, one found a defect worse than the thing being discussed, one
+was an unshipped half of the compat layer, and one they withdrew.
+
+### Index keys are jittered, so two clients can insert in the same place
+
+Plain fractional indexing is a pure function of its two neighbours, so two
+clients inserting into the same gap generated the **same key** — not
+occasionally, every time:
+
+```
+getIndexBetween("a0", "a2")   // "a1" on every client, always
+```
+
+A record's `index` is a single register to a last-writer-wins merge, so the two
+shapes claimed one position and the merge kept one of them. This is the failure
+4.1.1's own notes described for the double-seeded page — "equal index keys have
+no defined order" — sitting in the multiplayer path, where it fires whenever two
+people add a shape at once.
+
+Every generated key now carries six random digits. The jitter is bounded when
+the plain key is a prefix of the upper neighbour, which is the case where an
+appended suffix would otherwise sort straight past it. Existing documents are
+untouched: an index already written is data, ordering is relative, and the key
+format is unchanged — `a1PzzxyO` was always valid.
+
+### The first child of an empty parent moved up one step
+
+`editor.getHighestIndexForParent()` answered `ZERO_INDEX_KEY` for an empty
+parent, while `getIndexAbove(ZERO_INDEX_KEY)` from `@mocanvas/store` answers one
+step above it. One package, one question, two answers — and a consumer whose
+headless fold mirrors the store helper had matched a live tldraw editor on this
+for months before ours stopped agreeing.
+
+I argued the other way in 4.1.1 from a `.tldr` fixture holding shapes at `a0`,
+and that argument was wrong: a shape sitting at `a0` in a saved file says
+nothing about what assigned it, because it may have been reordered after it was
+created. Only newly created shapes move.
+
+### `@mocanvas/compat` now ships a stylesheet
+
+```ts
+import "@mocanvas/compat/compat.css"
+```
+
+The compat layer aliased the symbols an app imports and nothing else. The
+`--tl-*` custom properties a migrated stylesheet reads had no counterpart —
+there was not one `--tl-` string in the entire published build — and that gap
+is invisible to every check a migration runs: TypeScript sees no CSS, the build
+succeeds, the tests pass. What a consumer eventually saw was a cursor whose
+white outline had quietly stopped being drawn, because
+`--tl-color-selected-contrast` resolved to nothing.
+
+Silently is the operative word. A `var()` that resolves to nothing does not
+fail — it invalidates the declaration it sits in, and inside `calc()` it takes
+the whole property. `compat.css` therefore gives **every** token a literal
+fallback, so a token with no counterpart cannot delete the rule around it.
+
+Two supporting changes made the mapping possible:
+
+- **`--mocanvas-zoom` and `--mocanvas-scale`** are now stamped on the canvas
+  container and restamped on zoom, so `--tl-zoom` and `--tl-scale` — 56 uses in
+  one consumer's stylesheets, and previously mapped to nothing at all — carry
+  real values. `getCameraCssVars` and `useCameraCssVars` are exported for an app
+  that wants them directly.
+- **`--mocanvas-brush-stroke`** was added to the themed set.
+
+`MIGRATION.md` §1b now names the import and lists the tokens that resolve to a
+static fallback rather than following your theme. It also carries a Next.js
+note: an app coming from tldraw almost certainly lists it in
+`serverExternalPackages`, and leaving mocanvas in that list turns
+`…/mocanvas.css` into a request Node cannot resolve.
+
+While writing the mapping, two of the new theme variables turned out to name
+colour roles the default ramp does not carry — `TLThemeColors` has an index
+signature for an app's own palette, so the typo type-checks and then emits
+nothing. They were removed and a test now refuses a mapping onto a variable the
+ramp never publishes.
+
+### Withdrawn
+
+The `tsc` memory report is withdrawn by the reporter: the original figures
+compared two checkouts on different branches. A clean measurement on the same
+package puts tldraw at 1.307 GB / 8.75 s and mocanvas at 1.302 GB / 7.88 s.
+
 ## 4.1.1
 
 Follow-up to a consumer's re-measurement of 4.1.0 against a real migration
