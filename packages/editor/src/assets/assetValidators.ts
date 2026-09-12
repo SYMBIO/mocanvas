@@ -1,6 +1,7 @@
 import { T } from "../validation/T"
 import type { Validator } from "../validation/validator"
 import type { Asset, AssetId, BookmarkAsset, ImageAsset, VideoAsset } from "../records/asset"
+import { registerDefaultAssetSchema } from "../records/defaultSchemas"
 
 /**
  * Per-type asset validators.
@@ -14,8 +15,16 @@ import type { Asset, AssetId, BookmarkAsset, ImageAsset, VideoAsset } from "../r
 /** An `asset:...` record id. */
 export const assetIdValidator = T.idOfType<AssetId>("asset")
 
-/** `w`, `h`, `src` and the file metadata an image or video asset carries. */
-export const imageAssetPropsValidator = T.object({
+/**
+ * The prop maps, one entry per prop.
+ *
+ * Exported as maps rather than only as composed validators because the store
+ * needs to check *declared* props while keeping ones it has never heard of —
+ * the same policy shapes and bindings use — and that is built per prop, not
+ * from a finished `T.object`. The composed validators below are built from
+ * these, so there is one definition of what an asset's props are.
+ */
+export const imageAssetProps = {
   w: T.number,
   h: T.number,
   name: T.string,
@@ -23,16 +32,22 @@ export const imageAssetPropsValidator = T.object({
   mimeType: T.string.nullable(),
   src: T.srcUrl.nullable(),
   fileSize: T.number.optional(),
-})
+}
 
 /** The unfurled metadata a bookmark asset caches for its card. */
-export const bookmarkAssetPropsValidator = T.object({
+export const bookmarkAssetProps = {
   title: T.string,
   description: T.string,
   image: T.srcUrl,
   favicon: T.srcUrl,
   src: T.linkUrl.nullable(),
-})
+}
+
+/** `w`, `h`, `src` and the file metadata an image or video asset carries. */
+export const imageAssetPropsValidator = T.object(imageAssetProps)
+
+/** The unfurled metadata a bookmark asset caches for its card. */
+export const bookmarkAssetPropsValidator = T.object(bookmarkAssetProps)
 
 function assetValidatorFor<A extends Asset>(
   type: A["type"],
@@ -89,3 +104,21 @@ export const assetValidators = {
   video: videoAssetValidator,
   bookmark: bookmarkAssetValidator,
 } as const
+
+/**
+ * Register the built-in asset types' props with the schema registry.
+ *
+ * Unlike shapes and bindings, whose built-ins live in the flagship package,
+ * the three asset types are defined here — so this package registers them
+ * itself rather than waiting for `@mocanvas/mocanvas` to be imported. That
+ * matters: `createStore()` with no utils at all must still refuse an `image`
+ * asset with empty props, because a store assembled from untrusted rows is
+ * exactly the case where nobody passes utils.
+ *
+ * Registered as prop *maps*, so the store checks the declared props and keeps
+ * ones it has never heard of — see `createAssetRecordType`. Migrations are
+ * registered separately through `defaultAssetMigrations`.
+ */
+registerDefaultAssetSchema("image", { props: imageAssetProps })
+registerDefaultAssetSchema("video", { props: imageAssetProps })
+registerDefaultAssetSchema("bookmark", { props: bookmarkAssetProps })

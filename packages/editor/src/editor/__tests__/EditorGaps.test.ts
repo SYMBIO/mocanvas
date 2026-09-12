@@ -8,6 +8,7 @@ import { Rectangle2d } from "../../geometry"
 import type { BaseShape, ShapeId } from "../../records/base"
 import { BaseBoxShapeUtil } from "../../shapes/ShapeUtil"
 import { DOCUMENT_ID, DEFAULT_PAGE_ID } from "../../records/base"
+import { ZERO_INDEX_KEY, getIndexAbove } from "@mocanvas/store"
 
 /**
  * Gaps measured against a real consumer, each of which was a member that
@@ -72,8 +73,25 @@ describe("a brand new store", () => {
     expect(reloaded.query.records("page").get()).toHaveLength(1)
   })
 
+  it("puts pages and shapes where tldraw puts them, which is not the same key", () => {
+    // Not an inconsistency, though it reads like one: `sample.tldr` — written
+    // by tldraw — holds a page at `a1` and shapes at `a0` in the same file.
+    // The index helpers are the shape convention; the page seed is its own.
+    expect(createStore().query.records("page").get()[0]!.index).toBe("a1")
+    expect(ZERO_INDEX_KEY).toBe("a0")
+    expect(getIndexAbove()).toBe("a0")
+  })
+
   it("gives every replica the same first page, so two of them meet on it", () => {
     expect(createStore().query.records("page").get()[0]!.id).toEqual(createStore().query.records("page").get()[0]!.id)
+  })
+
+  it("can be told not to seed, for a caller that owns the document structure", () => {
+    // 4.1.0 seeded unconditionally, so a headless pipeline that put its own
+    // page afterwards ended up with two pages AT THE SAME INDEX — and equal
+    // index keys have no defined order.
+    const store = createStore({ seed: false })
+    expect(store.allRecords()).toEqual([])
   })
 
   it("indexes that page where a tldraw document indexes its own", () => {

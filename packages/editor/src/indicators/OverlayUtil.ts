@@ -92,8 +92,30 @@ export abstract class OverlayUtil<H extends OverlayHost = OverlayHost, O extends
     return (this.constructor as unknown as { options: O }).options
   }
 
-  /** Paint this overlay. Implementations must leave `ctx` in the state they found it. */
-  abstract render(ctx: CanvasRenderingContext2D): void
+  /**
+   * Paint this overlay. Implementations must leave `ctx` in the state they
+   * found it.
+   *
+   * `overlays` is what {@link getOverlays} returned this frame, handed over so
+   * a subclass can paint a subset and delegate the rest:
+   *
+   * ```ts
+   * override render(ctx: CanvasRenderingContext2D, overlays = this.getOverlays()) {
+   *   const [mine, theirs] = partition(overlays, isMine)
+   *   this.paintMine(ctx, mine)
+   *   super.render(ctx, theirs)
+   * }
+   * ```
+   *
+   * Without it the only way to narrow what gets painted was to override
+   * `getOverlays()` — which also narrows what hit-testing, the cursor lookup
+   * and `onPointerDown` see, for every caller and not just the painter.
+   *
+   * A util that ignores the parameter is unaffected: a one-argument `render`
+   * still satisfies this signature, and the manager passes what it already
+   * computed either way.
+   */
+  abstract render(ctx: CanvasRenderingContext2D, overlays?: OverlayLike[]): void
 
   /**
    * Whether this util has anything to contribute this frame. A util that does

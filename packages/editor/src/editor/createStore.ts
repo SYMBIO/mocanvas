@@ -21,9 +21,10 @@ import { AssetRecordType, type Asset } from "../records/asset"
 import { createInMemoryAssetStore, type AssetStore } from "../assets/AssetStore"
 import { InstancePresenceRecordType, type InstancePresence } from "../records/presence"
 import { createPropsMigrationSequences, type PropsMigrationSource } from "../migrations/propsMigrations"
-import { defaultBindingSchemas, defaultShapeSchemas } from "../records/defaultSchemas"
+import { defaultAssetSchemas, defaultBindingSchemas, defaultShapeSchemas } from "../records/defaultSchemas"
 import {
   collectProps,
+  createAssetRecordType,
   createBindingRecordType,
   createShapeRecordType,
   type PropsSource,
@@ -110,6 +111,20 @@ export interface CreateStoreOptions {
    * in-memory store.
    */
   assets?: AssetStore
+  /**
+   * Give a brand new store its document and first page. Defaults to `true`.
+   *
+   * The seeded page uses {@link DEFAULT_PAGE_ID} at {@link FIRST_PAGE_INDEX},
+   * so two replicas that each built their own store meet on one page. Turn it
+   * OFF when the caller owns the document structure and will put its own page
+   * in afterwards — a headless pipeline, a fold that replays records, a test
+   * that builds a fixture by hand. Leaving it on there gives the store *two*
+   * pages at the same index, and equal indices have no defined order.
+   *
+   * Already off, without asking, whenever `initialData` or `snapshot` is
+   * supplied: those bring their own pages.
+   */
+  seed?: boolean
 }
 
 /**
@@ -153,13 +168,17 @@ function createSchemaWithMigrations(
   // and the rest of its non-validating surface.
   const shapeRecords = createShapeRecordType(collectProps(utils.shapeUtils, defaultShapeSchemas))
   const bindingRecords = createBindingRecordType(collectProps(utils.bindingUtils, defaultBindingSchemas))
+  // No util list for assets: the three built-in types are defined in this
+  // package and register themselves, and an app's own asset type registers
+  // through `registerDefaultAssetSchema`.
+  const assetRecords = createAssetRecordType(collectProps(undefined, defaultAssetSchemas))
   return StoreSchema.create<EditorRecord, EditorStoreProps>(
     {
       document: DocumentRecordType,
       page: PageRecordType,
       shape: shapeRecords,
       binding: bindingRecords,
-      asset: AssetRecordType,
+      asset: assetRecords,
       camera: CameraRecordType,
       instance: InstanceRecordType,
       instance_page_state: InstancePageStateRecordType,
@@ -187,7 +206,7 @@ export function createStore(options: CreateStoreOptions = {}): EditorStore {
     props: { defaultName: options.defaultName ?? "", assets: options.assets ?? createInMemoryAssetStore() },
   })
   if (options.snapshot) store.loadStoreSnapshot(options.snapshot)
-  else seedBaseRecords(store)
+  else if (options.seed ?? true) seedBaseRecords(store)
   return store
 }
 
@@ -208,7 +227,10 @@ export function createStore(options: CreateStoreOptions = {}): EditorStore {
  *
  * Skipped when the caller supplies `initialData` or a `snapshot`, both of
  * which bring their own document and pages; seeding over them would put a
- * second, empty page beside the real ones.
+ * second, empty page beside the real ones. A caller that builds its document
+ * some other way — putting records in after the fact — turns it off with
+ * `seed: false`, which is the case this could not detect for itself and which
+ * cost a consumer eleven parity tests in 4.1.0.
  */
 function seedBaseRecords(store: EditorStore): void {
   if (store.has(DOCUMENT_ID)) return

@@ -56,6 +56,7 @@ export type TLAnyOverlayUtilConstructor = TLOverlayUtilConstructor<OverlayUtil<E
 interface InteractiveOverlayUtil {
   isActive?(): boolean
   getOverlays?(): TLOverlay[]
+  render(ctx: CanvasRenderingContext2D, overlays?: TLOverlay[]): void
   getGeometry?(overlay: TLOverlay): Geometry2d | undefined
   getCursor?(overlay: TLOverlay): string | undefined
   onPointerDown?(overlay: TLOverlay): void
@@ -203,7 +204,10 @@ export class OverlayManager extends EditorManager {
     for (const util of this.getOverlayUtilsInZOrder()) {
       const interactive = util as unknown as InteractiveOverlayUtil
       if (interactive.isActive && !interactive.isActive()) continue
-      util.render(ctx)
+      // Resolved once and handed over, so a util that wants to paint a subset
+      // does not have to narrow `getOverlays()` — which every other reader of
+      // it would then see narrowed too.
+      util.render(ctx, interactive.getOverlays?.())
     }
   }
 

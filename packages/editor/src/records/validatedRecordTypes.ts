@@ -26,10 +26,18 @@
 
 import { createRecordType, type RecordType } from "@mocanvas/store"
 import { ValidationError } from "../validation/validator"
+import type { Asset, BaseAsset } from "./asset"
 import type { UnknownShape } from "./base"
 import type { UnknownBinding } from "./binding"
 import type { UnknownRecordProps } from "./props"
-import { createBaseBindingValidator, createBaseShapeValidator, createBindingValidator, createShapeValidator } from "./recordValidators"
+import {
+  createAssetPropsValidator,
+  createBaseAssetValidator,
+  createBaseBindingValidator,
+  createBaseShapeValidator,
+  createBindingValidator,
+  createShapeValidator,
+} from "./recordValidators"
 
 /** What this module needs to know about one util: its type and its props. */
 export interface PropsSource {
@@ -67,7 +75,7 @@ export function collectProps(
  * like that is corrupt rather than foreign.
  */
 function dispatchingValidator<R>(
-  kind: "shape" | "binding",
+  kind: "shape" | "binding" | "asset",
   byType: ReadonlyMap<string, { validate(value: unknown): unknown }>,
   base: { validate(value: unknown): unknown },
 ): { validate(value: unknown): R } {
@@ -104,6 +112,34 @@ export function createShapeRecordType(
     scope: "document",
     validator: dispatchingValidator<UnknownShape>("shape", byType, createBaseShapeValidator()),
   }).withDefaultProperties(() => ({ x: 0, y: 0, rotation: 0, isLocked: false, opacity: 1, meta: {} }))
+}
+
+/**
+ * The `asset` record type, validating every type whose props are known.
+ *
+ * Assets were the one record kind the schema left unchecked. The comment on
+ * `AssetRecordType` said so and gave the reason — turning validation on would
+ * start rejecting assets inside `parseTldrFile` written by older editors — but
+ * that is an argument for the `"keep"` policy, not for checking nothing: a
+ * consumer building a document from untrusted rows had an `image` asset with
+ * empty props mount and render rather than throw.
+ */
+export function createAssetRecordType(
+  propsByType: Readonly<Record<string, UnknownRecordProps>>,
+): RecordType<Asset, any> {
+  const byType = new Map(
+    Object.entries(propsByType).map(
+      ([type, props]) => [type, createAssetPropsValidator(type, props, { unknownProps: "keep" })] as const,
+    ),
+  )
+  // Built over the open form — the store may hold an asset type this build has
+  // never heard of — and restated as the closed `Asset` the record union names.
+  // Shapes get the same effect by putting the open form in the union itself;
+  // widening `EditorRecord` for assets would move a published type for no gain.
+  return createRecordType<BaseAsset<string, object>>("asset", {
+    scope: "document",
+    validator: dispatchingValidator<BaseAsset<string, object>>("asset", byType, createBaseAssetValidator()),
+  }).withDefaultProperties(() => ({ meta: {} })) as unknown as RecordType<Asset, any>
 }
 
 /** The `binding` record type; see {@link createShapeRecordType}. */

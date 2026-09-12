@@ -283,3 +283,70 @@ describe("store.put with no shape utils", () => {
     expect(() => store.put([{ id: "shape:bogus", type: "geo", x: 0, y: 0 } as never])).toThrow(/typeName/)
   })
 })
+
+/**
+ * Assets, which the schema left entirely unchecked until 4.1.1.
+ *
+ * Shapes and bindings validated correctly; `asset` records did not, so an
+ * `image` with empty props was accepted, mounted and rendered. A consumer
+ * building a document from untrusted rows relied on a corrupt row throwing.
+ */
+describe("store.put for assets", () => {
+  const image = (props: Record<string, unknown>, id = "asset:a") => ({
+    id,
+    typeName: "asset",
+    type: "image",
+    props,
+    meta: {},
+  })
+  const validImageProps = { w: 10, h: 10, name: "x", isAnimated: false, mimeType: "image/png", src: null }
+
+  it("rejects an image asset with empty props", () => {
+    const store = createStore()
+    expect(() => store.put([image({}) as never])).toThrow(/props/)
+  })
+
+  it("rejects a prop of the wrong type", () => {
+    const store = createStore()
+    expect(() => store.put([image({ ...validImageProps, w: "NOT A NUMBER" }) as never])).toThrow(/w/)
+  })
+
+  it("rejects a bookmark asset missing its unfurled fields", () => {
+    const store = createStore()
+    expect(() => store.put([{ ...image({}), type: "bookmark" } as never])).toThrow(/props/)
+  })
+
+  it("rejects an id that is not an asset id", () => {
+    const store = createStore()
+    expect(() => store.put([image(validImageProps, "shape:nope") as never])).toThrow(/id/)
+  })
+
+  it("accepts a valid one", () => {
+    const store = createStore()
+    store.put([image(validImageProps) as never])
+    expect(store.get("asset:a" as never)).toBeDefined()
+  })
+
+  it("keeps props it cannot describe, so a round trip does not lose them", () => {
+    // Same policy as shapes: a `.tldr` from a newer build may carry asset props
+    // this one has never heard of, and dropping them loses data on the save.
+    const store = createStore()
+    store.put([image({ ...validImageProps, futureProp: { nested: true } }) as never])
+    const got = store.get("asset:a" as never) as unknown as { props: Record<string, unknown> }
+    expect(got.props["futureProp"]).toEqual({ nested: true })
+  })
+
+  it("passes through an asset type nothing declares", () => {
+    const store = createStore()
+    store.put([{ ...image({ anything: true }), type: "from-a-newer-build" } as never])
+    expect(store.get("asset:a" as never)).toBeDefined()
+  })
+
+  it("validates without any utils being passed, which is when it matters most", () => {
+    // The three asset types live in `@mocanvas/editor` and register themselves,
+    // so a store assembled from untrusted rows by a backend that passes no
+    // utils is still checked.
+    const bare = createStore()
+    expect(() => bare.put([image({}) as never])).toThrow(/props/)
+  })
+})

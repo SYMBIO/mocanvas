@@ -175,16 +175,55 @@ export function traceCross(ctx: CanvasRenderingContext2D, x: number, y: number, 
  * costs a `measureText`, which is why the result is handed back rather than
  * recomputed.
  */
+/**
+ * `text`, cut to fit `maxWidth` with a trailing ellipsis.
+ *
+ * A binary search rather than a character-by-character walk: a chat message is
+ * measured once per frame per collaborator, and `measureText` is the expensive
+ * part. Returns the text unchanged when it already fits or when no cap is set.
+ */
+function truncateToWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth?: number): string {
+  if (maxWidth === undefined || maxWidth <= 0) return text
+  if (ctx.measureText(text).width <= maxWidth) return text
+  const ellipsis = "\u2026"
+  // Not even the ellipsis fits; a chip of pure padding is better than one that
+  // spills, and callers still get a sensible width back.
+  if (ctx.measureText(ellipsis).width > maxWidth) return ""
+  let lo = 0
+  let hi = text.length
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2)
+    if (ctx.measureText(text.slice(0, mid) + ellipsis).width <= maxWidth) lo = mid
+    else hi = mid - 1
+  }
+  return text.slice(0, lo) + ellipsis
+}
+
 export function drawLabelChip(
   ctx: CanvasRenderingContext2D,
   text: string,
   x: number,
   y: number,
-  opts: { background: string; color: string; font: string; paddingX: number; paddingY: number; radius: number },
+  opts: {
+    background: string
+    color: string
+    font: string
+    paddingX: number
+    paddingY: number
+    radius: number
+    /**
+     * Widest the whole chip may draw. Text that does not fit is cut and ends
+     * with an ellipsis. Omitted means no cap, which is what every caller did
+     * before — and is why one long collaborator name could draw a chip across
+     * the board it was labelling.
+     */
+    maxWidth?: number
+  },
 ): number {
   ctx.font = opts.font
   ctx.textBaseline = "top"
   ctx.textAlign = "left"
+  text = truncateToWidth(ctx, text, opts.maxWidth === undefined ? undefined : opts.maxWidth - opts.paddingX * 2)
   const metrics = ctx.measureText(text)
   // `fontBoundingBox*` is absent in older engines and in jsdom; fall back to
   // the em size the font string implies rather than drawing a zero-height chip.

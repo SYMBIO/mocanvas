@@ -130,6 +130,50 @@ export function createBaseShapeValidator(): Validator<BaseShape<string, object>>
   ) as unknown as Validator<BaseShape<string, object>>
 }
 
+/**
+ * The validator for an asset type, from its prop map.
+ *
+ * Same policy as {@link createShapeValidator}: an `unknownProps: "keep"` asset
+ * is one the store is holding, and a `.tldr` from a newer build may carry asset
+ * props this one cannot describe.
+ */
+export function createAssetPropsValidator<Type extends string, Props extends object>(
+  type: Type,
+  props: PropsMap,
+  options?: RecordValidatorOptions,
+): Validator<BaseAsset<Type, Props>> {
+  return T.model(
+    `${type}_asset`,
+    T.object({
+      id: T.idOfType<AssetId>("asset"),
+      typeName: T.literal("asset"),
+      type: T.literal(type),
+      props: propsValidator(props, options?.unknownProps),
+      meta: T.jsonObject,
+    }),
+  ) as unknown as Validator<BaseAsset<Type, Props>>
+}
+
+/**
+ * The fields every asset has whatever its type — everything but `props`.
+ *
+ * For an asset type this build has no prop map for. See
+ * {@link createBaseShapeValidator}: forward compatibility is about `props`, and
+ * an id that is not an `asset:` id is corruption in any generation.
+ */
+export function createBaseAssetValidator(): Validator<BaseAsset<string, object>> {
+  return T.model(
+    "asset",
+    T.object({
+      id: T.idOfType<AssetId>("asset"),
+      typeName: T.literal("asset"),
+      type: T.string,
+      props: T.jsonObject,
+      meta: T.jsonObject,
+    }),
+  ) as unknown as Validator<BaseAsset<string, object>>
+}
+
 /** The counterpart of {@link createBaseShapeValidator} for bindings. */
 export function createBaseBindingValidator(): Validator<BaseBinding<string, object>> {
   return T.model(

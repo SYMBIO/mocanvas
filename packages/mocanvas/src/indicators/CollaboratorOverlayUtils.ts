@@ -31,15 +31,36 @@ import type {
   TLCollaboratorShapeIndicatorOverlay,
 } from "./types"
 
-/** Shared configuration: how a person who has gone quiet is dimmed. */
+/**
+ * Shared configuration for the collaborator painters.
+ *
+ * These exist so a subclass that redraws a cursor can read the label's
+ * measurements instead of hard-coding them next to a `super.render` it does not
+ * control. `zIndex` is not here because it is a static on the util itself —
+ * `class Mine extends CollaboratorCursorOverlayUtil { static override zIndex = 1100 }`.
+ */
 export interface CollaboratorOverlayUtilOptions {
   /** Opacity applied to everything drawn for an idle collaborator. */
   idleOpacity: number
+  /** Point size of the name and chat chips. */
+  fontSize: number
+  /** Widest a name chip may draw before its text is clipped with an ellipsis. */
+  nameMaxWidth: number
+  /** The same, for a chat message, which is usually allowed more room. */
+  chatMaxWidth: number
 }
 
-/** The one dial every collaborator overlay has. */
+/** The dials every collaborator overlay has. */
 export const DEFAULT_COLLABORATOR_OVERLAY_OPTIONS: CollaboratorOverlayUtilOptions = {
   idleOpacity: 0.5,
+  fontSize: 12,
+  nameMaxWidth: 120,
+  chatMaxWidth: 200,
+}
+
+/** The chip font, from the options, as a CSS `font` string. */
+function chipFont(fontSize: number): string {
+  return `${fontSize}px system-ui, -apple-system, "Segoe UI", sans-serif`
 }
 
 /**
@@ -111,11 +132,11 @@ export class CollaboratorCursorOverlayUtil extends CollaboratorOverlayUtil {
     return out
   }
 
-  override render(ctx: CanvasRenderingContext2D): void {
-    const overlays = this.getOverlays()
+  override render(ctx: CanvasRenderingContext2D, given?: TLCollaboratorCursorOverlay[]): void {
+    const overlays = given ?? this.getOverlays()
     if (overlays.length === 0) return
     const editor = this.editor
-    const idleOpacity = this.options.idleOpacity
+    const { idleOpacity, fontSize, nameMaxWidth, chatMaxWidth } = this.options
     isolate(ctx, (c) => {
       for (const overlay of overlays) {
         const at = editor.pageToViewport(overlay.point)
@@ -143,6 +164,7 @@ export class CollaboratorCursorOverlayUtil extends CollaboratorOverlayUtil {
         c.stroke()
         c.restore()
 
+        const isChat = !!overlay.chatMessage
         const label = overlay.chatMessage || overlay.userName
         if (label) {
           drawLabelChip(c, label, at.x + 12, at.y + 16, {
@@ -150,10 +172,13 @@ export class CollaboratorCursorOverlayUtil extends CollaboratorOverlayUtil {
             // White reads on all eight presence colours, which are chosen to be
             // dark enough for exactly this.
             color: "#ffffff",
-            font: '12px system-ui, -apple-system, "Segoe UI", sans-serif',
+            font: chipFont(fontSize),
             paddingX: 6,
             paddingY: 3,
             radius: 4,
+            // Without a cap a long name drew a chip as wide as the name, which
+            // on a zoomed-out board covered the drawing it was labelling.
+            maxWidth: isChat ? chatMaxWidth : nameMaxWidth,
           })
         }
       }
