@@ -1,5 +1,246 @@
 # Changelog
 
+## 4.1.0
+
+> **This minor release contains breaking changes.** They are marked below, and
+> the two that will reach you without warning are these:
+>
+> 1. **Add `import "@mocanvas/mocanvas/mocanvas.css"` to your app.** Without it
+>    the chrome renders unstyled. Until 4.0.2 your bundler picked the
+>    stylesheet up on its own.
+> 2. **`createStore()` now validates records and seeds a document and a page.**
+>    A store built with no shape utils will no longer load a document whose geo
+>    shapes predate the flip migration, and a brand new store is no longer
+>    empty.
+>
+> A `^4.0.0` range will pull this in on its own, so read the two items above
+> before upgrading rather than after.
+
+Four things in this release were controls that existed and did nothing. They are
+grouped that way below rather than by package, because that is what they have in
+common and it is worth seeing at once.
+
+### Breaking: record validation actually runs
+
+`StoreSchema.validateRecord` returned every record untouched. Three independent
+causes, each of which alone was enough:
+
+- A record whose type was not found was returned as-is. A record carrying **no**
+  `typeName` looked up as `undefined`, missed, and took the same path as foreign
+  data that is deliberately allowed through.
+- **No editor record type ever carried a validator.** `ShapeRecordType` and the
+  rest were constructed without a `validator` key, and `RecordType.validate`
+  opens with `if (!this.validator) return record`.
+- `createSchema()` read `static migrations` off the utils but never `static
+  props`, and `registerDefaultShapeSchema` — documented as the seam a package
+  registers itself through on import — was exported and never called, so
+  `defaultShapeSchemas` was permanently empty.
+
+So the `static props` that were a breaking change in 2.0.0 were documentation.
+They did nothing.
+
+Turning validation on found a real defect in our own code:
+`external/excalidraw.ts` spread `{color, dash, size}` into every converted shape
+including `text`, and `textShapeProps` has no `dash`. **Every label imported from
+Excalidraw carried a prop its own type rejects.**
+
+Declared props are validated; props no util declares still pass through, so a
+round trip preserves them (`binding:arrow.props.snap` in our own reference
+`.tldr` depends on this). Strict rejection stays available to direct callers.
+
+**What changes for you:** `createStore()` with no shape utils passed will no
+longer load a document whose geo shapes predate the flip migration — without the
+utils the migration cannot run and `flipX`/`flipY` are absent. This is
+fail-closed and matches what `createSchema` documents ("pass the same lists you
+pass the editor"), but it is visible.
+
+### Breaking: the stylesheet is now imported by your app
+
+Add one line, once, anywhere in your app:
+
+```ts
+import "@mocanvas/mocanvas/mocanvas.css"
+```
+
+Without it `<Mocanvas />` renders the canvas but the toolbar, panels, menus and
+dialogs come up unstyled. This is the same arrangement as `tldraw/tldraw.css`,
+and `@mocanvas/compat` users need the same line (the stylesheet lives in
+`@mocanvas/mocanvas`; a package can only export files it contains).
+
+It is listed as breaking because it changes required consumer setup: until
+4.0.2 a bundler picked the stylesheet up on its own, and now it does not. It is
+also a bug fix, and the bug was worse than the fix:
+
+- **`@mocanvas/mocanvas` could not be imported outside a bundler.**
+  `dist/index.js` carried `import "./ui-4C5V5GYT.css"`, which Node has no
+  loader for, so vitest, SSR, and any plain `node` import threw
+  `ERR_UNKNOWN_FILE_EXTENSION: Unknown file extension ".css"`. Consumers were
+  working around it in their bundler config.
+- **The stylesheet's name was content-hashed**, and `exports` did not list it
+  at all, so there was no stable path to import instead — any import written
+  against `ui-4C5V5GYT.css` would have broken at the next release.
+
+The JavaScript entry no longer imports CSS. The stylesheet is emitted as
+`dist/mocanvas.css` under a fixed name and exported as the subpath
+`@mocanvas/mocanvas/mocanvas.css`, which resolves under Node, under every
+bundler, and under TypeScript's `moduleResolution: "node16"` and `"bundler"`.
+
+`@mocanvas/wasm` had the same shape of problem with a different asset: it
+shipped `pkg/` with no `exports` subpath, so `import wasmUrl from
+"@mocanvas/wasm/pkg/mocanvas_bg.wasm?url"` was blocked. Now exported.
+
+### The frame loop never ticked
+
+`Editor` wired `on("tick", …)` correctly and nothing ever emitted it. `draw` now
+takes rAF's timestamp and emits the real elapsed milliseconds, clamped to 64ms
+so a tab returning from hidden — where rAF does not fire at all — does not
+arrive with seconds on the clock and fling the camera.
+
+- **Laser and highlighter trails never advanced.** A separate defect in
+  `ScribbleManager.tick()` compared only `points.length` and `state`, so once a
+  trail reached equilibrium (one point added and one shed per frame) the record
+  stopped updating and the trail froze behind a still-moving pointer.
+- **Edge scrolling was dead twice over.** Beyond the missing tick,
+  `edgeScrollManager.start()` was never called anywhere in the repository, so
+  the tick alone would have fixed nothing. It is now started and stopped by
+  `SelectTool`'s `Brushing` and `Translating`, and `EdgeScrollManager` refreshes
+  `inputs.currentPagePoint` after panning so a dragged shape tracks the camera
+  instead of being left behind.
+
+The loop parks when there is no work: measured at 0 editor ticks against 122
+available browser frames on an idle board.
+
+### Menus and controls that did nothing
+
+- **No submenu in the chrome was clickable.** Submenus are portalled as
+  siblings of the menu that opened them, so each parent layer's "did this press
+  land inside me?" check answered no for its own submenu's rows and closed
+  everything on `pointerdown`, swallowing the click. Layers now know their
+  nesting; Escape backs out of the innermost only.
+- **Print printed the host web page.** It called
+  `editor.getContainerWindow().print()`. It now renders the selection (or the
+  page) through the SVG exporter into a hidden same-origin iframe and prints
+  that. The row disables itself on an empty page.
+- **`v`, `r`, `n` and the other tool keys did nothing.** `TldrawUi` never
+  mounted `<ToolShortcuts/>` while `Mocanvas` had already switched off the
+  hard-coded tool keys — and the shortcuts dialog advertised them anyway. The
+  dialog is now generated from the same tables that install the bindings.
+- **Theme moved a tick and changed no pixel.** It wrote only to user
+  preferences, which `ThemeManager` — what the canvas paints from — never reads.
+- **Reduce motion could not be switched off** on a machine that asks the OS for
+  reduced motion, because the tick combined the two; and nothing consumed
+  `animationSpeed` at all. `setCamera` now scales animation duration by it.
+- **The selection was never announced to a screen reader.**
+  `useSelectedShapesAnnouncer` existed, was exported, and was mounted nowhere —
+  the live regions rendered and nothing ever announced into them.
+- **Page rename closed the menu it needed to stay in.** The page list is also
+  restructured: one actions trigger per page rather than three action rows
+  printed beside every page, which made a five-page document a twenty-row menu
+  with no indication which "Delete" belonged to which page.
+
+### Twelve keyboard shortcuts the menus advertised and nothing bound
+
+`⇧L` on Toggle lock, `⌥A/H/D/W/V/S` on the align items, `⌥⇧H/V` on distribute,
+`⇧H/V` on flip, and bare `]` and `[` on bring-to-front and send-to-back all
+printed in the Arrange and Actions menus and did nothing.
+
+They are bound now, by binding the action list itself — the same way the tool
+list's shortcuts are bound — so `TLUiOverrides.actions` carries its bindings
+with it and the two cannot drift apart again. The shortcuts dialog has an
+Actions section generated from the same map.
+
+Two related defects went with it:
+
+- **`⇧H` and `⇧L` selected the hand and line tools.** The tool-key handler
+  lowercased the key without checking Shift, so a shifted press fell through to
+  the plain tool binding underneath.
+- **`⌥D` printed "Align right" in the menu and opened the frame-statistics
+  overlay.** Align right keeps `⌥D` — it is one of a coherent `⌥A/H/D/W/V/S`
+  set — and frame statistics moves to `⌘⌥D`.
+
+### Gaps found by a consumer integration (MOL-2410)
+
+Measured against a real app rather than read off the documentation.
+
+- **`store.put()` validated nothing.** Covered above; the remaining half is
+  fixed here. A store built with **no shape utils** — what a sync backend, a
+  headless export or a test gets — still passed every shape straight through,
+  so `x: "NOT A NUMBER"` landed in the document. Forward compatibility is about
+  `props` and only `props`: a `.tldr` from a newer build may carry props this
+  one cannot describe, and those are still kept verbatim, but `x`, `y`,
+  `rotation`, `index`, `parentId`, `isLocked` and `opacity` are the same on
+  every shape record there has ever been and are now checked whatever utils
+  were passed.
+
+- **A new store held nothing at all.** `createStore()` now seeds the document
+  and its first page, so anything reading a document without mounting an editor
+  sees one. Only those two: camera, instance and page-state are session records
+  and belong to an editor, not to a document. Skipped when `initialData` or a
+  `snapshot` is supplied.
+
+- **The seeded page was indexed `a0`.** Every `.tldr` tldraw writes — including
+  the reference fixture this project compares against — puts its first page at
+  `a1`, so a mocanvas-seeded page sorted before all of them. Invisible with one
+  page; it shows the moment two documents are merged. The index *helpers* still
+  start at `ZERO_INDEX_KEY` and remain consistent with each other; reconciling
+  the generator itself with tldraw's first key changes how every index is
+  allocated and is not in this release.
+
+- **`deleted-shapes` did not exist.** Added, carrying every id removed,
+  descendants included — deleting a frame takes its children with it and a
+  listener cleaning up per-shape state needs all of them. Fires after the
+  removal and only when something was actually removed.
+
+- **`renderingOnly` was declared and read by nothing.** The hit-test option now
+  skips shapes the viewport has culled. Off by default: a programmatic query is
+  asked about the document, and an answer that changed with the scroll position
+  would be surprising. The culled set is read once per query, not per shape.
+
+- **`TLEditorComponents.CollaboratorCursor` was declared on two component maps
+  and rendered by nothing**, so an app that supplied its own cursor silently
+  kept seeing ours. `CollaboratorCursors` now renders the slot when one is
+  supplied — in its own HTML layer, since the default is a `div` and would not
+  render inside the SVG layer — and draws nothing of its own in that case.
+
+- **The published declarations failed a consumer's typecheck.**
+  `@mocanvas/wasm`'s `pkg/mocanvas.d.ts` carries `[Symbol.dispose](): void`
+  from wasm-pack, which needs TypeScript's `esnext.disposable`. A consumer on
+  any ordinary target got `TS2550` pointing into *our* file, with no fix
+  available but widening their own `lib` to satisfy a dependency. The file now
+  carries its own `/// <reference lib="esnext.disposable" />`.
+
+  On the reported type-check memory: not reproduced here. A consumer importing
+  `@mocanvas/mocanvas` and `@mocanvas/editor` from the tarballs, with
+  `skipLibCheck: false`, typechecks in **124 MB and 0.18s** (65k types, 120k
+  instantiations); `tsc -b` across this repository peaks at **890 MB**. If a
+  4.97 GB figure persists after the `TS2550` fix above, it needs measuring in
+  the consumer's own tree.
+
+### Documentation
+
+`MIGRATION.md` §7 and §10 described a 3.x-era editor. §7 said slot
+compatibility did not exist and was a v1 non-goal; both stopped being true
+before 4.0. §10 listed `editor.resizeShape` / `stretchShapes`,
+`editor.getSvgString` / `toImage`, `editor.textMeasure` / `user` / `menus`,
+presence records and slot-compatible UI as missing — every one of them is
+present, checked against the built package rather than the roadmap.
+`ARCHITECTURE.md`'s non-goals list carried the same stale entry.
+
+### Breaking: two menu items removed
+
+- **Language.** mocanvas ships no message catalogues, so the default mount
+  offered twenty-five languages that all rendered the same English. The menu now
+  lists only locales the host supplied non-empty dictionaries for, and renders
+  nothing below two. An app that ships dictionaries is unaffected and now sees
+  exactly its own languages.
+- **`useEnhancedA11yMode`.** The hook was backed by a module-level boolean, so
+  every caller got its own copy of state and nothing read any of them. The
+  preference is now the single source of truth
+  (`editor.user.getIsEnhancedA11yMode()`), and `ToggleEnhancedA11yModeItem` —
+  which tldraw's reference documents and which is unchanged — writes it. Turning
+  it on makes the selection announcer read back position and size as well as
+  what is selected.
+
 ## 4.0.2
 
 Corrects the benchmark. No code change.
