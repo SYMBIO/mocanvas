@@ -1,5 +1,97 @@
 # Changelog
 
+## 4.1.1
+
+Follow-up to a consumer's re-measurement of 4.1.0 against a real migration
+(220 files, 24 custom shape types). Two fixes, one new extension point, and two
+measurements that did not confirm what was suspected.
+
+### Assets were the one record kind nothing validated
+
+Shapes and bindings validated correctly after 4.1.0; `asset` records did not, so
+this was accepted:
+
+```ts
+store.put([{ id: "asset:bad", typeName: "asset", type: "image", props: {}, meta: {} }])
+```
+
+The per-type validators existed (`imageAssetValidator` and friends) and were
+deliberately not attached, with the reason written down: turning them on would
+start rejecting assets inside `parseTldrFile` written by older editors. That is
+an argument for the `"keep"` policy, not for checking nothing — and it is the
+same argument that was wrong for shapes. Assets now follow exactly the shape
+rule: declared props are checked, props this build has never heard of are kept
+so a round trip does not lose them, and an asset type nothing declares passes
+through.
+
+The three built-in asset types live in `@mocanvas/editor` rather than the
+flagship, so that package registers them itself. This matters: a store built
+with **no utils at all** — a sync backend, a headless pipeline — is exactly
+where rows are least trustworthy, and it now refuses a corrupt asset instead of
+mounting and rendering it.
+
+### Breaking-ish: `createStore()` seeding can be turned off
+
+4.1.0 started seeding a document and a first page, which was asked for. It
+seeded *unconditionally*, so a caller that builds its own document by putting
+records in afterwards ended up with **two pages at the same index** — and equal
+index keys have no defined order. That cost one consumer eleven parity tests.
+
+```ts
+createStore({ seed: false })   // I own the document structure
+```
+
+Already off, without asking, when `initialData` or a `snapshot` is supplied.
+
+### Collaborator overlays can be extended without lying to the rest of the editor
+
+Two things made "paint some of these myself, let the inherited painter do the
+rest" inexpressible:
+
+- `render(ctx)` did not receive the overlays, so narrowing what got painted
+  meant overriding `getOverlays()` — which also narrows what hit-testing, the
+  cursor lookup and `onPointerDown` see. `render(ctx, overlays)` now receives
+  what the manager already resolved. A util that ignores the parameter is
+  unaffected.
+- `CollaboratorOverlayUtilOptions` carried only `idleOpacity`, so a subclass
+  redrawing a cursor had to hard-code the label's measurements. It now carries
+  `fontSize`, `nameMaxWidth` and `chatMaxWidth`. (`zIndex` stays a static on the
+  util — `static override zIndex = 1100` — which is how every overlay sets it.)
+
+Capping the label width fixed a defect of its own: nothing truncated, so one
+long collaborator name drew a chip across the drawing it was labelling. Text
+that does not fit is now cut with an ellipsis.
+
+### Two reports that measurement did not confirm
+
+**The index convention is not inconsistent.** The report read
+`editor.createShape` giving `a0` while the seeded page gets `a1` as two
+conventions fighting. They are two conventions, and they are tldraw's:
+`sample.tldr` — written by tldraw — holds its page at `a1` and its shapes at
+`a0`, in one file. `getIndexAbove()` returns `a0`, the same as `createShape`,
+so the helpers and the editor agree. Nothing changed here except a test that
+now pins it.
+
+**`tsc` memory does not scale with registered shape types.** The suggested
+experiment, run: registering 5, 25 and 50 shape types moves instantiations by
+1.6% and peak RSS not at all (~160 MB). Holding shapes at 24 and scaling files
+to 220 reaches 205 MB. Neither axis reproduces a figure twenty times larger, so
+`TLGlobalShapePropsMap` is not the cause and there is nothing to fix here from
+this side. To find the real one, run `tsc --generateTrace trace/` in the
+consumer's own tree and open the result with `@typescript/analyze-trace`; it
+names the hot types directly. Send the trace and it can be read from here.
+
+### Documented rather than changed
+
+- **`FrameShapeUtil` creates a frame at 160×90**, where tldraw creates one at
+  320×180 — same aspect, half the size. It only affects a frame created
+  programmatically with no `w`/`h`; drawing one with the tool sizes it from the
+  drag. Now a row in `MIGRATION.md` §10. Aligning the default is a behaviour
+  change and does not belong in a patch.
+- **`store.put()` accepting an unregistered shape type is deliberate** and is
+  now stated in `MIGRATION.md` rather than only in `COMPAT.md`. Its other
+  fields are still validated: `x` must be a number whatever the type is.
+
 ## 4.1.0
 
 > **This minor release contains breaking changes.** They are marked below, and
