@@ -1,5 +1,61 @@
 # Changelog
 
+## 4.3.0
+
+One fix, and it is a breaking one in a minor — the same judgement 4.1.0 made,
+for the same reason. See below if you call `getIndices`.
+
+### Breaking: `getIndices(n)` returns `n + 1` keys, starting at `a1`
+
+```ts
+getIndices(3)        // was ["a0", …2 more]   now ["a1", …3 more]
+getIndices(3, "a1")  // was ["a1", …2 more]   now ["a1", "a2…", "a3…", "a4…"]
+getIndices(1)        // was ["a0"] — generated nothing at all
+```
+
+`n` now counts the keys generated **above** `start`, so the array is one longer.
+`start` is an index you already hold; it is echoed back verbatim, unjittered,
+because it is an input rather than something this generated. The default start
+moved from `a0` to `a1`.
+
+**This change is silent.** The return type is unchanged and nothing in your
+build will complain — a caller that iterates the result and creates one item per
+key now creates one extra. A caller that destructures a fixed number, or indexes
+by its own item count, is unaffected. Grep for `getIndices(` before upgrading;
+`getIndicesAbove`, `getIndicesBelow` and `getIndicesBetween` are untouched and
+still return exactly `n`.
+
+Why this is a fix rather than a preference. The old contract was invented here:
+same name as the helper migrating code is written against, same argument shape,
+an answer one element short and one bucket low. That is the failure COMPAT.md
+already names as the one to avoid — *"an undocumented helper that behaves
+almost-right is worse than one that is absent and reported by the compiler."*
+A consumer's headless fold called it in its reparent path and landed a step
+below the editor on every move, while every other index path in this workspace
+had already settled on the `a1` bucket in 4.2.0. It was the last holdout, and
+`a0` is the bottom of the key space — handing it out as a real index leaves
+nothing underneath to insert before.
+
+`START_INDEX_KEY` (`"a1"`) is exported alongside `ZERO_INDEX_KEY` (`"a0"`) so
+the distinction has a name rather than being two literals that look alike.
+
+### Also
+
+The post-publish registry check no longer fails a good release. It timed out on
+4.2.0 while every gate had passed and every package had published correctly —
+six were serving inside eighty seconds and `@mocanvas/store` took longer than
+the five minutes allowed. Its budget is now fifteen minutes, and its error says
+what the red means: the packages are already public by the time it runs.
+
+### Not changed
+
+A consumer withdrew an earlier report of five missing CSS tokens after checking
+it against real usage — two have CSS fallbacks, one they define themselves, one
+was in a comment, one in a test fixture. Nothing was missing. The `tsc` memory
+report was likewise withdrawn: the original figures compared two checkouts on
+different branches, and a clean measurement puts tldraw at 1.307 GB and mocanvas
+at 1.302 GB.
+
 ## 4.2.0
 
 A consumer re-measured 4.1.1 against their migration and confirmed the asset and
