@@ -125,23 +125,35 @@ jobs:
         if: ${{ github.event_name == 'push' || !inputs.dry_run }}
         run: |
           want=$(node -p "require('./packages/mocanvas/package.json').version")
-          # The registry takes a minute or two to serve a freshly published
-          # version, and not evenly across packages — the first run of this check
-          # failed while six of seven were already live and the seventh appeared
-          # forty seconds later. Poll rather than read once, and ask the registry
-          # directly so a stale npm cache cannot answer for it.
-          for attempt in $(seq 1 20); do
+          # The registry takes its time to serve a freshly published version, and
+          # not evenly across packages. Poll rather than read once, and ask the
+          # registry directly so a stale npm cache cannot answer for it.
+          #
+          # The budget is 15 minutes because this check has now cried wolf twice
+          # on a perfectly good release. At 4.0.x six of seven were live and the
+          # seventh arrived forty seconds later; at 4.2.0 six were live inside
+          # eighty seconds and `store` took longer than the five minutes this
+          # allowed, so a release that had published correctly reported failure.
+          # A false red here is expensive in a way a slow green is not: the
+          # packages are already public by this point, so the only thing a
+          # premature failure changes is whether someone trusts the next one.
+          for attempt in $(seq 1 60); do
             missing=""
             for p in mocanvas editor state store sync compat wasm; do
               got=$(curl -sS "https://registry.npmjs.org/@mocanvas%2f$p" \
                 | node -p "JSON.parse(require('fs').readFileSync(0,'utf8'))['dist-tags'].latest" 2>/dev/null || echo missing)
               [ "$got" = "$want" ] || missing="$missing $p($got)"
             done
-            [ -n "$missing" ] || { echo "all seven packages are at $want"; exit 0; }
-            echo "attempt $attempt — still waiting for:$missing"
+            [ -n "$missing" ] || { echo "all seven packages are at $want after $attempt attempt(s)"; exit 0; }
+            echo "attempt $attempt/60 — still waiting for:$missing"
             sleep 15
           done
-          echo "::error::not every package reached $want:$missing"
+          echo "::error::After 15 minutes, these are still not serving $want:$missing"
+          echo "::error::The Publish step above SUCCEEDED, so this is either registry"
+          echo "::error::propagation running long or a genuinely half-published set."
+          echo "::error::Check with: npm view @mocanvas/<name> versions --json"
+          echo "::error::If the versions are there, nothing needs republishing — the"
+          echo "::error::artifacts are public and correct, and only this check is red."
           exit 1
 
   # Deprecating needs a credential the publish job does not have. Trusted
