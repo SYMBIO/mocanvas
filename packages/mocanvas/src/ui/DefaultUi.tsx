@@ -21,6 +21,8 @@ import { StylePanel } from "./StylePanel"
 import { MORE_GEO_KINDS, PRIMARY_GEO_KINDS, TOOLBAR_GROUPS, type ToolbarItem } from "./toolbar-config"
 import { buildDefaultActionItems, buildDefaultToolItems, registeredToolIds } from "./tools-context"
 import { ToolShortcuts } from "./useToolShortcuts"
+import { ActionShortcuts } from "./useActionShortcuts"
+import { SelectionAnnouncer } from "./ui-a11y"
 import { debugStatsOpen } from "./useKeyboardShortcuts"
 import "./ui.css"
 
@@ -320,6 +322,8 @@ function Chrome({ showStats, hidePanels }: { showStats: boolean; hidePanels: boo
       {c.A11y ? <c.A11y /> : null}
       {c.Tooltip ? <c.Tooltip /> : null}
       <ToolShortcuts />
+      <ActionShortcuts />
+      <SelectionAnnouncer />
     </>
   )
 }

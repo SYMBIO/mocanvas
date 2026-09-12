@@ -45,6 +45,13 @@ export function useToolShortcuts(): void {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
+      // Shift is a modifier here too, but only where it is *only* a modifier.
+      // `toolKeyMap` drops any binding containing "+", so no tool key is a
+      // shifted one, and without this ⇧H reached the map as a plain "h" and
+      // selected the hand tool out from under an action bound to ⇧H. The
+      // alphanumeric test is what keeps that from breaking a key that needs
+      // Shift to be typed at all: "?" arrives as "?" , not as a capital.
+      if (e.shiftKey && e.key.length === 1 && /[a-z0-9]/i.test(e.key)) return
       if (isEditable(e.target)) return
       if (editor.getEditingShapeId()) return
       const map = toolKeyMap(toolsRef.current, editor.getInstanceState().isReadonly)

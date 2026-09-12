@@ -16,6 +16,11 @@ npm install @mocanvas/editor react react-dom
 
 `react` and `react-dom` (>= 18) are peer dependencies.
 
+This package ships no stylesheet: `<Canvas />` carries its own fallbacks for
+the theme custom properties, so it renders correctly on its own. The default
+UI theme is `@mocanvas/mocanvas/mocanvas.css`, and you import it only if you
+also render that package's UI.
+
 ## Use
 
 ```tsx

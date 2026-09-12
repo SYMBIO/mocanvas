@@ -31,6 +31,36 @@ function setCursor(editor: { updateInstanceState(p: { cursor: { type: string; ro
   editor.updateInstanceState({ cursor: { type, rotation: 0 } })
 }
 
+/**
+ * Turn edge scrolling on for a drag, and keep the drag honest while it runs.
+ *
+ * `EdgeScrollManager` only pans the camera; it is deliberately ignorant of what
+ * the gesture on top of it is doing. But a drag reads
+ * `inputs.currentPagePoint`, and edge scrolling changes what is under a
+ * stationary pointer without any pointer event firing — so the gesture has to
+ * be re-run on the frames where the camera actually moved, or the board scrolls
+ * out from under a shape that never follows. Comparing the camera rather than
+ * asking the manager also covers a camera moved during the drag by anything
+ * else (a wheel zoom, a collaborator being followed).
+ *
+ * Returns the teardown, to be called from the state's `onExit`.
+ */
+function startEdgeScrolling(node: StateNode, update: () => void): () => void {
+  const editor = node.editor
+  editor.edgeScrollManager.start()
+  let camera = editor.getCamera()
+  const off = editor.on("tick", () => {
+    const next = editor.getCamera()
+    if (next.x === camera.x && next.y === camera.y && next.z === camera.z) return
+    camera = next
+    update()
+  })
+  return () => {
+    off()
+    editor.edgeScrollManager.stop()
+  }
+}
+
 class Idle extends StateNode {
   static override id = "idle"
 
@@ -182,8 +212,13 @@ class Brushing extends StateNode {
   static override id = "brushing"
   private initialSelection: ShapeId[] = []
 
+  private stopEdgeScrolling: (() => void) | undefined
+
   override onEnter(): void {
     this.initialSelection = this.editor.inputs.shiftKey ? this.editor.getSelectedShapeIds() : []
+    // A marquee has to be able to reach past the edge of the window, or the
+    // only shapes selectable in one gesture are the ones already on screen.
+    this.stopEdgeScrolling = startEdgeScrolling(this, () => this.update())
     this.update()
   }
 
@@ -201,6 +236,8 @@ class Brushing extends StateNode {
   }
 
   override onExit(): void {
+    this.stopEdgeScrolling?.()
+    this.stopEdgeScrolling = undefined
     this.editor.updateInstanceState({ brush: null })
   }
 
@@ -272,10 +309,14 @@ class Translating extends StateNode {
   static override id = "translating"
   private initialShapes = new Map<ShapeId, UnknownShape>()
   private markId = ""
+  private stopEdgeScrolling: (() => void) | undefined
 
   override onEnter(): void {
     const editor = this.editor
     this.markId = editor.markHistoryStoppingPoint("translate")
+    // Dragging a shape to somewhere off screen is only possible if the board
+    // scrolls under the drag.
+    this.stopEdgeScrolling = startEdgeScrolling(this, () => this.update())
     this.initialShapes.clear()
     for (const s of editor.getSelectedShapes()) {
       this.initialShapes.set(s.id, s)
@@ -412,6 +453,8 @@ class Translating extends StateNode {
   }
 
   override onExit(): void {
+    this.stopEdgeScrolling?.()
+    this.stopEdgeScrolling = undefined
     this.editor.snaps.clearLines()
     this.editor.setHintingShapes([])
     this.initialBounds = undefined

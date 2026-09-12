@@ -25,6 +25,24 @@ for (const required of ["mocanvas.js", "mocanvas.d.ts", "mocanvas_bg.wasm"]) {
 }
 
 /**
+ * Declare the lib `Engine` needs, so a consumer does not have to.
+ *
+ * wasm-pack emits `[Symbol.dispose](): void` on every exported class, which
+ * only exists in TypeScript's `esnext.disposable` lib. Without this line a
+ * consumer whose `target` predates it — which is most of them — gets
+ * `TS2550: Property 'dispose' does not exist on type 'SymbolConstructor'`
+ * pointing into *our* declarations, and their only fix is to change their own
+ * `lib` setting to satisfy a dependency. A `reference lib` directive pulls it
+ * in for this file alone, which is where the requirement actually is.
+ */
+const dtsPath = join(pkgDir, "mocanvas.d.ts")
+const dts = readFileSync(dtsPath, "utf8")
+const libReference = '/// <reference lib="esnext.disposable" />'
+if (!dts.includes(libReference)) {
+  writeFileSync(dtsPath, `${libReference}\n${dts}`)
+}
+
+/**
  * Emit the module `loadEngine` falls back to when the `.wasm` URL does not
  * answer with WebAssembly — a bundler that rewrote `import.meta.url` without
  * moving the asset, most often Vite's dependency optimizer. It is imported

@@ -183,6 +183,11 @@ export interface EditorEvents {
   "select-all-text": (info: { shapeId: ShapeId }) => void
   "stop-camera-animation": () => void
   "stop-following": () => void
+  /**
+   * Shapes were deleted. Carries every id removed, descendants included.
+   * See {@link TLEventMap} for the full contract.
+   */
+  "deleted-shapes": (ids: ShapeId[]) => void
 }
 
 type Listener<T extends unknown[]> = (...args: T) => void

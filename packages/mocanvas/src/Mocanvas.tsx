@@ -1,5 +1,6 @@
 import {
   type TLAnyOverlayUtilConstructor,
+  ContainerProvider,
   EditorProvider,
   AssetUrlsProvider,
   Canvas,
@@ -244,16 +245,25 @@ export function Mocanvas(props: MocanvasProps) {
           // `TldrawUi` is the documented chrome: it owns the context
           // providers the component slots read from, and renders the canvas as
           // its child rather than taking it as a prop.
+          //
+          // `ContainerProvider` publishes the element above: the chrome needs
+          // it to portal its floating layers out of whichever panel opened
+          // them — a popover left inside the toolbar is trapped in that
+          // panel's stacking context and paints *under* its neighbours — and
+          // to measure the editor for the breakpoint, which is what makes the
+          // chrome respond to an embed's width rather than the window's.
           <EditorProvider editor={editor}>
-            <TldrawUi
-              {...(components ? { components: components as TLUiComponents } : {})}
-              {...(overrides ? { overrides } : {})}
-              {...(onUiEvent ? { onUiEvent } : {})}
-              {...(forceMobile ? { forceMobile } : {})}
-              hideUi={hideUi === true}
-            >
-              {canvas}
-            </TldrawUi>
+            <ContainerProvider container={editor.getContainer()}>
+              <TldrawUi
+                {...(components ? { components: components as TLUiComponents } : {})}
+                {...(overrides ? { overrides } : {})}
+                {...(onUiEvent ? { onUiEvent } : {})}
+                {...(forceMobile ? { forceMobile } : {})}
+                hideUi={hideUi === true}
+              >
+                {canvas}
+              </TldrawUi>
+            </ContainerProvider>
           </EditorProvider>
         ) : (
           <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#9ca3af", fontFamily: "system-ui" }}>loading engine…</div>

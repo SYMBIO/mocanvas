@@ -13,7 +13,17 @@ export {
   type IconProps,
 } from "./icons"
 export { Popover, UiTooltip, placeNear, type PopoverProps, type Placement } from "./overlays"
-export { useKeyboardShortcuts, debugStatsOpen } from "./useKeyboardShortcuts"
+export {
+  useKeyboardShortcuts,
+  debugStatsOpen,
+  // The table the shortcuts dialog is rendered from; exported so an app that
+  // replaces the dialog can render the same bindings rather than invent a list.
+  KEYBOARD_SHORTCUTS,
+  buildShortcutIndex,
+  normalizeKbd,
+  type TLKeyboardShortcut,
+  type TLKeyboardShortcutGroup,
+} from "./useKeyboardShortcuts"
 export {
   DefaultToolbar,
   MocanvasUiMenuItem,
@@ -22,6 +32,7 @@ export {
 } from "./DefaultToolbar"
 export { buildDefaultToolItems, buildDefaultActionItems, registeredToolIds } from "./tools-context"
 export { useToolShortcuts, ToolShortcuts, toolKeyMap } from "./useToolShortcuts"
+export { useActionShortcuts, ActionShortcuts, actionKeyMap } from "./useActionShortcuts"
 
 // ---------------------------------------------------------------------------
 // The tldraw-shaped UI layer

@@ -1,5 +1,6 @@
-import { useEditor, type TLUiOverrides, type TLUiTranslations } from "@mocanvas/editor"
+import { MocanvasUiProvider, useEditor, useMaybeEditor, type TLUiOverrides, type TLUiTranslations } from "@mocanvas/editor"
 import { useMemo, type ReactNode } from "react"
+import { buildDefaultActionItems, buildDefaultToolItems } from "./tools-context"
 import { BreakPointProvider } from "./ui-breakpoint"
 import { TldrawUiA11yProvider, useA11y } from "./ui-a11y"
 import { TldrawUiComponentsProvider, type TLUiComponents } from "./ui-components"
@@ -31,6 +32,34 @@ export interface TLUiContextProviderProps {
   children?: ReactNode
 }
 
+/**
+ * Publishes the tool and action lists the chrome renders from.
+ *
+ * This is the context `useTools()` and `useActions()` read, and nothing else
+ * builds it: without this wrapper every list-driven component — every toolbar
+ * button, every menu item — sees an empty list and correctly renders nothing,
+ * which is indistinguishable from an editor that has no tools. It therefore
+ * belongs here, beside the other UI contexts, rather than at one call site.
+ *
+ * The editor is read from context instead of taken as a prop so that
+ * {@link TldrawUiContextProvider} keeps working standalone; with no editor
+ * above it there is nothing to build a list from, so it passes through.
+ */
+function UiListsProvider({ overrides, children }: { overrides?: TLUiOverrides; children?: ReactNode }) {
+  const editor = useMaybeEditor()
+  if (!editor) return <>{children}</>
+  return (
+    <MocanvasUiProvider
+      editor={editor}
+      defaultTools={buildDefaultToolItems}
+      defaultActions={buildDefaultActionItems}
+      {...(overrides ? { overrides } : {})}
+    >
+      {children}
+    </MocanvasUiProvider>
+  )
+}
+
 /** Mounts the UI contexts. Render inside an editor provider. */
 export function TldrawUiContextProvider({ onUiEvent, components, overrides, forceMobile, children }: TLUiContextProviderProps) {
   const translations: TLUiTranslations | undefined = overrides?.translations
@@ -42,7 +71,9 @@ export function TldrawUiContextProvider({ onUiEvent, components, overrides, forc
             <TldrawUiToastsProvider>
               <TldrawUiDialogsProvider>
                 <TldrawUiComponentsProvider {...(components ? { overrides: components } : {})}>
-                  <TldrawUiTooltipProvider>{children}</TldrawUiTooltipProvider>
+                  <UiListsProvider {...(overrides ? { overrides } : {})}>
+                    <TldrawUiTooltipProvider>{children}</TldrawUiTooltipProvider>
+                  </UiListsProvider>
                 </TldrawUiComponentsProvider>
               </TldrawUiDialogsProvider>
             </TldrawUiToastsProvider>

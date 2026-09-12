@@ -37,14 +37,6 @@ export interface TLGetShapeAtPointOptions extends HitTestOptions {
   hitLocked?: boolean
   /** Extra tolerance in page units. Defaults to the hit-test margin for the current pointer. */
   margin?: number
-  /**
-   * Only consider shapes that are currently being rendered.
-   *
-   * A large page culls most of its shapes, and for a pointer gesture "not on
-   * screen" and "not hit" are the same answer — this makes the hit test cost
-   * proportional to what is visible rather than to the document.
-   */
-  renderingOnly?: boolean
   /** Arbitrary further filtering, applied last. */
   filter?: (shape: UnknownShape) => boolean
 }

@@ -13,7 +13,9 @@ import { EngineBridge, FLAG, GEO_FLAG, type CameraState, type ClipRect, type Fra
 import { Box, Mat, Vec, type BoxLike, type Geometry2d, type VecLike } from "../geometry"
 import {
   CameraRecordType,
+  DEFAULT_PAGE_ID,
   DOCUMENT_ID,
+  FIRST_PAGE_INDEX,
   DocumentRecordType,
   INSTANCE_ID,
   InstancePageStateRecordType,
@@ -74,7 +76,7 @@ import {
 } from "./events"
 import { HandleTable } from "./HandleTable"
 import { bucketTextureResolution, TextureManager } from "./TextureManager"
-import type { InstancePresence } from "../records/presence"
+import { InstancePresenceRecordType, type InstancePresence, type InstancePresenceId } from "../records/presence"
 import { createCurrentUser, UserPreferencesManager } from "../user"
 import { getStylePropsOf, SharedStyleMap, type StyleProp } from "../records/styleProp"
 import { HistoryManager } from "./HistoryManager"
@@ -302,6 +304,18 @@ export interface HitTestOptions {
   hitInside?: boolean
   hitLocked?: boolean
   hitFrameInside?: boolean
+  /**
+   * Only consider shapes the viewport is currently rendering.
+   *
+   * A large page culls most of its shapes, and for a pointer gesture "off
+   * screen" and "not hit" are the same answer — so this makes the hit test
+   * cost proportional to what is visible rather than to the document.
+   *
+   * Off by default: a programmatic query ("what is at this page point?") is
+   * usually asked about the document, not about the viewport, and an answer
+   * that changed with the scroll position would be surprising.
+   */
+  renderingOnly?: boolean
   filter?: (shape: UnknownShape) => boolean
 }
 
@@ -329,8 +343,52 @@ const MIDDLE_BUTTON = 1
  */
 export const COLLABORATOR_INACTIVE_TIMEOUT = 60_000
 
+/**
+ * The id of the page a blank document starts with.
+ *
+ * A **constant**, and that is the point. Two replicas of the same empty
+ * document — two tabs joined to one sync room, each with a `<Mocanvas />` that
+ * built its own store — must end up on the *same* page or they see nothing of
+ * each other: shapes sync into a page the other replica is not looking at, and
+ * `getCollaboratorsOnCurrentPage()` filters every cursor out. Minting a random
+ * id here made that the default outcome, and it failed silently.
+ *
+ * So the first page converges by construction. Creating the same record id on
+ * two peers is a field-by-field merge (see `@mocanvas/sync`), and the two
+ * bodies are identical anyway, so there is nothing to settle. Pages created
+ * afterwards still get random ids, which is what keeps two people genuinely on
+ * different pages of one document independent.
+ */
+// Defined beside DOCUMENT_ID so `createStore` can seed a page without
+// importing the editor. Re-exported here because this is where it has always
+// been part of the public surface.
+export { DEFAULT_PAGE_ID }
+
 /** Feeds {@link Editor.id}; process-local, so ids are readable in a log. */
 let editorSequence = 0
+
+/** Keys already warned about, so a per-frame mistake logs once and not 60x/s. */
+const warnedKeys = new Set<string>()
+
+/**
+ * Say something, once, about a mistake the library can see but cannot fix.
+ *
+ * Development only: a shipped bundle should not pay for the string, and a
+ * production log is not where this reaches anyone. `process` may not exist at
+ * all in a raw-ESM browser page, hence the guard rather than a bare read.
+ */
+export function warnOnce(key: string, message: string): void {
+  let isProduction = false
+  try {
+    isProduction = typeof process !== "undefined" && process.env?.["NODE_ENV"] === "production"
+  } catch {
+    isProduction = false
+  }
+  if (isProduction) return
+  if (warnedKeys.has(key)) return
+  warnedKeys.add(key)
+  console.warn(message)
+}
 
 /**
  * The editor: document access, selection, camera, tool dispatch, and the
@@ -432,6 +490,21 @@ export class Editor extends EventEmitter<EditorEvents> {
   private richTextEditor: unknown = null
   /** Tools added or removed after construction, by id. */
   private readonly removedToolIds = new Set<string>()
+  /**
+   * This editor's own presence identity. See {@link getInstancePresenceId}.
+   *
+   * Minted per editor rather than per user: presence is about an *instance*,
+   * and one person may have several.
+   */
+  private readonly _instancePresenceId: InstancePresenceId = InstancePresenceRecordType.createId()
+  /**
+   * A {@link zoomToBounds} that arrived before the container had been measured,
+   * waiting for the first non-empty viewport. See {@link zoomToBounds}.
+   */
+  private pendingViewportFit: { bounds: BoxLike; opts: TLCameraMoveOptions & { inset?: number; targetZoom?: number } } | null =
+    null
+  /** Whether a host has ever measured the canvas. See {@link getHasMeasuredViewport}. */
+  private hasMeasuredViewport = false
 
   constructor(opts: EditorOptions) {
     super()
@@ -668,7 +741,10 @@ export class Editor extends EventEmitter<EditorEvents> {
       }
       let pages = this.store.query.records("page").get()
       if (pages.length === 0) {
-        const page = PageRecordType.create({ id: PageRecordType.createId(), name: "Page 1", index: ZERO_INDEX_KEY })
+        // {@link DEFAULT_PAGE_ID}, not a fresh one: an empty document's first
+        // page is the same page on every replica, so two tabs that each built
+        // their own store still meet on it.
+        const page = PageRecordType.create({ id: DEFAULT_PAGE_ID, name: "Page 1", index: FIRST_PAGE_INDEX })
         this.store.put([page])
         pages = [page]
       }
@@ -1240,6 +1316,19 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this.getInstanceState().isCoarsePointer ? this.options.coarseHitTestMargin : this.options.hitTestMargin
   }
 
+  /**
+   * `opts.filter` with `renderingOnly` folded in.
+   *
+   * Returned as one predicate so each query applies both in the same place;
+   * the culled set is read once per call rather than per candidate shape.
+   */
+  private hitFilter(opts: HitTestOptions): ((shape: UnknownShape) => boolean) | undefined {
+    if (!opts.renderingOnly) return opts.filter
+    const culled = this.getCulledShapes()
+    const filter = opts.filter
+    return filter ? (shape) => !culled.has(shape.id) && filter(shape) : (shape) => !culled.has(shape.id)
+  }
+
   private hitFilterBits(opts: HitTestOptions): number {
     let bits = 0
     if (opts.hitLocked) bits |= 1
@@ -1273,13 +1362,14 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.flushEngine()
     const margin = (opts.margin ?? this.getHitTestMargin()) / this.getZoomLevel()
     const bits = this.hitFilterBits(opts) | (opts.hitInside ? 0 : 4)
-    if (!opts.filter) {
+    const filter = this.hitFilter(opts)
+    if (!filter) {
       const h = this.engine.hitTest(point.x, point.y, margin, bits)
       const id = this.handles.id(h)
       return id ? this.getShape<UnknownShape>(id as ShapeId) : undefined
     }
     for (const shape of this.getShapesAtPoint(point, opts)) {
-      if (opts.filter(shape)) return shape
+      if (filter(shape)) return shape
     }
     return undefined
   }
@@ -1289,12 +1379,13 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.flushEngine()
     const margin = (opts.margin ?? this.getHitTestMargin()) / this.getZoomLevel()
     const handles = this.engine.queryBox(point.x - margin, point.y - margin, point.x + margin, point.y + margin, 0, this.hitFilterBits(opts))
+    const filter = this.hitFilter(opts)
     const out: UnknownShape[] = []
     for (let i = handles.length - 1; i >= 0; i--) {
       const id = this.handles.id(handles[i]!)
       const shape = id ? this.getShape<UnknownShape>(id as ShapeId) : undefined
       if (!shape) continue
-      if (opts.filter && !opts.filter(shape)) continue
+      if (filter && !filter(shape)) continue
       const local = this.getPointInShapeSpace(shape, point)
       const geo = this.getShapeGeometry(shape)
       if (geo.hitTestPoint(local, margin, opts.hitInside ?? false)) out.push(shape)
@@ -1306,14 +1397,14 @@ export class Editor extends EventEmitter<EditorEvents> {
   getShapesInsideBounds(box: BoxLike, opts: HitTestOptions = {}): UnknownShape[] {
     this.flushEngine()
     const handles = this.engine.queryBox(box.x, box.y, box.x + box.w, box.y + box.h, 1, this.hitFilterBits(opts))
-    return this.handlesToShapes(handles, opts.filter)
+    return this.handlesToShapes(handles, this.hitFilter(opts))
   }
 
   /** Shapes whose outline touches a page box, in draw order. */
   getShapesIntersectingBounds(box: BoxLike, opts: HitTestOptions = {}): UnknownShape[] {
     this.flushEngine()
     const handles = this.engine.queryBox(box.x, box.y, box.x + box.w, box.y + box.h, 0, this.hitFilterBits(opts))
-    return this.handlesToShapes(handles, opts.filter)
+    return this.handlesToShapes(handles, this.hitFilter(opts))
   }
 
   private handlesToShapes(handles: Uint32Array, filter?: (s: UnknownShape) => boolean): UnknownShape[] {
@@ -1455,6 +1546,10 @@ export class Editor extends EventEmitter<EditorEvents> {
       if (ps.editingShapeId && toDelete.has(ps.editingShapeId)) this.setEditingShape(null)
       this.store.remove([...toDelete])
     })
+    // After the removal, so a listener that reads the editor sees the document
+    // without them; and outside `run`, so a throwing listener cannot roll the
+    // deletion back.
+    this.emit("deleted-shapes", [...toDelete])
     return this
   }
 
@@ -2308,6 +2403,9 @@ export class Editor extends EventEmitter<EditorEvents> {
    */
   setCamera(point: Partial<VecModel>, opts: TLCameraMoveOptions = {}): this {
     this.stopCameraAnimation()
+    // An explicit camera move overrules a fit that is still waiting for the
+    // viewport, the same way it abandons an animation in flight.
+    this.pendingViewportFit = null
     if (this._cameraOptions.get().isLocked && opts.force !== true) return this
 
     const cam = this.getCamera()
@@ -2316,7 +2414,13 @@ export class Editor extends EventEmitter<EditorEvents> {
     const y = point.y ?? cam.y
     if (cam.x === x && cam.y === y && cam.z === z) return this
 
-    const duration = opts.immediate === true ? 0 : (opts.animation?.duration ?? 0)
+    // `animationSpeed` is the user's reduced-motion setting expressed as a
+    // multiplier: `0` means the camera jumps rather than eases. Honouring it
+    // here is what makes the preference mean something, since every animated
+    // camera move in the editor and in an app's own code goes through here.
+    const speed = this.user.getAnimationSpeed()
+    const requested = opts.immediate === true ? 0 : (opts.animation?.duration ?? 0)
+    const duration = speed > 0 ? requested / speed : 0
     if (duration > 0) {
       this.animateCameraTo({ x, y, z }, duration, opts.animation?.easing ?? easeInOutCubic)
       return this
@@ -2423,6 +2527,20 @@ export class Editor extends EventEmitter<EditorEvents> {
     return new Box(b.x, b.y, b.w, b.h)
   }
 
+  /**
+   * Whether a host has ever told us how big the canvas is
+   * ({@link updateViewportScreenBounds}).
+   *
+   * Until it has, {@link getViewportScreenBounds} answers with the instance
+   * record's default — a plausible-looking 1080x720 that is not this canvas —
+   * or with zeros once a container that has not been laid out yet has been
+   * measured. Both are wrong in the same way and neither announces itself,
+   * which is why anything that needs the viewport asks this first.
+   */
+  getHasMeasuredViewport(): boolean {
+    return this.hasMeasuredViewport
+  }
+
   getViewportScreenCenter(): Vec {
     const b = this.getViewportScreenBounds()
     return new Vec(b.w / 2, b.h / 2)
@@ -2447,13 +2565,27 @@ export class Editor extends EventEmitter<EditorEvents> {
    * would otherwise fail on a `getBoundingClientRect` that was never there.
    */
   updateViewportScreenBounds(bounds: Box | BoxLike | HTMLElement, center = false): this {
+    this.hasMeasuredViewport = true
     const prev = this.getViewportScreenBounds()
     const measured =
       typeof HTMLElement !== "undefined" && bounds instanceof HTMLElement
         ? (({ x, y, width, height }) => ({ x, y, w: width, h: height }))(bounds.getBoundingClientRect())
         : (bounds as Box | BoxLike)
     const next = Box.From(measured)
-    if (prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h) return this
+    const unchanged = prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h
+    // Taken before the write: the `center` branch below goes through
+    // `setCamera`, which cancels a pending fit, and an automatic recentre on
+    // resize must not swallow a fit the app asked for.
+    const pending = this.pendingViewportFit
+    this.pendingViewportFit = null
+    if (unchanged) {
+      // Still a measurement, even though the numbers match what the record
+      // already held: a canvas that happens to be exactly the default size
+      // must release a waiting fit like any other.
+      if (pending && next.w > 0 && next.h > 0) this.zoomToBounds(pending.bounds, pending.opts)
+      else this.pendingViewportFit = pending
+      return this
+    }
     this.run(
       () => {
         this.updateInstanceState({ screenBounds: next.toJson() })
@@ -2464,6 +2596,10 @@ export class Editor extends EventEmitter<EditorEvents> {
       },
       { history: "ignore" },
     )
+    // The container has a size now, so a fit that could not be computed
+    // without one can run. See {@link zoomToBounds}.
+    if (pending && next.w > 0 && next.h > 0) this.zoomToBounds(pending.bounds, pending.opts)
+    else this.pendingViewportFit = pending
     return this
   }
 
@@ -2537,6 +2673,26 @@ export class Editor extends EventEmitter<EditorEvents> {
    */
   zoomToBounds(bounds: BoxLike, opts: TLCameraMoveOptions & { inset?: number; targetZoom?: number } = {}): this {
     const vp = this.getViewportScreenBounds()
+    // An unmeasured viewport is the `onMount` case: the editor exists before
+    // the canvas component has laid itself out, so `screenBounds` is still
+    // 0x0 and the arithmetic below would divide by it — producing a camera at
+    // the zoom floor pointing away from the shapes, which looks exactly like a
+    // render failure. Remember the request instead and run it the moment the
+    // container is measured; `setCamera` cancels it, so a later camera move
+    // by the app or the user is never overruled by it.
+    if (!this.hasMeasuredViewport || vp.w <= 0 || vp.h <= 0) {
+      this.pendingViewportFit = { bounds: { x: bounds.x, y: bounds.y, w: bounds.w, h: bounds.h }, opts }
+      warnOnce(
+        `editor.zoom:${this.id}`,
+        "mocanvas: zoomToFit / zoomToBounds was called before this canvas had a measured viewport — which is what onMount " +
+          "looks like, because the canvas component measures itself after the editor exists. Fitting against the placeholder " +
+          "bounds would put the camera somewhere that is not the shapes, so the move is deferred until the container reports " +
+          "a size; reading getCamera() straight afterwards therefore still sees the old camera. In a headless editor, call " +
+          "editor.updateViewportScreenBounds({ x: 0, y: 0, w, h }) first.",
+      )
+      return this
+    }
+    this.pendingViewportFit = null
     const inset = opts.inset ?? Math.min(256, vp.w * 0.28)
     let z = Math.min((vp.w - inset) / bounds.w, (vp.h - inset) / bounds.h)
     if (opts.targetZoom !== undefined) z = Math.min(z, opts.targetZoom)
@@ -3202,11 +3358,37 @@ export class Editor extends EventEmitter<EditorEvents> {
    */
   readonly user: UserPreferencesManager
 
-  /** Presence records of everyone else in the room, in arrival order. */
+  /**
+   * This editor instance's presence record id — who *this tab* is, as opposed
+   * to `user.getId()`, which is who the person is.
+   *
+   * The two are not interchangeable and conflating them was a bug: a user id
+   * is per browser (it is the same in every tab, and the same on a phone and a
+   * laptop signed in as one person), while a presence record is per editor
+   * instance. Two tabs of one browser are two presences of one user, and they
+   * must see each other.
+   *
+   * `@mocanvas/sync` publishes this tab's presence record under this id, which
+   * is what lets {@link getCollaborators} drop our own record — and only our
+   * own record — should it ever come back to us.
+   */
+  getInstancePresenceId(): InstancePresenceId {
+    return this._instancePresenceId
+  }
+
+  /**
+   * Presence records of everyone else in the room, in arrival order.
+   *
+   * "Else" means *another instance*, not another person: the filter is on the
+   * presence record id ({@link getInstancePresenceId}), so a second tab, a
+   * second window, or the same person on a phone and a laptop all show up as
+   * collaborators. Filtering by user id instead made two tabs of one browser
+   * invisible to each other while every message arrived correctly.
+   */
   getCollaborators(): InstancePresence[] {
-    const me = this.user.getId()
+    const me = this.getInstancePresenceId()
     const records = this.store.query.records("instance_presence").get()
-    return records.filter((p) => p.userId !== me)
+    return records.filter((p) => p.id !== me)
   }
 
   /** The subset of `getCollaborators()` looking at the page we are on. */

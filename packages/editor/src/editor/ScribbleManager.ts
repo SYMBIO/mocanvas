@@ -229,11 +229,13 @@ export class ScribbleManager extends EditorManager {
     for (const item of [...this.items.values()]) {
       const points = [...item.scribble.points]
       let state = item.scribble.state
+      /** Whether this scribble's points differ from the ones in its record. */
+      let moved = false
 
       if (item.next && (!item.prev || item.prev.x !== item.next.x || item.prev.y !== item.next.y)) {
         points.push(item.next)
         item.prev = item.next
-        changed = true
+        moved = true
       }
       item.next = null
 
@@ -247,7 +249,7 @@ export class ScribbleManager extends EditorManager {
         const shed = Math.max(1, Math.ceil(points.length * item.scribble.shrink))
         if (points.length > 0) {
           points.splice(0, shed)
-          changed = true
+          moved = true
         }
       }
 
@@ -258,13 +260,33 @@ export class ScribbleManager extends EditorManager {
         continue
       }
 
-      if (points.length !== item.scribble.points.length || state !== item.scribble.state) {
+      // Whether the points *moved*, not whether there are more of them. Once a
+      // trail is in equilibrium — one point committed and one shed on the same
+      // frame, which is where a laser spends most of its life — the count does
+      // not change from one frame to the next, and a length comparison would
+      // decide there was nothing to publish and freeze the trail on screen
+      // behind a pointer that is still moving.
+      if (moved || state !== item.scribble.state) {
         item.scribble = { ...item.scribble, points, state }
         changed = true
       }
     }
 
     if (changed) this.flush()
+  }
+
+  /**
+   * Whether anything here still needs frames.
+   *
+   * A host's frame loop asks this to decide whether to schedule another one. It
+   * is deliberately "is there a scribble at all" rather than "is there anything
+   * visible to redraw": a point offered through {@link addPoint} is held in
+   * `next` and writes nothing to the store, so a loop that parked itself
+   * because the picture had settled would never wake up to commit it, and the
+   * trail would stop dead under a moving pointer.
+   */
+  hasPendingWork(): boolean {
+    return this.items.size > 0
   }
 
   /** Every live scribble, in the order they were started. */

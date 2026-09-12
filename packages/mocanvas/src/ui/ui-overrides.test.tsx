@@ -19,6 +19,12 @@ function makeEditor(overrides: Partial<Record<string, unknown>> = {}) {
     getStateDescendant: () => undefined,
     getEditingShapeId: () => null,
     getInstanceState: () => ({ openMenus: [], isReadonly: false }),
+    // The chrome mounts the selection announcer, which reads the selection on
+    // every render even when this suite only cares about the toolbar.
+    getSelectedShapes: () => [],
+    getSelectionPageBounds: () => null,
+    getShapePageBounds: () => null,
+    user: { getIsEnhancedA11yMode: () => false },
     updateInstanceState: () => {},
     getContainer: () => ({ ownerDocument: undefined }),
     setCurrentTool: calls.setCurrentTool,

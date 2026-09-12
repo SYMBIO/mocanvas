@@ -268,6 +268,35 @@ describe("presence", () => {
     presence.dispose()
   })
 
+  it("re-announces an unchanged record when somebody new arrives", () => {
+    const store = makeStore()
+    const editor = makePresenceEditor(store, createUserId("idle"))
+    const sent: unknown[] = []
+    const presence = createPresenceSync({
+      editor,
+      clientId: "c1",
+      send: (record) => sent.push(record),
+      throttleMs: 34,
+      heartbeatMs: 100_000,
+    })
+
+    presence.start()
+    expect(sent).toHaveLength(1)
+
+    // A peer joined. Nothing about this client has changed — it has been
+    // sitting still — so an ordinary poke compares equal and sends nothing,
+    // which left the newcomer with no cursor for it until the next heartbeat.
+    presence.poke()
+    vi.advanceTimersByTime(34)
+    expect(sent).toHaveLength(1)
+
+    presence.poke(true)
+    vi.advanceTimersByTime(34)
+    expect(sent).toHaveLength(2)
+
+    presence.dispose()
+  })
+
   it("shares presence records, drops them on bye and sweeps stale ones", async () => {
     const [ta, tb] = createMemoryTransportPair<EditorRecord>()
     const a = makeStore()

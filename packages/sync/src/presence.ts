@@ -32,6 +32,16 @@ export interface PresenceEditor {
     scribbles: readonly unknown[]
     followingUserId: UserId | null
   }
+  /**
+   * Optional: the id this instance's presence record is published under.
+   *
+   * A real `Editor` has one and it is the identity that matters here — a user
+   * id is per browser, so two tabs of one browser are one user and would
+   * discard each other's presence as their own. Structural stand-ins (tests,
+   * a headless participant) may omit it and fall back to
+   * {@link presenceIdForClient}.
+   */
+  getInstancePresenceId?(): InstancePresenceId
   /** Optional: used to sample the cursor, which is not itself a signal. */
   on?(name: "event", fn: () => void): () => void
 }
@@ -53,8 +63,17 @@ export interface PresenceSyncOptions {
 export interface PresenceSync {
   start(): void
   stop(): void
-  /** Ask for a send; collapses with any other request inside the throttle window. */
-  poke(): void
+  /**
+   * Ask for a send; collapses with any other request inside the throttle
+   * window.
+   *
+   * `force` sends even when nothing about this client has changed, which is
+   * what a *re-announcement* is: somebody who was not listening when we last
+   * spoke has arrived, so the record has to go out again although it says the
+   * same thing. Without it a peer that has been sitting still since before the
+   * newcomer joined stays invisible until its next heartbeat.
+   */
+  poke(force?: boolean): void
   /** The record last handed to `send`, for tests and debugging. */
   getLastSent(): InstancePresence | null
   dispose(): void
@@ -73,7 +92,10 @@ export function createPresenceSync(options: PresenceSyncOptions): PresenceSync {
   const { editor, clientId, send } = options
   const throttleMs = options.throttleMs ?? DEFAULT_PRESENCE_THROTTLE_MS
   const heartbeatMs = options.heartbeatMs ?? DEFAULT_PRESENCE_HEARTBEAT_MS
-  const id = presenceIdForClient(clientId)
+  // The editor's own instance id when it has one, so that the id this tab
+  // publishes under is the same id the editor filters its own record by.
+  // `presenceIdForClient` is the fallback for a structural stand-in.
+  const id = editor.getInstancePresenceId?.() ?? presenceIdForClient(clientId)
 
   let timer: ReturnType<typeof setTimeout> | null = null
   let heartbeat: ReturnType<typeof setInterval> | null = null
@@ -111,11 +133,18 @@ export function createPresenceSync(options: PresenceSyncOptions): PresenceSync {
     send(next)
   }
 
-  const poke = () => {
-    if (!running || timer !== null) return
+  /** Set while a forced send is waiting out the throttle window. */
+  let pendingForce = false
+
+  const poke = (force = false) => {
+    if (!running) return
+    if (force) pendingForce = true
+    if (timer !== null) return
     timer = setTimeout(() => {
       timer = null
-      flush(false)
+      const forced = pendingForce
+      pendingForce = false
+      flush(forced)
     }, throttleMs)
   }
 
@@ -140,6 +169,7 @@ export function createPresenceSync(options: PresenceSyncOptions): PresenceSync {
     },
     stop() {
       running = false
+      pendingForce = false
       if (timer !== null) {
         clearTimeout(timer)
         timer = null

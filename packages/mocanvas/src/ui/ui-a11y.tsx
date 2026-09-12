@@ -94,11 +94,29 @@ export function DefaultA11yAnnouncer() {
 }
 
 /**
+ * What to call a shape out loud.
+ *
+ * The record's `type` is the useful answer for most shapes, but not for `geo`:
+ * every rectangle, ellipse and star is a "geo", which tells a listener
+ * nothing. The kind lives in `props.geo`, so that is what gets said.
+ */
+function describeShape(shape: { type: string; props?: unknown }): string {
+  if (shape.type !== "geo") return shape.type
+  const geo = (shape.props as Record<string, unknown> | undefined)?.["geo"]
+  return typeof geo === "string" && geo !== "" ? geo : shape.type
+}
+
+/**
  * Announce the selection whenever it changes.
  *
  * Says how many shapes are selected and, for a single shape, what kind it is —
  * which is the minimum a keyboard user needs to know that their last keystroke
  * did what they meant.
+ *
+ * Under {@link ToggleEnhancedA11yModeItem} it also reads back position and
+ * size. That is deliberately not the default: it is what a person wants when
+ * they are placing something by keyboard, and unbearable when they are only
+ * tabbing through a board.
  */
 export function useSelectedShapesAnnouncer(): void {
   const editor = useEditor()
@@ -108,8 +126,21 @@ export function useSelectedShapesAnnouncer(): void {
     () => {
       const shapes = editor.getSelectedShapes()
       if (shapes.length === 0) return ""
-      if (shapes.length === 1) return `${shapes[0]!.type} selected`
-      return `${shapes.length} shapes selected`
+      const enhanced = editor.user.getIsEnhancedA11yMode()
+      if (shapes.length === 1) {
+        const shape = shapes[0]!
+        const name = describeShape(shape)
+        if (!enhanced) return `${name} selected`
+        const bounds = editor.getShapePageBounds(shape)
+        if (!bounds) return `${name} selected`
+        // Rounded: a screen reader reading "271.83164" is worse than useless,
+        // and nothing a person does by ear needs sub-pixel precision.
+        return `${name} selected, at ${Math.round(bounds.x)}, ${Math.round(bounds.y)}, ${Math.round(bounds.w)} by ${Math.round(bounds.h)}`
+      }
+      if (!enhanced) return `${shapes.length} shapes selected`
+      const bounds = editor.getSelectionPageBounds()
+      if (!bounds) return `${shapes.length} shapes selected`
+      return `${shapes.length} shapes selected, ${Math.round(bounds.w)} by ${Math.round(bounds.h)}`
     },
     [editor],
   )
@@ -121,10 +152,21 @@ export function useSelectedShapesAnnouncer(): void {
 }
 
 /**
- * Whether the user has asked for reduced motion, following both the OS setting
- * and the editor's own `animationSpeed` preference (which `0` disables
- * animation with).
+ * Runs {@link useSelectedShapesAnnouncer}. Draws nothing.
+ *
+ * Separate from {@link DefaultA11yAnnouncer} — which is the live region, the
+ * place announcements land — because the two are independently replaceable:
+ * an app that swaps the `A11y` slot for its own region still wants the
+ * editor's selection announcements delivered into it. Before this existed the
+ * regions rendered and nothing ever announced into them, so a screen reader
+ * heard nothing at all when the selection changed.
  */
+export function SelectionAnnouncer() {
+  useSelectedShapesAnnouncer()
+  return null
+}
+
+/** Whether the *operating system* asks for reduced motion. */
 export function usePrefersReducedMotion(): boolean {
   const [os, setOs] = useState(false)
   useEffect(() => {
@@ -136,4 +178,41 @@ export function usePrefersReducedMotion(): boolean {
     return () => mq.removeEventListener("change", update)
   }, [])
   return os
+}
+
+/**
+ * Whether motion is reduced right now: the user's `animationSpeed`
+ * preference, or — while they have expressed none — the operating system's.
+ *
+ * The distinction matters for a checkbox. Reading only the combined value
+ * leaves a box that is already ticked because of the OS setting and does not
+ * untick when pressed, which is a control that appears broken. Reading the
+ * raw preference (`undefined` for "not set") lets the box start in the state
+ * the OS asked for and still respond to every press.
+ */
+export function useReduceMotion(): boolean {
+  const editor = useEditor()
+  const os = usePrefersReducedMotion()
+  const preference = useValue("animationSpeed", () => editor.user.getUserPreferences().animationSpeed, [editor])
+  return preference === undefined ? os : preference === 0
+}
+
+/**
+ * Puts `data-reduce-motion` on the editor's container while motion is
+ * reduced, so `ui.css` can switch off the chrome's transitions.
+ *
+ * An attribute rather than a class because the container belongs to the host:
+ * adding to `className` would fight whatever the app set there.
+ */
+export function ReduceMotionAttribute() {
+  const editor = useEditor()
+  const reduced = useReduceMotion()
+  useEffect(() => {
+    const container = editor.getContainer()
+    if (!container) return
+    if (reduced) container.setAttribute("data-reduce-motion", "true")
+    else container.removeAttribute("data-reduce-motion")
+    return () => container.removeAttribute("data-reduce-motion")
+  }, [editor, reduced])
+  return null
 }

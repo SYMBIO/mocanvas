@@ -53,6 +53,21 @@ const TOOL_ICONS = {
       <path d="M7 19.4h10.5" />
     </>
   ),
+  highlight: (
+    <>
+      {/* A chisel tip over the wet band it has just laid down. */}
+      <path d="M9.15 14.9L6.1 11.85l7.15-6.4a2.15 2.15 0 0 1 3.05 3.05z" />
+      <path d="M8.6 15.7l-2.9.6.5-2.95" />
+      <path d="M5.2 20.05h13.6" strokeWidth={2.8} />
+    </>
+  ),
+  laser: (
+    <>
+      <circle cx="12" cy="12" r="2.55" />
+      <path d="M12 3.1v3.15M12 17.75v3.15M3.1 12h3.15M17.75 12h3.15" />
+      <path d="M5.7 5.7l2.2 2.2M16.1 16.1l2.2 2.2M18.3 5.7l-2.2 2.2M7.9 16.1l-2.2 2.2" />
+    </>
+  ),
   text: (
     <>
       <path d="M5 6.25V4.5h14v1.75" />

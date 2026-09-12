@@ -30,8 +30,33 @@ import type { UnknownRecordProps } from "./props"
  */
 type PropsMap = UnknownRecordProps | Record<string, Validatable<unknown>>
 
-function propsValidator(props: PropsMap): Validator<unknown> {
-  return T.object(props as Record<string, Validatable<unknown>>) as unknown as Validator<unknown>
+/**
+ * How strict the props half of a record validator is about props the map does
+ * not declare.
+ *
+ * `"reject"` is the default and the right answer for a record an app is
+ * *making*: an undeclared prop there is a typo or a prop whose migration was
+ * forgotten, and saying so early is the point.
+ *
+ * `"keep"` is the right answer for a record the store is *holding*, and is what
+ * the schema's shape and binding types use. A `.tldr` written by a newer
+ * generation of the format legitimately carries props this build has never
+ * heard of — `binding.props.snap` is in the fixture in this repo — and dropping
+ * or rejecting them would lose the user's data on the next save. The declared
+ * props are still checked; the rest ride along. See `normalizeLoadedRecords`,
+ * which states the same policy for the load path.
+ */
+export type UnknownPropsPolicy = "reject" | "keep"
+
+/** Options the record validator factories share. */
+export interface RecordValidatorOptions {
+  /** What to do with props the map does not declare. Defaults to `"reject"`. */
+  readonly unknownProps?: UnknownPropsPolicy | undefined
+}
+
+function propsValidator(props: PropsMap, unknownProps: UnknownPropsPolicy = "reject"): Validator<unknown> {
+  const validator = T.object(props as Record<string, Validatable<unknown>>)
+  return (unknownProps === "keep" ? validator.allowUnknownProperties() : validator) as unknown as Validator<unknown>
 }
 
 /**
@@ -49,6 +74,7 @@ export function createShapeValidator<Type extends string, Props extends object>(
   type: Type,
   props: PropsMap,
   meta?: PropsMap,
+  options?: RecordValidatorOptions,
 ): Validator<BaseShape<Type, Props>> {
   return T.model(
     `shape:${type}`,
@@ -63,7 +89,7 @@ export function createShapeValidator<Type extends string, Props extends object>(
       parentId: parentIdValidator,
       isLocked: T.boolean,
       opacity: opacityValidator,
-      props: propsValidator(props),
+      props: propsValidator(props, options?.unknownProps),
       meta: meta ? propsValidator(meta) : T.jsonObject,
     }),
     // The config above describes exactly the record type named, but `T.object`
@@ -71,6 +97,53 @@ export function createShapeValidator<Type extends string, Props extends object>(
     // `Record<string, unknown>` meta) and `Validator` is invariant in its
     // parameter. Restate what was actually built.
   ) as unknown as Validator<BaseShape<Type, Props>>
+}
+
+/**
+ * The fields every shape has, whatever its type — everything but `props`.
+ *
+ * Used for a shape whose type this build has no props map for. Forward
+ * compatibility is about `props`: a newer generation of the format may carry
+ * props this build cannot describe, and those must survive a round trip. It
+ * says nothing about `x` being a number or `index` being an index key, which
+ * are true of every shape record there has ever been. Passing an unknown type
+ * through untouched let `{ x: "NOT A NUMBER" }` into the store.
+ */
+export function createBaseShapeValidator(): Validator<BaseShape<string, object>> {
+  return T.model(
+    "shape",
+    T.object({
+      id: T.idOfType<ShapeId>("shape"),
+      typeName: T.literal("shape"),
+      type: T.string,
+      x: T.number,
+      y: T.number,
+      rotation: T.number,
+      index: T.indexKey,
+      parentId: parentIdValidator,
+      isLocked: T.boolean,
+      opacity: opacityValidator,
+      // Anything, deliberately — see above.
+      props: T.jsonObject,
+      meta: T.jsonObject,
+    }),
+  ) as unknown as Validator<BaseShape<string, object>>
+}
+
+/** The counterpart of {@link createBaseShapeValidator} for bindings. */
+export function createBaseBindingValidator(): Validator<BaseBinding<string, object>> {
+  return T.model(
+    "binding",
+    T.object({
+      id: T.idOfType<BindingId>("binding"),
+      typeName: T.literal("binding"),
+      type: T.string,
+      fromId: T.idOfType<ShapeId>("shape"),
+      toId: T.idOfType<ShapeId>("shape"),
+      props: T.jsonObject,
+      meta: T.jsonObject,
+    }),
+  ) as unknown as Validator<BaseBinding<string, object>>
 }
 
 /**
@@ -84,6 +157,7 @@ export function createBindingValidator<Type extends string, Props extends object
   type: Type,
   props: PropsMap,
   meta?: PropsMap,
+  options?: RecordValidatorOptions,
 ): Validator<BaseBinding<Type, Props>> {
   return T.model(
     `binding:${type}`,
@@ -93,7 +167,7 @@ export function createBindingValidator<Type extends string, Props extends object
       type: T.literal(type),
       fromId: T.idOfType<ShapeId>("shape"),
       toId: T.idOfType<ShapeId>("shape"),
-      props: propsValidator(props),
+      props: propsValidator(props, options?.unknownProps),
       meta: meta ? propsValidator(meta) : T.jsonObject,
     }),
   ) as unknown as Validator<BaseBinding<Type, Props>>

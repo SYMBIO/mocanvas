@@ -1,5 +1,4 @@
-import { track, useEditor, useValue } from "@mocanvas/editor"
-import { useState } from "react"
+import { track, useEditor } from "@mocanvas/editor"
 import { useCanApplySelectionAction, useHasLockedShapes, useReadonly } from "./ui-actions"
 import { useDialogs } from "./ui-dialogs"
 import {
@@ -10,9 +9,9 @@ import {
   TldrawUiMenuItem,
   TldrawUiMenuSubmenu,
 } from "./ui-menu"
-import { copyAs, cutSelectionToClipboard, copySelectionToClipboard, exportAs, pasteFromClipboard, printSelection } from "./ui-clipboard"
-import { LANGUAGES } from "./ui-translation"
-import { usePrefersReducedMotion } from "./ui-a11y"
+import { canPrint, copyAs, cutSelectionToClipboard, copySelectionToClipboard, exportAs, pasteFromClipboard, printSelection } from "./ui-clipboard"
+import { useAvailableTranslationLocales } from "./ui-translation"
+import { useReduceMotion } from "./ui-a11y"
 
 /**
  * The concrete menu items, and the groups and submenus that arrange them.
@@ -111,7 +110,6 @@ export function ExportFileContentSubMenu() {
         <TldrawUiMenuItem
           id="save-file-copy"
           label="Save a copy"
-          kbd="mod+s"
           onSelect={() => {
             void import("../file").then(({ serializeMocanvasFile }) => {
               const blob = new Blob([serializeMocanvasFile(editor)], { type: "application/json" })
@@ -125,11 +123,17 @@ export function ExportFileContentSubMenu() {
   )
 }
 
-/** Print, through the browser's own dialog. */
-export function PrintItem() {
+/**
+ * Print the drawing — the selection if there is one, otherwise the page.
+ *
+ * Disabled on an empty page, because there is nothing to put on the paper and
+ * a print dialog showing a blank sheet is worse than a greyed-out row.
+ */
+export const PrintItem = track(function PrintItem() {
   const editor = useEditor()
-  return <TldrawUiMenuItem id="print" label="Print" kbd="mod+p" onSelect={() => printSelection(editor)} />
-}
+  const enabled = canPrint(editor)
+  return <TldrawUiMenuItem id="print" label="Print" disabled={!enabled} onSelect={() => void printSelection(editor)} />
+})
 
 /** Copy-as and export-as, as one group. */
 export function ConversionsMenuGroup() {
@@ -527,22 +531,22 @@ export function ToggleTransparentBgMenuItem() {
 }
 
 /**
- * Turn off animation.
+ * Turn off animation: the chrome's transitions and the camera's easing.
  *
- * Reflects the OS setting as well as the preference: a user whose system asks
- * for reduced motion should find the box already ticked rather than have to
- * ask twice.
+ * Starts ticked for a user whose operating system asks for reduced motion —
+ * they should not have to ask twice — but the tick tracks the editor's own
+ * preference from the first press onwards, so the box always answers a click.
+ * See {@link useReduceMotion}.
  */
 export function ToggleReduceMotionItem() {
   const editor = useEditor()
-  const os = usePrefersReducedMotion()
-  const off = useValue("reduceMotion", () => editor.user.getAnimationSpeed() === 0, [editor])
+  const reduced = useReduceMotion()
   return (
     <TldrawUiMenuCheckboxItem
       id="toggle-reduce-motion"
       label="Reduce motion"
-      checked={off || os}
-      onSelect={() => editor.user.updateUserPreferences({ animationSpeed: off ? 1 : 0 })}
+      checked={reduced}
+      onSelect={() => editor.user.updateUserPreferences({ animationSpeed: reduced ? 1 : 0 })}
     />
   )
 }
@@ -571,29 +575,31 @@ export const ToggleInvertZoomItem = track(function ToggleInvertZoomItem() {
 /**
  * Announce more than the minimum to a screen reader.
  *
- * SEMANTICS-ASSUMED: kept as a local preference rather than a store record,
- * because it changes only how much the announcer says and nothing about the
- * document. Read it with {@link useEnhancedA11yMode}.
+ * SEMANTICS-ASSUMED: the name specifies no behaviour, so this settles on the
+ * one an editor can honour — how much the selection announcer says. Off, it
+ * names the selection; on, it also reads back position and size, which a
+ * keyboard user otherwise cannot get at. Read it with
+ * `editor.user.getIsEnhancedA11yMode()`; `useSelectedShapesAnnouncer` is what
+ * consumes it today.
+ *
+ * `useEnhancedA11yMode` is deliberately NOT exported alongside it. An earlier
+ * version of this file had one backed by a module-level boolean — so each
+ * caller got its own copy of the state, and nothing read any of them. The
+ * preference is the single source of truth, and tldraw's reference documents
+ * only the menu item.
  */
-let enhancedA11y = false
-
-/** Whether the enhanced-announcement preference is on. */
-export function useEnhancedA11yMode(): [boolean, (value: boolean) => void] {
-  const [value, setValue] = useState(enhancedA11y)
-  return [
-    value,
-    (next: boolean) => {
-      enhancedA11y = next
-      setValue(next)
-    },
-  ]
-}
-
-/** Toggle the enhanced-announcement preference. */
-export function ToggleEnhancedA11yModeItem() {
-  const [enabled, setEnabled] = useEnhancedA11yMode()
-  return <TldrawUiMenuCheckboxItem id="toggle-enhanced-a11y" label="Enhanced accessibility" checked={enabled} onSelect={() => setEnabled(!enabled)} />
-}
+export const ToggleEnhancedA11yModeItem = track(function ToggleEnhancedA11yModeItem() {
+  const editor = useEditor()
+  const enabled = editor.user.getIsEnhancedA11yMode()
+  return (
+    <TldrawUiMenuCheckboxItem
+      id="toggle-enhanced-a11y"
+      label="Enhanced accessibility"
+      checked={enabled}
+      onSelect={() => editor.user.updateUserPreferences({ isEnhancedA11yMode: !enabled })}
+    />
+  )
+})
 
 /** Every preference toggle, as one group. */
 export function PreferencesGroup() {
@@ -616,10 +622,17 @@ export function PreferencesGroup() {
   )
 }
 
-/** Light, dark, or follow the system. */
+/**
+ * Light, dark, or follow the system.
+ *
+ * Writes through {@link Editor.setColorMode} as well as to the user's
+ * preferences. The theme manager is what the canvas and the CSS custom
+ * properties actually paint from; writing only the preference left the tick
+ * moving and the screen unchanged, which is what made this menu look dead.
+ */
 export const ColorSchemeMenu = track(function ColorSchemeMenu() {
   const editor = useEditor()
-  const current = editor.user.getUserPreferences().colorScheme ?? "system"
+  const current = editor.theme.getColorScheme()
   return (
     <TldrawUiMenuSubmenu id="color-scheme" label="Theme">
       <TldrawUiMenuGroup id="color-scheme-group">
@@ -629,7 +642,10 @@ export const ColorSchemeMenu = track(function ColorSchemeMenu() {
             id={`color-scheme-${scheme}`}
             label={scheme[0]!.toUpperCase() + scheme.slice(1)}
             checked={current === scheme}
-            onSelect={() => editor.user.updateUserPreferences({ colorScheme: scheme })}
+            onSelect={() => {
+              editor.setColorMode(scheme)
+              editor.user.updateUserPreferences({ colorScheme: scheme })
+            }}
           />
         ))}
       </TldrawUiMenuGroup>
@@ -637,14 +653,26 @@ export const ColorSchemeMenu = track(function ColorSchemeMenu() {
   )
 })
 
-/** Pick the UI locale. */
+/**
+ * Pick the UI locale — when there is more than one to pick from.
+ *
+ * mocanvas ships no message catalogues: its own labels are English display
+ * text, and `overrides.translations` is where an app's dictionaries come
+ * from. So the list is the host's locales, not the twenty-five entries of
+ * {@link LANGUAGES} — offering a language for which no strings exist is a
+ * promise the library cannot keep, and a user who picks one and sees nothing
+ * change learns that the menu lies. With no dictionaries, or only one, this
+ * renders nothing at all.
+ */
 export const LanguageMenu = track(function LanguageMenu() {
   const editor = useEditor()
+  const languages = useAvailableTranslationLocales()
   const current = editor.user.getLocale()
+  if (languages.length < 2) return null
   return (
     <TldrawUiMenuSubmenu id="language" label="Language">
       <TldrawUiMenuGroup id="language-group">
-        {LANGUAGES.map((language) => (
+        {languages.map((language) => (
           <TldrawUiMenuCheckboxItem
             key={language.locale}
             id={`language-${language.locale}`}
@@ -750,7 +778,6 @@ export function KeyboardShortcutsMenuItem() {
     <TldrawUiMenuItem
       id="keyboard-shortcuts"
       label="Keyboard shortcuts"
-      kbd="mod+/"
       onSelect={() => {
         void import("./panel-shortcuts").then(({ KeyboardShortcutsDialogContents }) => {
           addDialog({ component: KeyboardShortcutsDialogContents })

@@ -1,5 +1,5 @@
 import { track, useValue } from "@mocanvas/state/react"
-import type { Editor, EditorRecord, InstancePresence, UnknownShape } from "@mocanvas/editor"
+import { useEditorComponents, type Editor, type EditorRecord, type InstancePresence, type UnknownShape } from "@mocanvas/editor"
 import { useEffect, useRef, useState, type CSSProperties } from "react"
 import { createSyncClient, type SyncClient, type SyncClientOptions, type SyncStatus } from "./SyncClient"
 import type { Transport } from "./transport"
@@ -24,23 +24,53 @@ export interface CollaboratorCursorsProps {
 /**
  * Other people's cursors and selections, drawn in screen space above the
  * canvas. Drop it inside `<Mocanvas>` or `<Canvas>`; it positions itself.
+ *
+ * The arrow below is the default. An app that supplies a
+ * {@link TLEditorComponents.CollaboratorCursor} component gets that instead —
+ * the slot was declared on two component maps and consulted by nothing, so an
+ * app that replaced the cursor silently kept seeing ours.
  */
 export const CollaboratorCursors = track(function CollaboratorCursors({
   editor,
   showSelection = true,
   showNames = true,
 }: CollaboratorCursorsProps) {
+  const components = useEditorComponents()
   const collaborators = editor.getCollaboratorsOnCurrentPage()
   if (collaborators.length === 0) return null
+  // `null` is an app switching the cursors off, which is different from not
+  // supplying one; `undefined` means "use ours".
+  const Slot = components.CollaboratorCursor
   return (
-    <svg className="mocanvas-collaborators" style={layerStyle}>
-      {collaborators.map((presence) => (
-        <g key={presence.id}>
-          {showSelection ? <CollaboratorSelection editor={editor} presence={presence} /> : null}
-          <CollaboratorCursor editor={editor} presence={presence} showName={showNames} />
-        </g>
-      ))}
-    </svg>
+    <>
+      <svg className="mocanvas-collaborators" style={layerStyle}>
+        {collaborators.map((presence) => (
+          <g key={presence.id}>
+            {showSelection ? <CollaboratorSelection editor={editor} presence={presence} /> : null}
+            {Slot === undefined ? <CollaboratorCursor editor={editor} presence={presence} showName={showNames} /> : null}
+          </g>
+        ))}
+      </svg>
+      {/* A supplied slot is HTML, not SVG — `DefaultCursor` is a div — so it
+          gets its own layer rather than being nested inside the <svg> above,
+          where it would not render at all. */}
+      {Slot ? (
+        <div className="mocanvas-collaborator-cursors" style={layerStyle}>
+          {collaborators.map((presence) =>
+            presence.cursor === null ? null : (
+              <Slot
+                key={presence.id}
+                type="default"
+                rotation={presence.cursor.rotation}
+                color={presence.color}
+                name={showNames ? presence.userName || "Anonymous" : null}
+                point={editor.pageToViewport(presence.cursor)}
+              />
+            ),
+          )}
+        </div>
+      ) : null}
+    </>
   )
 })
 

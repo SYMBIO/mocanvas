@@ -75,6 +75,14 @@ await loadEngine("/assets/mocanvas_bg.wasm")
 await loadEngine(fetch("/assets/mocanvas_bg.wasm"))
 ```
 
+The file is also reachable as a module specifier, so a bundler can emit it and
+hand you the URL without a copy step:
+
+```ts
+import wasmUrl from "@mocanvas/wasm/pkg/mocanvas_bg.wasm?url" // Vite
+await loadEngine(wasmUrl)
+```
+
 An explicit input is taken at face value: it is handed straight to the glue,
 with no validation and no fallback, so a wrong location surfaces as its own
 error instead of being papered over.

@@ -18,9 +18,15 @@ document model, tools, and UI live in TypeScript.
 
 ## Non-goals (v1)
 
-- Wire compatibility with tldraw's sync protocol.
-- Slot-compatible UI components.
+- Wire compatibility with tldraw's sync protocol. `@mocanvas/sync` is a
+  transport of its own; it does not speak tldraw's wire format.
 - Pixel-identical rendering of every built-in shape.
+- Shipping message catalogues. The translation seam exists
+  (`TLUiOverrides.translations`); the strings are the host's.
+
+Slot-compatible UI components were a non-goal here and are no longer: the
+`TLComponents` and `TLUiOverrides` surfaces are implemented. See
+[MIGRATION.md §7](MIGRATION.md).
 
 ## Clean-room rule
 

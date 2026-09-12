@@ -15,6 +15,12 @@ export interface TLUiTranslation {
   label: string
   dir: "ltr" | "rtl"
   messages: Readonly<Record<string, string>>
+  /**
+   * The locales the host supplied a dictionary for, in the order it gave
+   * them. Empty when it supplied none — which is the default, because
+   * mocanvas ships no catalogues of its own.
+   */
+  locales?: readonly string[]
 }
 
 /**
@@ -105,11 +111,16 @@ export function TldrawUiTranslationProvider({ overrides, children }: TLUiTransla
   const locale = useValue("ui locale", () => editor.user.getLocale(), [editor])
   const value = useMemo<TLUiTranslation>(() => {
     const messages = overrides ? Object.assign({}, ...getLocaleChain(locale).reverse().map((l) => overrides[l] ?? {})) : {}
+    // A locale counts as available only if it has strings. An empty entry is
+    // a placeholder, and offering it in a language menu would promise a
+    // translation that does not exist.
+    const locales = overrides ? Object.keys(overrides).filter((l) => Object.keys(overrides[l] ?? {}).length > 0) : []
     return {
       locale,
       label: LANGUAGES.find((l) => l.locale === locale)?.label ?? locale,
       dir: isRtlLanguage(locale) ? "rtl" : "ltr",
       messages,
+      locales,
     }
   }, [locale, overrides])
   return <TranslationContext.Provider value={value}>{children}</TranslationContext.Provider>
@@ -146,6 +157,25 @@ export function useTranslation(): (id: TLUiTranslationKey) => string {
 
 /** Alias of {@link useTranslation}, spelled as the value it returns. */
 export const useMsg = useTranslation
+
+/**
+ * The languages this editor can actually be shown in.
+ *
+ * mocanvas ships no message catalogues — its default labels are English
+ * display text — so this is the set the *host* supplied through
+ * `overrides.translations`, named where {@link LANGUAGES} knows the name.
+ * With no dictionaries it is empty, and a language menu built from it
+ * correctly offers nothing rather than twenty-five languages that all render
+ * the same English.
+ */
+export function useAvailableTranslationLocales(): readonly TLLanguage[] {
+  const translation = useMaybeCurrentTranslation()
+  const locales = translation?.locales
+  return useMemo(
+    () => (locales ?? []).map((locale) => LANGUAGES.find((l) => l.locale === locale) ?? { locale, label: locale }),
+    [locales],
+  )
+}
 
 /** The writing direction of the current locale; `"ltr"` outside a provider. */
 export function useDirection(): "ltr" | "rtl" {

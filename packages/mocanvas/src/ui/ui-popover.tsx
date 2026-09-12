@@ -60,6 +60,12 @@ export function TldrawUiPopover({ id, open: controlled, onOpenChange, side = "be
 }
 
 export interface TLUiPopoverTriggerProps {
+  /**
+   * Accessible name for the trigger. A trigger whose only content is an icon
+   * has no text to be named by, so without this it reaches a screen reader as
+   * an unnamed button.
+   */
+  label?: string
   className?: string
   children?: ReactNode
 }
@@ -71,7 +77,7 @@ export interface TLUiPopoverTriggerProps {
  * whatever it likes inside without the trigger having to guess which prop on
  * an unknown element is the click handler.
  */
-export function TldrawUiPopoverTrigger({ className, children }: TLUiPopoverTriggerProps) {
+export function TldrawUiPopoverTrigger({ label, className, children }: TLUiPopoverTriggerProps) {
   const { id, open, setOpen, anchorRef } = usePopoverContext("TldrawUiPopoverTrigger")
   return (
     <button
@@ -80,6 +86,7 @@ export function TldrawUiPopoverTrigger({ className, children }: TLUiPopoverTrigg
       }}
       type="button"
       className={["mocanvas-btn", className].filter(Boolean).join(" ")}
+      {...(label ? { "aria-label": label, "data-tooltip": label } : {})}
       aria-haspopup="dialog"
       aria-expanded={open}
       aria-controls={`${id}-content`}

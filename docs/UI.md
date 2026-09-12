@@ -4,6 +4,27 @@
 style panel, an optional statistics chip, and the chrome the editor draws on the
 canvas itself. All of it is optional and all of it is themeable from CSS.
 
+## Loading the stylesheet
+
+The theme is published as `@mocanvas/mocanvas/mocanvas.css` and your app
+imports it:
+
+```ts
+import "@mocanvas/mocanvas/mocanvas.css"
+```
+
+The package's JavaScript entry does not import it. That is deliberate: Node has
+no loader for `.css`, so a CSS import inside `dist/index.js` makes
+`import "@mocanvas/mocanvas"` throw `ERR_UNKNOWN_FILE_EXTENSION` anywhere there
+is no bundler — vitest, SSR, a plain script. Up to and including 4.0.2 it did,
+and the emitted file was content-hashed (`dist/ui-4C5V5GYT.css`) so there was no
+stable name to import instead. Both are fixed; the cost is this one line in your
+app.
+
+`<Canvas />` from `@mocanvas/editor` carries fallback values for the canvas
+chrome tokens, so an editor mounted without the stylesheet still renders
+legibly — but the toolbar, panels, menus and dialogs need it.
+
 Source lives in `packages/mocanvas/src/ui/`:
 
 | File | What it holds |
@@ -122,8 +143,9 @@ so inline marks like the "mixed" badge keep the size they ask for.
 <Mocanvas hideUi />
 ```
 
-This drops the toolbar, zoom bar, style panel and stats chip. `ui.css` still
-loads, so the canvas chrome tokens above keep working. Default keyboard
+This drops the toolbar, zoom bar, style panel and stats chip. The stylesheet is
+imported by your app, not by the component, so the canvas chrome tokens above
+keep working. Default keyboard
 shortcuts are wired by `<Mocanvas />` itself and are unaffected; call
 `useKeyboardShortcuts(editor)` yourself if you build on `<Canvas />` directly.
 

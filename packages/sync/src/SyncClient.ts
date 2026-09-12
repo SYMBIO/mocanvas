@@ -1,4 +1,5 @@
 import { atom, type Signal } from "@mocanvas/state"
+import { warnOnce } from "@mocanvas/editor"
 import {
   createEmptyRecordsDiff,
   isRecordsDiffEmpty,
@@ -80,6 +81,9 @@ export function createSyncClient<R extends UnknownRecord = UnknownRecord>(
 
   const unsubscribes: (() => void)[] = []
   const reportedVersions = new Set<number>()
+  /** Which page each peer says it is looking at, for the check below. */
+  const peerPages = new Map<string, string>()
+  let warnedAboutPages = false
   let presence: PresenceSync | null = null
   let seq = 0
   /**
@@ -219,7 +223,10 @@ export function createSyncClient<R extends UnknownRecord = UnknownRecord>(
         awaitingSnapshot = false
         sendSnapshot()
         // Re-announce our presence so the newcomer sees us immediately.
-        presence?.poke()
+        // Forced: our record has not changed — it is the audience that has —
+        // and an unforced poke would compare equal and send nothing, leaving
+        // us invisible to the newcomer until our next heartbeat.
+        presence?.poke(true)
         return
       }
       case "snapshot": {
@@ -263,14 +270,46 @@ export function createSyncClient<R extends UnknownRecord = UnknownRecord>(
       case "presence": {
         if (message.clientId === clientId) return
         room.receive(message.clientId, message.record)
+        notePeerPage(message.clientId, message.record)
         return
       }
       case "bye": {
         if (message.clientId === clientId) return
         room.remove(message.clientId)
+        peerPages.delete(message.clientId)
         return
       }
     }
+  }
+
+  /**
+   * Say something when this replica is looking at a page none of its peers is.
+   *
+   * Everything still works — diffs and presence arrive, the status says
+   * `online` — and nothing is drawn: `getCollaboratorsOnCurrentPage()` filters
+   * every peer out and their shapes are on a page this replica is not showing.
+   * It is the failure mode with the least evidence, so the library says it out
+   * loud rather than letting a developer hunt for a transport bug that is not
+   * there. Once per client, and only outside production.
+   */
+  const notePeerPage = (peerId: string, record: R) => {
+    const editor = options.presence?.editor
+    if (!editor || warnedAboutPages) return
+    const page = (record as unknown as { currentPageId?: unknown }).currentPageId
+    if (typeof page !== "string") return
+    peerPages.set(peerId, page)
+    const mine = editor.getCurrentPageId()
+    for (const peerPage of peerPages.values()) if (peerPage === mine) return
+    warnedAboutPages = true
+    const theirs = Array.from(new Set(peerPages.values())).join(", ")
+    warnOnce(
+      `sync.page:${roomId}:${clientId}`,
+      `mocanvas/sync: this replica is on page ${mine}, and none of the ${peerPages.size} peer(s) in room "${roomId}" is — ` +
+        `they are on ${theirs}. Their cursors and their shapes will not be visible here. That is correct if you moved to ` +
+        `another page on purpose; if you did not, the two replicas are on pages that were built separately. Every editor ` +
+        `that starts from a blank document starts on the same default page, so check whether one side pinned, created or ` +
+        `loaded a page of its own — and if so, call editor.setCurrentPage() with a page id both sides agree on.`,
+    )
   }
 
   const onOpen = () => {
@@ -281,7 +320,9 @@ export function createSyncClient<R extends UnknownRecord = UnknownRecord>(
     // transport was down. Push them: the peers merge field by field, so
     // neither side of the split loses anything.
     if (!awaitingSnapshot) sendSnapshot()
-    presence?.poke()
+    // Forced, for the same reason as the `hello` case: after a reconnect the
+    // room has not heard from us in a while and our record may be unchanged.
+    presence?.poke(true)
   }
 
   const onClose = () => {

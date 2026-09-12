@@ -110,6 +110,16 @@ export interface TLEventMap {
   "stop-following": []
   /** A page hit its shape limit; the payload names the page and the count. */
   "max-shapes": [info: { name: string; pageId: string; count: number }]
+  /**
+   * Shapes were deleted, with every id that went — descendants included, since
+   * deleting a frame or a group takes its children with it and a listener
+   * cleaning up per-shape state needs all of them.
+   *
+   * Fires once per `deleteShapes` call, after the removal, and only when
+   * something was actually removed: a call naming a locked or missing shape
+   * deletes nothing and emits nothing.
+   */
+  "deleted-shapes": [ids: ShapeId[]]
 }
 
 /** A handler for one entry of {@link TLEventMap}. */

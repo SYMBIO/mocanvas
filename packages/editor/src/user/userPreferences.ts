@@ -56,6 +56,14 @@ export interface UserPreferencesState {
   isPasteAtCursorMode?: boolean
   /** Whether keyboard shortcuts are active. */
   areKeyboardShortcutsEnabled?: boolean
+  /**
+   * Announce more than the minimum to a screen reader.
+   *
+   * The plain announcement names the selection and nothing else ("rectangle
+   * selected"); with this on it also carries position and size, which is what a
+   * keyboard user otherwise has no way to read back.
+   */
+  isEnhancedA11yMode?: boolean
 }
 
 /** The colour a person gets when their preferences carry none. */
@@ -73,6 +81,7 @@ export const USER_PREFERENCES_DEFAULTS = {
   isDynamicSizeMode: false,
   isPasteAtCursorMode: false,
   areKeyboardShortcutsEnabled: true,
+  isEnhancedA11yMode: false,
 } as const satisfies Omit<Required<UserPreferencesState>, "id" | "color">
 
 /**
@@ -170,8 +179,19 @@ export class UserPreferencesManager {
     return this.getUserPreferences().locale ?? USER_PREFERENCES_DEFAULTS.locale
   }
 
+  /**
+   * How fast the editor animates; `0` means "do not animate".
+   *
+   * A user who has expressed no preference inherits the operating system's,
+   * the same way `colorScheme: "system"` does. Reduced motion is an
+   * accessibility setting people set once, for every application, and an
+   * editor that ignored it until it was told a second time would be reading
+   * the setting and then disregarding it.
+   */
   getAnimationSpeed(): number {
-    return this.getUserPreferences().animationSpeed ?? USER_PREFERENCES_DEFAULTS.animationSpeed
+    const own = this.getUserPreferences().animationSpeed
+    if (own !== undefined) return own
+    return prefersReducedMotion() ? 0 : USER_PREFERENCES_DEFAULTS.animationSpeed
   }
 
   getEdgeScrollSpeed(): number {
@@ -203,6 +223,10 @@ export class UserPreferencesManager {
     return this.getUserPreferences().isPasteAtCursorMode ?? USER_PREFERENCES_DEFAULTS.isPasteAtCursorMode
   }
 
+  getIsEnhancedA11yMode(): boolean {
+    return this.getUserPreferences().isEnhancedA11yMode ?? USER_PREFERENCES_DEFAULTS.isEnhancedA11yMode
+  }
+
   getAreKeyboardShortcutsEnabled(): boolean {
     return (
       this.getUserPreferences().areKeyboardShortcutsEnabled ?? USER_PREFERENCES_DEFAULTS.areKeyboardShortcutsEnabled
@@ -230,4 +254,10 @@ export class UserPreferencesManager {
 function prefersDarkMode(): boolean {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false
   return window.matchMedia("(prefers-color-scheme: dark)").matches
+}
+
+/** The OS "reduce motion" setting; `false` where there is no DOM to ask. */
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches
 }

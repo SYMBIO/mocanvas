@@ -1,5 +1,5 @@
 import { EditorPortal } from "@mocanvas/editor"
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react"
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react"
 import { placeNear, type Placement } from "./overlays"
 
 /**
@@ -13,6 +13,54 @@ import { placeNear, type Placement } from "./overlays"
  */
 
 export type Side = "above" | "below"
+
+/**
+ * How a layer learns about the layers opened from inside it.
+ *
+ * Every floating layer is portalled to the same place, so a submenu is a
+ * *sibling* of the menu that opened it, not a descendant. A dismiss check
+ * written as "did the press land inside me?" therefore answers no for a press
+ * on the submenu's own rows — and closes the whole menu on pointer-down,
+ * before the click that would have chosen the row ever happens. Every submenu
+ * item in the chrome was unreachable for exactly this reason.
+ *
+ * A layer registers its element with the layer it was opened from (and, up
+ * the chain, with that layer's own parent), so "inside me" can mean "inside
+ * me or anything I opened".
+ */
+export interface TLUiLayerNesting {
+  /** Register a nested layer's element. Returns the un-register. */
+  register(node: HTMLElement): () => void
+  /** Whether `target` is inside a layer opened from this one. */
+  containsNested(target: Node): boolean
+}
+
+const LayerNestingContext = createContext<TLUiLayerNesting | null>(null)
+
+/** The nesting handle a layer publishes to whatever it renders inside it. */
+function useLayerNesting(): TLUiLayerNesting {
+  const parent = useContext(LayerNestingContext)
+  const nested = useRef<Set<HTMLElement>>(new Set())
+  return useMemo<TLUiLayerNesting>(
+    () => ({
+      register(node) {
+        nested.current.add(node)
+        // Forward upwards, so a press two submenus deep still counts as
+        // inside the menu at the top.
+        const releaseParent = parent?.register(node)
+        return () => {
+          nested.current.delete(node)
+          releaseParent?.()
+        }
+      },
+      containsNested(target) {
+        for (const node of nested.current) if (node.contains(target)) return true
+        return false
+      },
+    }),
+    [parent],
+  )
+}
 
 /** Position an element beside `anchor` once it has been measured. */
 export function useAnchoredPosition(
@@ -46,16 +94,25 @@ export function useDismissable(
   layerRef: RefObject<HTMLElement | null>,
   anchorRef: RefObject<HTMLElement | null>,
   onClose: () => void,
+  /** Also treat these as "inside": the layers this one opened. */
+  containsNested?: (target: Node) => boolean,
 ): void {
   useEffect(() => {
     if (!open) return
     const onDown = (event: PointerEvent) => {
       const target = event.target as Node
       if (layerRef.current?.contains(target) || anchorRef.current?.contains(target)) return
+      if (containsNested?.(target)) return
       onClose()
     }
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
+      // Escape inside a field reverts the field. The layer only closes once
+      // there is nothing left in it that owns the key.
+      if (isTypingTarget(event.target)) return
+      // Escape closes the innermost layer only: one press should back out of
+      // a submenu, not out of the menu it lives in.
+      if (containsNested?.(event.target as Node)) return
       event.stopPropagation()
       onClose()
       anchorRef.current?.focus()
@@ -66,11 +123,26 @@ export function useDismissable(
       document.removeEventListener("pointerdown", onDown, true)
       document.removeEventListener("keydown", onKey, true)
     }
-  }, [open, layerRef, anchorRef, onClose])
+  }, [open, layerRef, anchorRef, onClose, containsNested])
 }
 
 /** Everything inside a floating layer that the keyboard can reach. */
 const FOCUSABLE = '[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"],[role="option"],button:not([disabled]),a[href],input:not([disabled])'
+
+/**
+ * Whether a key press is being typed into a field.
+ *
+ * A menu that holds a text field — the page menu's rename row — has to stop
+ * being a menu for as long as the caret is in it: Home, End and the arrows
+ * belong to the text, and Escape means "undo this edit" rather than "close
+ * everything". Without this the field is unusable inside the layer that
+ * contains it.
+ */
+function isTypingTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null
+  if (!el || typeof el.tagName !== "string") return false
+  return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable === true
+}
 
 /**
  * Roving focus inside a menu: Up/Down move, Home/End jump, and focus lands on
@@ -89,6 +161,7 @@ export function useMenuKeyboard(open: boolean, layerRef: RefObject<HTMLElement |
     const first = items()[0]
     first?.focus()
     const onKey = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return
       const list = items()
       if (list.length === 0) return
       const index = list.indexOf(layer.ownerDocument.activeElement as HTMLElement)
@@ -143,8 +216,17 @@ export function FloatingLayer({
   children,
 }: FloatingLayerProps) {
   const [ref, pos] = useAnchoredPosition(anchorRef, open, prefer)
-  useDismissable(open, ref, anchorRef, onClose)
+  const parent = useContext(LayerNestingContext)
+  const nesting = useLayerNesting()
+  useDismissable(open, ref, anchorRef, onClose, nesting.containsNested)
   useMenuKeyboard(keyboardNav && open, ref)
+  // Tell the layer we were opened from that we exist, so a press on our rows
+  // does not read to it as a press outside itself.
+  useEffect(() => {
+    const node = ref.current
+    if (!open || !node || !parent) return
+    return parent.register(node)
+  }, [open, parent, ref])
   if (!open) return null
   return (
     <EditorPortal>
@@ -156,7 +238,7 @@ export function FloatingLayer({
         style={pos ? { position: "fixed", left: pos.left, top: pos.top } : { position: "fixed", left: 0, top: 0, visibility: "hidden" }}
         onPointerDown={(event) => event.stopPropagation()}
       >
-        {children}
+        <LayerNestingContext.Provider value={nesting}>{children}</LayerNestingContext.Provider>
       </div>
     </EditorPortal>
   )

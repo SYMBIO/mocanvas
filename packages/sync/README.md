@@ -48,6 +48,47 @@ const { status } = useSync(editor, { roomId, transport: () => createBroadcastCha
 selection outlines in screen space. It positions itself absolutely, so it goes
 anywhere inside the canvas container.
 
+That is the whole integration: nothing above pins a page, and nothing names a
+person. Two things make it work, and both are worth knowing because both used
+to have to be worked around by hand.
+
+### The page both replicas start on
+
+A blank document's first page has a **fixed id** — `DEFAULT_PAGE_ID`, i.e.
+`page:page` — so two `<Mocanvas />`s that each built their own store start on
+the *same* page. Shapes drawn in one tab land on the page the other is looking
+at, and `getCollaboratorsOnCurrentPage()` has something to return. (Creating
+the same record id on two peers is a field-by-field merge, and the two bodies
+are identical, so there is nothing to settle.) Pages created *after* that get
+random ids, so two people genuinely on different pages of one document stay
+independent.
+
+When a replica does end up alone on its page — someone moved to another page,
+or two apps built their documents separately — the client says so once, in
+development:
+
+> mocanvas/sync: this replica is on page `page:…`, and none of the 1 peer(s) in
+> room "…" is — they are on `page:…`. Their cursors and their shapes will not be
+> visible here.
+
+Everything is still `online` in that state, every message still arrives, and
+nothing is drawn. It is the failure with the least evidence, which is why it
+gets a sentence instead of silence.
+
+### A tab is not a person
+
+Presence is per **editor instance**, not per user. `editor.user.getId()` is per
+*browser* — the same in every tab, and the same on a phone and a laptop signed
+in as one person — so a person with three tabs open would otherwise discard
+their own other tabs as themselves. The identity that decides is
+`editor.getInstancePresenceId()`: every editor mints one, this package
+publishes the tab's presence record under it, and `editor.getCollaborators()`
+drops that one record and no other.
+
+So two tabs of one browser are two collaborators — which is the entire point of
+`createBroadcastChannelTransport` — and an app does not have to invent a fake
+per-tab identity to make its own demo work.
+
 ## Protocol
 
 Every message is one JSON object on the wire.
@@ -93,7 +134,13 @@ half-parsed. Nothing on the wire can crash this client.
 - Presence records are derived from the editor's camera,
   `inputs.currentPagePoint` and selection, throttled to at most 30 Hz, and
   re-sent on a heartbeat. A collaborator is dropped on `bye` or after 10s of
-  silence.
+  silence. The record is keyed on the sending editor's instance id (see
+  "A tab is not a person" above), so one person's tabs do not overwrite each
+  other's presence.
+- A `hello` makes every established peer **re-announce** its presence, even
+  when its own record has not changed — what changed is who is listening. A
+  peer that has been sitting still since before you joined is therefore visible
+  immediately rather than at its next heartbeat.
 
 ## Conflict policy: a CRDT over the record fields
 

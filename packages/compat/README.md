@@ -15,10 +15,23 @@ npm install @mocanvas/compat
 ```ts
 import type { TLShape, TLShapeId, TLGeoShape } from "@mocanvas/compat"
 import { Tldraw } from "@mocanvas/compat" // alias of <Mocanvas />
+import "@mocanvas/mocanvas/mocanvas.css"
 ```
 
 The package also re-exports everything from `@mocanvas/mocanvas`, so a single import
 source works during a migration.
+
+**The stylesheet import is required** if you render `<Tldraw />` — it is where
+`import "tldraw/tldraw.css"` goes. Without it the toolbar, panels and menus
+come up unstyled. It comes from `@mocanvas/mocanvas`, which this package
+depends on; under a strict `node_modules` layout (pnpm's default) add
+`@mocanvas/mocanvas` to your own dependencies so the import resolves.
+
+> **Upgrading from 4.0.2 or earlier?** Add that line. Until 4.0.2
+> `@mocanvas/mocanvas` imported its stylesheet from its own JavaScript entry,
+> which worked under a bundler and threw
+> `ERR_UNKNOWN_FILE_EXTENSION: Unknown file extension ".css"` under plain Node
+> — vitest, SSR, a script. The JS entry no longer imports CSS, so your app does.
 
 What does and does not carry over is listed in `COMPAT.md`; the step-by-step
 move is in `MIGRATION.md`. Both are shipped inside this package.

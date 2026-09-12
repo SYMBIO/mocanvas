@@ -1,6 +1,13 @@
 import { track, useEditor, useGlobalMenuIsOpen, type PageId } from "@mocanvas/editor"
 import { useState } from "react"
-import { TldrawUiDropdownMenuContent, TldrawUiDropdownMenuRoot, TldrawUiDropdownMenuTrigger } from "./ui-dropdown-menu"
+import {
+  TldrawUiDropdownMenuContent,
+  TldrawUiDropdownMenuRoot,
+  TldrawUiDropdownMenuSub,
+  TldrawUiDropdownMenuSubContent,
+  TldrawUiDropdownMenuSubTrigger,
+  TldrawUiDropdownMenuTrigger,
+} from "./ui-dropdown-menu"
 import { TldrawUiIcon } from "./ui-icon"
 import { TldrawUiInput } from "./ui-input"
 import { TldrawUiMenuContextProvider, TldrawUiMenuGroup, TldrawUiMenuItem } from "./ui-menu"
@@ -11,6 +18,14 @@ import { TldrawUiMenuContextProvider, TldrawUiMenuGroup, TldrawUiMenuItem } from
  * A menu rather than a tab bar: a document with twenty pages has to stay
  * usable, and a row of twenty tabs does not. The current page's name doubles
  * as the trigger, so the panel costs one button's worth of chrome.
+ *
+ * ## Why the per-page actions are behind their own trigger
+ * They used to be three rows printed beside every page name, which made a
+ * five-page document a twenty-row menu in which nothing said which "Delete"
+ * belonged to which page. One trigger per row, opening a menu that names the
+ * page it acts on, is the same three actions without the ambiguity — and it
+ * leaves the row itself as what it should be: the thing you click to switch
+ * page.
  */
 
 export interface PageItemInputProps {
@@ -33,9 +48,10 @@ export function PageItemInput({ id, name, onCancel }: PageItemInputProps) {
   return (
     <TldrawUiInput
       value={name}
-      label="Page name"
+      label={`Rename ${name}`}
       autoFocus
       autoSelect
+      className="mocanvas-page-rename"
       onComplete={(next) => {
         const trimmed = next.trim()
         if (trimmed && trimmed !== name) {
@@ -54,18 +70,64 @@ export interface PageItemSubmenuProps {
   index: number
   /** How many pages there are, so the last one cannot be deleted. */
   total: number
+  /** The page's name, so the menu can say which page it acts on. */
+  name?: string
   onRename?(): void
 }
 
-/** The per-page actions: rename, duplicate, delete. */
-export function PageItemSubmenu({ id, total, onRename }: PageItemSubmenuProps) {
+/**
+ * The per-page actions: rename, duplicate, delete.
+ *
+ * Its open state is controlled here rather than left to the submenu, because
+ * "Rename" has to close *this* menu and leave the page list open behind it —
+ * the rename field it reveals lives in that list. An item that closed the
+ * whole menu would put the field out of sight, which is the bug this shape
+ * exists to prevent.
+ */
+export function PageItemSubmenu({ id, total, name, onRename }: PageItemSubmenuProps) {
   const editor = useEditor()
+  const [open, setOpen] = useState(false)
+  const label = name ? `Actions for ${name}` : "Page actions"
   return (
-    <TldrawUiMenuGroup id={`page-actions-${id}`}>
-      <TldrawUiMenuItem id={`rename-page-${id}`} label="Rename" onSelect={() => onRename?.()} />
-      <TldrawUiMenuItem id={`duplicate-page-${id}`} label="Duplicate" onSelect={() => editor.duplicatePage(id)} />
-      <TldrawUiMenuItem id={`delete-page-${id}`} label="Delete" disabled={total < 2} onSelect={() => editor.deletePage(id)} />
-    </TldrawUiMenuGroup>
+    <TldrawUiDropdownMenuSub id={`page-actions-${id}`} open={open} onOpenChange={setOpen}>
+      <TldrawUiDropdownMenuSubTrigger label={label} className="mocanvas-page-row-actions">
+        <span className="sr-only">{label}</span>
+      </TldrawUiDropdownMenuSubTrigger>
+      <TldrawUiDropdownMenuSubContent label={label}>
+        <TldrawUiMenuGroup id={`page-actions-group-${id}`}>
+          <TldrawUiMenuItem
+            id={`rename-page-${id}`}
+            label="Rename"
+            noClose
+            onSelect={() => {
+              setOpen(false)
+              onRename?.()
+            }}
+          />
+          <TldrawUiMenuItem
+            id={`duplicate-page-${id}`}
+            label="Duplicate"
+            noClose
+            onSelect={() => {
+              setOpen(false)
+              editor.markHistoryStoppingPoint("duplicate page")
+              editor.duplicatePage(id)
+            }}
+          />
+          <TldrawUiMenuItem
+            id={`delete-page-${id}`}
+            label="Delete"
+            noClose
+            disabled={total < 2}
+            onSelect={() => {
+              setOpen(false)
+              editor.markHistoryStoppingPoint("delete page")
+              editor.deletePage(id)
+            }}
+          />
+        </TldrawUiMenuGroup>
+      </TldrawUiDropdownMenuSubContent>
+    </TldrawUiDropdownMenuSub>
   )
 }
 
@@ -85,44 +147,62 @@ export const DefaultPageMenu = track(function DefaultPageMenu() {
   const current = pages.find((page) => page.id === currentId)
 
   return (
-    <TldrawUiDropdownMenuRoot id="page-menu" open={isOpen} onOpenChange={setIsOpen}>
+    <TldrawUiDropdownMenuRoot
+      id="page-menu"
+      open={isOpen}
+      onOpenChange={(next) => {
+        // A rename left half-finished when the menu closes should not be
+        // waiting to reappear the next time it opens.
+        if (!next) setRenaming(null)
+        setIsOpen(next)
+      }}
+    >
       <TldrawUiDropdownMenuTrigger label={`Page: ${current?.name ?? "Untitled"}`} className="mocanvas-btn--wide">
         {current?.name ?? "Untitled"}
       </TldrawUiDropdownMenuTrigger>
       <TldrawUiDropdownMenuContent label="Pages" side="below">
         <TldrawUiMenuContextProvider type="menu" sourceId="menu">
           <div className="mocanvas-page-list" role="radiogroup" aria-label="Pages">
-            {pages.map((page, index) =>
-              renaming === page.id ? (
-                <PageItemInput key={page.id} id={page.id} name={page.name} onCancel={() => setRenaming(null)} />
-              ) : (
-                <div key={page.id} className="mocanvas-page-row">
-                  <button
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={page.id === currentId}
-                    className="mocanvas-menu-item"
-                    onDoubleClick={() => setRenaming(page.id)}
-                    onClick={() => {
-                      editor.setCurrentPage(page.id)
-                      setIsOpen(false)
-                    }}
-                  >
-                    {page.name}
-                  </button>
-                  <PageItemSubmenu id={page.id} index={index} total={pages.length} onRename={() => setRenaming(page.id)} />
-                </div>
-              ),
-            )}
+            {pages.map((page) => (
+              <div key={page.id} className="mocanvas-page-row">
+                {renaming === page.id ? (
+                  <PageItemInput id={page.id} name={page.name} onCancel={() => setRenaming(null)} />
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={page.id === currentId}
+                      className="mocanvas-menu-item mocanvas-page-row-name"
+                      data-item={`page-${page.id}`}
+                      onDoubleClick={() => setRenaming(page.id)}
+                      onClick={() => {
+                        editor.setCurrentPage(page.id)
+                        setIsOpen(false)
+                      }}
+                    >
+                      {page.name}
+                    </button>
+                    <PageItemSubmenu id={page.id} index={pages.indexOf(page)} total={pages.length} name={page.name} onRename={() => setRenaming(page.id)} />
+                  </>
+                )}
+              </div>
+            ))}
           </div>
           <TldrawUiMenuGroup id="page-menu-actions">
             <TldrawUiMenuItem
               id="new-page"
               label="New page"
               icon="duplicate"
+              noClose
               onSelect={() => {
+                const before = new Set(pages.map((page) => page.id))
                 editor.markHistoryStoppingPoint("new page")
                 editor.createPage({ name: `Page ${pages.length + 1}` })
+                // Straight into the rename field: a page called "Page 4" is
+                // almost never what it is going to be called.
+                const created = editor.getPages().find((page) => !before.has(page.id))
+                if (created) setRenaming(created.id)
               }}
             />
           </TldrawUiMenuGroup>

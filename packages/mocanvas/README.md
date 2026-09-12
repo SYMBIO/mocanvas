@@ -112,11 +112,32 @@ npm install @mocanvas/mocanvas react react-dom
 
 `react` and `react-dom` (>= 18) are peer dependencies.
 
+Then import the stylesheet once, anywhere in your app:
+
+```ts
+import "@mocanvas/mocanvas/mocanvas.css"
+```
+
+**This line is required.** Without it the canvas still renders, but the
+toolbar, panels, menus and dialogs come up unstyled. It is the same arrangement
+as `tldraw/tldraw.css`.
+
+> **Upgrading from 4.0.2 or earlier?** Add that line — it is the only change.
+> Until 4.0.2 `@mocanvas/mocanvas` imported the stylesheet from its own
+> JavaScript entry, which worked in a bundler and broke everywhere else:
+> vitest, SSR, or any plain Node `import` threw
+> `ERR_UNKNOWN_FILE_EXTENSION: Unknown file extension ".css"`, because Node has
+> no loader for CSS. The file was also content-hashed
+> (`dist/ui-4C5V5GYT.css`), so nothing could import it by name. The JS entry no
+> longer imports CSS and the stylesheet now has a fixed path, so your app
+> imports it.
+
 ## Use
 
 ```tsx
 import { createRoot } from "react-dom/client"
 import { Mocanvas, createShapeId, type Editor } from "@mocanvas/mocanvas"
+import "@mocanvas/mocanvas/mocanvas.css"
 
 function App() {
   function onMount(editor: Editor) {
@@ -142,8 +163,12 @@ function App() {
 createRoot(document.getElementById("root")!).render(<App />)
 ```
 
-`<Mocanvas />` fills its container, so give the container a size. The default
-UI stylesheet is imported by the package itself — no extra CSS import.
+`<Mocanvas />` fills its container, so give the container a size.
+
+The default UI stylesheet is `@mocanvas/mocanvas/mocanvas.css` and your app
+imports it — the package's JavaScript entry deliberately does not, so that
+importing `@mocanvas/mocanvas` works under Node as well as under a bundler.
+`UI.md`, shipped in this package, covers restyling it.
 
 ## ESM only
 

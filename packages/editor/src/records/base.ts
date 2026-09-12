@@ -35,6 +35,30 @@ export type PageId = RecordId<Page>
 export const PageRecordType = createRecordType<Page>("page", { scope: "document" }).withDefaultProperties(() => ({
   meta: {},
 }))
+/**
+ * The id of an empty document's first page.
+ *
+ * A fixed id rather than a fresh one, so two replicas that each seeded their
+ * own store still meet on the same page. Lives here beside {@link DOCUMENT_ID}
+ * because `createStore` seeds both and must not import the editor to do it.
+ */
+export const DEFAULT_PAGE_ID = PageRecordType.createId("page")
+
+/**
+ * The index a blank document's first page gets.
+ *
+ * `a1`, not `ZERO_INDEX_KEY` — every `.tldr` written by tldraw puts its first
+ * page at `a1`, including the reference fixture this project compares against,
+ * and a page seeded at `a0` sorts before all of them. With a single page that
+ * is invisible; it shows up the moment two documents are merged or synced.
+ *
+ * This is deliberately only about the SEEDED page. The index helpers still
+ * start at `ZERO_INDEX_KEY` and are internally consistent with each other;
+ * reconciling the generator itself with tldraw's first key is a change to how
+ * every index is allocated and does not belong here.
+ */
+export const FIRST_PAGE_INDEX = "a1" as IndexKey
+
 /** Whether `record` is a page record. Narrows to {@link Page}. */
 export function isPage(record: { typeName?: string } | null | undefined): record is Page {
   return record?.typeName === "page"

@@ -157,7 +157,27 @@ describe("the geo props migration", () => {
         isLocked: false,
         opacity: 1,
         meta: {},
-        props: { geo: "triangle", w: 100, h: 100, growY: 0, url: "", text: "", scale: 1 },
+        // Every prop `geoShapeProps` declares EXCEPT the two the migration adds:
+        // the record has to be a valid geo shape apart from the gap under test,
+        // or it is rejected for the wrong reason.
+        props: {
+          geo: "triangle",
+          w: 100,
+          h: 100,
+          color: "black",
+          labelColor: "black",
+          fill: "none",
+          dash: "draw",
+          size: "m",
+          font: "draw",
+          align: "middle",
+          verticalAlign: "middle",
+          growY: 0,
+          url: "",
+          richText: { type: "doc", content: [] },
+          text: "",
+          scale: 1,
+        },
       },
     }
 
@@ -170,7 +190,7 @@ describe("the geo props migration", () => {
     expect(shape.props["flipY"]).toBe(false)
   })
 
-  it("is what backfills them — a store that never registered the util leaves them missing", () => {
+  it("is what backfills them — a store that never registered the util cannot load the board at all", () => {
     const before = {
       "shape:old": {
         id: "shape:old",
@@ -184,13 +204,40 @@ describe("the geo props migration", () => {
         isLocked: false,
         opacity: 1,
         meta: {},
-        props: { geo: "triangle", w: 100, h: 100, growY: 0, url: "", text: "", scale: 1 },
+        // Every prop `geoShapeProps` declares EXCEPT the two the migration adds:
+        // the record has to be a valid geo shape apart from the gap under test,
+        // or it is rejected for the wrong reason.
+        props: {
+          geo: "triangle",
+          w: 100,
+          h: 100,
+          color: "black",
+          labelColor: "black",
+          fill: "none",
+          dash: "draw",
+          size: "m",
+          font: "draw",
+          align: "middle",
+          verticalAlign: "middle",
+          growY: 0,
+          url: "",
+          richText: { type: "doc", content: [] },
+          text: "",
+          scale: 1,
+        },
       },
     }
 
+    // No shape utils, so `GeoShapeUtil.migrations` never reaches the schema and
+    // `flipX`/`flipY` are never backfilled. `geoShapeProps` declares both as
+    // required booleans, and the built-in props are registered whether or not
+    // the util was passed — so the record is refused rather than held in a
+    // state no geo shape may be in. Fail-closed is the point: the board is
+    // loadable, but only by a store built from the utils that describe it.
     const store = createStore()
-    store.loadStoreSnapshot({ store: before, schema: createSchema([]).serialize() } as never)
-    const shape = store.get("shape:old" as never) as unknown as { props: Record<string, unknown> }
-    expect(shape.props["flipX"]).toBeUndefined()
+    expect(() =>
+      store.loadStoreSnapshot({ store: before, schema: createSchema([]).serialize() } as never),
+    ).toThrow(/flipX/)
+    expect(store.get("shape:old" as never)).toBeUndefined()
   })
 })

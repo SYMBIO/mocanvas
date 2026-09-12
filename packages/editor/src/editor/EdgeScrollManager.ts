@@ -80,6 +80,14 @@ export class EdgeScrollManager extends EditorManager {
     // pushing right must bring content in from the right, i.e. pan left.
     const offset = new Vec(-direction.x * step, -direction.y * step)
     this.editor.pan(offset)
+    // The pointer has not moved, but the page underneath it has. `inputs`
+    // is only refreshed by pointer events, so without this every gesture
+    // reading `currentPagePoint` — the shape being dragged, the marquee being
+    // stretched — would keep using the point from the last pointer move and
+    // stand still while the camera slid out from under it. Scrolling the board
+    // and leaving the dragged shape behind is worse than not scrolling at all.
+    const inputs = this.editor.inputs
+    inputs.currentPagePoint = this.editor.viewportToPage(inputs.currentScreenPoint)
     return offset
   }
 

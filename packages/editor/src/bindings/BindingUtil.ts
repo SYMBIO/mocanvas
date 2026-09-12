@@ -1,11 +1,12 @@
 import type { Editor } from "../editor/Editor"
 import type { UnknownBinding } from "../records/binding"
 import type { UnknownShape } from "../records/base"
+import type { UnknownRecordProps } from "../records/props"
 
 export interface BindingUtilConstructor<B extends UnknownBinding = UnknownBinding, U extends BindingUtil<B> = BindingUtil<B>> {
   new (editor: Editor): U
   type: B["type"]
-  props?: Record<string, unknown>
+  props?: UnknownRecordProps
   migrations?: unknown
 }
 
@@ -68,7 +69,13 @@ export interface BindingOnDeleteOptions<B extends UnknownBinding> {
  */
 export abstract class BindingUtil<B extends UnknownBinding = UnknownBinding> {
   static type: string
-  static props?: Record<string, unknown>
+  /**
+   * One validator per prop of the binding this util describes — the contract
+   * the store checks a record against before it is written, and what
+   * `createSchema()` reads to build the document schema. A binding type that
+   * declares none is not validated: see `createBindingRecordType`.
+   */
+  static props?: UnknownRecordProps
   static migrations?: unknown
 
   constructor(readonly editor: Editor) {}

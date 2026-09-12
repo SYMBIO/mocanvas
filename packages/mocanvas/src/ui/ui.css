@@ -534,6 +534,9 @@
   font: inherit;
 }
 
+/* Reduced motion, from the OS or from the editor's own preference. The
+   attribute is stamped on the container by `ReduceMotionAttribute`; the media
+   query stands alone so an editor with no chrome still obeys the OS. */
 @media (prefers-reduced-motion: reduce) {
   .mocanvas-btn,
   .mocanvas-swatch,
@@ -541,6 +544,16 @@
   .mocanvas-picker {
     transition: none;
   }
+}
+
+[data-reduce-motion="true"] .mocanvas-btn,
+[data-reduce-motion="true"] .mocanvas-swatch,
+[data-reduce-motion="true"] .mocanvas-swatch > span,
+[data-reduce-motion="true"] .mocanvas-picker,
+[data-reduce-motion="true"] .mocanvas-menu-item,
+[data-reduce-motion="true"] .mocanvas-layer {
+  transition: none !important;
+  animation: none !important;
 }
 
 .mocanvas-more {
@@ -894,6 +907,21 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* The name takes the row; its actions trigger is a square beside it, so a
+   five-page menu is five rows rather than twenty. */
+.mocanvas-page-row-name,
+.mocanvas-page-rename {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mocanvas-page-row-actions {
+  flex: 0 0 auto;
+  width: var(--mocanvas-ui-btn);
+  justify-content: center;
+  padding: 0;
 }
 
 .mocanvas-presence-editor {

@@ -10,7 +10,8 @@ The short version: your **documents, records, ids and `.tldr` files carry over
 untouched**, most of your **`Editor` calls carry over untouched**, your
 **`ShapeUtil` / `StateNode` / `BindingUtil` subclasses keep their shape**, and
 the real work is (a) imports, (b) teaching custom shapes about the GPU
-renderer, and (c) rebuilding UI, which has no slot compatibility yet.
+renderer, and (c) UI, where the slots are compatible but the message
+catalogues are yours to supply (§7).
 
 ---
 
@@ -236,6 +237,21 @@ the `export * from "@mocanvas/mocanvas"` at the top of the package.
 
 Everything `@mocanvas/editor` exports is re-exported by `@mocanvas/mocanvas`, so in app
 code you can import from `@mocanvas/mocanvas` alone.
+
+### Step 1b — the stylesheet
+
+| Old import               | New import                        |
+| ------------------------ | --------------------------------- |
+| `"tldraw/tldraw.css"`    | `"@mocanvas/mocanvas/mocanvas.css"` |
+
+Same arrangement, same one line, wherever you had it. The default UI is
+unstyled without it.
+
+`@mocanvas/compat` does not re-export the stylesheet — a package can only
+export files it contains — so this import names `@mocanvas/mocanvas` even
+during the zero-rename step. Under pnpm's strict `node_modules` that means
+adding `@mocanvas/mocanvas` to your own dependencies alongside
+`@mocanvas/compat`.
 
 ### Step 2 — drop the prefixes
 
@@ -499,26 +515,35 @@ returns both and `putContentOntoCurrentPage` accepts both.
 
 ## 7. UI
 
-**There is no slot compatibility yet**, and it is an explicit v1 non-goal. Do
-not expect your existing overrides of tldraw's UI components to compile.
+**Slot compatibility exists.** This section used to say it did not and that it
+was a v1 non-goal; both stopped being true before 4.0. Your existing overrides
+of tldraw's UI components are the shape mocanvas expects.
 
 What you have:
 
-- `hideUi` on `<Mocanvas />` turns off the default toolbar and zoom bar
-  entirely, leaving you the canvas and your `children`.
-- `components` (passed through to `<Canvas>`) lets you replace the canvas-level
-  render slots.
+- `components` — the `TLComponents` map, at both the canvas level and the
+  chrome level. Pass a component to replace a slot, `null` to remove it.
+- `overrides` — `TLUiOverrides`, with `tools`, `actions` and `translations`.
+  The tool and action lists are what the toolbar, the menus and the keyboard
+  bindings are all built from, so rewriting an entry changes all three
+  together rather than only what is drawn.
+- The default chrome as named exports — `TldrawUi`, `DefaultUi`,
+  `DefaultToolbar`, `DefaultMainMenu` and the rest — so you can render one
+  piece of it inside chrome of your own.
+- `useTools()` and `useActions()` return those lists after overrides, which is
+  what a toolbar of your own should render from.
+- `hideUi` on `<Mocanvas />` still turns the chrome off entirely, leaving you
+  the canvas and your `children`.
 - `useEditor()` inside any descendant of `<Canvas>` / `<EditorProvider>`
   returns the `Editor` (`useMaybeEditor()` returns `Editor | null`).
 - `track(Component)` and `useValue` from `@mocanvas/state/react` — re-exported
-  from `@mocanvas/editor` and `@mocanvas/mocanvas` — make a component re-render when the
-  signals it reads change.
+  from `@mocanvas/editor` and `@mocanvas/mocanvas` — make a component re-render
+  when the signals it reads change.
 
-The practical migration is: `hideUi`, then rebuild your chrome as ordinary
-React inside `<Mocanvas>`, reading and driving the editor through `useEditor`
-and `track`. Because the default UI is still being reworked, treat its internals
-as unstable and build against `useEditor` rather than against specific UI
-components.
+One real difference remains: mocanvas ships **no message catalogues**, so
+`overrides.translations` is where UI strings come from. The language menu lists
+only the locales you supply a non-empty dictionary for, and renders nothing at
+all if you supply none — see the note in `UI.md`.
 
 ---
 
@@ -626,19 +651,18 @@ before.
 
 ## 10. Known gaps
 
-Taken from the "phase 3" and "later" rows of [COMPAT.md](COMPAT.md), plus what
-the code confirms today.
+Every row below was re-checked against the built package rather than carried
+forward from the roadmap. Rows that used to sit here and no longer belong —
+`editor.resizeShape` and `stretchShapes`, `editor.getSvgString` and `toImage`,
+`editor.textMeasure`/`user`/`menus`, presence records, and slot-compatible UI —
+are all present, and the entries claiming otherwise were stale rather than
+aspirational.
 
 | Gap | Status |
 | --- | ------ |
-| `editor.resizeShape`, `editor.stretchShapes` | phase 3. Interactive resize lives in the select tool; `ShapeUtil.onResize` and `BaseBoxShapeUtil` work, but there is no imperative resize entry point on `Editor`. |
-| `editor.getSvgString`, `editor.toImage` | Not `Editor` methods. Export is a set of free functions in `@mocanvas/mocanvas`: `getSvgString(editor, ids?, opts?)`, `exportToBlob(editor, opts)`, `downloadBlob(blob, filename)`, `copyBlobToClipboard(blob)`. |
 | `ShapeUtil.toSvg`, `ShapeUtil.toBackgroundSvg` | Not `ShapeUtil` members. Custom shapes contribute to SVG export through `registerShapeSvgRenderer(type, renderer)`; without one they fall back to `geometryFallbackSvg`. |
-| `pointer` and `instance_presence` records | later — collaboration. No presence records, and no `mergeRemoteChanges` transport yet. |
-| Sync protocol | Explicit v1 non-goal. Wire compatibility with tldraw's sync protocol is not planned for v1. |
-| Slot-compatible UI | Explicit v1 non-goal. See §7. |
+| Sync protocol | Wire compatibility with tldraw's own sync protocol is not planned. `@mocanvas/sync` is a working transport of its own — presence records, `store.mergeRemoteChanges`, and a relay — but it does not speak tldraw's wire format. |
 | `image` shape on the GPU | The texture path exists in the engine (`StyleWords.texture` + `uploadTexture`) but the `image` shape still draws an `<img>` in the DOM overlay. |
-| `editor.textMeasure`, `editor.user`, `editor.menus` | Not implemented. Text measurement is DOM-backed inside the text layer; `editor.inputs` and `editor.sideEffects` do exist. |
 | Text rendering | DOM overlay. Glyph-atlas text in WASM is phase 3. |
 | GPU frame clipping | The `CLIP` flag and `isClipShape` hook are wired end to end, but no built-in shape enables it yet (phase 3). |
 | WebGPU backend | Phase 3. WebGL2 is the only backend today, behind `RenderBackend`. |

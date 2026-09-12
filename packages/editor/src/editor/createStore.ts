@@ -1,11 +1,13 @@
 import { Store, StoreSchema, type MigrationSequence, type SerializedStore, type StoreSnapshot } from "@mocanvas/store"
 import {
   CameraRecordType,
+  DEFAULT_PAGE_ID,
+  DOCUMENT_ID,
+  FIRST_PAGE_INDEX,
   DocumentRecordType,
   InstancePageStateRecordType,
   InstanceRecordType,
   PageRecordType,
-  ShapeRecordType,
   type Camera,
   type Document,
   type Instance,
@@ -14,11 +16,18 @@ import {
   type Shape,
   type UnknownShape,
 } from "../records/base"
-import { BindingRecordType, type Binding, type UnknownBinding } from "../records/binding"
+import type { Binding, UnknownBinding } from "../records/binding"
 import { AssetRecordType, type Asset } from "../records/asset"
 import { createInMemoryAssetStore, type AssetStore } from "../assets/AssetStore"
 import { InstancePresenceRecordType, type InstancePresence } from "../records/presence"
 import { createPropsMigrationSequences, type PropsMigrationSource } from "../migrations/propsMigrations"
+import { defaultBindingSchemas, defaultShapeSchemas } from "../records/defaultSchemas"
+import {
+  collectProps,
+  createBindingRecordType,
+  createShapeRecordType,
+  type PropsSource,
+} from "../records/validatedRecordTypes"
 import {
   createCustomRecordMigrationSequences,
   createCustomRecordTypeMap,
@@ -26,6 +35,13 @@ import {
   type UnknownCustomRecord,
 } from "../records/schemaRecords"
 import { CUSTOM_RECORD_TYPE_NAME, type CustomRecordInfo } from "../records/customRecord"
+
+/**
+ * A util as the schema reads it: a type name, its `static props` (what the
+ * records of that type are validated against) and its `static migrations`. A
+ * `ShapeUtil` or `BindingUtil` subclass satisfies this through its statics.
+ */
+export type SchemaUtilSource = PropsMigrationSource & PropsSource
 
 /** The schema an editor store is built on. */
 export type TLSchema = StoreSchema<EditorRecord, EditorStoreProps>
@@ -73,9 +89,9 @@ export interface CreateStoreOptions {
    * are collected into the schema, so a board persisted before a prop existed
    * is backfilled on load. Pass the same list you give the editor.
    */
-  shapeUtils?: readonly PropsMigrationSource[]
+  shapeUtils?: readonly SchemaUtilSource[]
   /** Binding utils, for the same reason as `shapeUtils`. */
-  bindingUtils?: readonly PropsMigrationSource[]
+  bindingUtils?: readonly SchemaUtilSource[]
   /**
    * Custom record types this document may contain, beyond shapes and bindings —
    * an app's own top-level entities. Each contributes a record type and its
@@ -119,20 +135,30 @@ export function createSchema(
     ...createCustomRecordMigrationSequences(records),
     ...(migrationsOrUtils.migrations ?? []),
   ]
-  return createSchemaWithMigrations(migrations, records)
+  return createSchemaWithMigrations(migrations, records, {
+    ...(migrationsOrUtils.shapeUtils ? { shapeUtils: migrationsOrUtils.shapeUtils } : {}),
+    ...(migrationsOrUtils.bindingUtils ? { bindingUtils: migrationsOrUtils.bindingUtils } : {}),
+  })
 }
 
 function createSchemaWithMigrations(
   migrations: MigrationSequence[],
   records: Readonly<Record<string, CustomRecordInfo<string>>> | undefined,
+  utils: { shapeUtils?: readonly SchemaUtilSource[] | undefined; bindingUtils?: readonly SchemaUtilSource[] | undefined } = {},
 ): StoreSchema<EditorRecord, EditorStoreProps> {
   const customRecords = createCustomRecordTypeMap(records)
+  // The `shape` and `binding` entries are BUILT here rather than taken from
+  // `../records/base`, because what they validate depends on which utils this
+  // schema is for. `ShapeRecordType` stays exported for `createId`, defaults
+  // and the rest of its non-validating surface.
+  const shapeRecords = createShapeRecordType(collectProps(utils.shapeUtils, defaultShapeSchemas))
+  const bindingRecords = createBindingRecordType(collectProps(utils.bindingUtils, defaultBindingSchemas))
   return StoreSchema.create<EditorRecord, EditorStoreProps>(
     {
       document: DocumentRecordType,
       page: PageRecordType,
-      shape: ShapeRecordType,
-      binding: BindingRecordType,
+      shape: shapeRecords,
+      binding: bindingRecords,
       asset: AssetRecordType,
       camera: CameraRecordType,
       instance: InstanceRecordType,
@@ -161,5 +187,36 @@ export function createStore(options: CreateStoreOptions = {}): EditorStore {
     props: { defaultName: options.defaultName ?? "", assets: options.assets ?? createInMemoryAssetStore() },
   })
   if (options.snapshot) store.loadStoreSnapshot(options.snapshot)
+  else seedBaseRecords(store)
   return store
+}
+
+/**
+ * Give a brand new store the two records every document has: the document
+ * itself and its first page.
+ *
+ * A store built with no data used to contain nothing at all, so anything that
+ * reads a document without mounting an editor — a sync backend, a headless
+ * export, a test — saw an empty store and had to seed it by hand or work
+ * around the absence. `Editor` seeds the same two records on construction, so
+ * this only changes what a store looks like BEFORE an editor touches it.
+ *
+ * Deliberately only these two. Camera, instance and page-state are session
+ * records: they belong to a particular editor on a particular tab, and a store
+ * that is only ever read, synced or exported should not carry someone's
+ * viewport. `Editor.ensureBaseRecords` still creates those.
+ *
+ * Skipped when the caller supplies `initialData` or a `snapshot`, both of
+ * which bring their own document and pages; seeding over them would put a
+ * second, empty page beside the real ones.
+ */
+function seedBaseRecords(store: EditorStore): void {
+  if (store.has(DOCUMENT_ID)) return
+  if (store.query.records("page").get().length > 0) return
+  store.put([
+    DocumentRecordType.create({ id: DOCUMENT_ID, name: store.props.defaultName }),
+    // The same fixed id the editor uses, so two replicas that each seeded
+    // their own store meet on one page rather than diverging into two.
+    PageRecordType.create({ id: DEFAULT_PAGE_ID, name: "Page 1", index: FIRST_PAGE_INDEX }),
+  ])
 }

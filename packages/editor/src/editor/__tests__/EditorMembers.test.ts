@@ -2,14 +2,15 @@ import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { loadEngineSync, type StyleWords } from "@mocanvas/wasm"
-import { COLLABORATOR_INACTIVE_TIMEOUT, Editor } from "../Editor"
+import { COLLABORATOR_INACTIVE_TIMEOUT, DEFAULT_PAGE_ID, Editor } from "../Editor"
 import { createStore } from "../createStore"
 import { Timers } from "../Timers"
 import { getOwnerDocument, getOwnerWindow } from "../container"
 import { getBaseZoomForCameraOptions, DEFAULT_CAMERA_OPTIONS } from "../CameraOptions"
+import { ZERO_INDEX_KEY } from "@mocanvas/store"
 import { Rectangle2d } from "../../geometry"
 import { InstancePresenceRecordType } from "../../records/presence"
-import type { BaseShape, ShapeId } from "../../records/base"
+import { PageRecordType, type BaseShape, type ShapeId } from "../../records/base"
 import { BaseBoxShapeUtil } from "../../shapes/ShapeUtil"
 import { StateNode } from "../../tools/StateNode"
 import { createUserId } from "../../user/userRecord"
@@ -539,6 +540,46 @@ describe("collaboration", () => {
     expect(editor.getVisibleCollaboratorsOnCurrentPage().map((c) => c.userId)).toEqual(["user:live"])
   })
 
+  it("treats another instance of the same person as a collaborator", () => {
+    // Two tabs of one browser are one *user* and two *instances*. The presence
+    // filter is about not drawing our own cursor, which is an instance
+    // question; filtering by user id made two tabs invisible to each other.
+    editor.store.put([
+      InstancePresenceRecordType.create({
+        id: InstancePresenceRecordType.createId("other-tab"),
+        userId: editor.user.getId(),
+        userName: "me, elsewhere",
+        currentPageId: editor.getCurrentPageId(),
+        lastActivityTimestamp: Date.now(),
+      }),
+    ])
+
+    expect(editor.getVisibleCollaboratorsOnCurrentPage().map((c) => c.userName)).toEqual(["me, elsewhere"])
+  })
+
+  it("drops this instance's own presence record, whoever wrote it", () => {
+    editor.store.put([
+      InstancePresenceRecordType.create({
+        id: editor.getInstancePresenceId(),
+        userId: editor.user.getId(),
+        currentPageId: editor.getCurrentPageId(),
+        lastActivityTimestamp: Date.now(),
+      }),
+    ])
+
+    expect(editor.getCollaborators()).toEqual([])
+  })
+
+  it("gives every editor instance a presence id of its own", () => {
+    const other = makeEditor()
+    try {
+      expect(editor.getInstancePresenceId()).not.toBe(other.getInstancePresenceId())
+      expect(editor.getInstancePresenceId()).toMatch(/^instance_presence:/)
+    } finally {
+      other.dispose()
+    }
+  })
+
   it("hides collaborators looking at another page, however active they are", () => {
     addCollaborator("elsewhere", Date.now())
     editor.createPage({ name: "other" })
@@ -718,5 +759,161 @@ describe("Timers", () => {
     timers.setTimeout(() => ticks++, 1)
     vi.advanceTimersByTime(100)
     expect(ticks).toBe(3)
+  })
+})
+
+describe("a blank document's first page", () => {
+  let editor: Editor
+  beforeEach(() => {
+    editor = makeEditor()
+  })
+  afterEach(() => {
+    editor.dispose()
+  })
+
+  it("has the same id in every editor, so two replicas meet on it", () => {
+    const other = makeEditor()
+    try {
+      expect(editor.getCurrentPageId()).toBe(DEFAULT_PAGE_ID)
+      expect(other.getCurrentPageId()).toBe(DEFAULT_PAGE_ID)
+    } finally {
+      other.dispose()
+    }
+  })
+
+  it("does not make every later page shared too", () => {
+    editor.createPage({ name: "second" })
+    const other = makeEditor()
+    try {
+      other.createPage({ name: "second" })
+      const mine = editor.getPages().find((p) => p.name === "second")!
+      const theirs = other.getPages().find((p) => p.name === "second")!
+      // Two people who each add a page have added two pages, not one.
+      expect(mine.id).not.toBe(theirs.id)
+    } finally {
+      other.dispose()
+    }
+  })
+
+  it("leaves a document that already has pages alone", () => {
+    // Through `initialData`, which is how a document arrives from storage —
+    // and which suppresses the store's own seeding, so the only page here is
+    // the loaded one. Putting a page into an already-seeded store would leave
+    // two, which is a different situation and not the one this asserts.
+    const existing = PageRecordType.create({ id: PageRecordType.createId("loaded"), name: "Loaded", index: ZERO_INDEX_KEY })
+    const store = createStore({ initialData: { [existing.id]: existing } })
+    const loaded = new Editor({
+      store,
+      shapeUtils: [BoxUtil],
+      tools: [TestTool],
+      engine: loadEngineSync(readFileSync(wasmPath)),
+      getContainer: () => ({}) as HTMLElement,
+    })
+    try {
+      expect(loaded.getPages().map((p) => p.id)).toEqual([existing.id])
+    } finally {
+      loaded.dispose()
+    }
+  })
+})
+
+describe("a camera move made before the canvas has been measured", () => {
+  /** The `onMount` situation: an editor whose container has no size yet. */
+  function makeUnmeasuredEditor(): Editor {
+    return new Editor({
+      store: createStore(),
+      shapeUtils: [BoxUtil, FrameUtil, SectionUtil],
+      tools: [TestTool],
+      engine: loadEngineSync(readFileSync(wasmPath)),
+      getContainer: () => ({}) as HTMLElement,
+    })
+  }
+
+  it("runs the fit once the viewport has a size instead of aiming at nothing", () => {
+    const editor = makeUnmeasuredEditor()
+    try {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      editor.createShapes([{ type: "box", x: 1000, y: 1000, props: { w: 200, h: 200 } }])
+      // Unmeasured does not mean zero: the instance record's placeholder is a
+      // plausible 1080x720 that belongs to no canvas in particular, which is
+      // precisely why fitting against it is wrong without being obviously so.
+      expect(editor.getHasMeasuredViewport()).toBe(false)
+
+      const before = { ...editor.getCamera() }
+      editor.zoomToFit()
+      // Nothing could be computed yet, so nothing was written — in particular
+      // not a camera at the zoom floor pointing away from the shapes.
+      expect(editor.getCamera()).toMatchObject(before)
+      expect(warn).toHaveBeenCalledTimes(1)
+
+      editor.updateViewportScreenBounds({ x: 0, y: 0, w: 1000, h: 800 })
+
+      // ...and now the shapes are actually in view.
+      const viewport = editor.getViewportPageBounds()
+      const shapes = editor.getCurrentPageBounds()!
+      expect(viewport.x).toBeLessThanOrEqual(shapes.x)
+      expect(viewport.y).toBeLessThanOrEqual(shapes.y)
+      expect(viewport.maxX).toBeGreaterThanOrEqual(shapes.maxX)
+      expect(viewport.maxY).toBeGreaterThanOrEqual(shapes.maxY)
+      warn.mockRestore()
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("is overruled by a camera move the app makes afterwards", () => {
+    const editor = makeUnmeasuredEditor()
+    try {
+      vi.spyOn(console, "warn").mockImplementation(() => {})
+      editor.createShapes([{ type: "box", x: 1000, y: 1000, props: { w: 200, h: 200 } }])
+      editor.zoomToFit()
+      editor.setCamera({ x: 5, y: 6, z: 2 })
+
+      editor.updateViewportScreenBounds({ x: 0, y: 0, w: 1000, h: 800 })
+
+      expect(editor.getCamera()).toMatchObject({ x: 5, y: 6, z: 2 })
+      vi.restoreAllMocks()
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("fits against the real viewport, not the placeholder the fit was asked with", () => {
+    const editor = makeUnmeasuredEditor()
+    try {
+      vi.spyOn(console, "warn").mockImplementation(() => {})
+      editor.createShapes([{ type: "box", x: 0, y: 0, props: { w: 400, h: 400 } }])
+      editor.zoomToFit()
+      // A tall, narrow canvas — nothing like the 1080x720 placeholder.
+      editor.updateViewportScreenBounds({ x: 0, y: 0, w: 400, h: 1200 })
+
+      const measured = { ...editor.getCamera() }
+      const reference = makeUnmeasuredEditor()
+      try {
+        reference.updateViewportScreenBounds({ x: 0, y: 0, w: 400, h: 1200 })
+        reference.createShapes([{ type: "box", x: 0, y: 0, props: { w: 400, h: 400 } }])
+        reference.zoomToFit()
+        expect(measured).toMatchObject({ ...reference.getCamera() })
+      } finally {
+        reference.dispose()
+      }
+      vi.restoreAllMocks()
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("still fits normally when the viewport is known", () => {
+    const editor = makeEditor()
+    try {
+      editor.createShapes([{ type: "box", x: 1000, y: 1000, props: { w: 200, h: 200 } }])
+      editor.zoomToFit()
+      const viewport = editor.getViewportPageBounds()
+      const shapes = editor.getCurrentPageBounds()!
+      expect(viewport.x).toBeLessThanOrEqual(shapes.x)
+      expect(viewport.maxX).toBeGreaterThanOrEqual(shapes.maxX)
+    } finally {
+      editor.dispose()
+    }
   })
 })

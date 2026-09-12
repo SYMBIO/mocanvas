@@ -7,7 +7,9 @@ import { DefaultRichTextToolbar } from "./panel-richtext"
 import { ResponsiveStylePanel } from "./panel-style"
 import { DefaultImageToolbar, DefaultVideoToolbar } from "./asset-toolbars"
 import { DefaultToolbarWithOverflow } from "./toolbar-items"
-import { DefaultA11yAnnouncer } from "./ui-a11y"
+import { DefaultA11yAnnouncer, ReduceMotionAttribute, SelectionAnnouncer } from "./ui-a11y"
+import { ToolShortcuts } from "./useToolShortcuts"
+import { ActionShortcuts } from "./useActionShortcuts"
 import { TldrawUiContextProvider } from "./ui-context-provider"
 import { useTldrawUiComponents, type TLUiComponents } from "./ui-components"
 import { DefaultDialogs } from "./ui-dialogs"
@@ -131,6 +133,16 @@ const Layout = track(function Layout({ children }: { children?: ReactNode }) {
       {Toasts ? <Toasts /> : null}
       {Dialogs ? <Dialogs /> : null}
       {A11y ? <A11y /> : null}
+      {/* Neither of these draws anything, and both belong to the chrome
+          rather than to a panel: the tool list's keyboard shortcuts are only
+          bound while the chrome that owns that list is mounted, and the
+          reduced-motion preference is only expressible while there is chrome
+          to reduce the motion of. Outside `focus`, because a hidden panel is
+          not a reason to stop answering the keyboard. */}
+      <ToolShortcuts />
+      <ActionShortcuts />
+      <SelectionAnnouncer />
+      <ReduceMotionAttribute />
     </>
   )
 })

@@ -67,6 +67,8 @@ export interface TLUiToolbarButtonProps {
   disabled?: boolean
   title?: string
   "aria-label"?: string
+  /** The tool the button selects, published as `data-tool` for tests and apps. */
+  "data-tool"?: string
   className?: string
   ref?: Ref<HTMLButtonElement>
   onClick?(): void
@@ -76,12 +78,14 @@ export interface TLUiToolbarButtonProps {
 /** A button inside a {@link TldrawUiToolbar}. */
 export function TldrawUiToolbarButton({ type = "icon", isActive, disabled, title, className, ref, onClick, children, ...rest }: TLUiToolbarButtonProps) {
   const label = rest["aria-label"] ?? title
+  const tool = rest["data-tool"]
   return (
     <button
       ref={ref}
       type="button"
       className={["mocanvas-btn", `mocanvas-btn--${type}`, className].filter(Boolean).join(" ")}
       disabled={disabled}
+      {...(tool ? { "data-tool": tool } : {})}
       {...(label ? { "aria-label": label, "data-tooltip": title ?? label } : {})}
       {...(isActive === undefined ? {} : { "aria-pressed": isActive })}
       onClick={onClick}

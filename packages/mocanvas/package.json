@@ -44,6 +44,10 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./mocanvas.css": {
+      "style": "./src/ui/ui.css",
+      "default": "./src/ui/ui.css"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -54,6 +58,10 @@
       ".": {
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"
+      },
+      "./mocanvas.css": {
+        "style": "./dist/mocanvas.css",
+        "default": "./dist/mocanvas.css"
       },
       "./package.json": "./package.json"
     }

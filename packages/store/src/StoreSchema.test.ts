@@ -306,3 +306,76 @@ describe("StoreSchema", () => {
     expect(schema.getScope("unknown")).toBe("document")
   })
 })
+
+describe("validateRecord", () => {
+  /** `validateRecord` only passes the store to the failure hook; a stub is enough. */
+  const store = {} as never
+
+  const ValidatedBook = createRecordType<Book>("book", {
+    scope: "document",
+    validator: {
+      validate(value: unknown): Book {
+        const record = value as Book
+        if (typeof record.title !== "string") throw new Error("Expected a string title")
+        return record
+      },
+    },
+  })
+
+  function validatingSchema(onValidationFailure?: (data: { record: R }) => R) {
+    return StoreSchema.create<R>(
+      { book: ValidatedBook, note: Note },
+      onValidationFailure ? { onValidationFailure: onValidationFailure as never } : {},
+    )
+  }
+
+  it("refuses a value that is not a record at all", () => {
+    const schema = validatingSchema()
+    // The `typeName` lookup used to miss and take the unknown-type path, which
+    // is how a store accepted `{ id: "shape:bogus", x: 0, y: 0 }`.
+    for (const bad of [
+      { id: "book:1" },
+      { typeName: "book", title: "no id" },
+      { id: 7, typeName: "book" },
+      { id: "book:1", typeName: 7 },
+      null,
+      "book:1",
+      [],
+    ]) {
+      expect(() => schema.validateRecord(store, bad as never, "createRecord", undefined)).toThrow(/id|typeName/)
+    }
+  })
+
+  it("runs the record type's validator and rethrows what it says", () => {
+    const schema = validatingSchema()
+    expect(() =>
+      schema.validateRecord(store, { id: "book:1", typeName: "book", title: 7 } as never, "createRecord", undefined),
+    ).toThrow(/string title/)
+  })
+
+  it("accepts a valid record and hands back what the validator returned", () => {
+    const schema = validatingSchema()
+    const record = { id: "book:1", typeName: "book", title: "Dune" } as Book
+    expect(schema.validateRecord(store, record, "createRecord", undefined)).toBe(record)
+  })
+
+  it("still passes a record of an unknown typeName through, so foreign data round-trips", () => {
+    const schema = validatingSchema()
+    const foreign = { id: "widget:1", typeName: "widget", anything: true } as never
+    expect(schema.validateRecord(store, foreign, "initialize", undefined)).toBe(foreign)
+  })
+
+  it("routes both kinds of failure to `onValidationFailure` when one is given", () => {
+    const seen: unknown[] = []
+    const repaired = { id: "book:1", typeName: "book", title: "repaired" } as Book
+    const schema = validatingSchema((data) => {
+      seen.push(data.record)
+      return repaired
+    })
+    expect(schema.validateRecord(store, { id: "book:1" } as never, "createRecord", undefined)).toBe(repaired)
+    expect(
+      schema.validateRecord(store, { id: "book:1", typeName: "book", title: 7 } as never, "updateRecord", undefined),
+    ).toBe(repaired)
+    expect(seen).toHaveLength(2)
+  })
+})

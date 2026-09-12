@@ -89,6 +89,32 @@ const INDICATOR_STROKE = 1.5
 const HANDLE = { corner: 9, rotate: 5.5, shape: 6, virtual: 4 } as const
 
 /**
+ * The largest `elapsed` a single tick may carry, in milliseconds — about four
+ * frames at 60Hz. See the note in the frame loop.
+ */
+const MAX_TICK_MS = 64
+
+/**
+ * Whether anything needs another frame *for its own sake*, as opposed to
+ * because the picture changed.
+ *
+ * The loop below is invalidation-driven: it draws when the document, the camera
+ * or the viewport change and then stops, which is what keeps an idle board off
+ * the CPU. Animation does not fit that rule. A scribble fades while nothing
+ * else on the board is moving, and edge scrolling has to sit through
+ * `edgeScrollDelay` — during which it deliberately changes nothing — before it
+ * pans at all. Both would stall the moment the picture settled, which is
+ * exactly what "the laser leaves no trail" looked like.
+ *
+ * So the loop asks. The cost of asking is two field reads per frame, and the
+ * cost of being wrong in the other direction — a permanent rAF on a canvas
+ * nobody is touching — is a laptop that never reaches an idle power state.
+ */
+function hasFrameWork(editor: Editor): boolean {
+  return editor.scribbles.hasPendingWork() || editor.edgeScrollManager.getIsEnabled()
+}
+
+/**
  * The canvas: a WebGL2 surface driven by the engine, a DOM overlay for shapes
  * that render through `ShapeUtil.component`, a 2D canvas overlay for shape
  * indicators, and an SVG layer for the selection handles, snap lines, the brush
@@ -133,21 +159,43 @@ export function Canvas({ editor, className, style, children, components, indicat
     }
   }, [editor, backend])
 
-  // Frame loop: redraw when the frame epoch, camera, or viewport change.
+  // Frame loop: redraw when the frame epoch, camera, or viewport change, and
+  // keep frames coming for as long as something is animating. See
+  // {@link hasFrameWork} for why those are two different questions.
   useEffect(() => {
     if (!backend) return
     let raf = 0
     let dirty = true
-    const draw = () => {
+    /** Timestamp of the previous frame, or `null` while the loop is parked. */
+    let last: number | null = null
+    const draw = (time: number) => {
       raf = 0
-      if (!dirty) return
-      dirty = false
-      // Shapes that entered the viewport may still be waiting on the engine's
-      // per-frame tessellation budget, drawn as flat quads until their turn comes.
-      // Keep the loop alive until that backlog clears.
-      if (editor.renderFrame(backend).pending) {
-        dirty = true
+      // Real elapsed milliseconds — a manager that is told 16 every frame
+      // fades at the frame rate rather than in time, and would run at half
+      // speed on a 30Hz display and double on a 120Hz one. Clamped, because
+      // the first frame of a burst has nothing to measure against and a tab
+      // that was hidden (where rAF simply does not fire) comes back with
+      // seconds on the clock: handed on unclamped, that one step would shed a
+      // whole trail and jump the camera across the page.
+      const elapsed = last === null ? 0 : Math.min(time - last, MAX_TICK_MS)
+      last = time
+      // The heartbeat of the frame-driven managers — the scribble fade and
+      // edge scrolling. Nothing else in the library emits it, so a headless
+      // editor simply has no animation, and this canvas is what gives it one.
+      if (elapsed > 0) editor.emit("tick", elapsed)
+      if (dirty) {
+        dirty = false
+        // Shapes that entered the viewport may still be waiting on the engine's
+        // per-frame tessellation budget, drawn as flat quads until their turn comes.
+        // Keep the loop alive until that backlog clears.
+        if (editor.renderFrame(backend).pending) dirty = true
+      }
+      if (dirty || hasFrameWork(editor)) {
         raf = requestAnimationFrame(draw)
+      } else {
+        // Park: no frame is scheduled and none will be until something
+        // invalidates below, so an idle canvas costs exactly nothing.
+        last = null
       }
     }
     const stop = reactSignal(

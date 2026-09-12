@@ -82,6 +82,7 @@ npm install @mocanvas/mocanvas react react-dom
 
 ```tsx
 import { Mocanvas } from "@mocanvas/mocanvas"
+import "@mocanvas/mocanvas/mocanvas.css"
 
 export const App = () => (
   <div style={{ position: "absolute", inset: 0 }}>
@@ -89,6 +90,16 @@ export const App = () => (
   </div>
 )
 ```
+
+**The stylesheet import is required.** Without it the canvas renders but the
+toolbar, panels and menus come up unstyled. Import it once, anywhere in your
+app — the same way `tldraw/tldraw.css` is imported in a tldraw app.
+
+> **Upgrading from 4.0.2 or earlier?** Add that one line. Until 4.0.2 the
+> stylesheet was pulled in by `@mocanvas/mocanvas` itself, which broke the
+> package everywhere there is no bundler — vitest, SSR, any plain Node import
+> threw `ERR_UNKNOWN_FILE_EXTENSION: Unknown file extension ".css"`. The JS
+> entry no longer imports CSS, so the import has to come from your app.
 
 Every package is **ESM only** — there is no CommonJS build. The engine locates
 its `.wasm` asset with `import.meta.url`, which has no CommonJS equivalent;

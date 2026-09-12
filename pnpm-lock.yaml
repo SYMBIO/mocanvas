@@ -218,12 +218,18 @@ importers:
       '@types/react':
         specifier: ^19.1.0
         version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.1.0
+        version: 19.2.7(@types/react@19.2.18)
       '@types/ws':
         specifier: ^8.5.0
         version: 8.18.1
       react:
         specifier: ^19.1.0
         version: 19.2.8
+      react-dom:
+        specifier: ^19.1.0
+        version: 19.2.8(react@19.2.8)
       ws:
         specifier: ^8.18.0
         version: 8.21.3

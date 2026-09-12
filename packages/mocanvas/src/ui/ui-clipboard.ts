@@ -1,5 +1,5 @@
 import type { Editor, ShapeId } from "@mocanvas/editor"
-import { copyBlobToClipboard, downloadBlob, exportToBlob, type ExportFormat } from "../export"
+import { copyBlobToClipboard, downloadBlob, exportToBlob, getSvgString, type ExportFormat } from "../export"
 
 /**
  * Cut, copy, paste and "copy as" for the menus.
@@ -117,13 +117,69 @@ export async function exportAs(
   downloadBlob(blob, `${name ?? page?.name ?? "drawing"}.${format}`)
 }
 
+/** Whether there is anything on the current page to print. */
+export function canPrint(editor: Editor): boolean {
+  return editor.getCurrentPageShapeIds().size > 0
+}
+
 /**
- * Print the current page.
+ * Print the drawing: the selection if there is one, otherwise the page.
  *
- * Delegates to the browser's own print dialog rather than rendering a print
- * sheet: the page's stylesheet is what decides how the editor prints, and an
- * app that cares will have written one.
+ * Not `window.print()`. The editor is a component on somebody's page, and the
+ * host window's print view is that whole page — headers, navigation, the
+ * article the canvas is embedded in, and a canvas element that a print
+ * stylesheet cannot usefully lay out. What the user asked to print is the
+ * drawing, so the drawing is what is rendered: the same SVG the exporter
+ * produces, alone in a hidden same-origin frame that is printed and then
+ * thrown away.
+ *
+ * Returns `false` when there was nothing to print or no DOM to print it in;
+ * the menu item disables itself on the same condition, so this is the
+ * belt-and-braces case rather than the normal one.
  */
-export function printSelection(editor: Editor): void {
-  editor.getContainerWindow()?.print()
+export function printSelection(editor: Editor, ids?: readonly ShapeId[]): boolean {
+  const doc = editor.getContainerDocument()
+  if (!doc?.body) return false
+
+  const rendered = getSvgString(editor, ids, {
+    background: editor.getInstanceState().exportBackground,
+    darkMode: false,
+  })
+  if (!rendered) return false
+
+  const title = editor.getCurrentPage()?.name ?? "Drawing"
+  const frame = doc.createElement("iframe")
+  frame.setAttribute("aria-hidden", "true")
+  frame.setAttribute("title", `Print ${title}`)
+  // Off-screen rather than `display: none`: a frame with no layout box does
+  // not paint, and a frame that does not paint prints blank.
+  frame.style.cssText = "position:fixed;left:-10000px;top:0;width:1px;height:1px;border:0;opacity:0"
+
+  const cleanUp = () => frame.remove()
+  frame.addEventListener("load", () => {
+    const view = frame.contentWindow
+    if (!view) {
+      cleanUp()
+      return
+    }
+    view.addEventListener("afterprint", cleanUp, { once: true })
+    // Chrome fires `afterprint`; some browsers do not fire it at all, so the
+    // frame is also swept up on a timer. Removing it twice is harmless.
+    view.setTimeout(cleanUp, 60_000)
+    view.focus()
+    view.print()
+  })
+
+  frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>
+html,body{margin:0;padding:0;background:#fff}
+svg{display:block;width:100%;height:auto;max-width:100%}
+@page{margin:12mm}
+</style></head><body>${rendered.svg}</body></html>`
+  doc.body.appendChild(frame)
+  return true
+}
+
+/** Minimal escaping for the one interpolated value in the print document. */
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&quot;"))
 }

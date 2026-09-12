@@ -128,7 +128,12 @@ export async function putExcalidrawContent(editor: Editor, excalidrawClipboardCo
     const x = (element.x ?? 0) + dx
     const y = (element.y ?? 0) + dy
     const rotation = element.angle ?? 0
-    const common = { color: colorFor(element.strokeColor), dash: dashFor(element.strokeStyle), size: sizeFor(element.strokeWidth) }
+    // What every stroked shape here takes. `dash` is NOT among them: a text
+    // shape has no stroke style, and `textShapeProps` does not declare the prop
+    // — spreading it in gave every imported label a prop its own shape type
+    // rejects.
+    const common = { color: colorFor(element.strokeColor), size: sizeFor(element.strokeWidth) }
+    const stroked = { ...common, dash: dashFor(element.strokeStyle) }
 
     const geo = GEO_BY_EXCALIDRAW_TYPE[element.type ?? ""]
     if (geo && editor.hasShapeUtil("geo")) {
@@ -141,7 +146,7 @@ export async function putExcalidrawContent(editor: Editor, excalidrawClipboardCo
         y,
         rotation,
         props: {
-          ...common,
+          ...stroked,
           geo,
           w: Math.max(1, element.width ?? 1),
           h: Math.max(1, element.height ?? 1),
@@ -180,7 +185,7 @@ export async function putExcalidrawContent(editor: Editor, excalidrawClipboardCo
           x,
           y,
           rotation,
-          props: { ...common, start: { x: first[0], y: first[1] }, end: { x: last[0], y: last[1] } },
+          props: { ...stroked, start: { x: first[0], y: first[1] }, end: { x: last[0], y: last[1] } },
         })
         continue
       }
@@ -194,7 +199,7 @@ export async function putExcalidrawContent(editor: Editor, excalidrawClipboardCo
           x,
           y,
           rotation,
-          props: { ...common, points: Object.fromEntries(points.map((p, i) => [`a${i + 1}`, { id: `a${i + 1}`, index: `a${i + 1}`, x: p[0], y: p[1] }])) },
+          props: { ...stroked, points: Object.fromEntries(points.map((p, i) => [`a${i + 1}`, { id: `a${i + 1}`, index: `a${i + 1}`, x: p[0], y: p[1] }])) },
         })
       }
       continue

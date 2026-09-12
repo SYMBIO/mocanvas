@@ -39,7 +39,9 @@ export const TOOLBAR_GROUPS: readonly (readonly ToolbarItem[])[] = [
   ],
   [
     { id: "draw", tool: "draw", icon: "draw", label: "Draw", shortcut: "D", kbd: "d,p,b" },
+    { id: "highlight", tool: "highlight", icon: "highlight", label: "Highlight", shortcut: "I", kbd: "i" },
     { id: "eraser", tool: "eraser", icon: "eraser", label: "Eraser", shortcut: "E", kbd: "e" },
+    { id: "laser", tool: "laser", icon: "laser", label: "Laser", shortcut: "K", kbd: "k", readonlyOk: true },
   ],
   [
     { id: "rectangle", tool: "geo", icon: "geo-rectangle", label: "Rectangle", shortcut: "R", kbd: "r", geo: "rectangle" },

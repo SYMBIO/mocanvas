@@ -49,6 +49,7 @@ export const TldrawUiToolbarItem = track(function TldrawUiToolbarItem({ tool: to
       type="tool"
       isActive={isSelected}
       title={text}
+      data-tool={tool.id}
       {...(tool.disabled ? { disabled: true } : {})}
       onClick={() => tool.onSelect("toolbar")}
     >
@@ -70,6 +71,7 @@ export const GeoToolbarItem = track(function GeoToolbarItem({ geo, label }: { ge
       type="tool"
       isActive={current === geo}
       title={text}
+      data-tool={geo}
       onClick={() => {
         editor.setStyleForNextShapes(GeoShapeGeoStyle, geo)
         editor.setCurrentTool("geo", { geo, force: true })
@@ -183,31 +185,40 @@ export const ToggleToolLockedButton = track(function ToggleToolLockedButton({ cl
 /**
  * The default set of toolbar buttons, in order.
  *
+ * An array rather than markup, because {@link OverflowingToolbar} splits its
+ * children one by one: handed `<DefaultToolbarContent />` it would see a
+ * single opaque child and could only move the whole bar into the popover at
+ * once. `Children.toArray` flattens a nested array, so spreading this list
+ * into the bar gives it the per-button children it measures against.
+ */
+export const DEFAULT_TOOLBAR_ITEMS: readonly ReactNode[] = [
+  <SelectToolbarItem key="select" />,
+  <HandToolbarItem key="hand" />,
+  <DrawToolbarItem key="draw" />,
+  <HighlightToolbarItem key="highlight" />,
+  <EraserToolbarItem key="eraser" />,
+  <LaserToolbarItem key="laser" />,
+  <ArrowToolbarItem key="arrow" />,
+  <TextToolbarItem key="text" />,
+  <NoteToolbarItem key="note" />,
+  <RectangleToolbarItem key="rectangle" />,
+  <EllipseToolbarItem key="ellipse" />,
+  <TriangleToolbarItem key="triangle" />,
+  <DiamondToolbarItem key="diamond" />,
+  <StarToolbarItem key="star" />,
+  <LineToolbarItem key="line" />,
+  <FrameToolbarItem key="frame" />,
+  <AssetToolbarItem key="asset" />,
+]
+
+/**
+ * The default set of toolbar buttons, in order.
+ *
  * Every one of them removes itself when its tool is absent, so this same list
  * is correct for an editor with three tools and for one with fifteen.
  */
 export function DefaultToolbarContent() {
-  return (
-    <>
-      <SelectToolbarItem />
-      <HandToolbarItem />
-      <DrawToolbarItem />
-      <EraserToolbarItem />
-      <ArrowToolbarItem />
-      <TextToolbarItem />
-      <NoteToolbarItem />
-      <RectangleToolbarItem />
-      <EllipseToolbarItem />
-      <TriangleToolbarItem />
-      <DiamondToolbarItem />
-      <StarToolbarItem />
-      <LineToolbarItem />
-      <FrameToolbarItem />
-      <HighlightToolbarItem />
-      <LaserToolbarItem />
-      <AssetToolbarItem />
-    </>
-  )
+  return <>{DEFAULT_TOOLBAR_ITEMS}</>
 }
 
 export interface OverflowingToolbarProps {
@@ -217,35 +228,91 @@ export interface OverflowingToolbarProps {
   children?: ReactNode
 }
 
+/** The layout metrics, read from the same custom properties the CSS uses. */
+interface BarMetrics {
+  /** Width one button occupies, including the gap after it. */
+  slot: number
+  /** Width unavailable to the bar: its own padding plus the side docks. */
+  reserved: number
+}
+
+const FALLBACK_METRICS: BarMetrics = { slot: 42, reserved: 634 }
+
+/**
+ * How wide a button is and how much of the row the bar may not use.
+ *
+ * Read off the element rather than hard-coded, so restyling the chrome through
+ * the custom properties moves the split with it instead of leaving the two
+ * descriptions of the same layout to drift apart.
+ */
+function readBarMetrics(el: HTMLElement): BarMetrics {
+  if (typeof getComputedStyle !== "function") return FALLBACK_METRICS
+  const style = getComputedStyle(el)
+  const px = (name: string, fallback: number) => {
+    const value = Number.parseFloat(style.getPropertyValue(name))
+    return Number.isFinite(value) ? value : fallback
+  }
+  const pad = px("--mocanvas-ui-pad", 4)
+  const inset = px("--mocanvas-ui-inset", 12)
+  const dock = px("--mocanvas-ui-dock", 300)
+  return {
+    slot: px("--mocanvas-ui-btn", 40) + px("--mocanvas-ui-gap", 2),
+    // Matches `.mocanvas-toolbar`'s `max-width`, plus the plate's own padding
+    // and 1px border on each side.
+    reserved: 2 * (inset + dock + pad + 1),
+  }
+}
+
 /**
  * A toolbar that moves whatever will not fit into a "more" popover.
  *
- * The split is measured, not guessed: the bar is observed and the inline count
- * derived from its width, so the same component works in a 320px phone frame
- * and in a 1600px desktop one without the caller configuring anything.
+ * The split is measured, not guessed, so the same component works in a 320px
+ * phone frame and in a 1600px desktop one without the caller configuring
+ * anything.
+ *
+ * ## Why the *container* is measured, not the bar
+ * The plate is `width: max-content`, so its own width is a consequence of how
+ * many children it is currently showing. Deriving the split from that is a
+ * feedback loop: dropping a button narrows the bar, which drops another. The
+ * room available to it — the container, less what the CSS reserves for the
+ * docks on either side — is independent of the decision, so the split settles.
  *
  * A child that renders nothing still takes a slot, so a caller mapping over a
  * fixed list gets a split that does not jump around as tools appear.
  */
 export function OverflowingToolbar({ label = "Tools", maxInline, children }: OverflowingToolbarProps) {
   const barRef = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState<number | null>(null)
+  const [available, setAvailable] = useState<number | null>(null)
+  const [metrics, setMetrics] = useState<BarMetrics>(FALLBACK_METRICS)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   useEffect(() => {
     const el = barRef.current
-    if (!el || typeof ResizeObserver === "undefined") return
-    const update = () => setWidth(el.getBoundingClientRect().width)
+    const container = el?.parentElement
+    if (!el || !container || typeof ResizeObserver === "undefined") return
+    const update = () => {
+      setMetrics(readBarMetrics(el))
+      const width = container.getBoundingClientRect().width
+      // A zero width is an unlaid-out or headless container, not a bar with no
+      // room: treat it as "not measured" and show everything.
+      setAvailable(width > 0 ? width : null)
+    }
     update()
     const ro = new ResizeObserver(update)
-    ro.observe(el)
+    ro.observe(container)
     return () => ro.disconnect()
   }, [])
 
   const items = Children.toArray(children)
-  // 44px per button, and room for the "more" button itself. Before the first
-  // measurement, assume everything fits: a bar that starts full and settles
-  // narrower reads as layout, one that starts collapsed reads as a glitch.
-  const fits = width === null ? items.length : Math.max(1, Math.floor((width - 48) / 44))
+  // Before the first measurement, assume everything fits: a bar that starts
+  // full and settles narrower reads as layout, one that starts collapsed reads
+  // as a glitch.
+  const room = available === null ? null : available - metrics.reserved
+  const fits =
+    room === null || items.length * metrics.slot <= room
+      ? items.length
+      : // One slot goes to the "more" button itself.
+        Math.max(1, Math.floor(room / metrics.slot) - 1)
   const limit = Math.min(maxInline ?? items.length, fits)
   const inline = items.slice(0, limit)
   const overflow = items.slice(limit)
@@ -254,12 +321,16 @@ export function OverflowingToolbar({ label = "Tools", maxInline, children }: Ove
     <TldrawUiToolbar ref={barRef} label={label}>
       {inline}
       {overflow.length > 0 ? (
-        <TldrawUiPopover id="toolbar-overflow" side="above">
-          <TldrawUiPopoverTrigger className="mocanvas-btn">
+        <TldrawUiPopover id="toolbar-overflow" side="above" open={moreOpen} onOpenChange={setMoreOpen}>
+          <TldrawUiPopoverTrigger className="mocanvas-btn" label="More tools">
             <Icon name="chevron-down" />
           </TldrawUiPopoverTrigger>
           <TldrawUiPopoverContent label="More tools">
-            <div className="mocanvas-toolbar-overflow">{overflow}</div>
+            {/* Picking a tool closes the panel: it is the toolbar's spill-over,
+                not a palette to stay open while you work. */}
+            <div className="mocanvas-toolbar-overflow" onClick={() => setMoreOpen(false)}>
+              {overflow}
+            </div>
           </TldrawUiPopoverContent>
         </TldrawUiPopover>
       ) : null}
@@ -277,7 +348,7 @@ export function DefaultToolbarWithOverflow() {
   const breakpoint = useBreakpoint()
   return (
     <OverflowingToolbar label="Tools">
-      <DefaultToolbarContent />
+      {DEFAULT_TOOLBAR_ITEMS}
       <ToggleToolLockedButton />
       {breakpoint < PORTRAIT_BREAKPOINT.TABLET_SM ? <MobileStylePanel /> : null}
     </OverflowingToolbar>

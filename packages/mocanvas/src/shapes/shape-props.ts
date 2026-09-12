@@ -39,7 +39,10 @@ import {
   LINE_SPLINE_KINDS,
   T,
   assetIdValidator,
+  registerDefaultBindingSchema,
+  registerDefaultShapeSchema,
   type RecordProps,
+  type UnknownRecordProps,
   type StyleProp,
   type Validator,
 } from "@mocanvas/editor"
@@ -315,3 +318,42 @@ export const arrowBindingProps: RecordProps<ArrowBinding> = {
   isExact: T.boolean,
   isPrecise: T.boolean,
 }
+
+/* ---- registering the built-ins ------------------------------------------ */
+
+/**
+ * Hand the maps above to `@mocanvas/editor`'s registry.
+ *
+ * `createSchema()` builds the `shape` and `binding` record types out of the
+ * props maps it can see, and it can only see two sources: the utils a caller
+ * passed in, and this registry. `@mocanvas/editor` ships no shapes of its own,
+ * so without this the registry stays empty and `createSchema()` — the no-argument
+ * form an app or a test uses — builds a `shape` record type that knows nothing
+ * and therefore checks nothing. That is exactly the hole that let a `geo` shape
+ * with `props: {}` into the store.
+ *
+ * Only the props are registered. Migration sequences already reach the schema
+ * through `createPropsMigrationSequences(shapeUtils)`, and registering them
+ * here as well would hand `StoreSchema` the same `sequenceId` twice.
+ */
+const builtInShapeProps: Record<string, UnknownRecordProps> = {
+  arrow: arrowShapeProps,
+  bookmark: bookmarkShapeProps,
+  draw: drawShapeProps,
+  embed: embedShapeProps,
+  frame: frameShapeProps,
+  geo: geoShapeProps,
+  group: groupShapeProps,
+  highlight: highlightShapeProps,
+  image: imageShapeProps,
+  line: lineShapeProps,
+  note: noteShapeProps,
+  text: textShapeProps,
+  video: videoShapeProps,
+}
+
+for (const [type, props] of Object.entries(builtInShapeProps)) {
+  registerDefaultShapeSchema(type, { props })
+}
+
+registerDefaultBindingSchema("arrow", { props: arrowBindingProps })

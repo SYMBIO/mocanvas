@@ -1,4 +1,4 @@
-import type { IdOf, RecordScope, RecordType, UnknownRecord } from "./ids"
+import { isRecordLike, type IdOf, type RecordScope, type RecordType, type UnknownRecord } from "./ids"
 import {
   applyMigrationToStore,
   applyRecordMigration,
@@ -100,9 +100,18 @@ export class StoreSchema<R extends UnknownRecord, Props = unknown> {
   }
 
   /**
-   * Validate a record, delegating to its record type's validator. Records of
-   * unknown types are passed through untouched so that foreign data survives
-   * a load/save round-trip.
+   * Validate a record, delegating to its record type's validator.
+   *
+   * Two things are checked before the delegation. First, the value has to be a
+   * record at all: an object with a string `id` and a string `typeName`.
+   * Without that check a value carrying no `typeName` looks up `undefined` in
+   * the type map, misses, and takes the unknown-type path below — which is how
+   * `store.put([{ id: "shape:bogus", x: 0, y: 0 }])` used to be accepted.
+   *
+   * Second, a record whose `typeName` this schema does not know is passed
+   * through untouched, so foreign data survives a load/save round-trip. That
+   * is the escape hatch; it is not meant to cover malformed input, hence the
+   * first check.
    */
   validateRecord(
     store: Store<R, any>,
@@ -110,22 +119,43 @@ export class StoreSchema<R extends UnknownRecord, Props = unknown> {
     phase: StoreValidationPhase,
     recordBefore: R | undefined,
   ): R {
+    if (!isRecordLike(record)) {
+      return this.onFailure(
+        new Error(
+          `Expected a record with a string \`id\` and \`typeName\`, got ${describeRecord(record)}`,
+        ),
+        store,
+        record,
+        phase,
+        recordBefore,
+      )
+    }
     const type = this.typeByName.get(record.typeName)
     if (!type) return record
     try {
       return type.validate(record, recordBefore)
     } catch (error) {
-      if (this.options.onValidationFailure) {
-        return this.options.onValidationFailure({
-          error,
-          store,
-          record,
-          phase,
-          recordBefore: recordBefore ?? null,
-        })
-      }
-      throw error
+      return this.onFailure(error, store, record, phase, recordBefore)
     }
+  }
+
+  private onFailure(
+    error: unknown,
+    store: Store<R, any>,
+    record: R,
+    phase: StoreValidationPhase,
+    recordBefore: R | undefined,
+  ): R {
+    if (this.options.onValidationFailure) {
+      return this.options.onValidationFailure({
+        error,
+        store,
+        record,
+        phase,
+        recordBefore: recordBefore ?? null,
+      })
+    }
+    throw error
   }
 
   /** The current version of every sequence. Always the v2 shape — mocanvas never writes v1. */
@@ -261,4 +291,20 @@ export class StoreSchema<R extends UnknownRecord, Props = unknown> {
     }
     return { type: "success", value: store as SerializedStore<R> }
   }
+}
+
+/** How a non-record reads back in the failure message. */
+function describeRecord(value: unknown): string {
+  if (value === null) return "null"
+  if (typeof value !== "object") return typeof value
+  if (Array.isArray(value)) return "an array"
+  const { id, typeName } = value as { id?: unknown; typeName?: unknown }
+  const parts: string[] = []
+  parts.push(typeof id === "string" ? `id ${JSON.stringify(id)}` : `id ${id === undefined ? "missing" : typeof id}`)
+  parts.push(
+    typeof typeName === "string"
+      ? `typeName ${JSON.stringify(typeName)}`
+      : `typeName ${typeName === undefined ? "missing" : typeof typeName}`,
+  )
+  return `an object with ${parts.join(" and ")}`
 }
