@@ -138,6 +138,26 @@ describe("two replicas of one document", () => {
     expect(a.getCurrentPageId()).toBe(b.getCurrentPageId())
   })
 
+  it("keeps both shapes when two tabs draw at the same moment", async () => {
+    // The bug this pins: index keys were a pure function of their neighbours,
+    // so two replicas adding a shape to the same empty page minted the SAME
+    // key. `index` is one register to the merge, so one of the two positions
+    // was overwritten and the shapes stacked. Jitter is what separates them.
+    const [a, b] = openTwoTabs()
+    await flush()
+
+    // Neither has seen the other's shape when it picks its index — which is
+    // exactly the concurrent case, not a sequential one.
+    a.createShapes([{ type: "box", x: 0, y: 0, props: { w: 10, h: 10 } }])
+    b.createShapes([{ type: "box", x: 50, y: 0, props: { w: 10, h: 10 } }])
+    await flush()
+
+    const indices = a.getCurrentPageShapes().map((s) => s.index)
+    expect(a.getCurrentPageShapes(), "both shapes survived the merge").toHaveLength(2)
+    expect(new Set(indices).size, `both claimed one position: ${indices.join(", ")}`).toBe(2)
+    expect(b.getCurrentPageShapes()).toHaveLength(2)
+  })
+
   it("shows each tab the shapes drawn in the other, on the page it is looking at", async () => {
     const [a, b] = openTwoTabs()
     await flush()
