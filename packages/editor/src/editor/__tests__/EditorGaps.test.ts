@@ -73,13 +73,8 @@ describe("a brand new store", () => {
     expect(reloaded.query.records("page").get()).toHaveLength(1)
   })
 
-  it("puts pages and shapes where tldraw puts them, which is not the same key", () => {
-    // Not an inconsistency, though it reads like one: `sample.tldr` — written
-    // by tldraw — holds a page at `a1` and shapes at `a0` in the same file.
-    // The index helpers are the shape convention; the page seed is its own.
+  it("seeds its page at a1, where every .tldr in the fixtures has one", () => {
     expect(createStore().query.records("page").get()[0]!.index).toBe("a1")
-    expect(ZERO_INDEX_KEY).toBe("a0")
-    expect(getIndexAbove()).toBe("a0")
   })
 
   it("gives every replica the same first page, so two of them meet on it", () => {
@@ -200,6 +195,59 @@ describe("the renderingOnly hit-test option", () => {
       expect(editor.getShape(id)).toBeDefined()
     } finally {
       editor.dispose()
+    }
+  })
+})
+
+/**
+ * The editor and the store helpers, asked the same question.
+ *
+ * A consumer's headless fold computes a first child's index as
+ * `getIndexAbove(ZERO_INDEX_KEY)` and matched a live tldraw editor on it for
+ * months. Ours answered one step lower, so the two disagreed — inside one
+ * package, about one number.
+ */
+describe("where the first child of an empty parent goes", () => {
+  it("is above the zero key, matching what the store helpers answer", () => {
+    const editor = makeEditor()
+    try {
+      const page = editor.getCurrentPageId()
+      const fromEditor = editor.getHighestIndexForParent(page as never)
+      expect(fromEditor > ZERO_INDEX_KEY, `${fromEditor} must sort above ${ZERO_INDEX_KEY}`).toBe(true)
+      // Same bucket as the helper, jitter aside: both land in the gap above a0.
+      expect(fromEditor.startsWith("a1")).toBe(true)
+      expect(getIndexAbove(ZERO_INDEX_KEY).startsWith("a1")).toBe(true)
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("puts a created shape there, and keeps later ones climbing", () => {
+    const editor = makeEditor()
+    try {
+      const first = box(editor, 0, 0)
+      const second = box(editor, 20, 0)
+      const a = editor.getShape(first)!.index
+      const b = editor.getShape(second)!.index
+      expect(a > ZERO_INDEX_KEY).toBe(true)
+      expect(b > a).toBe(true)
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("gives two editors different indices for their first shape, so a merge keeps both", () => {
+    // The jitter, seen from the editor: two peers each adding one shape to an
+    // empty page no longer claim the same position.
+    const one = makeEditor()
+    const two = makeEditor()
+    try {
+      const a = one.getShape(box(one, 0, 0))!.index
+      const b = two.getShape(box(two, 0, 0))!.index
+      expect(a).not.toBe(b)
+    } finally {
+      one.dispose()
+      two.dispose()
     }
   })
 })

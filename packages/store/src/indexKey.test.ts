@@ -48,8 +48,20 @@ describe("fractional index keys", () => {
     validateIndexKey(first)
     expect(getIndexAbove(first) > first).toBe(true)
     expect(getIndexBelow(first) < first).toBe(true)
-    expect(getIndexAbove() > getIndexBelow()).toBe(false) // both are "first" keys: equal
-    expect(getIndexAbove()).toBe(getIndexBelow())
+  })
+
+  it("gives two 'first' keys that differ, because every generated key is jittered", () => {
+    // This used to assert `getIndexAbove() === getIndexBelow()`, which encoded
+    // the absence of jitter — the property that let two clients inserting in
+    // the same gap mint the same key and lose one of the two records to the
+    // merge. They are still both first keys; they are no longer the same one.
+    const a = getIndexAbove()
+    const b = getIndexBelow()
+    expect(a).not.toBe(b)
+    validateIndexKey(a)
+    validateIndexKey(b)
+    expect(a.startsWith("a0")).toBe(true)
+    expect(b.startsWith("a0")).toBe(true)
   })
 
   it("throws when below >= above", () => {

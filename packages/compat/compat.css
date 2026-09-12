@@ -1,0 +1,96 @@
+/**
+ * tldraw's CSS custom properties, mapped onto mocanvas's.
+ *
+ * `@mocanvas/compat` aliases the *symbols* an app imports. It did not alias the
+ * custom properties an app's stylesheets read, and that gap is invisible to
+ * every check a migration runs: TypeScript sees nothing, the build succeeds,
+ * the tests pass, and the regression is a white outline that quietly stopped
+ * being drawn. Import this alongside the package alias and a stylesheet
+ * written against tldraw keeps resolving.
+ *
+ *     import "@mocanvas/mocanvas/mocanvas.css"
+ *     import "@mocanvas/compat/compat.css"
+ *
+ * ## Every declaration carries a literal fallback, on purpose
+ *
+ * A `var()` that resolves to nothing makes the whole declaration invalid — so
+ * one missing token does not just lose its own colour, it takes the rule it
+ * appears in with it, and in a `calc()` it takes the entire property. Every
+ * mapping below therefore ends in a concrete value. A token mocanvas has no
+ * equivalent for still resolves to something defensible rather than poisoning
+ * the rule around it.
+ *
+ * ## What this cannot give you
+ *
+ * The tokens below marked "no equivalent" resolve to a static fallback, which
+ * keeps your CSS valid but is not the value tldraw would have computed. They
+ * are listed in MIGRATION.md §7 so you can decide what to do about each.
+ *
+ * Scoped to `.mocanvas` rather than `:root` so an app that still renders a real
+ * tldraw editor somewhere on the page keeps its own values.
+ */
+
+.mocanvas,
+.tl-container {
+  /* ---- camera ---------------------------------------------------------
+   * The two that are computed, not themed. `--tl-zoom` is the camera's zoom
+   * and `--tl-scale` its reciprocal — what a rule multiplies by to hold a
+   * constant on-screen size while the canvas zooms.
+   */
+  --tl-zoom: var(--mocanvas-zoom, 1);
+  --tl-scale: var(--mocanvas-scale, 1);
+
+  /* ---- surfaces and text ---------------------------------------------- */
+  --tl-color-background: var(--mocanvas-background, #f9fafb);
+  --tl-color-low: var(--mocanvas-background, #f9fafb);
+  --tl-color-panel: var(--mocanvas-ui-panel, #ffffff);
+  --tl-color-panel-contrast: var(--mocanvas-ui-text, #1d1d1d);
+  --tl-color-text: var(--mocanvas-ui-text, #1d1d1d);
+  --tl-color-text-1: var(--mocanvas-ui-text, #1d1d1d);
+  --tl-color-text-3: var(--mocanvas-ui-muted, #9a9a9a);
+  --tl-color-text-shadow: var(--mocanvas-background, #f9fafb);
+  --tl-color-divider: var(--mocanvas-ui-panel-border, #e8e8e8);
+  --tl-color-muted-1: var(--mocanvas-ui-hover, rgba(0, 0, 0, 0.04));
+  --tl-color-muted-2: var(--mocanvas-ui-active, rgba(0, 0, 0, 0.08));
+  --tl-color-hint: var(--mocanvas-snap, #bd5b16);
+  --tl-color-focus: var(--mocanvas-ui-accent, #2f80ed);
+
+  /* ---- selection ------------------------------------------------------
+   * `--tl-color-selected-contrast` is the one whose absence was found by eye:
+   * the chevron cursor draws its outline in it, and an empty value removed the
+   * outline without failing anything.
+   */
+  --tl-color-selected: var(--mocanvas-selection, #2f80ed);
+  --tl-color-selected-contrast: var(--mocanvas-selection-fg, #ffffff);
+  --tl-color-selection-fill: var(--mocanvas-brush-fill, rgba(47, 128, 237, 0.08));
+  --tl-color-selection-stroke: var(--mocanvas-selection, #2f80ed);
+  --tl-color-brush-fill: var(--mocanvas-brush-fill, rgba(47, 128, 237, 0.08));
+  --tl-color-brush-stroke: var(--mocanvas-brush-stroke, rgba(47, 128, 237, 0.4));
+  --tl-color-grid: var(--mocanvas-grid, #d4d4d4);
+  --tl-color-laser: #ff0000; /* no equivalent: the laser colour is not on the ramp */
+  --tl-color-cursor: var(--mocanvas-selection, #2f80ed);
+  --tl-color-note-border: rgba(0, 0, 0, 0.08); /* no equivalent */
+
+  /* ---- chrome ---------------------------------------------------------- */
+  --tl-color-primary: var(--mocanvas-ui-accent, #2f80ed);
+  --tl-color-background-secondary: var(--mocanvas-ui-dock, #ffffff);
+  --tl-font-draw: var(--mocanvas-ui-font, ui-sans-serif, system-ui, sans-serif);
+  --tl-font-sans: var(--mocanvas-ui-font, ui-sans-serif, system-ui, sans-serif);
+  --tl-font-mono: var(--mocanvas-ui-mono, ui-monospace, monospace);
+  --tl-radius: var(--mocanvas-ui-radius, 10px);
+  --tl-shadow-1: var(--mocanvas-ui-shadow, 0 1px 2px rgba(0, 0, 0, 0.12));
+  --tl-shadow-2: var(--mocanvas-ui-shadow, 0 2px 6px rgba(0, 0, 0, 0.14));
+  --tl-space-1: 4px;
+  --tl-space-2: 8px;
+  --tl-space-3: 12px;
+  --tl-space-4: 16px;
+
+  /* ---- no equivalent ---------------------------------------------------
+   * Static fallbacks. They keep a migrated rule valid; they are not values
+   * mocanvas computes, and it will not notice if you need a different one.
+   */
+  --tl-color-overlay: rgba(0, 0, 0, 0.2);
+  --tl-color-background-overlay: rgba(0, 0, 0, 0.2);
+  --tl-color-warn: #e03131;
+  --tl-color-accent: var(--mocanvas-ui-accent, #2f80ed);
+}

@@ -15,40 +15,108 @@ function assertOrdered(below: IndexKey | undefined, above: IndexKey | undefined)
   }
 }
 
-/** Generate a key strictly between `below` and `above`; either may be omitted. Throws when `below >= above`. */
+/* ---- jitter -------------------------------------------------------------
+ *
+ * Plain fractional indexing is a pure function of its two neighbours, so two
+ * clients inserting in the same gap generate the *same* key — not rarely, but
+ * every single time. A record's `index` is one register to a last-writer-wins
+ * merge, so the two shapes end up claiming one position and the merge keeps
+ * one of them. Appending a few random digits makes the keys differ while
+ * staying in the same gap, which is what makes concurrent insertion safe.
+ *
+ * The alphabet deliberately omits "0": a key may not end in the smallest digit
+ * (`fractional-indexing` rejects it), and excluding it outright is cheaper than
+ * checking the last character and costs a negligible amount of entropy —
+ * 61^6 is about 5.1e10 per gap.
+ * ------------------------------------------------------------------------- */
+
+const JITTER_DIGITS = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+const JITTER_LENGTH = 6
+
+function randomJitterChar(maxExclusive?: string): string {
+  // When `key` is a prefix of `above`, the first jittered character has to be
+  // strictly below the character `above` continues with, or the jittered key
+  // would sort past it. Anything after that first character is then free.
+  const pool = maxExclusive === undefined ? JITTER_DIGITS : [...JITTER_DIGITS].filter((c) => c < maxExclusive).join("")
+  if (pool.length === 0) return ""
+  return pool[Math.floor(Math.random() * pool.length)]!
+}
+
+/**
+ * `key` with random digits appended, still strictly between its neighbours.
+ *
+ * Returns `key` unchanged when there is no room — `above` continues with the
+ * smallest digit, so no suffix fits underneath it. That is the one case where
+ * two clients can still collide, and it is vanishingly rarer than the every-time
+ * collision it replaces.
+ */
+function withJitter(key: string, above: string | undefined): IndexKey {
+  // `key` already sorts below `above`. If they differ *inside* `key` then any
+  // suffix keeps that difference, and only the prefix case needs a bound.
+  const bounded = above !== undefined && above.startsWith(key)
+  const first = randomJitterChar(bounded ? above[key.length] : undefined)
+  if (first === "") return key as IndexKey
+  let out = key + first
+  for (let i = 1; i < JITTER_LENGTH; i++) out += randomJitterChar()
+  return out as IndexKey
+}
+
+/**
+ * Generate a key strictly between `below` and `above`; either may be omitted.
+ * Throws when `below >= above`.
+ *
+ * Jittered — see the note above {@link JITTER_DIGITS}. Two calls with the same
+ * arguments return *different* keys, both in the same gap, which is what lets
+ * two clients insert at one position without one of them being merged away.
+ */
 export function getIndexBetween(below?: IndexKey | undefined, above?: IndexKey | undefined): IndexKey {
   assertOrdered(below, above)
-  return generateKeyBetween(below ?? null, above ?? null) as IndexKey
+  return withJitter(generateKeyBetween(below ?? null, above ?? null), above)
 }
 
-/** Generate a key strictly above `below` (or a first key when omitted). */
+/** Generate a key strictly above `below` (or a first key when omitted). Jittered. */
 export function getIndexAbove(below?: IndexKey | undefined): IndexKey {
-  return generateKeyBetween(below ?? null, null) as IndexKey
+  return withJitter(generateKeyBetween(below ?? null, null), undefined)
 }
 
-/** Generate a key strictly below `above` (or a first key when omitted). */
+/** Generate a key strictly below `above` (or a first key when omitted). Jittered. */
 export function getIndexBelow(above?: IndexKey | undefined): IndexKey {
-  return generateKeyBetween(null, above ?? null) as IndexKey
+  return withJitter(generateKeyBetween(null, above ?? null), above)
 }
 
-/** Generate `n` sorted keys strictly between `below` and `above`. */
+/**
+ * Jitter a run of keys without disturbing their order.
+ *
+ * Each key is bounded by the *next* one rather than by the outer `above`: two
+ * keys in a run are often prefixes of one another, and jittering one past its
+ * successor would reorder the run it belongs to.
+ */
+function withJitterEach(keys: string[], above: string | undefined): IndexKey[] {
+  const out: IndexKey[] = []
+  for (let i = 0; i < keys.length; i++) {
+    out.push(withJitter(keys[i]!, i + 1 < keys.length ? keys[i + 1] : above))
+  }
+  return out
+}
+
+/** Generate `n` sorted keys strictly between `below` and `above`. Jittered. */
 export function getIndicesBetween(
   below: IndexKey | undefined,
   above: IndexKey | undefined,
   n: number,
 ): IndexKey[] {
   assertOrdered(below, above)
-  return generateNKeysBetween(below ?? null, above ?? null, n) as IndexKey[]
+  return withJitterEach(generateNKeysBetween(below ?? null, above ?? null, n), above)
 }
 
-/** Generate `n` sorted keys strictly above `below`. */
+/** Generate `n` sorted keys strictly above `below`. Jittered. */
 export function getIndicesAbove(below: IndexKey | undefined, n: number): IndexKey[] {
-  return generateNKeysBetween(below ?? null, null, n) as IndexKey[]
+  return withJitterEach(generateNKeysBetween(below ?? null, null, n), undefined)
 }
 
-/** Generate `n` sorted keys strictly below `above`. */
+/** Generate `n` sorted keys strictly below `above`. Jittered. */
 export function getIndicesBelow(above: IndexKey | undefined, n: number): IndexKey[] {
-  return generateNKeysBetween(null, above ?? null, n) as IndexKey[]
+  return withJitterEach(generateNKeysBetween(null, above ?? null, n), above)
 }
 
 /**

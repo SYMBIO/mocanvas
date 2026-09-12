@@ -253,6 +253,40 @@ during the zero-rename step. Under pnpm's strict `node_modules` that means
 adding `@mocanvas/mocanvas` to your own dependencies alongside
 `@mocanvas/compat`.
 
+**If your own CSS reads tldraw's custom properties, add a second line:**
+
+```ts
+import "@mocanvas/compat/compat.css"
+```
+
+This is the half of the compat layer that nothing checks for you. The package
+alias covers the symbols TypeScript sees; it cannot cover the `--tl-*` names in
+your stylesheets. Without it a migration goes green — build, types, tests — and
+the damage shows up only to the eye, because a `var()` that resolves to nothing
+does not fail, it deletes the declaration it sits in (and inside `calc()`, the
+whole property). One consumer found it as a cursor whose white outline had
+quietly stopped being drawn.
+
+`compat.css` maps tldraw's tokens onto mocanvas's and gives **every** one a
+literal fallback, so a token with no counterpart cannot take a rule down with
+it. Two groups are worth knowing about:
+
+| tldraw token | What you get |
+| --- | --- |
+| `--tl-zoom`, `--tl-scale` | Real values. mocanvas now stamps `--mocanvas-zoom` and `--mocanvas-scale` on the canvas container and restamps them on zoom, so `calc()` rules that hold a constant on-screen size keep working. |
+| `--tl-color-overlay`, `--tl-color-background-overlay`, `--tl-color-warn` | A static fallback. mocanvas has no equivalent, so these do not follow your theme — set them yourself if they matter. |
+
+Everything else maps onto a themed mocanvas variable and follows a theme swap
+or a flip to dark. The stylesheet is scoped to `.mocanvas` rather than `:root`,
+so a page that still renders a real tldraw editor somewhere keeps its own
+values.
+
+**Next.js**: an app coming from tldraw almost certainly lists it in
+`serverExternalPackages`. Next matches that by package name, so leaving
+`@mocanvas/mocanvas` in the list turns `…/mocanvas.css` into a request Node has
+to resolve — and Node has no loader for `.css`. Take mocanvas out of the list
+entirely; there is nothing in it that needs to be external.
+
 ### Step 2 — drop the prefixes
 
 Once the app builds and runs against `@mocanvas/compat`, rename `TLFoo` →

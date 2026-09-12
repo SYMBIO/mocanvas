@@ -9,7 +9,7 @@ import type { UnknownShape } from "../records/base"
 import { Vec } from "../geometry"
 import { EditorProvider } from "./EditorContext"
 import { useEditorComponents } from "./ui-context"
-import { useThemeCssVars } from "./themeVars"
+import { useCameraCssVars, useThemeCssVars } from "./themeVars"
 import { useCanvasEvents } from "./useCanvasEvents"
 import { getSelectionHandlePositions } from "../editor/selectionHandles"
 import { ShapeIndicatorCompositor, type TLIndicatorHost } from "../indicators/ShapeIndicatorCompositor"
@@ -243,6 +243,9 @@ export function Canvas({ editor, className, style, children, components, indicat
   // overlays, the chrome and an app's own CSS all read one source. `style`
   // comes after, so a caller can still override an individual variable.
   const themeVars = useThemeCssVars(editor)
+  // The camera, for CSS that has to hold a constant on-screen size while the
+  // canvas zooms. Restamped on zoom, not per frame.
+  const cameraVars = useCameraCssVars(editor)
   const Indicators = components?.Indicators ?? DefaultIndicators
   const Brush = components?.Brush ?? (hasOverlay(editor, "brush") ? null : DefaultBrush)
   const Background = components?.Background
@@ -252,7 +255,7 @@ export function Canvas({ editor, className, style, children, components, indicat
       <div
         ref={containerRef}
         className={className ? `mocanvas ${className}` : "mocanvas"}
-        style={{ ...containerStyle, ...themeVars, ...style, cursor }}
+        style={{ ...containerStyle, ...themeVars, ...cameraVars, ...style, cursor }}
         tabIndex={0}
         onPointerDown={events.onPointerDown}
         onPointerMove={events.onPointerMove}

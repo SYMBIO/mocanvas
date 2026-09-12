@@ -25,12 +25,39 @@ export const CANVAS_THEME_VARS = {
   "--mocanvas-selection": "selectStroke",
   "--mocanvas-selection-fg": "background",
   "--mocanvas-brush-fill": "selectFill",
+  "--mocanvas-brush-stroke": "selectStroke",
   "--mocanvas-snap": "hint",
   "--mocanvas-background": "background",
   "--mocanvas-surface": "solid",
   "--mocanvas-text": "text",
   "--mocanvas-grid": "grid",
+  // Every name above is a key the ramp really carries. `TLThemeColors` has an
+  // index signature for an app's own palette entries, so a typo — or a role
+  // borrowed from a different enum — type-checks here and then silently emits
+  // nothing. Two of these were added that way and had to be taken back out.
 } as const satisfies Record<string, keyof TLThemeColors>
+
+/**
+ * The camera, as custom properties.
+ *
+ * Separate from the colours because these change on every zoom rather than on
+ * a theme swap, and because they are the two variables an app most often needs
+ * in CSS: anything drawn in the DOM over a zooming canvas has to divide by the
+ * zoom to keep a constant on-screen size. `@mocanvas/compat` maps tldraw's
+ * `--tl-zoom` and `--tl-scale` onto them; without them every `calc()` in a
+ * migrated stylesheet resolved to nothing and took its whole declaration with
+ * it.
+ */
+export function getCameraCssVars(zoom: number): CSSProperties {
+  // `--mocanvas-scale` is the reciprocal, which is what a rule actually wants:
+  // `width: calc(2px * var(--mocanvas-scale))` holds a 2px line at any zoom.
+  return { "--mocanvas-zoom": String(zoom), "--mocanvas-scale": String(1 / zoom) } as CSSProperties
+}
+
+/** {@link getCameraCssVars} for an editor, tracked reactively. */
+export function useCameraCssVars(editor: Editor): CSSProperties {
+  return useValue("cameraCssVars", () => getCameraCssVars(editor.getZoomLevel()), [editor])
+}
 
 /**
  * The custom properties for one resolved ramp.

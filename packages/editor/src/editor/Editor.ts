@@ -1234,9 +1234,24 @@ export class Editor extends EventEmitter<EditorEvents> {
     return sortByIndex(children).map((s) => s.id)
   }
 
+  /**
+   * The index a new child of `parentId` should take: above every existing one.
+   *
+   * An empty parent answers `getIndexAbove(ZERO_INDEX_KEY)`, not
+   * `ZERO_INDEX_KEY` itself. Two reasons, and the first stands on its own:
+   * asking this package the same question two ways used to give two answers,
+   * because `getIndexAbove(ZERO_INDEX_KEY)` from `@mocanvas/store` sits one
+   * step above what this returned. The second is parity — a consumer whose
+   * headless fold mirrors the store helper matched a live tldraw editor for
+   * months on this and stopped matching ours.
+   *
+   * Only newly created shapes move; an index already written into a document
+   * is data and is never recomputed. Order is relative, so a document built
+   * before this still sorts exactly as it did.
+   */
   getHighestIndexForParent(parentId: ParentId): IndexKey {
     const children = this._allShapes.get().filter((s) => s.parentId === parentId)
-    if (children.length === 0) return ZERO_INDEX_KEY
+    if (children.length === 0) return getIndexAbove(ZERO_INDEX_KEY)
     return getIndexAbove(sortByIndex(children).at(-1)!.index)
   }
 

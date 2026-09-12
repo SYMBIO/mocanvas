@@ -1,7 +1,7 @@
 export { Canvas, getShapeIndicatorNode, type CanvasProps, type CanvasComponents, type TLCanvasComponentProps } from "./Canvas"
 export { useEditor, useMaybeEditor, EditorProvider, EditorContext, type EditorProviderProps } from "./EditorContext"
 export { HTMLContainer, SVGContainer, stopEventPropagation, type HTMLContainerProps, type SVGContainerProps } from "./containers"
-export { CANVAS_THEME_VARS, getThemeCssVars, useThemeCssVars } from "./themeVars"
+export { CANVAS_THEME_VARS, getCameraCssVars, getThemeCssVars, useCameraCssVars, useThemeCssVars } from "./themeVars"
 export { AssetUrlsProvider, useAssetUrls, type TLAssetUrls, type TLEditorAssetUrls, type TLUiAssetUrls, type AssetUrlsProviderProps } from "./assetUrls"
 export { getLocaleChain, resolveUiMessage } from "./translations"
 export type {
