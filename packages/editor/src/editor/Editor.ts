@@ -266,7 +266,20 @@ export interface EditorConfig extends TldrawOptions {
   zoomMax: number
   /** The zoom levels the zoom-in / zoom-out steps land on. */
   zoomSteps: number[]
-  /** The renderer's clear colour, as premultiplied linear RGBA. */
+  /**
+   * The page colour behind the canvas, as RGBA in 0–1.
+   *
+   * @deprecated The canvas background is a *theme* colour — the theme carries
+   * one for each colour mode and publishes it as `--mocanvas-background`,
+   * which is what the container paints. This knob is honoured when it is set
+   * to anything other than its default, so an app that configured it keeps the
+   * colour it configured; a new app should set the theme, or pass
+   * `style={{ background }}` to `<Canvas>`, either of which follows dark mode.
+   *
+   * It is no longer the renderer's clear colour: the GPU layer clears
+   * transparent, because anything it painted covered the grid and the
+   * `Background` slot beneath it.
+   */
   backgroundColor: [number, number, number, number]
   /**
    * How far the zoom must change, in octaves, before `getDebouncedZoomLevel()`
@@ -332,6 +345,14 @@ const WHEEL_ZOOM_DELTA_CAP = 50
 
 /** `PointerEvent.button` for the middle button. */
 const MIDDLE_BUTTON = 1
+
+/**
+ * What the GPU layer clears to: nothing.
+ *
+ * The canvas sits above the grid and the `Background` slot in the DOM, so it
+ * has to be see-through for either of them to exist at all. See `renderFrame`.
+ */
+const TRANSPARENT_CLEAR: [number, number, number, number] = [0, 0, 0, 0]
 
 /**
  * How long a collaborator may go without refreshing their presence record
@@ -3218,6 +3239,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   // ---- rendering ---------------------------------------------------------
 
+
   /** Build and draw one frame. Called by the canvas component inside rAF. */
   renderFrame(backend: RenderBackend): FrameBuffers {
     const t0 = performance.now()
@@ -3228,7 +3250,12 @@ export class Editor extends EventEmitter<EditorEvents> {
     const vp = this.getViewportScreenBounds()
     const camState: CameraState = { x: cam.x, y: cam.y, z: cam.z }
     const frame = this.engine.frame(camState, vp.w, vp.h)
-    backend.draw(frame, camState, { background: this.options.backgroundColor })
+    // Transparent, always. The grid and the `Background` slot are DOM layers
+    // *beneath* this canvas, so a clear with any alpha at all paints over both
+    // of them — which is how "Show grid" kept drawing nothing after the slot
+    // was mounted and the colour darkened. The page colour is painted by the
+    // container instead, where those layers can sit on top of it.
+    backend.draw(frame, camState, { background: TRANSPARENT_CLEAR })
 
     const overlay = EngineBridge.readOverlay(frame.overlay)
     const ids: ShapeId[] = []

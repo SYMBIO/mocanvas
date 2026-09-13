@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * "Show grid" drew nothing.
+ * "Show grid" drew nothing — twice.
  *
  * The `Grid` slot carried three paragraphs of documentation — "rendered only
  * while the editor is in grid mode", handed the camera so it need not
@@ -8,6 +8,13 @@
  * `Canvas` rendered neither, so the menu item ticked a box and the canvas was
  * unchanged. Every unit test passed: there was nothing wrong with the grid, it
  * was simply never asked for.
+ *
+ * Mounting it was not enough either, and the second failure is the reason the
+ * last block of this file exists. The grid is a DOM layer *beneath* the GPU
+ * canvas, and the renderer cleared every frame to an opaque near-white, so the
+ * grid was painted and then painted over. It had a node, correct patterns and
+ * the right colour, and measured zero pixels on screen — which is exactly what
+ * a test that asserts "the element is there" cannot see.
  */
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
@@ -132,5 +139,59 @@ describe("grid mode", () => {
   it("lets an app switch it off entirely", () => {
     mount({ Grid: null })
     expect(grid()).toBeNull()
+  })
+})
+
+/**
+ * The invariant that makes any of the layers beneath the canvas visible.
+ *
+ * These assert the two halves separately because neither is sufficient and
+ * jsdom composites nothing: a DOM test can see that the grid comes before the
+ * canvas and that the clear is transparent, and those two facts together are
+ * what put dots on a screen.
+ */
+describe("the canvas layer", () => {
+  it("clears transparent, so the grid beneath it survives the frame", () => {
+    const e = mount()
+    fakeBackend.draw.mockClear()
+    act(() => {
+      e.renderFrame(fakeBackend as never)
+    })
+    const [, , options] = fakeBackend.draw.mock.calls[0] as [unknown, unknown, { background: number[] }]
+    expect(options.background[3], "an opaque clear paints over the grid and the Background slot").toBe(0)
+  })
+
+  it("keeps the grid underneath it, so dots do not land on top of shapes", () => {
+    mount()
+    const layers = [...host!.querySelector(".mocanvas")!.children]
+    const gridAt = layers.findIndex((el) => el.classList.contains("mocanvas-grid"))
+    const canvasAt = layers.findIndex((el) => el.tagName === "CANVAS")
+    expect(gridAt).toBeGreaterThanOrEqual(0)
+    expect(gridAt, "the grid must sit below the canvas, not above the shapes on it").toBeLessThan(canvasAt)
+  })
+
+  it("paints the page colour on the container instead", () => {
+    mount()
+    const container = host!.querySelector(".mocanvas") as HTMLElement
+    // The theme's colour, not the renderer's — so dark mode gets a dark page.
+    expect(container.style.background).toContain("--mocanvas-background")
+  })
+
+  it("still honours an app that set the deprecated `backgroundColor`", () => {
+    host = document.createElement("div")
+    document.body.appendChild(host)
+    editor = new Editor({
+      store: createStore(),
+      shapeUtils: [],
+      tools: [SelectTool],
+      engine: loadEngineSync(readFileSync(wasmPath)),
+      getContainer: () => host!,
+      options: { backgroundColor: [1, 0, 0, 1] },
+    })
+    root = createRoot(host)
+    act(() => root!.render(<Canvas editor={editor!} />))
+    const container = host!.querySelector(".mocanvas") as HTMLElement
+    // jsdom drops a redundant alpha, so both spellings mean the same red.
+    expect(container.style.background).toMatch(/rgba?\(255, 0, 0/)
   })
 })

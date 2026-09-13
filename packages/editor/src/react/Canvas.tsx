@@ -5,7 +5,7 @@ import type { TLGridProps } from "./ui-types"
 import { DefaultErrorFallback, ErrorBoundary, type TLErrorFallbackProps } from "./ErrorBoundary"
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react"
 import type { ClipRect } from "@mocanvas/wasm"
-import type { Editor } from "../editor/Editor"
+import { DEFAULT_EDITOR_CONFIG, type Editor } from "../editor/Editor"
 import type { RenderBackend } from "../render/backend"
 import { createBackend } from "../render/webgl2"
 import type { UnknownShape } from "../records/base"
@@ -105,6 +105,28 @@ function useErrorSlot(
   const provided = useEditorComponents()
   const slot = local?.[key] !== undefined ? local[key] : provided[key]
   return slot === undefined ? fallback : slot
+}
+
+/**
+ * The colour painted behind the canvas.
+ *
+ * It is painted here rather than by the renderer because the grid and the
+ * `Background` slot are DOM layers *underneath* the GPU canvas: a clear colour
+ * with any alpha covers both, which is what kept the grid invisible after it
+ * was mounted. The canvas now clears transparent and this shows through it.
+ *
+ * The theme is the source — it carries a background for each colour mode and
+ * publishes it as `--mocanvas-background`, so dark mode gets a dark page
+ * instead of the light one the static clear colour used to paint in both. An
+ * app that set the deprecated `backgroundColor` option keeps that colour, and
+ * `style={{ background }}` on `<Canvas>` beats either.
+ */
+function backgroundFor(editor: Editor): string {
+  const set = editor.options.backgroundColor
+  const dflt = DEFAULT_EDITOR_CONFIG.backgroundColor
+  if (set.every((v, i) => v === dflt[i])) return "var(--mocanvas-background, #f9fafb)"
+  const [r, g, b, a] = set
+  return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`
 }
 
 const containerStyle: CSSProperties = {
@@ -344,7 +366,7 @@ function CanvasBody({ editor, className, style, children, components, indicatorO
       <div
         ref={containerRef}
         className={className ? `mocanvas ${className}` : "mocanvas"}
-        style={{ ...containerStyle, ...themeVars, ...cameraVars, ...style, cursor }}
+        style={{ ...containerStyle, background: backgroundFor(editor), ...themeVars, ...cameraVars, ...style, cursor }}
         tabIndex={0}
         onPointerDown={events.onPointerDown}
         onPointerMove={events.onPointerMove}
