@@ -2,8 +2,8 @@ import { react as reactSignal } from "@mocanvas/state"
 import { track, useValue } from "@mocanvas/state/react"
 import { DefaultGrid, DefaultShapeErrorFallback } from "./defaultEditorComponents"
 import type { TLGridProps } from "./ui-types"
-import { DefaultErrorFallback, ErrorBoundary } from "./ErrorBoundary"
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import { DefaultErrorFallback, ErrorBoundary, type TLErrorFallbackProps } from "./ErrorBoundary"
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react"
 import type { ClipRect } from "@mocanvas/wasm"
 import type { Editor } from "../editor/Editor"
 import type { RenderBackend } from "../render/backend"
@@ -38,7 +38,13 @@ export interface CanvasProps {
   style?: CSSProperties
   /** Extra layers rendered above the canvas (UI, menus). */
   children?: ReactNode
-  /** Override the default selection/brush indicators. */
+  /**
+   * The canvas's own slots: the indicators, the brush, the background, the
+   * grid, and the two error fallbacks. A slot given here wins over the same
+   * slot on the surrounding `MocanvasUiProvider`, so an app can configure the
+   * whole editor through the provider and still override one canvas on one
+   * screen.
+   */
   components?: Partial<CanvasComponents>
   /**
    * The overlay util that paints shape indicators onto the canvas layer.
@@ -60,6 +66,45 @@ export interface CanvasComponents {
    * `TLComponents.Grid`. `null` draws none; omitted uses {@link DefaultGrid}.
    */
   Grid: ((props: TLGridProps) => ReactNode) | null
+  /**
+   * Rendered in place of the whole editor once it has thrown. `null` renders
+   * nothing — the choice a host with its own error UI outside the canvas
+   * wants, rather than two competing messages. Omitted uses
+   * {@link DefaultErrorFallback}.
+   */
+  ErrorFallback: ComponentType<TLErrorFallbackProps> | null
+  /**
+   * Rendered in place of one shape whose body has thrown, at that shape's own
+   * bounds. `null` leaves a hole; omitted uses
+   * {@link DefaultShapeErrorFallback}.
+   */
+  ShapeErrorFallback: ComponentType<TLErrorFallbackProps> | null
+}
+
+/**
+ * The `components` prop, for the slots that are resolved below the component
+ * that receives it.
+ *
+ * Both error fallbacks are: the editor-wide boundary sits above the body the
+ * prop is passed to, and the per-shape one is three components below it. Prop
+ * beats provider for either, which is the rule the other slots on this map
+ * already follow.
+ */
+const CanvasComponentsContext = createContext<Partial<CanvasComponents> | undefined>(undefined)
+
+/**
+ * Resolve one error slot: the `components` prop, then the UI provider, then
+ * the built-in. `null` at either level is an answer — render nothing — rather
+ * than a miss to fall through.
+ */
+function useErrorSlot(
+  key: "ErrorFallback" | "ShapeErrorFallback",
+  fallback: ComponentType<TLErrorFallbackProps>,
+): ComponentType<TLErrorFallbackProps> | null {
+  const local = useContext(CanvasComponentsContext)
+  const provided = useEditorComponents()
+  const slot = local?.[key] !== undefined ? local[key] : provided[key]
+  return slot === undefined ? fallback : slot
 }
 
 const containerStyle: CSSProperties = {
@@ -130,18 +175,30 @@ function hasFrameWork(editor: Editor): boolean {
  * — and for any util still on the deprecated `indicator()` hook.
  */
 export function Canvas(props: CanvasProps) {
-  // The editor-wide boundary, outside everything else so it catches a throw
-  // from any of it — including from the hooks the body runs. Its fallback is
-  // the `ErrorFallback` slot; `null` there means a host that shows its own
-  // error UI outside the canvas gets silence rather than two messages.
-  const components = useEditorComponents()
-  const Fallback = components.ErrorFallback === undefined ? DefaultErrorFallback : components.ErrorFallback
+  return (
+    <CanvasComponentsContext.Provider value={props.components}>
+      <EditorBoundary>
+        <CanvasBody {...props} />
+      </EditorBoundary>
+    </CanvasComponentsContext.Provider>
+  )
+}
+
+/**
+ * The editor-wide boundary, outside everything else so it catches a throw from
+ * any of it — including from the hooks the body runs.
+ *
+ * Its own render is not covered by it, which is why it does as little as
+ * possible: read a slot, render a boundary.
+ */
+function EditorBoundary({ children }: { children: ReactNode }) {
+  const Fallback = useErrorSlot("ErrorFallback", DefaultErrorFallback)
   return (
     <ErrorBoundary
       fallback={(fallbackProps) => (Fallback ? <Fallback {...fallbackProps} /> : null)}
       onError={(error) => console.error("mocanvas: the editor stopped", error)}
     >
-      <CanvasBody {...props} />
+      {children}
     </ErrorBoundary>
   )
 }
@@ -758,8 +815,7 @@ const ShapeBody = track(function ShapeBody({ editor, shape }: { editor: Editor; 
  * spin.
  */
 function ShapeBoundary({ shape, children }: { shape: UnknownShape; children: ReactNode }) {
-  const components = useEditorComponents()
-  const Fallback = components.ShapeErrorFallback === undefined ? DefaultShapeErrorFallback : components.ShapeErrorFallback
+  const Fallback = useErrorSlot("ShapeErrorFallback", DefaultShapeErrorFallback)
   return (
     <ErrorBoundary
       fallback={({ error }) => (Fallback ? <Fallback error={error} /> : null)}

@@ -107,7 +107,7 @@ afterEach(() => {
  * above the body that receives the prop. So `slots` is provided the way a host
  * provides it.
  */
-function mountWithThrowingSlot(slots?: Partial<TLEditorComponents>) {
+function mountWithThrowingSlot(slots?: Partial<TLEditorComponents>, prop?: Parameters<typeof Canvas>[0]["components"]) {
   host = document.createElement("div")
   document.body.appendChild(host)
   editor = new Editor({
@@ -122,7 +122,7 @@ function mountWithThrowingSlot(slots?: Partial<TLEditorComponents>) {
   const Boom = () => {
     throw new Error("the indicators are broken")
   }
-  const canvas = <Canvas editor={editor!} components={{ Indicators: Boom }} />
+  const canvas = <Canvas editor={editor!} components={{ Indicators: Boom, ...prop }} />
   act(() =>
     root!.render(
       slots ? (
@@ -177,7 +177,7 @@ describe("the editor-wide boundary", () => {
  * have a DOM body — so the frame is driven by hand rather than waited for: the
  * component's own loop is rAF-driven and the backend here is a stub.
  */
-function mountWithBrokenShape(slots?: Partial<TLEditorComponents>) {
+function mountWithBrokenShape(slots?: Partial<TLEditorComponents>, prop?: Parameters<typeof Canvas>[0]["components"]) {
   host = document.createElement("div")
   document.body.appendChild(host)
   editor = new Editor({
@@ -190,7 +190,7 @@ function mountWithBrokenShape(slots?: Partial<TLEditorComponents>) {
   editor.updateViewportScreenBounds({ x: 0, y: 0, w: 800, h: 600 })
   editor.createShapes([{ id: createShapeId(), type: "box", x: 10, y: 10 }] as never)
   root = createRoot(host)
-  const canvas = <Canvas editor={editor!} />
+  const canvas = <Canvas editor={editor!} components={prop ?? {}} />
   act(() =>
     root!.render(
       slots ? (
@@ -236,5 +236,40 @@ describe("a shape whose body throws", () => {
     mountWithBrokenShape({ ShapeErrorFallback: null })
     expect(host!.querySelector(".mocanvas-shape-error")).toBeNull()
     expect(host!.querySelector(".mocanvas-overlay")).not.toBeNull()
+  })
+})
+
+/**
+ * Both fallbacks used to be provider-only while every other slot on the
+ * `components` prop was prop-only — the same names resolved from two different
+ * places depending on which boundary you meant. A host that passed
+ * `components={{ ErrorFallback }}` to `<Canvas>`, which is what the prop's own
+ * type invites, got the built-in screen and no indication why.
+ */
+describe("where a fallback may be configured", () => {
+  it("takes the editor-wide one from the `components` prop", () => {
+    mountWithThrowingSlot(undefined, { ErrorFallback: () => <div data-testid="prop" /> })
+    expect(host!.querySelector('[data-testid="prop"]')).not.toBeNull()
+  })
+
+  it("takes the per-shape one from the `components` prop", () => {
+    mountWithBrokenShape(undefined, { ShapeErrorFallback: () => <div data-testid="prop" /> })
+    expect(host!.querySelector('[data-testid="prop"]')).not.toBeNull()
+  })
+
+  it("lets the prop win over the provider, as it does for every other slot", () => {
+    mountWithThrowingSlot({ ErrorFallback: () => <div data-testid="provider" /> }, { ErrorFallback: () => <div data-testid="prop" /> })
+    expect(host!.querySelector('[data-testid="prop"]')).not.toBeNull()
+    expect(host!.querySelector('[data-testid="provider"]')).toBeNull()
+  })
+
+  it("reads `null` on the prop as an answer rather than a miss", () => {
+    mountWithThrowingSlot({ ErrorFallback: () => <div data-testid="provider" /> }, { ErrorFallback: null })
+    expect(host!.textContent).toBe("")
+  })
+
+  it("still falls through to the provider when the prop says nothing", () => {
+    mountWithBrokenShape({ ShapeErrorFallback: () => <div data-testid="provider" /> }, { Grid: null })
+    expect(host!.querySelector('[data-testid="provider"]')).not.toBeNull()
   })
 })
