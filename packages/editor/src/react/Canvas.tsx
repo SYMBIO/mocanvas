@@ -1,5 +1,7 @@
 import { react as reactSignal } from "@mocanvas/state"
 import { track, useValue } from "@mocanvas/state/react"
+import { DefaultGrid } from "./defaultEditorComponents"
+import type { TLGridProps } from "./ui-types"
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import type { ClipRect } from "@mocanvas/wasm"
 import type { Editor } from "../editor/Editor"
@@ -51,6 +53,12 @@ export interface CanvasComponents {
   Indicators: (props: { editor: Editor }) => ReactNode
   Brush: (props: { editor: Editor }) => ReactNode
   Background: (props: { editor: Editor }) => ReactNode
+  /**
+   * The grid, behind the scene. Rendered only in grid mode, and handed the
+   * camera and the document's step rather than reading them — see
+   * `TLComponents.Grid`. `null` draws none; omitted uses {@link DefaultGrid}.
+   */
+  Grid: ((props: TLGridProps) => ReactNode) | null
 }
 
 const containerStyle: CSSProperties = {
@@ -246,6 +254,12 @@ export function Canvas({ editor, className, style, children, components, indicat
   // The camera, for CSS that has to hold a constant on-screen size while the
   // canvas zooms. Restamped on zoom, not per frame.
   const cameraVars = useCameraCssVars(editor)
+  // Grid mode, the camera and the document's step — the three things the grid
+  // slot is given rather than subscribing to itself, so a pan redraws it once.
+  const isGridMode = useValue("isGridMode", () => editor.getInstanceState().isGridMode, [editor])
+  const camera = useValue("camera", () => editor.getCamera(), [editor])
+  const gridSize = useValue("gridSize", () => editor.getDocumentSettings().gridSize, [editor])
+  const Grid = components?.Grid === undefined ? DefaultGrid : components.Grid
   const Indicators = components?.Indicators ?? DefaultIndicators
   const Brush = components?.Brush ?? (hasOverlay(editor, "brush") ? null : DefaultBrush)
   const Background = components?.Background
@@ -265,6 +279,15 @@ export function Canvas({ editor, className, style, children, components, indicat
         data-testid="mocanvas-container"
       >
         {Background ? <Background editor={editor} /> : null}
+        {/*
+          The grid, behind the scene and above the backdrop.
+
+          The slot was documented — "rendered only while the editor is in grid
+          mode" — and `DefaultGrid` was written, and nothing ever rendered
+          either. So "Show grid" ticked a box and drew nothing, which is the
+          worst kind of dead control: the menu says the feature exists.
+        */}
+        {Grid !== null && isGridMode ? <Grid x={camera.x} y={camera.y} z={camera.z} size={gridSize} /> : null}
         <canvas ref={canvasRef} style={{ ...layerStyle, display: "block" }} />
         <OverlayLayer editor={editor} />
         <IndicatorCanvas editor={editor} util={indicatorOverlayUtil ?? ShapeIndicatorCompositor} />
