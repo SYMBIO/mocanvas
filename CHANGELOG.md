@@ -1,5 +1,111 @@
 # Changelog
 
+## 4.4.0
+
+Four findings from a consumer's migration. The first one is the reason to
+upgrade.
+
+### A filled shape could not be clicked in the middle
+
+`Geometry2d.hitTestPoint` asked only whether the *caller* wanted the interior,
+never whether the shape was **filled**. So a solid rectangle answered on its
+outline and nowhere else:
+
+```
+geometry.isFilled                        true
+geometry.hitTestPoint(centre, 0, false)  false   ← should be true
+editor.getShapeAtPoint(centre)           null
+```
+
+The interior now counts when the shape is filled **or** the caller passes
+`hitInside` — those are alternatives, not a requirement and a refinement.
+`hitInside` means "count the interior of a HOLLOW shape as well", which is what
+a marquee or a drop target wants; it was never the only way an interior should
+be reachable. An unfilled shape still misses in the middle, deliberately: a
+hollow rectangle is a frame around empty space, and clicking that space should
+reach whatever is behind it.
+
+The wasm engine knew about fill the whole time — `hit_test` has computed
+`filled = !hollow_only && … && style.has_fill()` since it was written. The
+editor was setting `hollow_only` whenever the caller had not asked for
+`hitInside`, which forced outline-only on everything. That is fixed too, so both
+the engine path (`getShapeAtPoint` with no filter) and the geometry path agree.
+
+Nothing failed and nothing warned while this was wrong. Every feature built on
+hit testing simply returned nothing, which reads as several unrelated bugs — the
+consumer who found it had selection, comment anchoring and a comment tool all
+apparently broken in different ways.
+
+**Also fixed while testing it:** `hitInside` never worked at the editor level for
+a point in the middle of a large hollow shape. The candidate set came from the
+engine's box query, which finds shapes whose *outline* meets the point, and a
+centre point is nowhere near one. That case now scans the page's shapes by
+bounds instead. It is not the default because it is a scan rather than a tree
+query, and `hitInside` is the deliberate, rare path.
+
+### Jitter can be turned off, so generated indices can be compared
+
+4.2.0 made every generated index key unpredictable, which is what makes
+concurrent insertion safe — and defeats any test that replays one operation
+through two implementations and asserts they agree. A consumer with a headless
+fold and a parity suite had to choose between the fix and their tests.
+
+Jitter is now **off under a test runner** (`NODE_ENV === "test"`), with no
+configuration:
+
+```ts
+getIndexAbove("a0")  // "a1", every time, in your test suite
+```
+
+Forceable either way for the cases that need it — `MOCANVAS_INDEX_JITTER=1|0`
+for a runner that sets no `NODE_ENV`, and `setIndexJitterEnabled(true | false |
+null)` in code. `isIndexJitterEnabled()` reports what is in effect. A test of
+the jitter itself forces it on; ours do.
+
+Unchanged on purpose: `getIndices` echoes its `start` verbatim, jitter or not.
+It is an input, not something generated, so two replicas moving into the same
+empty parent do get the same first key — faithful to the reference rather than a
+gap in the jitter.
+
+### Built-in shape defaults
+
+Measured against a consumer's table and corrected where ours was wrong:
+
+- **`text` is no longer written into new shapes.** It is the derived flattened
+  label — optional on the record, and a v5 writer stores only `richText`, as
+  this package's own props map already said. Writing it into every new note,
+  geo, text and arrow put a field into documents that nothing downstream reads.
+  It is still accepted and read on input, so old `.tldr` files are unaffected.
+- **`text.w` is 8, not 100.** Under `autoSize` that value is a *minimum* width,
+  not a starting one, so a new text shape was a hundred pixels wide before a
+  character was typed — the opposite of auto-sizing.
+
+Deliberate and unchanged, for the record: `note.fontSizeAdjustment` defaults to
+`0` meaning "unset", and the reader treats any value too small to be a font size
+as unset too, so a file written with `1` renders identically rather than at one
+pixel. `frame` stays 160×90 (documented in `MIGRATION.md` §10), and
+`DEFAULT_EMBED_DEFINITIONS` stays at six services — it is a permit list, nothing
+outside it is ever put in an iframe, and each entry carries hand-written URL
+rewriting that should not be guessed at.
+
+### A clearer error when a util map goes missing
+
+`editor.getBindingUtil` / `getShapeUtil` used to fail with `TypeError: Cannot
+read properties of undefined (reading '<your type>')`, which reads like an
+unregistered util and is not — it means `shapeUtils` or `bindingUtils` itself
+was gone. The constructor never leaves them that way; what does is a subclass
+redeclaring the field:
+
+```ts
+class MyEditor extends Editor {
+  readonly bindingUtils!: Record<string, BindingUtil>  // ← wipes the base's
+}
+```
+
+At ES2022 a field declaration with no initializer is not a type annotation — it
+defines the property as `undefined` after the base constructor has run. Use
+`declare readonly bindingUtils: …` instead. The error now says so.
+
 ## 4.3.0
 
 One fix, and it is a breaking one in a minor — the same judgement 4.1.0 made,
