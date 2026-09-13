@@ -1,5 +1,51 @@
 # Changelog
 
+## 4.5.2
+
+### The grid answered the camera backwards in both directions
+
+Zoom in and it vanished; zoom out and it turned into a grey sheen. Both are
+the opposite of what a grid is for, and both came from the same two decisions
+in `DefaultGrid`.
+
+**Zooming in.** The dot was a fixed 1px radius. At 8× the cell is 80 screen
+pixels, so what remained was a speck every 80px — a lattice you cannot see is
+not a lattice. The radius is now a fraction of the cell, `cell / 16`, floored
+at 0.75px so it never disappears and capped at 5px so a deep zoom draws dots
+rather than blobs.
+
+**Zooming out.** A second, heavier lattice was drawn every fifth cell at a
+*fixed* 0.9 opacity while the fine one faded. So the fine grid dissolved on
+schedule and the coarse one stayed, at full strength, until the cells were a
+few pixels apart. That is the sheen. There is one lattice now, one opacity,
+and it fades out together: solid at a 12px cell, gone by 6px.
+
+```
+cell = gridSize × zoom      (screen pixels)
+dot   r = clamp(cell / 16, 0.75, 5)
+grid  opacity = clamp((cell - 6) / 6, 0, 1)   — nothing rendered at 0
+```
+
+Both thresholds are pixel numbers because that is what an eye judges. With the
+default `gridSize` of 10 the grid bows out below about 60% zoom; a document
+that wants it further out sets a larger step — `documentSettings.gridSize`,
+which is also the snap step, so the dots stay magnets at every zoom.
+
+**No re-levelling, deliberately.** The spacing is always the document's step
+rather than a power of it picked per zoom. A corner on a multiple of the step
+sits on a dot at *every* zoom, which re-levelling breaks on the intermediate
+steps — a grid that bows out when it gets too dense is the better trade.
+
+**The dots were also being clipped.** Drawn at the tile's corner, an SVG
+pattern throws away the three quarters that fall outside the tile — at the old
+1px radius a barely-noticeable speck, at 5px a quarter-disc. The dot is drawn
+at the tile centre now and the tile is shifted back half a cell, which puts it
+on the same lattice point whole.
+
+The every-fifth heavier dot is gone with the second lattice. It existed so the
+eye could count without the fine grid being dark enough to read alone; a dot
+that scales with the cell reads on its own.
+
 ## 4.5.1
 
 ### The grid was still invisible, and this time it was painted over
