@@ -1,5 +1,31 @@
 # Changelog
 
+## 4.4.2
+
+### A geo shape placed by a click was half the size it should be
+
+`GeoTypeDefinition.defaultSize` — "the size a click (rather than a drag) places
+this silhouette at" — was declared on the interface, documented, **populated by
+nothing and read by nothing**. So `GeoTool` handed back a hard-coded 100×100
+whatever the definition said, and a rectangle created by clicking came out at
+half the reference's 200×200. A drag was never affected: it resizes the shape
+from the pointer immediately.
+
+Both halves are fixed: the built-ins declare a click size, and the tool asks for
+it. A definition that omits one still falls back, so a custom geo type is not
+required to have an opinion.
+
+**One box for every silhouette, deliberately.** The reference gives some kinds
+proportions of their own — a star nearer 200×190, a cloud nearer 300×180 — and
+there is no measured table here for all twenty. One honest box beats eighteen
+guesses arranged around three known numbers; an app that wants per-kind sizes
+sets them through `customGeoTypes`, which overrides the table entry for entry.
+
+`FrameShapeUtil`'s 160×90 is **not** the same bug, in case the two look
+related: a frame is its own util with its own `getDefaultProps`, and it never
+consulted this table. It stays as it is and stays documented in `MIGRATION.md`
+§10.
+
 ## 4.4.1
 
 ### `rotateShapesBy` wraps the angle it stores
