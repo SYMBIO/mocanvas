@@ -11,6 +11,18 @@
 # Before the first run, each package needs a trusted publisher configured at
 # npmjs.com → package → Settings → Trusted Publisher: GitHub Actions,
 # SYMBIO/mocanvas, workflow `release.yml`.
+#
+# ## Cutting a release candidate
+#
+# Set every package's version to a prerelease — `4.4.0-rc.1` — and tag it
+# `v4.4.0-rc.1`. This workflow reads the version, sees the `-`, and publishes
+# under `next` instead of `latest`, so nobody on a caret range is handed it.
+# Everything else is identical: the same gates decide whether it is publishable.
+#
+# Cut one EARLY, while the version is still being worked on. A consumer whose
+# supply-chain policy refuses packages under a day old then has the clock
+# running during development rather than after the release, and their findings
+# can land before the final is tagged instead of turning into a patch.
 name: Release
 
 on:
@@ -108,11 +120,38 @@ jobs:
             exit 1
           fi
 
+      # Which dist-tag this version claims.
+      #
+      # pnpm publishes under `latest` by default WHATEVER the version is — there
+      # is no prerelease special case — so `4.4.0-rc.1` published plainly would
+      # become the version every consumer on `^4` installs. A release candidate
+      # exists to be opted into, so it goes to `next` and leaves `latest` alone.
+      #
+      # This is what makes an early RC usable: a consumer whose supply-chain
+      # policy refuses packages under a day old can install the RC the moment it
+      # has aged, test against it while the final is still being worked on, and
+      # never be handed it by a caret range in the meantime.
+      - name: Work out the dist-tag
+        id: disttag
+        run: |
+          ver=$(node -p "require('./packages/mocanvas/package.json').version")
+          # A semver prerelease is anything carrying a `-`: 1.2.3-rc.1, -beta.0.
+          case "$ver" in
+            *-*) tag=next ;;
+            *)   tag=latest ;;
+          esac
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publishing $ver under dist-tag '$tag'"
+
       - name: Publish
         if: ${{ github.event_name == 'push' || !inputs.dry_run }}
         # `--provenance` records where this build came from; trusted publishing
         # is what makes that attestation trustworthy.
-        run: pnpm -r --filter "./packages/*" publish --access public --no-git-checks --provenance
+        run: |
+          pnpm -r --filter "./packages/*" publish \
+            --access public --no-git-checks --provenance \
+            --tag "${{ steps.disttag.outputs.tag }}"
 
       - name: Pack only (dry run)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
@@ -124,7 +163,8 @@ jobs:
       - name: Verify every package published the same version
         if: ${{ github.event_name == 'push' || !inputs.dry_run }}
         run: |
-          want=$(node -p "require('./packages/mocanvas/package.json').version")
+          want="${{ steps.disttag.outputs.version }}"
+          tag="${{ steps.disttag.outputs.tag }}"
           # The registry takes its time to serve a freshly published version, and
           # not evenly across packages. Poll rather than read once, and ask the
           # registry directly so a stale npm cache cannot answer for it.
@@ -141,14 +181,14 @@ jobs:
             missing=""
             for p in mocanvas editor state store sync compat wasm; do
               got=$(curl -sS "https://registry.npmjs.org/@mocanvas%2f$p" \
-                | node -p "JSON.parse(require('fs').readFileSync(0,'utf8'))['dist-tags'].latest" 2>/dev/null || echo missing)
+                | node -p "JSON.parse(require('fs').readFileSync(0,'utf8'))['dist-tags'][process.argv[1]]" "$tag" 2>/dev/null || echo missing)
               [ "$got" = "$want" ] || missing="$missing $p($got)"
             done
-            [ -n "$missing" ] || { echo "all seven packages are at $want after $attempt attempt(s)"; exit 0; }
+            [ -n "$missing" ] || { echo "all seven packages serve $want under '$tag' after $attempt attempt(s)"; exit 0; }
             echo "attempt $attempt/60 — still waiting for:$missing"
             sleep 15
           done
-          echo "::error::After 15 minutes, these are still not serving $want:$missing"
+          echo "::error::After 15 minutes, these are still not serving $want under '$tag':$missing"
           echo "::error::The Publish step above SUCCEEDED, so this is either registry"
           echo "::error::propagation running long or a genuinely half-published set."
           echo "::error::Check with: npm view @mocanvas/<name> versions --json"

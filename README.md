@@ -101,6 +101,23 @@ app — the same way `tldraw/tldraw.css` is imported in a tldraw app.
 > threw `ERR_UNKNOWN_FILE_EXTENSION: Unknown file extension ".css"`. The JS
 > entry no longer imports CSS, so the import has to come from your app.
 
+### Release candidates
+
+A version being prepared is published under the `next` dist-tag, never `latest`,
+so a caret range will not hand you one:
+
+```bash
+npm install @mocanvas/mocanvas@next
+```
+
+Why it exists: a release candidate goes out **early**, while the version is
+still being worked on. If your supply-chain policy refuses packages below some
+age — one team here cannot install anything under 24 hours old — that clock
+starts when the RC is published rather than when the final is, so you can test
+against it and have your findings land before the release is cut instead of
+after. All seven packages carry the same version under `next`; mixing one from
+`next` with the rest from `latest` is not a supported combination.
+
 Every package is **ESM only** — there is no CommonJS build. The engine locates
 its `.wasm` asset with `import.meta.url`, which has no CommonJS equivalent;
 Vite, webpack 5, Next, Astro, Remix and Rollup all consume the packages as-is.
