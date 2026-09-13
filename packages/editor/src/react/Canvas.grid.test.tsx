@@ -109,8 +109,8 @@ describe("grid mode", () => {
     act(() => void e.updateInstanceState({ isGridMode: false }))
     act(() => void e.updateInstanceState({ isGridMode: true }))
     expect(grid(), "the slot rendered nothing — this is the bug it was written for").not.toBeNull()
-    // A fine cell and a heavier fifth, so the eye can count.
-    expect(grid()!.querySelectorAll("pattern")).toHaveLength(2)
+    // One lattice on the document's step — see the note on `DefaultGrid`.
+    expect(grid()!.querySelectorAll("pattern")).toHaveLength(1)
   })
 
   it("goes away and comes back as the state flips", () => {
@@ -193,5 +193,76 @@ describe("the canvas layer", () => {
     const container = host!.querySelector(".mocanvas") as HTMLElement
     // jsdom drops a redundant alpha, so both spellings mean the same red.
     expect(container.style.background).toMatch(/rgba?\(255, 0, 0/)
+  })
+})
+
+/**
+ * How the lattice answers the camera.
+ *
+ * Both directions were backwards, and both were reported from a canvas rather
+ * than found here: zooming IN made the grid vanish, because a fixed 1px dot
+ * every 80 screen pixels is a speck and not a lattice; and zooming OUT kept a
+ * second, heavier lattice at a fixed opacity, which is the grey sheen a
+ * zoomed-out board must not have.
+ */
+const dot = () => grid()!.querySelector("circle")!
+const cellOf = () => Number(grid()!.querySelector("pattern")!.getAttribute("width"))
+
+describe("the grid against the camera", () => {
+  it("keeps drawing as the camera zooms in — the dot grows with the cell", () => {
+    const e = mount()
+    const near = Number(dot().getAttribute("r"))
+    act(() => void e.setCamera({ x: 0, y: 0, z: 8 }))
+    expect(cellOf()).toBe(80)
+    expect(Number(dot().getAttribute("r")), "the dot stayed a speck while the cell grew").toBeGreaterThan(near)
+  })
+
+  it("caps the dot, so a deep zoom draws a lattice and not a field of blobs", () => {
+    const e = mount()
+    act(() => void e.setCamera({ x: 0, y: 0, z: 8 }))
+    expect(Number(dot().getAttribute("r"))).toBeLessThanOrEqual(5)
+  })
+
+  it("goes away entirely once the cells are denser than the eye can read", () => {
+    const e = mount()
+    // 10 document units at z = 0.4 is a dot every four pixels: a sheen.
+    act(() => void e.setCamera({ x: 0, y: 0, z: 0.4 }))
+    expect(grid(), "a canvas zoomed out should be blank, not grey").toBeNull()
+  })
+
+  it("fades rather than snapping off, on the way there", () => {
+    const e = mount()
+    act(() => void e.setCamera({ x: 0, y: 0, z: 0.8 }))
+    const faint = Number(grid()!.querySelector("rect")!.getAttribute("opacity"))
+    expect(faint).toBeGreaterThan(0)
+    expect(faint).toBeLessThan(1)
+  })
+
+  it("is drawn whole rather than clipped to a quarter by its own tile", () => {
+    const e = mount()
+    act(() => void e.setCamera({ x: 0, y: 0, z: 8 }))
+    const cell = cellOf()
+    const r = Number(dot().getAttribute("r"))
+    const cx = Number(dot().getAttribute("cx"))
+    const cy = Number(dot().getAttribute("cy"))
+    // Every edge of the dot inside the tile: at the corner, a pattern throws
+    // three quarters of it away.
+    expect(Math.min(cx - r, cy - r)).toBeGreaterThanOrEqual(0)
+    expect(Math.max(cx + r, cy + r)).toBeLessThanOrEqual(cell)
+  })
+
+  it("still lands its dots on the document's own step, so they stay magnets", () => {
+    const e = mount()
+    act(() => void e.setCamera({ x: 3, y: 7, z: 2 }))
+    const cell = cellOf()
+    const [tx, ty] = grid()!
+      .querySelector("pattern")!
+      .getAttribute("patternTransform")!
+      .match(/-?[\d.]+/g)!
+      .map(Number) as [number, number]
+    // A dot is drawn at the tile centre, so the tile is shifted back by half a
+    // cell: the dot then sits exactly where a page multiple of the step lands.
+    expect(tx + cell / 2).toBeCloseTo(3 * 2, 6)
+    expect(ty + cell / 2).toBeCloseTo(7 * 2, 6)
   })
 })

@@ -38,37 +38,70 @@ export function DefaultBackground() {
   return <div className="mocanvas-background" style={{ position: "absolute", inset: 0, background: "var(--mocanvas-canvas, transparent)" }} />
 }
 
+/** Clamp `v` into `[min, max]`. */
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v))
+}
+
 /**
- * The grid, drawn in page space with an SVG pattern.
+ * The rendered spacing at which the lattice is fully drawn, and the one below
+ * which it is gone, in screen pixels.
  *
- * Two patterns rather than one: a fine cell at the document's grid step and a
- * heavier one every fifth cell, so the eye can count without the fine grid
- * having to be dark enough to read on its own. Both fade out as the camera
- * zooms away, because a grid finer than a few screen pixels is noise.
+ * The eye judges a grid in pixels, not in document units, so both thresholds
+ * are pixel numbers: a cell under ~12px is dissolving and one under 6px is a
+ * grey sheen rather than information. An app that wants the grid to survive
+ * further out enlarges the cell — `documentSettings.gridSize`, which is the
+ * snap step, so the dots stay magnets at every zoom.
+ */
+const GRID_SOLID_PX = 12
+const GRID_GONE_PX = 6
+
+/** How much of the cell one dot is, and the range that stays legible. */
+const GRID_DOT_RATIO = 16
+const GRID_DOT_MIN = 0.75
+const GRID_DOT_MAX = 5
+
+/**
+ * The grid: one lattice of dots on the document's own grid step, drawn with an
+ * SVG pattern in page space.
+ *
+ * **The dot scales with the world, and the lattice fades as a whole.** Those
+ * are the two rules, and each fixes a direction the old grid got backwards. A
+ * fixed 1px dot vanishes as you zoom in — the cell grows to 80 screen pixels
+ * and what is left is a speck every 80px, which reads as no grid at all — so
+ * the radius is a fraction of the cell, floored and capped so it never
+ * disappears and never becomes a blob. And a second, heavier lattice every
+ * fifth cell at a fixed opacity is exactly the dense sheen a zoomed-out canvas
+ * must not have: one lattice, one opacity, gone below {@link GRID_GONE_PX}.
+ *
+ * **No re-levelling**, deliberately: the spacing is always the document's step
+ * rather than a power of it chosen per zoom. Dots are then magnets — a corner
+ * on a multiple of the step sits on a dot at *every* zoom — and re-levelling
+ * breaks that on the intermediate steps, which is worse than a grid that
+ * bows out when it gets too dense to mean anything.
  */
 export function DefaultGrid({ x, y, z, size }: TLGridProps) {
   const id = useSharedSafeId("grid")
-  const step = size * z
-  // Below a few pixels per cell the fine grid is aliasing, not information.
-  const fineOpacity = Math.min(1, Math.max(0, (step - 4) / 12))
-  // 0.7 and 0.9 rather than 0.5 and 0.8. At the old pair the grid measured
-  // 1.10:1 against a white canvas — below what an eye separates from the page,
-  // so "Show grid" looked like it had done nothing even once it was wired up.
-  // The theme's grid colour was darkened alongside these; both were needed.
-  const FINE = 0.7
-  const MAJOR = 0.9
+  // The cell as the screen sees it. Everything below is a function of this.
+  const cell = size * z
+  const opacity = clamp((cell - GRID_GONE_PX) / (GRID_SOLID_PX - GRID_GONE_PX), 0, 1)
+  // Nothing at all rather than a transparent layer: at this density the grid
+  // is not faint, it is wrong, and a host reading the DOM should see it gone.
+  if (opacity <= 0) return null
+  const r = clamp(cell / GRID_DOT_RATIO, GRID_DOT_MIN, GRID_DOT_MAX)
+  // The dot sits at the centre of the tile and the pattern is shifted back by
+  // half a cell, so the dot lands on the world lattice AND is never clipped.
+  // Drawn at the tile's corner — where it was — a pattern clips three quarters
+  // of it away, which at r = 5 is a quarter-disc rather than a dot.
+  const half = cell / 2
   return (
     <svg className="mocanvas-grid" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} aria-hidden="true">
       <defs>
-        <pattern id={id} width={step} height={step} patternUnits="userSpaceOnUse" patternTransform={`translate(${x * z} ${y * z})`}>
-          <circle cx={0} cy={0} r={1} fill="var(--mocanvas-grid, currentColor)" opacity={fineOpacity * FINE} />
-        </pattern>
-        <pattern id={`${id}_major`} width={step * 5} height={step * 5} patternUnits="userSpaceOnUse" patternTransform={`translate(${x * z} ${y * z})`}>
-          <circle cx={0} cy={0} r={1.5} fill="var(--mocanvas-grid, currentColor)" opacity={MAJOR} />
+        <pattern id={id} width={cell} height={cell} patternUnits="userSpaceOnUse" patternTransform={`translate(${x * z - half} ${y * z - half})`}>
+          <circle cx={half} cy={half} r={r} fill="var(--mocanvas-grid, currentColor)" />
         </pattern>
       </defs>
-      <rect width="100%" height="100%" fill={`url(#${id})`} />
-      <rect width="100%" height="100%" fill={`url(#${id}_major)`} />
+      <rect width="100%" height="100%" fill={`url(#${id})`} opacity={opacity} />
     </svg>
   )
 }
