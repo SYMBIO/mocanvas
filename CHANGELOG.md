@@ -1,5 +1,23 @@
 # Changelog
 
+## 4.4.3
+
+### "Show grid" drew no grid
+
+The menu item toggled `isGridMode`, the tick moved, snapping started working —
+and the canvas looked identical, because **nothing rendered a grid**.
+
+Both halves existed. `TLComponents.Grid` was documented in three paragraphs,
+down to why it is handed the camera rather than subscribing to it. `DefaultGrid`
+was written: two SVG patterns, a fine cell at the document's step and a heavier
+one every fifth, fading out as the camera zooms away so a grid finer than a few
+pixels does not become noise. `Canvas` rendered neither.
+
+So every unit test passed, because there was nothing wrong with the grid. It was
+never asked for. `Canvas` now renders the slot while grid mode is on, handing it
+the camera and `documentSettings.gridSize`; `components={{ Grid: MyGrid }}`
+replaces it and `{ Grid: null }` switches it off.
+
 ## 4.4.2
 
 ### A geo shape placed by a click was half the size it should be

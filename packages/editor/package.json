@@ -1,6 +1,6 @@
 {
   "name": "@mocanvas/editor",
-  "version": "4.4.2",
+  "version": "4.4.3",
   "description": "The mocanvas editor core: Editor, ShapeUtil, StateNode, geometry, bindings and the <Canvas /> renderer.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",
