@@ -87,6 +87,17 @@ export interface GeoTypeDefinition {
   onDoubleClick?(shape: { id: string; props: { geo: string; w: number; h: number } }): { w?: number; h?: number } | void
 }
 
+/**
+ * The box a click places a built-in silhouette at.
+ *
+ * A click is not a drag: there is no second point to size from, so the shape
+ * has to arrive at some size. This used to be whatever `GeoShapeUtil`'s own
+ * default props said (100×100) because nothing read `defaultSize` at all — it
+ * was declared on the interface, documented, populated by nobody and consulted
+ * by nobody.
+ */
+export const DEFAULT_GEO_CLICK_SIZE: { w: number; h: number } = Object.freeze({ w: 200, h: 200 })
+
 /** The built-in table: one entry per {@link GeoShapeKind}. */
 export const DEFAULT_GEO_TYPE_DEFINITIONS: Readonly<Record<GeoShapeKind, GeoTypeDefinition>> = Object.freeze(
   Object.fromEntries(
@@ -98,6 +109,13 @@ export const DEFAULT_GEO_TYPE_DEFINITIONS: Readonly<Record<GeoShapeKind, GeoType
         snapType: BLOBBY_KINDS.has(kind) ? "blobby" : "polygon",
         // The icon set names its geo icons after the kind itself.
         icon: `geo-${kind}`,
+        // One size for every silhouette, deliberately. The reference gives some
+        // kinds a shape of their own — a star nearer 200×190, a cloud nearer
+        // 300×180 — and we have no measured table for all twenty, so a uniform
+        // box is the honest answer rather than eighteen guesses around three
+        // known numbers. An app that wants per-kind sizes sets them through
+        // `customGeoTypes`, which overrides this table entry for entry.
+        defaultSize: DEFAULT_GEO_CLICK_SIZE,
       },
     ]),
   ) as Record<GeoShapeKind, GeoTypeDefinition>,

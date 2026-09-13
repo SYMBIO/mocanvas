@@ -7,6 +7,7 @@ import {
   type ShapeId,
   type StateNodeConstructor,
 } from "@mocanvas/editor"
+import { getGeoTypeDefinition, type GeoShapeOptions } from "../shapes"
 
 class Idle extends StateNode {
   static override id = "idle"
@@ -63,12 +64,18 @@ class Pointing extends StateNode {
     this.markId = editor.markHistoryStoppingPoint("create geo")
     const id = createShapeId()
     const { originPagePoint } = editor.inputs
+    // The silhouette's own click size, when it declares one. A drag resizes
+    // this immediately, so it only survives on a click — which is exactly the
+    // case `defaultSize` exists for, and which used to ignore it and hand back
+    // a hard-coded 100×100 whatever the definition said.
+    const util = editor.getShapeUtil("geo") as unknown as { options?: GeoShapeOptions }
+    const size = getGeoTypeDefinition(geo, util.options?.customGeoTypes)?.defaultSize
     editor.createShape({
       id,
       type: "geo",
       x: originPagePoint.x,
       y: originPagePoint.y,
-      props: { geo, w: 100, h: 100 },
+      props: { geo, w: size?.w ?? 100, h: size?.h ?? 100 },
     })
     editor.select(id)
     this.shapeId = id
