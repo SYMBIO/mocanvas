@@ -74,6 +74,26 @@ export function DefaultGrid({ x, y, z, size }: TLGridProps) {
 }
 
 /**
+ * Drawn in place of one shape whose body threw.
+ *
+ * At the shape's own position and size, because that is where the user is
+ * looking — and quiet, because a page of thirty broken shapes should not be
+ * thirty alarms. The point is that the other twenty-nine still work.
+ */
+export function DefaultShapeErrorFallback({ error }: { error: unknown }) {
+  const message = error instanceof Error ? error.message : String(error)
+  return (
+    <div
+      className="mocanvas-shape-error"
+      role="img"
+      aria-label={`This shape could not be drawn: ${message}`}
+      title={message}
+      style={{ position: "absolute", inset: 0, border: "1px dashed var(--mocanvas-selection, #e03131)", borderRadius: 2, opacity: 0.6, pointerEvents: "none" }}
+    />
+  )
+}
+
+/**
  * The document-level `<defs>`: the one place a shape can put a gradient,
  * filter or marker that every instance of it shares.
  *

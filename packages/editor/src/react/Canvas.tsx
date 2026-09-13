@@ -1,7 +1,8 @@
 import { react as reactSignal } from "@mocanvas/state"
 import { track, useValue } from "@mocanvas/state/react"
-import { DefaultGrid } from "./defaultEditorComponents"
+import { DefaultGrid, DefaultShapeErrorFallback } from "./defaultEditorComponents"
 import type { TLGridProps } from "./ui-types"
+import { DefaultErrorFallback, ErrorBoundary } from "./ErrorBoundary"
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import type { ClipRect } from "@mocanvas/wasm"
 import type { Editor } from "../editor/Editor"
@@ -128,7 +129,24 @@ function hasFrameWork(editor: Editor): boolean {
  * indicators, and an SVG layer for the selection handles, snap lines, the brush
  * — and for any util still on the deprecated `indicator()` hook.
  */
-export function Canvas({ editor, className, style, children, components, indicatorOverlayUtil }: CanvasProps) {
+export function Canvas(props: CanvasProps) {
+  // The editor-wide boundary, outside everything else so it catches a throw
+  // from any of it — including from the hooks the body runs. Its fallback is
+  // the `ErrorFallback` slot; `null` there means a host that shows its own
+  // error UI outside the canvas gets silence rather than two messages.
+  const components = useEditorComponents()
+  const Fallback = components.ErrorFallback === undefined ? DefaultErrorFallback : components.ErrorFallback
+  return (
+    <ErrorBoundary
+      fallback={(fallbackProps) => (Fallback ? <Fallback {...fallbackProps} /> : null)}
+      onError={(error) => console.error("mocanvas: the editor stopped", error)}
+    >
+      <CanvasBody {...props} />
+    </ErrorBoundary>
+  )
+}
+
+function CanvasBody({ editor, className, style, children, components, indicatorOverlayUtil }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [backend, setBackend] = useState<RenderBackend | null>(null)
@@ -449,8 +467,16 @@ const OverlayShape = track(function OverlayShape({
         pointerEvents: isEditing ? "auto" : "none",
       }}
     >
-      {util.component(shape)}
-      {util.getContentElement ? <ContentElementSlot editor={editor} shape={shape} /> : null}
+      {/*
+        One shape's body throwing costs that shape and nothing else. Without
+        this a `TypeError` in a custom `ShapeUtil.component` unmounts the whole
+        editor — the boundary class and both fallback slots were written for
+        exactly this and were mounted nowhere.
+      */}
+      <ShapeBoundary shape={shape}>
+        <ShapeBody editor={editor} shape={shape} />
+        {util.getContentElement ? <ContentElementSlot editor={editor} shape={shape} /> : null}
+      </ShapeBoundary>
     </div>
   )
   if (!clip) return el
@@ -704,3 +730,46 @@ const DefaultBrush = track(function DefaultBrush({ editor }: { editor: Editor })
 
 /** Re-render on a signal value; convenience re-export for shape components. */
 export { useValue }
+
+/**
+ * Calls `ShapeUtil.component` — from inside the boundary, which is the whole
+ * point of it being a component at all.
+ *
+ * `{util.component(shape)}` written inline in the parent reads as if it were
+ * inside the boundary and is not: the call runs while the parent renders its
+ * own children, before the boundary exists, so a `TypeError` in a custom
+ * `component` escaped past it and took the editor down. That is the exact
+ * failure the boundary was added for, and it survived the boundary landing.
+ *
+ * Tracked, because moving the call down a component also moved the reactive
+ * scope it runs in: a body that reads a signal was re-rendered by the overlay's
+ * own tracking before, and would otherwise now read once and freeze.
+ */
+const ShapeBody = track(function ShapeBody({ editor, shape }: { editor: Editor; shape: UnknownShape }) {
+  return <>{editor.getShapeUtil(shape).component(shape)}</>
+})
+
+/**
+ * The boundary around one shape's body.
+ *
+ * Its fallback comes from the `ShapeErrorFallback` slot, so a host can draw its
+ * own marker or `null` for nothing at all. No retry: a shape that threw once
+ * will throw again on the next render, and a boundary that remounted it would
+ * spin.
+ */
+function ShapeBoundary({ shape, children }: { shape: UnknownShape; children: ReactNode }) {
+  const components = useEditorComponents()
+  const Fallback = components.ShapeErrorFallback === undefined ? DefaultShapeErrorFallback : components.ShapeErrorFallback
+  return (
+    <ErrorBoundary
+      fallback={({ error }) => (Fallback ? <Fallback error={error} /> : null)}
+      onError={(error) => {
+        // Named, because "Cannot read properties of undefined" with no shape id
+        // is the hardest kind of report to act on.
+        console.error(`mocanvas: the "${shape.type}" shape ${shape.id} failed to render`, error)
+      }}
+    >
+      {children}
+    </ErrorBoundary>
+  )
+}
