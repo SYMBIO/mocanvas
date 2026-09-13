@@ -39,7 +39,7 @@ const LIGHT_SURFACE = {
   selectFill: "rgba(68, 101, 233, 0.10)",
   selectStroke: "#4465e9",
   hint: "#cc00cc",
-  grid: "#dfe2e5",
+  grid: "#b4bcc4",
 } as const
 
 /** The dark surface. `background` is the plate every dark ink is measured on. */
@@ -50,7 +50,7 @@ const DARK_SURFACE = {
   selectFill: "rgba(122, 151, 245, 0.14)",
   selectStroke: "#7a97f5",
   hint: "#ff66ff",
-  grid: "#2a2a2e",
+  grid: "#46464d",
 } as const
 
 // ---- the dark inks ---------------------------------------------------------

@@ -51,14 +51,20 @@ export function DefaultGrid({ x, y, z, size }: TLGridProps) {
   const step = size * z
   // Below a few pixels per cell the fine grid is aliasing, not information.
   const fineOpacity = Math.min(1, Math.max(0, (step - 4) / 12))
+  // 0.7 and 0.9 rather than 0.5 and 0.8. At the old pair the grid measured
+  // 1.10:1 against a white canvas — below what an eye separates from the page,
+  // so "Show grid" looked like it had done nothing even once it was wired up.
+  // The theme's grid colour was darkened alongside these; both were needed.
+  const FINE = 0.7
+  const MAJOR = 0.9
   return (
     <svg className="mocanvas-grid" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} aria-hidden="true">
       <defs>
         <pattern id={id} width={step} height={step} patternUnits="userSpaceOnUse" patternTransform={`translate(${x * z} ${y * z})`}>
-          <circle cx={0} cy={0} r={1} fill="var(--mocanvas-grid, currentColor)" opacity={fineOpacity * 0.5} />
+          <circle cx={0} cy={0} r={1} fill="var(--mocanvas-grid, currentColor)" opacity={fineOpacity * FINE} />
         </pattern>
         <pattern id={`${id}_major`} width={step * 5} height={step * 5} patternUnits="userSpaceOnUse" patternTransform={`translate(${x * z} ${y * z})`}>
-          <circle cx={0} cy={0} r={1.5} fill="var(--mocanvas-grid, currentColor)" opacity={0.8} />
+          <circle cx={0} cy={0} r={1.5} fill="var(--mocanvas-grid, currentColor)" opacity={MAJOR} />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill={`url(#${id})`} />

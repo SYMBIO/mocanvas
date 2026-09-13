@@ -131,7 +131,10 @@ export const InstanceRecordType = createRecordType<Instance>("instance", { scope
     isFocusMode: false,
     isDebugMode: false,
     isToolLocked: false,
-    isGridMode: false,
+    // On by default: a canvas is a drawing surface and the grid is how a
+    // person judges size and alignment on one. An app that wants a blank page
+    // sets it false on its instance record.
+    isGridMode: true,
     isReadonly: false,
     isFocused: false,
     isPenMode: false,

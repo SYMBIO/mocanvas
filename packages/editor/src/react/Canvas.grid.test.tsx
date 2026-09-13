@@ -86,30 +86,37 @@ function mount(components?: Parameters<typeof Canvas>[0]["components"]): Editor 
 const grid = () => host!.querySelector(".mocanvas-grid")
 
 describe("grid mode", () => {
-  it("draws nothing while it is off", () => {
+  it("is on by default, because a canvas is a drawing surface", () => {
     mount()
+    expect(grid()).not.toBeNull()
+  })
+
+  it("draws nothing once it is switched off", () => {
+    const e = mount()
+    act(() => void e.updateInstanceState({ isGridMode: false }))
     expect(grid()).toBeNull()
   })
 
   it("draws a grid once it is on", () => {
     const e = mount()
+    act(() => void e.updateInstanceState({ isGridMode: false }))
     act(() => void e.updateInstanceState({ isGridMode: true }))
     expect(grid(), "the slot rendered nothing — this is the bug it was written for").not.toBeNull()
     // A fine cell and a heavier fifth, so the eye can count.
     expect(grid()!.querySelectorAll("pattern")).toHaveLength(2)
   })
 
-  it("goes away again when it is switched off", () => {
+  it("goes away and comes back as the state flips", () => {
     const e = mount()
-    act(() => void e.updateInstanceState({ isGridMode: true }))
     expect(grid()).not.toBeNull()
     act(() => void e.updateInstanceState({ isGridMode: false }))
     expect(grid()).toBeNull()
+    act(() => void e.updateInstanceState({ isGridMode: true }))
+    expect(grid()).not.toBeNull()
   })
 
   it("takes its cell from the document's step and the camera's zoom", () => {
     const e = mount()
-    act(() => void e.updateInstanceState({ isGridMode: true }))
     const step = e.getDocumentSettings().gridSize
     expect(grid()!.querySelector("pattern")!.getAttribute("width")).toBe(String(step))
     act(() => void e.setCamera({ x: 0, y: 0, z: 2 }))
@@ -117,15 +124,13 @@ describe("grid mode", () => {
   })
 
   it("lets an app replace it", () => {
-    const e = mount({ Grid: () => <div data-testid="mine" /> })
-    act(() => void e.updateInstanceState({ isGridMode: true }))
+    mount({ Grid: () => <div data-testid="mine" /> })
     expect(host!.querySelector('[data-testid="mine"]')).not.toBeNull()
     expect(grid()).toBeNull()
   })
 
   it("lets an app switch it off entirely", () => {
-    const e = mount({ Grid: null })
-    act(() => void e.updateInstanceState({ isGridMode: true }))
+    mount({ Grid: null })
     expect(grid()).toBeNull()
   })
 })
