@@ -33,7 +33,11 @@ describe("the size a click places a geo shape at", () => {
   })
 
   it("may be omitted, and then the tool falls back rather than throwing", () => {
-    const sizeless = { ...DEFAULT_GEO_TYPE_DEFINITIONS.rectangle, id: "sizeless", defaultSize: undefined }
+    // Omitted, not set to `undefined`: under `exactOptionalPropertyTypes` those
+    // are different things, and an explicit `undefined` does not type-check
+    // against an optional property.
+    const { defaultSize: _omitted, ...rest } = DEFAULT_GEO_TYPE_DEFINITIONS.rectangle
+    const sizeless = { ...rest, id: "sizeless" }
     expect(getGeoTypeDefinition("sizeless", { sizeless })?.defaultSize).toBeUndefined()
   })
 })
