@@ -1,5 +1,29 @@
 # Changelog
 
+## 4.4.1
+
+### `rotateShapesBy` wraps the angle it stores
+
+It added the delta and stored whatever came out, so rotating a shape −45° left
+`-0.785…` where the wrapped angle is `5.497…`:
+
+```
+                after -45°     after a further +360°
+was             -0.785398…     5.497787…
+now              5.497787…     5.497787…
+```
+
+The same picture, a different number — and `rotation` is persisted and sent over
+the wire, so a diff, a parity check and a sync merge all see a difference that
+is not on screen. `canonicalizeRotation` was exported from this package the
+whole time; `rotateShapesBy` just never called it. The interactive rotate
+session had the same gap and is fixed with it, which also stops the angle
+growing without bound as a shape is turned round and round.
+
+`updateShapes` is deliberately **not** canonicalized: a caller passing an
+explicit `rotation` is stating a value rather than accumulating one, and
+rewriting it would silently change an angle an app chose on purpose.
+
 ## 4.4.0
 
 Four findings from a consumer's migration. The first one is the reason to
