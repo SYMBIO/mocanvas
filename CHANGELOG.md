@@ -1,5 +1,41 @@
 # Changelog
 
+## 4.5.1
+
+### The grid was still invisible, and this time it was painted over
+
+4.4.3 mounted the `Grid` slot. 4.5.0 darkened it and turned it on. Neither put
+a single dot on a screen, because the grid is a DOM layer **beneath** the GPU
+canvas and the renderer cleared every frame to an opaque near-white:
+
+```
+<div class="mocanvas">
+  <svg class="mocanvas-grid">   position:absolute, z-index:auto
+  <canvas>                      position:absolute, z-index:auto  ← paints over it
+```
+
+The clear colour was `[0.976, 0.98, 0.984, 1]` — **alpha 1** — so the grid was
+drawn and then covered, every frame. It had a node, the right patterns and the
+right colour, and measured zero pixels. That is precisely what a test asserting
+"the element is in the document" cannot see, which is why this shipped twice.
+
+The canvas now clears fully transparent and the page colour is painted by the
+container instead, where the layers beneath the canvas can sit on top of it.
+The `Background` slot was dead for the same reason and is now visible too.
+
+**Dark mode gets a dark page.** The colour comes from the theme, which carries
+one per colour mode and publishes it as `--mocanvas-background`. The old clear
+colour was a static light value painted in both modes, so an editor in dark
+mode drew its shapes on a near-white page. Nothing changes for an editor in
+light mode: `--mocanvas-background` is `#f9fafb`, the exact colour the clear
+used. The *default* colour scheme is still `"light"` rather than `"system"` —
+call `editor.theme.setColorScheme("system")` to follow the window.
+
+**`backgroundColor` is deprecated**, not removed. An app that set it keeps the
+colour it set, now painted on the container; it no longer describes anything
+the renderer does. Prefer the theme, or `style={{ background }}` on `<Canvas>`
+— either follows the colour mode, which a fixed RGBA cannot.
+
 ## 4.5.0
 
 One break, and two halves of the same repair: the boundaries that were supposed
