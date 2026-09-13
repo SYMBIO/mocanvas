@@ -10,7 +10,7 @@ import {
   type IndexKey,
 } from "@mocanvas/store"
 import { EngineBridge, FLAG, GEO_FLAG, type CameraState, type ClipRect, type FrameBuffers, type StyleWords } from "@mocanvas/wasm"
-import { Box, Mat, Vec, type BoxLike, type Geometry2d, type VecLike } from "../geometry"
+import { Box, Mat, Vec, canonicalizeRotation, type BoxLike, type Geometry2d, type VecLike } from "../geometry"
 import {
   CameraRecordType,
   DEFAULT_PAGE_ID,
@@ -2027,7 +2027,16 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this.updateShapes(updates)
   }
 
-  /** Rotate shapes by `delta` radians around the center of their common page bounds. */
+  /**
+   * Rotate shapes by `delta` radians around the center of their common page
+   * bounds.
+   *
+   * The resulting rotation is canonicalized into `[0, 2π)`. Without that, an
+   * angle that only ever accumulates leaves two documents that look identical
+   * carrying different numbers — and `rotation` is persisted and sent over the
+   * wire, so a diff, a parity check and a sync merge all see a difference that
+   * is not on screen.
+   */
   rotateShapesBy(ids: readonly ShapeId[], delta: number, center?: VecLike): this {
     const shapes = ids.map((id) => this.getShape<UnknownShape>(id)).filter((s): s is UnknownShape => !!s && !s.isLocked)
     if (shapes.length === 0) return this
@@ -2038,7 +2047,7 @@ export class Editor extends EventEmitter<EditorEvents> {
       const m = this.getShapePageTransform(shape)
       const newPagePos = Vec.RotWith(new Vec(m.e, m.f), c, delta)
       const parentPoint = this.getPointInParentSpace(shape, newPagePos)
-      updates.push({ id: shape.id, type: shape.type, x: parentPoint.x, y: parentPoint.y, rotation: shape.rotation + delta })
+      updates.push({ id: shape.id, type: shape.type, x: parentPoint.x, y: parentPoint.y, rotation: canonicalizeRotation(shape.rotation + delta) })
     }
     return this.updateShapes(updates)
   }

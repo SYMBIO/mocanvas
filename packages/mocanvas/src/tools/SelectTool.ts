@@ -1,5 +1,6 @@
 import {
   Box,
+  canonicalizeRotation,
   dropShapesOnFrameLike,
   getFrameLikeDropTarget,
   StateNode,
@@ -733,7 +734,12 @@ class Rotating extends StateNode {
     for (const i of this.initialShapes) {
       const newPagePos = Vec.RotWith(i.pagePos, this.center, delta)
       const parentPoint = editor.getPointInParentSpace(i.shape, newPagePos)
-      const next = { ...i.shape, x: parentPoint.x, y: parentPoint.y, rotation: i.shape.rotation + delta }
+      // Canonicalized for the same reason `Editor.rotateShapesBy` does it: the
+      // number is persisted and synced, and an angle that only accumulates
+      // makes two identical-looking documents compare unequal. Safe mid-drag —
+      // each frame recomputes from the rotation captured at drag start, so
+      // there is nothing to accumulate and nothing to jump.
+      const next = { ...i.shape, x: parentPoint.x, y: parentPoint.y, rotation: canonicalizeRotation(i.shape.rotation + delta) }
       const change = editor.getShapeUtil(i.shape).onRotate?.(i.shape, next)
       updates.push({ id: i.shape.id, type: i.shape.type, x: next.x, y: next.y, rotation: next.rotation, ...(change ?? {}) })
     }

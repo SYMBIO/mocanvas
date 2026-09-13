@@ -254,3 +254,72 @@ describe("where the first child of an empty parent goes", () => {
     }
   })
 })
+
+/**
+ * Rotation is a number two documents have to agree on.
+ *
+ * `rotateShapesBy` added the delta and stored whatever came out, so rotating
+ * −45° left `-0.785…` where a wrapped angle is `5.497…`. The same picture, a
+ * different number — and `rotation` is persisted and synced, so a diff, a
+ * parity check and a merge all see a difference that is not on screen.
+ */
+describe("the angle rotateShapesBy stores", () => {
+  const TAU = Math.PI * 2
+  const rotationOf = (editor: Editor, id: ShapeId) => editor.getShape(id)!.rotation
+
+  it("is wrapped into [0, 2π) when the delta is negative", () => {
+    const editor = makeEditor()
+    try {
+      const id = box(editor, 0, 0)
+      editor.rotateShapesBy([id], -Math.PI / 4)
+      expect(rotationOf(editor, id)).toBeCloseTo(TAU - Math.PI / 4, 12)
+      expect(rotationOf(editor, id)).toBeGreaterThanOrEqual(0)
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("does not grow without bound as a shape is turned round and round", () => {
+    const editor = makeEditor()
+    try {
+      const id = box(editor, 0, 0)
+      for (let i = 0; i < 12; i++) editor.rotateShapesBy([id], Math.PI / 2)
+      const r = rotationOf(editor, id)
+      expect(r).toBeGreaterThanOrEqual(0)
+      expect(r).toBeLessThan(TAU)
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("gives two editors the same number for the same visible rotation", () => {
+    // The property that matters: one reaches it in a single step, the other the
+    // long way round. A parity test compares the records, not the pictures.
+    const a = makeEditor()
+    const b = makeEditor()
+    try {
+      const ida = box(a, 0, 0)
+      const idb = box(b, 0, 0)
+      a.rotateShapesBy([ida], -Math.PI / 4)
+      b.rotateShapesBy([idb], -Math.PI / 4 + TAU * 3)
+      expect(rotationOf(a, ida)).toBeCloseTo(rotationOf(b, idb), 9)
+    } finally {
+      a.dispose()
+      b.dispose()
+    }
+  })
+
+  it("leaves an explicitly set rotation alone", () => {
+    // `updateShapes` is a caller stating a value, not accumulating one. It is
+    // deliberately not canonicalized — that would silently rewrite an angle an
+    // app chose on purpose.
+    const editor = makeEditor()
+    try {
+      const id = box(editor, 0, 0)
+      editor.updateShapes([{ id, type: "box", rotation: 100 * Math.PI }] as never)
+      expect(rotationOf(editor, id)).toBe(100 * Math.PI)
+    } finally {
+      editor.dispose()
+    }
+  })
+})
