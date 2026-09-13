@@ -226,7 +226,6 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape, ArrowShapeUtilDisplayV
       arrowheadEnd: "arrow",
       font: "draw",
       richText: toRichText(""),
-      text: "",
       labelPosition: 0.5,
       scale: 1,
     }

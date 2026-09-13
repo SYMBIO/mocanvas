@@ -200,9 +200,12 @@ export class TextShapeUtil extends ShapeUtil<TextShape, TextShapeUtilDisplayValu
       size: "m",
       font: "draw",
       textAlign: "start",
-      w: 100,
+      // A MINIMUM width, not a starting one: `getTextShapeBox` takes
+      // `max(measured, props.w)` while `autoSize` is on. At 100 a new text
+      // shape was a hundred pixels wide before a character was typed, which is
+      // the opposite of what auto-sizing means.
+      w: 8,
       richText: toRichText(""),
-      text: "",
       scale: 1,
       autoSize: true,
     }

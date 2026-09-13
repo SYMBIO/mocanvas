@@ -210,7 +210,9 @@ describe("GeoShapeUtil", () => {
       verticalAlign: "middle",
       growY: 0,
       url: "",
-      text: "",
+      // No `text`. It is the derived flattened label, optional on the record,
+      // and a v5 writer stores only `richText` — so writing it into every new
+      // shape put a field into documents that nothing downstream reads.
       scale: 1,
       flipX: false,
       flipY: false,

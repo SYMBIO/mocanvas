@@ -266,7 +266,6 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape, NoteShapeUtilDisplayValu
       growY: 0,
       url: "",
       richText: toRichText(""),
-      text: "",
       // Deliberately absent: `textFirstEditedBy` is read and round-tripped but
       // never written by mocanvas (only the host knows who "a person" is), and
       // defaulting it would make every file that predates attribution warn on

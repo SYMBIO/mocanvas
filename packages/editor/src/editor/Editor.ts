@@ -394,6 +394,40 @@ export function warnOnce(key: string, message: string): void {
  * The editor: document access, selection, camera, tool dispatch, and the
  * bridge that mirrors the current page into the WASM engine.
  */
+/**
+ * Catch a `shapeUtils` / `bindingUtils` that is not there at all.
+ *
+ * The constructor always assigns both, so `undefined` here means something
+ * replaced the property afterwards. The way that happens in practice is a
+ * SUBCLASS redeclaring the field:
+ *
+ * ```ts
+ * class MyEditor extends Editor {
+ *   readonly bindingUtils!: Record<string, BindingUtil>  // ← wipes the base's
+ * }
+ * ```
+ *
+ * Under `useDefineForClassFields` — the default at ES2022, which this package
+ * targets — a field declaration with no initializer is not a type annotation.
+ * It runs `Object.defineProperty(this, name, { value: undefined })` after the
+ * base constructor has finished, so the base's assignment is overwritten with
+ * nothing. Use `declare readonly bindingUtils: ...` to annotate without
+ * emitting a definition.
+ *
+ * Without this the failure is a `TypeError: Cannot read properties of undefined
+ * (reading '<your type name>')` pointing inside mocanvas, which reads like a
+ * missing util and is not.
+ */
+function assertUtilMapPresent(map: unknown, name: "shapeUtils" | "bindingUtils"): void {
+  if (map) return
+  throw new Error(
+    `editor.${name} is undefined, which the constructor never leaves it. ` +
+      `The usual cause is a subclass redeclaring \`${name}\` without an initializer: ` +
+      `at ES2022 that DEFINES the field as undefined after the base constructor ran. ` +
+      `Write \`declare readonly ${name}: ...\` instead, or drop the redeclaration.`,
+  )
+}
+
 export class Editor extends EventEmitter<EditorEvents> {
   readonly store: EditorStore
   readonly engine: EngineBridge
@@ -1080,6 +1114,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     shape: UnknownShape | string,
   ): T extends ShapeUtil ? T : T extends UnknownShape ? ShapeUtil<T> : never {
     const type = typeof shape === "string" ? shape : shape.type
+    assertUtilMapPresent(this.shapeUtils, "shapeUtils")
     const util = this.shapeUtils[type]
     if (!util) throw new Error(`No ShapeUtil registered for type "${type}"`)
     return util as T extends ShapeUtil ? T : T extends UnknownShape ? ShapeUtil<T> : never
@@ -1376,30 +1411,61 @@ export class Editor extends EventEmitter<EditorEvents> {
   getShapeAtPoint(point: VecLike, opts: HitTestOptions = {}): UnknownShape | undefined {
     this.flushEngine()
     const margin = (opts.margin ?? this.getHitTestMargin()) / this.getZoomLevel()
-    const bits = this.hitFilterBits(opts) | (opts.hitInside ? 0 : 4)
     const filter = this.hitFilter(opts)
-    if (!filter) {
-      const h = this.engine.hitTest(point.x, point.y, margin, bits)
+    // The engine already answers "the interior of a FILLED shape, or the
+    // outline of any shape", which is this method's default. Bit 4 is its
+    // `hollow_only` — *ignore fill* — and it used to be set whenever the caller
+    // had not asked for `hitInside`, which forced outline-only on everything
+    // and made a solid shape unselectable by its middle.
+    //
+    // `hitInside` asks for the opposite favour: count the interior of a HOLLOW
+    // shape too. The engine has no flag for that, so that case goes the
+    // geometry way, where `Geometry2d.hitTestPoint` handles both.
+    if (!filter && !opts.hitInside) {
+      const h = this.engine.hitTest(point.x, point.y, margin, this.hitFilterBits(opts))
       const id = this.handles.id(h)
       return id ? this.getShape<UnknownShape>(id as ShapeId) : undefined
     }
-    for (const shape of this.getShapesAtPoint(point, opts)) {
-      if (filter(shape)) return shape
-    }
-    return undefined
+    // Topmost first, and it applies `opts.filter` and `renderingOnly` itself —
+    // re-filtering here would only be a second chance to get it wrong.
+    return this.getShapesAtPoint(point, opts)[0]
   }
 
   /** Shapes under a point, topmost first. */
   getShapesAtPoint(point: VecLike, opts: HitTestOptions = {}): UnknownShape[] {
     this.flushEngine()
     const margin = (opts.margin ?? this.getHitTestMargin()) / this.getZoomLevel()
-    const handles = this.engine.queryBox(point.x - margin, point.y - margin, point.x + margin, point.y + margin, 0, this.hitFilterBits(opts))
     const filter = this.hitFilter(opts)
     const out: UnknownShape[] = []
-    for (let i = handles.length - 1; i >= 0; i--) {
-      const id = this.handles.id(handles[i]!)
-      const shape = id ? this.getShape<UnknownShape>(id as ShapeId) : undefined
-      if (!shape) continue
+    // Candidates, topmost first.
+    //
+    // Normally the engine's box query supplies them: shapes whose OUTLINE meets
+    // a box around the point. That is the right set for every case but
+    // `hitInside`, where a point in the middle of a large hollow shape is
+    // nowhere near any outline, the query returns nothing, and the interior the
+    // caller explicitly asked for is unreachable.
+    //
+    // For that one case the candidates are the shapes whose bounds contain the
+    // point. It is a scan of the page rather than a tree query, which is why it
+    // is not the default — but it is a superset of the outline set (an outline
+    // within `margin` of the point sits inside bounds that contain it), so the
+    // two never need merging, and `hitInside` is a deliberate, rare path.
+    let candidates: UnknownShape[]
+    if (opts.hitInside) {
+      // Sorted: `getCurrentPageShapes` is store order, not draw order, and the
+      // result of this method is documented topmost-first.
+      candidates = this.getCurrentPageShapesSorted().filter((s) => this.getShapePageBounds(s)?.containsPoint(point, margin))
+      candidates.reverse()
+    } else {
+      const handles = this.engine.queryBox(point.x - margin, point.y - margin, point.x + margin, point.y + margin, 0, this.hitFilterBits(opts))
+      candidates = []
+      for (let i = handles.length - 1; i >= 0; i--) {
+        const id = this.handles.id(handles[i]!)
+        const shape = id ? this.getShape<UnknownShape>(id as ShapeId) : undefined
+        if (shape) candidates.push(shape)
+      }
+    }
+    for (const shape of candidates) {
       if (filter && !filter(shape)) continue
       const local = this.getPointInShapeSpace(shape, point)
       const geo = this.getShapeGeometry(shape)
@@ -1611,6 +1677,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   getBindingUtil<B extends UnknownBinding>(binding: B | B["type"]): BindingUtil<B> {
     const type = typeof binding === "string" ? binding : binding.type
+    assertUtilMapPresent(this.bindingUtils, "bindingUtils")
     const util = this.bindingUtils[type]
     if (!util) throw new Error(`No BindingUtil registered for type "${type}"`)
     return util as BindingUtil<B>

@@ -9,6 +9,7 @@ import {
   getIndicesBelow,
   getIndicesBetween,
   isIndexKey,
+  setIndexJitterEnabled,
   sortByIndex,
   START_INDEX_KEY,
   validateIndexKey,
@@ -52,6 +53,8 @@ describe("fractional index keys", () => {
   })
 
   it("gives two 'first' keys that differ, because every generated key is jittered", () => {
+    setIndexJitterEnabled(true)
+    try {
     // This used to assert `getIndexAbove() === getIndexBelow()`, which encoded
     // the absence of jitter — the property that let two clients inserting in
     // the same gap mint the same key and lose one of the two records to the
@@ -63,6 +66,9 @@ describe("fractional index keys", () => {
     validateIndexKey(b)
     expect(a.startsWith("a0")).toBe(true)
     expect(b.startsWith("a0")).toBe(true)
+    } finally {
+      setIndexJitterEnabled(null)
+    }
   })
 
   it("throws when below >= above", () => {

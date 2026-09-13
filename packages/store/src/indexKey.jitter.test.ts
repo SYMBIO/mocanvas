@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import {
   ZERO_INDEX_KEY,
   getIndexAbove,
@@ -7,6 +7,7 @@ import {
   getIndicesAbove,
   getIndicesBetween,
   sortByIndex,
+  setIndexJitterEnabled,
   validateIndexKey,
   type IndexKey,
 } from "./indexKey"
@@ -22,6 +23,12 @@ import {
  */
 
 const k = (s: string) => s as IndexKey
+
+// Jitter is OFF under a test runner — that is the point of the switch, and a
+// consumer comparing two generated documents depends on it. A test OF the
+// jitter therefore has to ask for it back.
+beforeAll(() => setIndexJitterEnabled(true))
+afterAll(() => setIndexJitterEnabled(null))
 
 describe("concurrent inserts do not collide", () => {
   it("gives two clients different keys for the same gap", () => {

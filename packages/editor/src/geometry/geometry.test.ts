@@ -8,8 +8,21 @@ describe("geometry", () => {
     expect(r.toPathWords()).toEqual([PATH_OP.MOVE, 0, 0, PATH_OP.LINE, 10, 0, PATH_OP.LINE, 10, 5, PATH_OP.LINE, 0, 5, PATH_OP.CLOSE])
     expect(r.bounds).toEqual(new Box(0, 0, 10, 5))
     expect(r.hitTestPoint({ x: 5, y: 2 }, 0, true)).toBe(true)
-    expect(r.hitTestPoint({ x: 5, y: 2 }, 0, false)).toBe(false)
+    // Filled, so its middle answers WITHOUT the caller asking for `hitInside`.
+    // This line used to expect `false`, which is the bug it was written around:
+    // a solid shape could not be selected by clicking the middle of it.
+    expect(r.hitTestPoint({ x: 5, y: 2 }, 0, false)).toBe(true)
     expect(r.hitTestPoint({ x: 5, y: 0.5 }, 1, false)).toBe(true)
+  })
+
+  it("leaves a HOLLOW rectangle's middle alone unless asked", () => {
+    // The other half of the rule, and the reason it is a disjunction rather
+    // than "always hit the inside": an unfilled rectangle is a frame around
+    // empty space, and clicking that space should reach what is behind it.
+    const r = new Rectangle2d({ width: 10, height: 5, isFilled: false })
+    expect(r.hitTestPoint({ x: 5, y: 2 }, 0, false)).toBe(false)
+    expect(r.hitTestPoint({ x: 5, y: 2 }, 0, true)).toBe(true)
+    expect(r.hitTestPoint({ x: 5, y: 0.5 }, 1, false), "the outline still answers").toBe(true)
   })
 
   it("ellipse uses cubics and tight bounds", () => {

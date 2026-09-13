@@ -233,8 +233,26 @@ export abstract class Geometry2d {
     return d
   }
 
+  /**
+   * Whether `point` hits this geometry, within `margin`.
+   *
+   * The interior counts when the shape is **filled**, or when the caller asks
+   * for `hitInside` — the two are alternatives, not a requirement and a
+   * refinement. `hitInside` means "count the interior of a HOLLOW shape too",
+   * which is what a marquee or a drop target wants; it is not the only way the
+   * interior is ever reachable.
+   *
+   * This used to test `hitInside` alone, so a solid rectangle could not be
+   * selected by clicking its middle — only its outline answered. Nothing failed
+   * and nothing warned: every feature built on hit testing simply returned
+   * nothing, which reads as several unrelated bugs rather than one.
+   *
+   * An unfilled shape still misses in the middle. A hollow rectangle is a frame
+   * around empty space, and clicking the space inside it should reach whatever
+   * is behind.
+   */
   hitTestPoint(point: VecLike, margin = 0, hitInside = false, _filters?: Geometry2dFilters): boolean {
-    if (hitInside && this.isClosed && pointInPolygon(point, this.vertices)) return true
+    if ((hitInside || this.isFilled) && this.isClosed && pointInPolygon(point, this.vertices)) return true
     return Vec.Dist(point, this.nearestPoint(point)) <= margin
   }
 
@@ -465,7 +483,8 @@ export class TransformedGeometry2d extends Geometry2d {
   }
 
   override hitTestPoint(point: VecLike, margin = 0, hitInside = false, filters?: Geometry2dFilters): boolean {
-    if (hitInside && this.isClosed && pointInPolygon(point, this.vertices)) return true
+    // Same rule as the base: filled OR asked for. See `Geometry2d.hitTestPoint`.
+    if ((hitInside || this.isFilled) && this.isClosed && pointInPolygon(point, this.vertices)) return true
     return Vec.Dist(point, this.nearestPoint(point, filters)) <= margin
   }
 

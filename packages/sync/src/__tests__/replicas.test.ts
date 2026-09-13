@@ -28,6 +28,7 @@ import {
   type PageId,
   type StyleWords,
 } from "@mocanvas/editor"
+import { setIndexJitterEnabled } from "@mocanvas/store"
 import { createSyncClient, type SyncClient } from "../SyncClient"
 import { createMemoryHub } from "../transport"
 
@@ -139,6 +140,10 @@ describe("two replicas of one document", () => {
   })
 
   it("keeps both shapes when two tabs draw at the same moment", async () => {
+    // Jitter is off under a test runner so a consumer can compare generated
+    // documents; the thing under test here IS the jitter, so ask for it back.
+    setIndexJitterEnabled(true)
+    try {
     // The bug this pins: index keys were a pure function of their neighbours,
     // so two replicas adding a shape to the same empty page minted the SAME
     // key. `index` is one register to the merge, so one of the two positions
@@ -156,6 +161,9 @@ describe("two replicas of one document", () => {
     expect(a.getCurrentPageShapes(), "both shapes survived the merge").toHaveLength(2)
     expect(new Set(indices).size, `both claimed one position: ${indices.join(", ")}`).toBe(2)
     expect(b.getCurrentPageShapes()).toHaveLength(2)
+    } finally {
+      setIndexJitterEnabled(null)
+    }
   })
 
   it("shows each tab the shapes drawn in the other, on the page it is looking at", async () => {

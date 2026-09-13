@@ -8,7 +8,7 @@ import { Rectangle2d } from "../../geometry"
 import type { BaseShape, ShapeId } from "../../records/base"
 import { BaseBoxShapeUtil } from "../../shapes/ShapeUtil"
 import { DOCUMENT_ID, DEFAULT_PAGE_ID } from "../../records/base"
-import { ZERO_INDEX_KEY, getIndexAbove } from "@mocanvas/store"
+import { ZERO_INDEX_KEY, getIndexAbove, setIndexJitterEnabled } from "@mocanvas/store"
 
 /**
  * Gaps measured against a real consumer, each of which was a member that
@@ -239,6 +239,8 @@ describe("where the first child of an empty parent goes", () => {
   it("gives two editors different indices for their first shape, so a merge keeps both", () => {
     // The jitter, seen from the editor: two peers each adding one shape to an
     // empty page no longer claim the same position.
+    // Off under a test runner by design; this is the test OF it.
+    setIndexJitterEnabled(true)
     const one = makeEditor()
     const two = makeEditor()
     try {
@@ -248,6 +250,7 @@ describe("where the first child of an empty parent goes", () => {
     } finally {
       one.dispose()
       two.dispose()
+      setIndexJitterEnabled(null)
     }
   })
 })

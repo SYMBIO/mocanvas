@@ -266,7 +266,6 @@ export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
       growY: 0,
       url: "",
       richText: toRichText(""),
-      text: "",
       scale: 1,
       flipX: false,
       flipY: false,

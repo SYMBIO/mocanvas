@@ -33,6 +33,61 @@ function assertOrdered(below: IndexKey | undefined, above: IndexKey | undefined)
 const JITTER_DIGITS = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 const JITTER_LENGTH = 6
 
+/**
+ * Whether generated keys carry jitter. `null` means "work it out".
+ *
+ * Jitter is what makes concurrent insertion safe, and it also makes every
+ * generated key unpredictable — which is exactly wrong for a test that compares
+ * two records, or replays an operation through two implementations and asserts
+ * they agree. A consumer without a way to turn it off has to weaken those tests
+ * until they stop checking `index` at all, losing the assertion they were
+ * written for.
+ *
+ * So it is off under test by default, and forceable either way.
+ */
+let jitterOverride: boolean | null = null
+
+/** Read an env var without assuming there is a `process`; there is not, in a browser. */
+function env(name: string): string | undefined {
+  const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
+  return proc?.env?.[name]
+}
+
+/**
+ * Whether jitter is on right now.
+ *
+ * Resolution order: an explicit {@link setIndexJitterEnabled} wins; then
+ * `MOCANVAS_INDEX_JITTER`, which is how you force it in a runner that does not
+ * set `NODE_ENV` or in one that sets it to `test` when you did not want that;
+ * then `NODE_ENV === "test"` turns it off. Otherwise on.
+ */
+export function isIndexJitterEnabled(): boolean {
+  if (jitterOverride !== null) return jitterOverride
+  const forced = env("MOCANVAS_INDEX_JITTER")
+  if (forced !== undefined) return !(forced === "0" || forced === "false" || forced === "off")
+  return env("NODE_ENV") !== "test"
+}
+
+/**
+ * Turn jitter on or off for the rest of this process; `null` restores the
+ * default resolution above.
+ *
+ * Tests of the jitter *itself* have to force it on — under a test runner it is
+ * off, which is the whole point — so they call this and restore afterwards.
+ *
+ * ```ts
+ * beforeAll(() => setIndexJitterEnabled(true))
+ * afterAll(() => setIndexJitterEnabled(null))
+ * ```
+ *
+ * Process-wide rather than per-call because the helpers are free functions
+ * reached from everywhere, including inside `Editor`; threading an option
+ * through every call site would leave the ones that matter untouched.
+ */
+export function setIndexJitterEnabled(enabled: boolean | null): void {
+  jitterOverride = enabled
+}
+
 function randomJitterChar(maxExclusive?: string): string {
   // When `key` is a prefix of `above`, the first jittered character has to be
   // strictly below the character `above` continues with, or the jittered key
@@ -51,6 +106,7 @@ function randomJitterChar(maxExclusive?: string): string {
  * collision it replaces.
  */
 function withJitter(key: string, above: string | undefined): IndexKey {
+  if (!isIndexJitterEnabled()) return key as IndexKey
   // `key` already sorts below `above`. If they differ *inside* `key` then any
   // suffix keeps that difference, and only the prefix case needs a bound.
   const bounded = above !== undefined && above.startsWith(key)
