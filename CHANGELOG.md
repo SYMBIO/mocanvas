@@ -1,5 +1,76 @@
 # Changelog
 
+## 4.5.0
+
+One break, and two halves of the same repair: the boundaries that were supposed
+to keep a broken shape from taking the editor down existed and caught nothing.
+
+### Breaking: the grid is on by default
+
+`isGridMode` starts `true`. The grid is how a person judges size and alignment
+on a drawing surface, and starting blank made the feature invisible to anyone
+who never opened the menu. An app that wants a blank page sets it back:
+
+```ts
+editor.updateInstanceState({ isGridMode: false })
+```
+
+**This change is silent** — nothing in your build will complain, the canvas just
+comes up with a grid on it. It is visual only: `isGridMode` already drove
+snapping, and that behaviour is unchanged.
+
+The grid also had to be *visible* to be worth defaulting on. The dots were drawn
+at 0.5 and 0.8 opacity over a `#dfe2e5` grid colour, which measures 1.10:1
+against a white canvas — below what an eye separates from the page, so switching
+the grid on looked like it had done nothing even after 4.4.3 wired it up. The
+colour and the opacities both moved; either alone still read as a blank canvas.
+`--mocanvas-grid` overrides the colour as before.
+
+### One broken shape took the whole editor down
+
+`ErrorBoundary` was written, exported, and **mounted nowhere**. `ErrorFallback`
+and `ShapeErrorFallback` were documented slots nothing rendered. `Canvas`'s own
+docstring described the arrangement — each shape body in a boundary, the editor
+as a whole in another — and described something that did not exist, so a
+`TypeError` in one custom `ShapeUtil.component` unmounted the editor and usually
+the page with it.
+
+Mounting the boundaries was not enough, and this is the part worth reading if
+you maintain something similar. Written inline:
+
+```tsx
+<ShapeBoundary shape={shape}>
+  {util.component(shape)}
+</ShapeBoundary>
+```
+
+the call runs while the *parent* renders its children — before the boundary
+exists — so the throw still went straight past it. It reads as if it were
+inside. The call now happens in a component of its own, which is the only thing
+that puts it inside the boundary's subtree; that component is tracked, since
+moving the call also moved the reactive scope a shape body reads its signals in.
+
+A shape that throws now leaves a dashed marker at its own bounds and logs the
+type and id — `mocanvas: the "box" shape shape:… failed to render` — because
+"Cannot read properties of undefined" with no shape id is the hardest kind of
+report to act on. The rest of the page keeps working. There is no retry: a shape
+that threw once throws again on the next render, and a boundary that remounted
+it would spin.
+
+### Either error fallback can come from the `components` prop
+
+`ErrorFallback` and `ShapeErrorFallback` were provider-only while every other
+slot on `<Canvas components={…}>` was prop-only — the same names resolved from
+two different places depending on which boundary you meant. Nothing said so, and
+the prop's own type invites it, so a host that wrote
+`components={{ ErrorFallback }}` got the built-in screen and no indication why.
+
+The cause was structural: the editor-wide boundary sits above the body the prop
+is passed to, and the per-shape one three components below it, so neither could
+read the prop at all. Both now resolve prop first, then the provider, then the
+built-in, with `null` at either level read as an answer — render nothing — rather
+than as a miss to fall through. Provider-only configuration is unaffected.
+
 ## 4.4.3
 
 ### "Show grid" drew no grid
