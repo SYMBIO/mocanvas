@@ -1,5 +1,103 @@
 # Changelog
 
+## 4.8.0
+
+Four parity breaks against tldraw 5.1.1, all measured A/B by a consumer rather
+than found here — which is the point worth noting about all four: the types
+were silent, our own tests passed, and each one was internally consistent. They
+only disagree with the reference, and a consumer moving across hits them as
+behaviour that looks like a bug in their own code.
+
+### Breaking: an operation notifies its listeners once, not once per write
+
+`store.listen` was called after every write inside a batch, so a listener saw
+every intermediate state the operation passed through:
+
+```
+editor.run(() => { update(y: 100); update(y: 200) })
+
+was:  2 notifications — y=[100, 0], then y=[100, 200]   ← the middle never existed
+now:  1 notification  — y=[100, 200]
+```
+
+A batch that reports its own intermediate states is not a batch. This is not
+cosmetic for the two things people actually put on a listener: a sync binding
+published each half-applied step to its peers, so a peer rendered a state that
+was never intended here; and a save-on-change handler wrote the document once
+per *step* instead of once per gesture. It also broke sequencing — a listener
+watching for a shape had already run by the time the same operation added that
+shape's binding, so anything reading both in one notification found only one.
+
+Entries are squashed per consecutive run of the same source, so a remote merge
+nested inside a user gesture stays separate and in order; a listener filtered
+to one source is never handed the other's changes.
+
+**If you relied on per-write notifications**, take the same information from a
+side effect: `registerAfterChangeHandler` still runs per record.
+
+### Breaking: `deleted-shapes` fires before the before-delete handlers
+
+```
+was:  beforeDelete(frame) → beforeDelete(kid) → EVENT
+now:  EVENT → beforeDelete(frame) → beforeDelete(kid)
+```
+
+The before-delete handler is the only place a delete can be refused, and
+whether a shape's own parent is going in the same gesture is the one thing it
+cannot work out for itself — that is what the event carries. Announcing the set
+afterwards told the handler what it needed once the decision was already made,
+so a child vetoing on its parent's behalf vetoed nothing: the parent survived
+and its children did not.
+
+Two things the old order bought are now gone, and both are worth checking for:
+a listener reads the editor with the shapes **still in it** (read the document
+without them in an `after-delete` handler instead), and the emit is inside the
+gesture, so a listener that throws takes the deletion with it.
+
+### Breaking: a write inside `operationComplete` completes too
+
+An `operationComplete` handler that wrote got an `afterChange` for its write
+but no second `operationComplete`. That silently breaks the pattern these
+handlers are written against — "set a guard on my own write, clear it in the
+completion that closes that write" — because the guard is never cleared, and
+the *next* real gesture is the one it eats. A consumer spent a day on seventeen
+failing tests that looked like a geometry bug.
+
+Handlers now re-run for what they themselves wrote, until a round writes
+nothing. Bounded at 100 rounds, after which the store gives up loudly rather
+than freezing the tab: a handler that writes every time it runs would otherwise
+never settle. The whole cascade is still **one** operation to the outside — one
+history entry, one listener notification.
+
+### Breaking: a note's `growY` is stored unscaled
+
+`growY` is how much taller than its square a note had to become for its text to
+fit. It was stored already multiplied by `scale`:
+
+```
+was:  height = 200 * scale + growY
+now:  height = (200 + growY) * scale
+```
+
+Both are self-consistent — they agree whenever `scale` is 1 or `growY` is 0 —
+and every note this codebase grew itself was correct, which is why no test here
+ever failed. What they disagree about is every note that arrives from outside:
+a `.tldr` file, or an app writing records directly, where the prop has always
+meant the unscaled thing. Such a note came out `growY * (scale - 1)` too short,
+so at scale 1.6 it lost 37.5% of its overflow and the text ran past the paper.
+`.tldr` export was wrong in the same way, in the other direction.
+
+**Existing documents migrate**: note props gain version 2, which divides the
+stored `growY` by the scale it was measured at. A record with a missing or
+zero `scale` is left alone rather than migrated to `Infinity`.
+
+### Not changed: the grid still starts on
+
+`isGridMode` defaults to `true` here and `false` in the reference. That is the
+deliberate change 4.5.0 made and the reason is in that entry; it stays. An app
+that wants the reference's resting state should set it rather than inherit it —
+a library default is the wrong thing to be load-bearing in either direction.
+
 ## 4.7.1
 
 ### Submenus open beside their row, not underneath it
