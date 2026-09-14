@@ -721,3 +721,64 @@ describe("an operation, as the outside sees it", () => {
     spy.mockRestore()
   })
 })
+
+/**
+ * Which operation a completion belongs to, and what it is told about it.
+ *
+ * Both of these are older than the batching work and neither was noticed by a
+ * test here, because both need an operation whose *inside* disagrees with its
+ * outside — a remote merge nested in something else.
+ */
+describe("an operation's completion", () => {
+  it("reports the source the changes were made with, not the one the operation opened with", () => {
+    const store = makeStore()
+    store.put([herbert])
+    const log: string[] = []
+    store.sideEffects.registerAfterChangeHandler("author", (_p, _n, source) => log.push(`afterChange:${source}`))
+    store.sideEffects.registerOperationCompleteHandler((source) => log.push(`opComplete:${source}`))
+    store.extractingChanges(() => {
+      store.mergeRemoteChanges(() => store.update(herbert.id, (a) => ({ ...a, name: "from a peer" })))
+    })
+    // Reported `user` before, so a handler that skips remote echoes — which is
+    // what a sync layer puts here — treated a peer's write as this user's own
+    // and sent it back out.
+    expect(log).toEqual(["afterChange:remote", "opComplete:remote"])
+  })
+
+  it("keeps the outer source when the operation carried both", () => {
+    const store = makeStore()
+    store.put([herbert])
+    const sources: string[] = []
+    store.sideEffects.registerOperationCompleteHandler((source) => sources.push(source))
+    store.atomic(() => {
+      store.update(herbert.id, (a) => ({ ...a, name: "mine" }))
+      store.mergeRemoteChanges(() => store.put([dune]))
+    })
+    // The user half is real work; labelling the whole thing `remote` would
+    // have a handler skip it.
+    expect(sources).toEqual(["user"])
+  })
+
+  it("still runs when something drained the pending entries mid-operation", () => {
+    const store = makeStore()
+    store.put([herbert])
+    let completed = 0
+    store.sideEffects.registerOperationCompleteHandler(() => completed++)
+    store.atomic(() => {
+      store.update(herbert.id, (a) => ({ ...a, name: "written" }))
+      // Whatever takes the entries — this is the shape a consumer hit — the
+      // writes still happened, so the completion is still owed.
+      ;(store as unknown as { flushHistory(): void }).flushHistory()
+    })
+    expect(completed, "the completion vanished along with the entries").toBe(1)
+    expect(store.get(herbert.id)!.name).toBe("written")
+  })
+
+  it("does not run for an operation that wrote nothing", () => {
+    const store = makeStore()
+    let completed = 0
+    store.sideEffects.registerOperationCompleteHandler(() => completed++)
+    store.atomic(() => {})
+    expect(completed).toBe(0)
+  })
+})

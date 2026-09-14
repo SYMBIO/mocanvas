@@ -855,8 +855,19 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   // ---- batching / history ------------------------------------------------
 
+  /**
+   * Run `fn` as one operation: one history entry, and one notification to the
+   * store's listeners however many writes it makes.
+   *
+   * It has to open an operation on the *store*, not just a signal transaction.
+   * A `transact` alone batches recomputation and nothing else, so every write
+   * inside still opened and closed an operation of its own — two
+   * `updateShapes` calls in one `run` reached a listener as two notifications,
+   * the first of them carrying a half-applied state that was never an intended
+   * state of the document. A sync binding published that state to its peers.
+   */
   run<T>(fn: () => T, opts: { history?: "record" | "ignore" | "record-preserveRedoStack" } = {}): T {
-    return transact(() => {
+    return this.store.atomic(() => {
       if (opts.history === "ignore") return this.history.ignore(fn)
       return fn()
     })

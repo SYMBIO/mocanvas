@@ -347,3 +347,52 @@ describe("the angle rotateShapesBy stores", () => {
     }
   })
 })
+
+/**
+ * `editor.run` is documented as running its callback as one operation, and for
+ * the store it was not one at all: it opened a signal transaction, which
+ * batches recomputation, while every write inside still opened and closed an
+ * operation of its own. Two calls in one `run` therefore reached a listener as
+ * two notifications, the first carrying a state the document was only ever
+ * halfway through.
+ */
+describe("editor.run, as the store sees it", () => {
+  it("notifies a store listener once for the whole callback", () => {
+    const editor = makeEditor()
+    try {
+      const a = box(editor, 0, 0)
+      const b = box(editor, 50, 0)
+      const batches: number[] = []
+      editor.store.listen(() => batches.push(1), { scope: "document", source: "all" })
+      editor.run(() => {
+        editor.updateShapes([{ id: a, type: "geo", y: 100 }] as never)
+        editor.updateShapes([{ id: b, type: "geo", y: 200 }] as never)
+      })
+      expect(batches).toHaveLength(1)
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("publishes no half-applied state on the way", () => {
+    const editor = makeEditor()
+    try {
+      const a = box(editor, 0, 0)
+      const b = box(editor, 50, 0)
+      const seen: { a: number; b: number }[] = []
+      editor.store.listen(() => seen.push({ a: editor.getShape(a)!.y, b: editor.getShape(b)!.y }), {
+        scope: "document",
+        source: "all",
+      })
+      editor.run(() => {
+        editor.updateShapes([{ id: a, type: "geo", y: 100 }] as never)
+        editor.updateShapes([{ id: b, type: "geo", y: 200 }] as never)
+      })
+      // The intermediate — a moved, b not yet — was never an intended state of
+      // this document, and a sync binding on this listener published it.
+      expect(seen).toEqual([{ a: 100, b: 200 }])
+    } finally {
+      editor.dispose()
+    }
+  })
+})

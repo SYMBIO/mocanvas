@@ -920,13 +920,17 @@ export class Store<R extends UnknownRecord = UnknownRecord, Props = unknown> {
     const source = this.source
     const runCallbacks = this.runCallbacks
     this.depth++
+    // Taken before the operation runs, so completion can ask "did this write
+    // anything" without depending on the pending entries still being there —
+    // see `completeOperation`.
+    const changesAtStart = this.changeCount
     try {
       return transact(() => unsafe__withoutCapture(fn))
     } finally {
       this.depth--
       if (this.depth === 0) {
         try {
-          this.completeOperation(source, runCallbacks)
+          this.completeOperation(source, runCallbacks, changesAtStart)
         } finally {
           this.source = prevSource
           this.runCallbacks = prevRunCallbacks
@@ -1165,15 +1169,27 @@ export class Store<R extends UnknownRecord = UnknownRecord, Props = unknown> {
     for (const diff of this.extractStack) applyChangeToDiff(diff, id, before, after)
   }
 
-  private completeOperation(source: ChangeSource, runCallbacks: boolean) {
-    if (!this.pendingEntries.some((e) => !isRecordsDiffEmpty(e.changes))) {
+  private completeOperation(source: ChangeSource, runCallbacks: boolean, changesAtStart: number) {
+    // "Did this operation write anything" is a question about the store, not
+    // about whether the pending entries are still sitting there — anything
+    // that drains them mid-operation used to make the completion vanish
+    // silently, handlers and all, while the writes themselves had happened.
+    if (this.changeCount === changesAtStart) {
       this.pendingEntries = []
       return
     }
+    // The source the changes were actually made with, which is not always the
+    // one the operation opened with: a remote merge nested inside an
+    // outer operation wrote as `remote` and completed as `user`, so a handler
+    // branching on it treated a peer's changes as this user's own. Reported
+    // only when the operation is of one mind; a mixed one keeps the outer
+    // source, because the user half is real work and must not be skipped.
+    const written = new Set(this.pendingEntries.filter((e) => !isRecordsDiffEmpty(e.changes)).map((e) => e.source))
+    const reported = written.size === 1 ? ([...written][0] as ChangeSource) : source
     if (runCallbacks && this.sideEffects.isEnabled() && !this.inOperationComplete) {
       this.inOperationComplete = true
       const prevSource = this.source
-      this.source = source
+      this.source = reported
       // Writes made by a handler belong to this operation — `depth` stays
       // above zero so they do not try to complete themselves — but they still
       // have to *reach* a completion of their own. See the loop below.
@@ -1182,7 +1198,7 @@ export class Store<R extends UnknownRecord = UnknownRecord, Props = unknown> {
         let round = 0
         for (;;) {
           const before = this.changeCount
-          transact(() => unsafe__withoutCapture(() => this.sideEffects.handleOperationComplete(source)))
+          transact(() => unsafe__withoutCapture(() => this.sideEffects.handleOperationComplete(reported)))
           if (this.changeCount === before) break
           if (++round >= MAX_OPERATION_COMPLETE_ROUNDS) {
             // Stopping is the lesser evil: a handler that writes on every
@@ -1200,6 +1216,12 @@ export class Store<R extends UnknownRecord = UnknownRecord, Props = unknown> {
         this.source = prevSource
         this.inOperationComplete = false
       }
+    }
+    if (!this.pendingEntries.some((e) => !isRecordsDiffEmpty(e.changes))) {
+      // Wrote and cancelled itself out, or somebody took the entries. Either
+      // way there is no diff to put in the history.
+      this.pendingEntries = []
+      return
     }
     this.pendingHistoryDiff = this.squashPendingEntries()
     try {
