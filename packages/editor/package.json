@@ -1,6 +1,6 @@
 {
   "name": "@mocanvas/editor",
-  "version": "4.8.3",
+  "version": "4.8.4",
   "description": "The mocanvas editor core: Editor, ShapeUtil, StateNode, geometry, bindings and the <Canvas /> renderer.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",
@@ -32,12 +32,16 @@
     "dist",
     "README.md",
     "LICENSE",
+    "AGENTS.md",
     "ARCHITECTURE.md",
     "BENCHMARK.md",
     "CLEAN_ROOM.md",
     "COMPAT.md",
     "CUSTOM_SHAPES.md",
+    "FILES.md",
     "MIGRATION.md",
+    "SYNC.md",
+    "TOOLS.md",
     "UI.md"
   ],
   "sideEffects": false,
@@ -63,7 +67,7 @@
     "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepack": "node ../../scripts/bundle-docs.mjs ARCHITECTURE.md BENCHMARK.md CLEAN_ROOM.md COMPAT.md CUSTOM_SHAPES.md MIGRATION.md UI.md && pnpm run build"
+    "prepack": "node ../../scripts/bundle-docs.mjs AGENTS.md ARCHITECTURE.md BENCHMARK.md CLEAN_ROOM.md COMPAT.md CUSTOM_SHAPES.md FILES.md MIGRATION.md SYNC.md TOOLS.md UI.md && pnpm run build"
   },
   "dependencies": {
     "@mocanvas/state": "workspace:*",

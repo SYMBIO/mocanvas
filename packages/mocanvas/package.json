@@ -1,6 +1,6 @@
 {
   "name": "@mocanvas/mocanvas",
-  "version": "4.8.3",
+  "version": "4.8.4",
   "description": "An infinite-canvas SDK for the web: React component, default shapes, tools and UI, on a Rust/WebAssembly engine.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",
@@ -36,12 +36,16 @@
     "dist",
     "README.md",
     "LICENSE",
+    "AGENTS.md",
     "ARCHITECTURE.md",
     "BENCHMARK.md",
     "CLEAN_ROOM.md",
     "COMPAT.md",
     "CUSTOM_SHAPES.md",
+    "FILES.md",
     "MIGRATION.md",
+    "SYNC.md",
+    "TOOLS.md",
     "UI.md"
   ],
   "sideEffects": [
@@ -79,7 +83,7 @@
     "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepack": "node ../../scripts/bundle-docs.mjs ARCHITECTURE.md BENCHMARK.md CLEAN_ROOM.md COMPAT.md CUSTOM_SHAPES.md MIGRATION.md UI.md && pnpm run build"
+    "prepack": "node ../../scripts/bundle-docs.mjs AGENTS.md ARCHITECTURE.md BENCHMARK.md CLEAN_ROOM.md COMPAT.md CUSTOM_SHAPES.md FILES.md MIGRATION.md SYNC.md TOOLS.md UI.md && pnpm run build"
   },
   "dependencies": {
     "@mocanvas/editor": "workspace:*",

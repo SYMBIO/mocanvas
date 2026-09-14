@@ -1,5 +1,28 @@
 # Changelog
 
+## 4.8.4
+
+### Four new guides ship with the package
+
+`AGENTS.md`, `TOOLS.md`, `SYNC.md` and `FILES.md` — about 1,700 lines between
+them, in the tarball and on the website, which renders `/docs/<slug>` out of
+`node_modules` so both read the same text at the same version.
+
+- **Driving the editor from an agent.** The claim the library is sold on, set
+  out precisely: a document with no browser, one API a person and a program
+  both call, reading the document back, and what `history: "ignore"` does and
+  does not promise.
+- **Writing a tool.** `StateNode` as a state machine rather than a click
+  handler: what the states are for, what each hook is handed, and which parts
+  only look load-bearing.
+- **Multiplayer.** The transport, presence, and exactly what converges when two
+  edits race — stated as the merge code supports it, with the non-guarantees
+  named rather than glossed.
+- **Saving and exporting.** Snapshots, `.tldr`, what migrations do when an old
+  file meets a new build, and image export.
+
+Nothing in the library changed.
+
 ## 4.8.3
 
 ### Every package now says where it comes from

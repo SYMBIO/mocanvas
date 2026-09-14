@@ -2,10 +2,11 @@
  * Copy the guides a package needs into the package, so its npm tarball carries
  * them.
  *
- * The repository is private. A published README that links to it sends every
- * reader to a 404, and until there is a website there is nowhere else to point —
- * so the documentation has to travel inside the package instead of being
- * referenced from it.
+ * The guides travel inside the package rather than being linked from it. That
+ * started because the repository was private, and it stays for a better reason:
+ * the website renders `/docs/<slug>` out of `node_modules`, so a reader on the
+ * site and a reader with the tarball see the same text at the same version,
+ * and there is exactly one edited copy — the one under `docs/`.
  *
  * Run from a package directory, at `prepack`:
  *
