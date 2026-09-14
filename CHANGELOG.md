@@ -1,5 +1,65 @@
 # Changelog
 
+## 4.8.1
+
+Three follow-ups to 4.8.0, all from the same consumer re-measuring it. The
+first is a gap in 4.8.0's own fix; the other two are older than it.
+
+### `editor.run` really is one operation now
+
+4.8.0 made the *store* notify once per operation, and missed that `editor.run`
+never opened a store operation at all:
+
+```ts
+run(fn) { return transact(() => fn()) }   // a signal transaction, nothing more
+```
+
+A `transact` batches recomputation. It does not make the writes inside one
+operation, so each `updateShapes` still opened and closed its own — and two of
+them in one `run` reached a listener as two notifications, the first carrying a
+state the document was only ever halfway through. Anything built out of `run`
+was affected, `duplicateShapes` included, which is why a shape and its binding
+arrived in separate batches.
+
+`run` opens a store operation now. One history entry, one notification, however
+many writes the callback makes.
+
+### A completion is told the source its changes were made with
+
+```ts
+store.extractingChanges(() => store.mergeRemoteChanges(() => …))
+
+was:  afterChange remote … operationComplete user     ← disagree about the same write
+now:  afterChange remote … operationComplete remote
+```
+
+The source was captured when the *outermost* operation opened, so a remote
+merge nested inside something else completed as `user`. A handler that skips
+remote echoes — which is what a sync layer puts there — treated a peer's write
+as this user's own and sent it back out.
+
+Reported only when the operation is of one mind. One carrying both sources
+keeps the outer one, because the user half is real work and a handler must not
+skip it.
+
+### A completion survives its pending entries being drained
+
+Whether an operation ran its completion was decided by looking at the pending
+entries — so anything that emptied them mid-operation made the completion
+vanish silently, handlers and all, while the writes themselves had happened.
+A consumer lost a whole derived-layout pass this way: the dirty set filled and
+nothing ever processed it, so one shape's height was corrected and the thing
+hugging it kept the old one.
+
+"Did this operation write anything" is now a question about the store rather
+than about whether the record of it is still sitting there. An operation that
+genuinely wrote nothing still runs no completion.
+
+**Neither of the last two was a regression in 4.8.0**, though both surfaced
+while checking it: the guard that swallowed the completion is identical in
+4.7.1, and the source has been captured at the outer operation since it was
+written.
+
 ## 4.8.0
 
 Four parity breaks against tldraw 5.1.1, all measured A/B by a consumer rather
