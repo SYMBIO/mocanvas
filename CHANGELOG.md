@@ -1,5 +1,48 @@
 # Changelog
 
+## 4.8.2
+
+### Breaking, and a regression in 4.8.1: `history: "ignore"` stopped ignoring
+
+**Upgrade straight past 4.8.1 if you use it.** `editor.run(fn, { history: "ignore" })`
+put its writes into the undo stack after all, so the user's next Cmd+Z reverted
+them along with their own edit — an agent's shape, or a collaborator's committed
+turn, taken back as part of undoing something else, and not restorable, because
+from that user's side it was never a step of theirs. That is other people's work
+lost, which is why this is a patch of its own rather than part of the next one.
+
+4.8.1 made `run` open a store operation, which was the fix it was for, and put
+the ignore *inside* it:
+
+```ts
+store.atomic(() => history.ignore(fn))   // 4.8.1 — wrong way round
+history.ignore(() => store.atomic(fn))   // 4.8.2
+```
+
+The history manager is a **store listener**. It reads its ignore counter when
+the notification arrives, and the whole point of 4.8.1 was that the
+notification now arrives once, at the end of the operation — by which time
+`ignore` had already returned and put the counter back to zero. Nothing in the
+suite here covered `run` + `ignore` + `undo` together, so it went out green.
+
+### What `history: "ignore"` does not promise
+
+Found while fixing the above, and **not** a regression — it behaves the same on
+4.8.0 and earlier. An ignored write to the *same record* the user then undoes
+is still reverted:
+
+```ts
+mark(); updateShapes([{ id: S, x: 100 }])
+run(() => updateShapes([{ id: S, y: 250 }]), { history: "ignore" })
+undo()   // S.x back to 0 — and S.y back to 0 as well
+```
+
+Undo restores whole records rather than fields, so putting S back as it was at
+the mark puts back every field of S, ignored ones included. `history: "ignore"`
+promises the write is not a *step* in the undo stack; it cannot promise that
+some other step will not overwrite it. There is now a test saying so, so the
+next person to meet it knows which of the two they are looking at.
+
 ## 4.8.1
 
 Three follow-ups to 4.8.0, all from the same consumer re-measuring it. The
