@@ -38,6 +38,16 @@
   --mocanvas-ui-pad: 4px;
   --mocanvas-ui-pad-lg: 10px;
   --mocanvas-ui-inset: 12px;
+  /* One plate's outer height: a button plus the plate's padding and border. */
+  --mocanvas-ui-row: 50px;
+  /*
+   * Where the toolbar's bottom edge sits. Published as a variable because the
+   * rows that stack above it — the actions row, "Back to content" — have to
+   * know, and it moves: on a narrow layout the toolbar takes a row of its own
+   * above the zoom bar. Two places computing it separately is how the actions
+   * row ended up drawn on top of the toolbar.
+   */
+  --mocanvas-ui-toolbar-bottom: var(--mocanvas-ui-inset);
   /*
    * Width the bottom-left and bottom-right docks (zoom bar, stats chip) reserve
    * on either side of the centred toolbar. The toolbar wraps rather than grow
@@ -115,7 +125,7 @@
 .mocanvas-toolbar {
   left: var(--mocanvas-ui-inset);
   right: var(--mocanvas-ui-inset);
-  bottom: var(--mocanvas-ui-inset);
+  bottom: var(--mocanvas-ui-toolbar-bottom);
   width: max-content;
   max-width: calc(100% - 2 * (var(--mocanvas-ui-inset) + var(--mocanvas-ui-dock)));
   margin-inline: auto;
@@ -198,11 +208,11 @@
   .mocanvas-panel {
     /* the toolbar now has a row of its own above the zoom bar */
     --mocanvas-ui-bottom-dock: 124px;
+    --mocanvas-ui-toolbar-bottom: calc(2 * var(--mocanvas-ui-inset) + var(--mocanvas-ui-row));
   }
 
   .mocanvas-toolbar {
     --mocanvas-ui-dock: 0px;
-    bottom: calc(2 * var(--mocanvas-ui-inset) + 50px);
   }
 }
 
@@ -839,15 +849,49 @@
   top: var(--mocanvas-ui-inset);
 }
 
+/*
+ * The common actions: a row of buttons that is either a plate of its own or a
+ * section of the menu plate, depending on how much room the chrome has. The
+ * row itself is the same either way — only what surrounds it changes.
+ */
+.mocanvas-action-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mocanvas-ui-gap);
+}
+
+/*
+ * Hosted in the menu plate, the actions are a second group after the page
+ * picker, with a hairline between: one bar, two jobs — where you are, and what
+ * you can do to what you have selected.
+ */
+.mocanvas-menu-panel .mocanvas-action-row {
+  margin-left: var(--mocanvas-ui-pad);
+  padding-left: calc(var(--mocanvas-ui-pad) + 2px);
+  border-left: 1px solid var(--mocanvas-ui-panel-border);
+}
+
+/*
+ * Standalone, it docks above the toolbar rather than over the middle of the
+ * canvas — the actions are a thumb's reach from the tools they follow.
+ */
 .mocanvas-quick-actions,
 .mocanvas-helper-buttons {
   position: absolute;
   left: 50%;
-  bottom: calc(2 * var(--mocanvas-ui-inset) + var(--mocanvas-ui-btn));
+  bottom: calc(var(--mocanvas-ui-toolbar-bottom) + var(--mocanvas-ui-row) + var(--mocanvas-ui-inset));
   transform: translateX(-50%);
   display: flex;
   gap: var(--mocanvas-ui-gap);
   z-index: 10;
+}
+
+/*
+ * "Back to content" appears only when the page is off screen, which can happen
+ * while the actions row is docked. One row higher, rather than on top of it.
+ */
+.mocanvas-helper-buttons {
+  bottom: calc(var(--mocanvas-ui-toolbar-bottom) + 2 * var(--mocanvas-ui-row) + 2 * var(--mocanvas-ui-inset));
 }
 
 .mocanvas-contextual-toolbar .mocanvas-toolbar {

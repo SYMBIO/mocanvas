@@ -4,7 +4,8 @@ import { EditorProvider, type Editor, type TLUiOverrides } from "@mocanvas/edito
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { TldrawUi } from "./TldrawUi"
+import { TldrawUi, type TldrawUiProps } from "./TldrawUi"
+import type { TLUiComponents } from "./ui-components"
 import { defaultTools } from "../tools"
 // The menu reaches the dialog through a dynamic import; loading the module up
 // front means the press only has to wait for the module cache, not for a
@@ -140,14 +141,18 @@ function makeEditor(options: { pages?: { id: string; name: string }[]; shapes?: 
 let root: Root | null = null
 let host: HTMLElement | null = null
 
-function renderChrome(parts = makeEditor(), overrides?: TLUiOverrides) {
+function renderChrome(parts = makeEditor(), overrides?: TLUiOverrides, ui: { forceMobile?: boolean; components?: TLUiComponents } = {}) {
   host = document.createElement("div")
   document.body.appendChild(host)
   root = createRoot(host)
+  const props: TldrawUiProps = {}
+  if (overrides) props.overrides = overrides
+  if (ui.forceMobile) props.forceMobile = true
+  if (ui.components) props.components = ui.components
   act(() => {
     root!.render(
       <EditorProvider editor={parts.editor}>
-        <TldrawUi {...(overrides ? { overrides } : {})} />
+        <TldrawUi {...props} />
       </EditorProvider>,
     )
   })
@@ -430,5 +435,92 @@ describe("the keyboard shortcuts dialog", () => {
     const text = dialog!.textContent ?? ""
     expect(text).toContain("Select")
     expect(text).toContain("Undo")
+  })
+})
+
+
+/**
+ * Where the common actions are drawn.
+ *
+ * They were drawn nowhere in particular: the row carried no `mocanvas-panel`
+ * class, and that is the selector its own rule declares its variables on, so
+ * `gap` and `bottom` were invalid and the buttons landed unstyled and cramped
+ * at the top of the canvas. The actions menu's trigger had no placement at all
+ * and sat in the container's top-left corner, under the menu plate.
+ *
+ * These assert the arrangement rather than the pixels: which plate the row is
+ * in, and that it is in exactly one of them.
+ */
+/**
+ * Give the chrome a container width to branch on.
+ *
+ * jsdom lays nothing out, so the breakpoint provider measures zero and every
+ * test would be the narrow one. The width is the point of these tests, so it
+ * is stated rather than inherited.
+ */
+function withContainerWidth(width: number) {
+  document.body.getBoundingClientRect = () =>
+    ({ left: 0, top: 0, x: 0, y: 0, width, height: 800, right: width, bottom: 800, toJSON: () => ({}) }) as DOMRect
+}
+
+const quickActions = () => document.querySelectorAll(".mocanvas-action-row[aria-label='Quick actions']")
+const menuPanel = () => document.querySelector(".mocanvas-menu-panel")!
+
+describe("the common actions", () => {
+  it("ride in the menu plate when there is room for them", () => {
+    withContainerWidth(1200)
+    renderChrome()
+    expect(quickActions()).toHaveLength(1)
+    expect(menuPanel().contains(quickActions()[0]!), "the row is not in the menu plate").toBe(true)
+  })
+
+  it("dock above the toolbar instead when the chrome is narrow", () => {
+    renderChrome(makeEditor(), undefined, { forceMobile: true })
+    expect(quickActions()).toHaveLength(1)
+    expect(menuPanel().contains(quickActions()[0]!)).toBe(false)
+    // Standalone it is a plate of its own — which is also where its variables
+    // come from, so the class is what makes the rest of the rule apply.
+    expect(quickActions()[0]!.classList.contains("mocanvas-panel")).toBe(true)
+  })
+
+  it("are drawn once, never in both places", () => {
+    withContainerWidth(1200)
+    renderChrome()
+    expect(quickActions()).toHaveLength(1)
+    expect(document.querySelectorAll(".mocanvas-action-row button[aria-label='Undo']")).toHaveLength(1)
+  })
+
+  it("take the actions menu with them", () => {
+    withContainerWidth(1200)
+    renderChrome()
+    const trigger = document.querySelector("[aria-label='Actions']")!
+    expect(menuPanel().contains(trigger), "the trigger was left in the corner").toBe(true)
+  })
+
+  it("take the actions menu into the dock too, not the corner", () => {
+    renderChrome(makeEditor(), undefined, { forceMobile: true })
+    const trigger = document.querySelector("[aria-label='Actions']")
+    expect(trigger, "the actions menu vanished on a narrow layout").not.toBeNull()
+    expect(quickActions()[0]!.contains(trigger!), "the trigger was left unplaced").toBe(true)
+  })
+
+  it("never leave an unplaced trigger behind at either width", () => {
+    withContainerWidth(1200)
+    renderChrome()
+    // The menu plate and the dock are the only two places either may appear.
+    for (const el of document.querySelectorAll("[aria-label='Actions']")) {
+      expect(menuPanel().contains(el) || [...quickActions()].some((row) => row.contains(el))).toBe(true)
+    }
+  })
+
+  it("still answer to the slot that owns them", () => {
+    renderChrome(makeEditor(), undefined, { components: { QuickActions: null } })
+    expect(quickActions(), "hosting them in the plate stopped `QuickActions: null` removing them").toHaveLength(0)
+  })
+
+  it("let an app put its own row in the plate", () => {
+    withContainerWidth(1200)
+    renderChrome(makeEditor(), undefined, { components: { QuickActions: () => <div data-testid="mine" /> } })
+    expect(menuPanel().querySelector('[data-testid="mine"]')).not.toBeNull()
   })
 })

@@ -1,5 +1,5 @@
-import { useEditor, useGlobalMenuIsOpen, useValue } from "@mocanvas/editor"
-import { useCallback, useRef, type ReactNode } from "react"
+import { useEditor, useEditorComponents, useGlobalMenuIsOpen, useValue } from "@mocanvas/editor"
+import { createContext, useCallback, useContext, useRef, type ComponentType, type ReactNode } from "react"
 import {
   AccessibilityMenu,
   ArrangeMenuSubmenu,
@@ -28,6 +28,8 @@ import {
 import { FloatingLayer } from "./ui-floating"
 import { TldrawUiIcon } from "./ui-icon"
 import { TldrawUiMenuActionItem, TldrawUiMenuContextProvider, TldrawUiMenuGroup } from "./ui-menu"
+import { useBreakpoint, PORTRAIT_BREAKPOINT } from "./ui-breakpoint"
+import { useTldrawUiComponents } from "./ui-components"
 import type {
   TLUiActionsMenuProps,
   TLUiContextMenuProps,
@@ -171,9 +173,53 @@ export function DefaultActionsMenuContent() {
   )
 }
 
+/**
+ * Where the row of common actions is drawn, which depends on how much room the
+ * chrome has.
+ *
+ * Wide, it belongs in the top-left plate beside the page picker: undo and
+ * delete are editing controls, and a bar of them floating over the middle of
+ * the canvas is chrome with nowhere to live. Narrow, that plate has no room,
+ * so the row docks above the toolbar with the other things a thumb reaches.
+ *
+ * A host — the menu plate, or the row's own standalone plate — provides this
+ * as `true` around what it contains. `DefaultQuickActions` then renders in
+ * exactly one place (`hosted === wide`), and the actions menu renders only
+ * when something is hosting it, which is what keeps its trigger from landing
+ * in the container's top-left corner with no placement at all.
+ */
+const ActionRowIsHosted = createContext(false)
+
+/** Provides {@link ActionRowIsHosted}. */
+export function HostedActionRow({ children }: { children: ReactNode }) {
+  return <ActionRowIsHosted.Provider value={true}>{children}</ActionRowIsHosted.Provider>
+}
+
+/**
+ * Resolve a chrome slot the way the surrounding chrome resolves it.
+ *
+ * There are two component maps — `TldrawUi` carries its own, `DefaultUi` uses
+ * the editor's — and the panels below are rendered by both. Reading only one
+ * of them is how the hosted row first rendered nothing at all: the slot was
+ * set, in the other map. `null` stays `null`, so `components={{ … : null }}`
+ * still means "remove it" even though it is a panel that draws it.
+ */
+export function useHostedSlot(name: "QuickActions" | "ActionsMenu", fallback: ComponentType): ComponentType | null {
+  const fromUi = useTldrawUiComponents()[name] as ComponentType | null | undefined
+  const fromEditor = useEditorComponents()[name] as ComponentType | null | undefined
+  const set = fromUi !== undefined ? fromUi : fromEditor
+  if (set === null) return null
+  return set ?? fallback
+}
+
 /** The selection-actions menu: a grid of icon buttons. */
 export function DefaultActionsMenu({ children }: TLUiActionsMenuProps) {
   const [isOpen, setIsOpen] = useGlobalMenuIsOpen("actions-menu")
+  // Only ever at the end of an action row. Rendered on its own — which is how
+  // the chrome renders it — it has no placement, and a dropdown trigger with
+  // no placement sits in the container's corner.
+  const hosted = useContext(ActionRowIsHosted)
+  if (!hosted) return null
   return (
     <TldrawUiDropdownMenuRoot id="actions-menu" open={isOpen} onOpenChange={setIsOpen}>
       <TldrawUiDropdownMenuTrigger label="Actions">
@@ -204,13 +250,30 @@ export function DefaultQuickActionsContent() {
   )
 }
 
-/** The always-visible row of common actions. */
+/**
+ * The always-visible row of common actions, and the row the actions menu rides
+ * at the end of.
+ *
+ * It used to carry no `mocanvas-panel` class, which is the selector its own
+ * rule declares its variables on — so `gap` and `bottom` were both invalid and
+ * the row rendered unstyled and cramped at the top of the canvas instead of
+ * anywhere it was meant to be.
+ *
+ * Removing this slot removes the row, and with it the actions menu it carries;
+ * an app that wants one without the other replaces this with its own row.
+ */
 export function DefaultQuickActions({ children }: TLUiQuickActionsProps) {
+  const hosted = useContext(ActionRowIsHosted)
+  const wide = useBreakpoint() >= PORTRAIT_BREAKPOINT.TABLET
+  const ActionsMenu = useHostedSlot("ActionsMenu", DefaultActionsMenu)
+  if (hosted !== wide) return null
+  const className = hosted ? "mocanvas-action-row" : "mocanvas-panel mocanvas-action-row mocanvas-quick-actions"
   return (
-    <div className="mocanvas-quick-actions" role="toolbar" aria-label="Quick actions">
+    <div className={className} role="toolbar" aria-label="Quick actions">
       <TldrawUiMenuContextProvider type="icons" sourceId="menu">
         {children ?? <DefaultQuickActionsContent />}
       </TldrawUiMenuContextProvider>
+      <HostedActionRow>{ActionsMenu ? <ActionsMenu /> : null}</HostedActionRow>
     </div>
   )
 }

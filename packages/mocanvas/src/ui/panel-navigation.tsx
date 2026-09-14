@@ -1,7 +1,7 @@
 import { track, useEditor } from "@mocanvas/editor"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { DefaultPageMenu } from "./panel-page"
-import { DefaultMainMenu, DefaultZoomMenu } from "./panel-menus"
+import { DefaultMainMenu, DefaultQuickActions, DefaultZoomMenu, HostedActionRow, useHostedSlot } from "./panel-menus"
 import { useBreakpoint, PORTRAIT_BREAKPOINT } from "./ui-breakpoint"
 import { TldrawUiIcon } from "./ui-icon"
 
@@ -88,12 +88,22 @@ export function DefaultNavigationPanel() {
   )
 }
 
-/** The top-left plate: the main menu and the page picker. */
+/**
+ * The top-left plate: the main menu, the page picker, and — where there is room
+ * for them — the common actions.
+ *
+ * The actions are rendered through their own chrome slots rather than inlined,
+ * so `components={{ QuickActions: null }}` still removes them and a replacement
+ * still appears here. Each slot decides whether *this* is its place; see
+ * `HostedActionRow`.
+ */
 export function DefaultMenuPanel() {
+  const QuickActions = useHostedSlot("QuickActions", DefaultQuickActions)
   return (
     <div className="mocanvas-panel mocanvas-menu-panel">
       <DefaultMainMenu />
       <DefaultPageMenu />
+      <HostedActionRow>{QuickActions ? <QuickActions /> : null}</HostedActionRow>
     </div>
   )
 }
