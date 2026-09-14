@@ -1,5 +1,48 @@
 # Changelog
 
+## 4.7.0
+
+Two changes to the default chrome, both visible the moment you open it.
+
+### Breaking: the preferences are behind one row, and the help menu is off
+
+Eleven preference toggles were listed flat in the main menu — the first screen
+of it read "Always snap / Tool lock / Show grid / Wrap text / Paste at cursor",
+with Edit, View and Export pushed up above a wall of settings nobody changes
+twice. They are now a `Preferences` submenu.
+
+Inside it, the three that group into a subject of their own get a submenu each:
+
+```
+Preferences ▸  Always snap, Tool lock, Show grid, Wrap text, Focus mode,
+               Edge scrolling, Dynamic size, Paste at cursor, Debug mode
+               ─────
+               Accessibility ▸   Input ▸   Theme ▸
+```
+
+`AccessibilityMenu` and `InputModeMenu` were both written, exported, and
+rendered nowhere — the first is where Reduce motion and Enhanced accessibility
+moved to, the second is the pen-mode choice, which had never appeared in any
+menu at all. **Language stays outside the submenu**, because it is not a
+preference about the canvas: it is the language the menu itself is in, and
+looking for it inside a menu you cannot read is the one case where nesting
+costs something real.
+
+`PreferencesGroup` keeps its name and its export, so a custom menu that renders
+it keeps working — it renders a submenu now rather than a flat group.
+
+**The help menu is no longer in the default chrome.** Its trigger was a bare
+`?` with no plate and no placement, so it sat in the container's top-left
+corner underneath the menu plate — the same failure 4.6.0 and 4.6.1 fixed in
+the actions row and the style swatch, in the last control that still had it.
+Behind it were the accessibility preferences and print/shortcuts, all of which
+the main menu already carries, so there was nothing there that was not one row
+away. `components={{ HelpMenu: DefaultHelpMenu }}` puts it back, and it is
+docked at the bottom-right now rather than stranded.
+
+**Not changed:** submenus still open below their parent rather than flying out
+to the side.
+
 ## 4.6.1
 
 ### The style trigger was stranded in the same corner
