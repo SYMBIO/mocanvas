@@ -4,6 +4,15 @@
   "description": "The mocanvas editor core: Editor, ShapeUtil, StateNode, geometry, bindings and the <Canvas /> renderer.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SYMBIO/mocanvas.git",
+    "directory": "packages/editor"
+  },
+  "homepage": "https://mocanvas.symbio.agency",
+  "bugs": {
+    "url": "https://github.com/SYMBIO/mocanvas/issues"
+  },
   "keywords": [
     "canvas",
     "infinite-canvas",

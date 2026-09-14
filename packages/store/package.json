@@ -4,6 +4,15 @@
   "description": "The mocanvas document model: reactive records, schema, migrations and .tldr file IO.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SYMBIO/mocanvas.git",
+    "directory": "packages/store"
+  },
+  "homepage": "https://mocanvas.symbio.agency",
+  "bugs": {
+    "url": "https://github.com/SYMBIO/mocanvas/issues"
+  },
   "keywords": [
     "store",
     "records",

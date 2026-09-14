@@ -4,6 +4,15 @@
   "description": "Typed loader and zero-copy bridge over the mocanvas Rust/WebAssembly engine.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SYMBIO/mocanvas.git",
+    "directory": "packages/wasm"
+  },
+  "homepage": "https://mocanvas.symbio.agency",
+  "bugs": {
+    "url": "https://github.com/SYMBIO/mocanvas/issues"
+  },
   "keywords": [
     "webassembly",
     "wasm",

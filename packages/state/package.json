@@ -4,6 +4,15 @@
   "description": "Signals for mocanvas: atoms, computed values, transactions and React bindings.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SYMBIO/mocanvas.git",
+    "directory": "packages/state"
+  },
+  "homepage": "https://mocanvas.symbio.agency",
+  "bugs": {
+    "url": "https://github.com/SYMBIO/mocanvas/issues"
+  },
   "keywords": [
     "signals",
     "reactive",

@@ -2,6 +2,15 @@
 
 ## 4.8.3
 
+### Every package now says where it comes from
+
+`repository`, `homepage` and `bugs` are in each `package.json`. They were
+missing, which nobody noticed while the repository was private — and the moment
+it went public, publishing started failing: npm verifies a provenance bundle
+against `repository.url`, and an empty one does not match the repository the
+build came from. The link on each package's npm page is the visible half of the
+same fix.
+
 ### `getContainer` is optional, so a headless editor stops inventing a DOM node
 
 The claim this library is sold on is that a document exists without a browser,

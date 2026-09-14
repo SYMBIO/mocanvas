@@ -4,6 +4,15 @@
   "description": "Multiplayer for a mocanvas store: record diffs over a transport, plus presence and cursors.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SYMBIO/mocanvas.git",
+    "directory": "packages/sync"
+  },
+  "homepage": "https://mocanvas.symbio.agency",
+  "bugs": {
+    "url": "https://github.com/SYMBIO/mocanvas/issues"
+  },
   "keywords": [
     "multiplayer",
     "collaboration",
