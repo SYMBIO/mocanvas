@@ -1,5 +1,28 @@
 # Changelog
 
+## 4.6.1
+
+### The style trigger was stranded in the same corner
+
+Follow-up to 4.6.0, which moved the actions row and missed the control beside
+it. On a layout too narrow for the docked style panel, the trigger is a single
+swatch — and it was rendered outside every `.mocanvas-panel`, which is the
+selector the UI's variables are declared on. So its `width` read an undefined
+variable and was dropped along with any placement: it landed in the
+container's top-left corner at the size of its icon, under the menu plate.
+
+It now sits in a plate of its own at the right end of the actions row's line,
+mirroring the zoom bar at the left end of the row below.
+
+**And a third rule was computing the toolbar's offset.** 4.6.0 published
+`--mocanvas-ui-toolbar-bottom` so the rows above the toolbar could follow it,
+and converted two of the three places that set it. The one left behind was the
+phone-width rule, so below 560px the actions row was drawn on top of the
+toolbar again. All three derive from the variable now, and a test asserts that
+the toolbar's edge is placed from it and nowhere else — an invariant no
+rendering test can catch, since jsdom lays nothing out and a screenshot only
+covers the width it was taken at.
+
 ## 4.6.0
 
 ### The common actions had no home
