@@ -12,7 +12,8 @@ import { placeNear, type Placement } from "./overlays"
  * bottom of a short window, or that drops focus into the void when dismissed.
  */
 
-export type Side = "above" | "below"
+/** Where a floating layer sits: over, under, or beside its anchor. */
+export type Side = "above" | "below" | "side"
 
 /**
  * How a layer learns about the layers opened from inside it.

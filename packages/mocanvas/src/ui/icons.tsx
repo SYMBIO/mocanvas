@@ -197,6 +197,7 @@ const ACTION_ICONS = {
   ),
   "chevron-down": <path d="M6.75 9.75L12 15l5.25-5.25" />,
   "chevron-up": <path d="M6.75 14.25L12 9l5.25 5.25" />,
+  "chevron-right": <path d="M9.75 6.75L15 12l-5.25 5.25" />,
   check: <path d="M5 12.5l4.9 4.9L19 6.75" />,
   close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
   mixed: <circle cx="12" cy="12" r="7.25" strokeDasharray="2.6 2.8" />,

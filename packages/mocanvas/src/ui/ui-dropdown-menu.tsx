@@ -269,7 +269,9 @@ export function TldrawUiDropdownMenuSubTrigger({ label, disabled, className, chi
       }}
     >
       {children ?? label}
-      <TldrawUiIcon icon="chevron-down" small />
+      {/* Points where the panel opens: a down chevron on a row that flies out
+          to the side reads as "this expands in place". */}
+      <TldrawUiIcon icon="chevron-right" small />
     </button>
   )
 }
@@ -292,7 +294,7 @@ export function TldrawUiDropdownMenuSubContent({ label, className, children }: T
       anchorRef={ctx.anchorRef}
       open={ctx.open}
       onClose={close}
-      prefer="below"
+      prefer="side"
       role="menu"
       className={["mocanvas-menu", "mocanvas-menu--sub", className].filter(Boolean).join(" ")}
       {...(label ? { label } : {})}

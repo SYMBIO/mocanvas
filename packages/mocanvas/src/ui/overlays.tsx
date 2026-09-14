@@ -19,10 +19,29 @@ export interface Placement {
 }
 
 /**
- * Centre `box` on `anchor`, on the preferred side if it fits there and on the
- * other side if it does not, then clamp the result inside the viewport.
+ * Place `box` next to `anchor`, on the preferred side if it fits there and on
+ * the other side if it does not, then clamp the result inside the viewport.
+ *
+ * `"above"` and `"below"` centre the box on the anchor — what a menu hanging
+ * off a button wants. `"side"` puts it beside the anchor and aligns their top
+ * edges, which is what a *submenu* wants: opening downwards in the parent's
+ * own column pushes the rest of the menu out of the way and grows towards the
+ * bottom of the screen, where a long submenu runs out of room.
  */
-export function placeNear(anchor: DOMRect, box: { width: number; height: number }, prefer: "above" | "below", vw: number, vh: number): Placement {
+export function placeNear(anchor: DOMRect, box: { width: number; height: number }, prefer: "above" | "below" | "side", vw: number, vh: number): Placement {
+  if (prefer === "side") {
+    // To the right of the row, or to its left when the right would overflow —
+    // the flip every platform menu does near the edge of a screen.
+    const toRight = anchor.right + GAP
+    const toLeft = anchor.left - box.width - GAP
+    let x = toRight
+    if (toRight + box.width > vw - EDGE && toLeft >= EDGE) x = toLeft
+    x = Math.min(Math.max(x, EDGE), Math.max(EDGE, vw - box.width - EDGE))
+    // Tops aligned, then clamped: a submenu longer than the room below its row
+    // slides up rather than running off the bottom.
+    const y = Math.min(Math.max(anchor.top, EDGE), Math.max(EDGE, vh - box.height - EDGE))
+    return { left: x, top: y }
+  }
   const above = anchor.top - box.height - GAP
   const below = anchor.bottom + GAP
   let top = prefer === "above" ? above : below
@@ -34,7 +53,7 @@ export function placeNear(anchor: DOMRect, box: { width: number; height: number 
   return { left, top }
 }
 
-function useClamped(getAnchor: () => DOMRect | null, prefer: "above" | "below", deps: unknown[]): [RefObject<HTMLDivElement | null>, Placement | null] {
+function useClamped(getAnchor: () => DOMRect | null, prefer: "above" | "below" | "side", deps: unknown[]): [RefObject<HTMLDivElement | null>, Placement | null] {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<Placement | null>(null)
   useLayoutEffect(() => {

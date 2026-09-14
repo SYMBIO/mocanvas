@@ -39,3 +39,46 @@ describe("placeNear", () => {
     expect(p.top).toBe(8)
   })
 })
+
+/**
+ * A submenu opens beside the row that owns it, not underneath it.
+ *
+ * Underneath is what the chrome did, and it has two costs: the parent menu's
+ * remaining rows are pushed out of the way, and the panel grows towards the
+ * bottom of the screen — so the longest submenu, which is the one most likely
+ * to need the room, is the one that runs out of it.
+ */
+describe("placeNear, beside the anchor", () => {
+  // A menu row: 190 wide, 28 tall, in a panel near the top-left.
+  const row = rect(12, 200, 190, 28)
+
+  it("opens to the right of the row", () => {
+    const p = placeNear(row, { width: 200, height: 300 }, "side", VW, VH)
+    expect(p.left).toBe(210) // row.right + gap
+  })
+
+  it("aligns its top with the row it belongs to", () => {
+    const p = placeNear(row, { width: 200, height: 300 }, "side", VW, VH)
+    expect(p.top).toBe(200)
+  })
+
+  it("flips to the left when the right would run off the screen", () => {
+    const nearEdge = rect(780, 200, 190, 28)
+    const p = placeNear(nearEdge, { width: 200, height: 300 }, "side", VW, VH)
+    // Left of the row rather than clamped against the right edge, which would
+    // sit the submenu on top of its own parent.
+    expect(p.left).toBe(572)
+  })
+
+  it("slides up rather than off the bottom when the submenu is long", () => {
+    const lowRow = rect(12, 600, 190, 28)
+    const p = placeNear(lowRow, { width: 200, height: 400 }, "side", VW, VH)
+    expect(p.top).toBe(VH - 400 - 8)
+    expect(p.top + 400).toBeLessThanOrEqual(VH)
+  })
+
+  it("keeps a submenu taller than the screen at the top edge", () => {
+    const p = placeNear(row, { width: 200, height: 900 }, "side", VW, VH)
+    expect(p.top).toBe(8)
+  })
+})
