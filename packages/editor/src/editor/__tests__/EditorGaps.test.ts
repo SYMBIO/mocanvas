@@ -40,7 +40,8 @@ function makeEditor() {
     shapeUtils: [BoxUtil],
     tools: [],
     engine: loadEngineSync(readFileSync(wasmPath)),
-    getContainer: () => ({}) as HTMLElement,
+    // No container. This harness used to pass `({}) as HTMLElement`, which is
+    // what the old signature forced on anything without a screen.
   })
   editor.updateViewportScreenBounds({ x: 0, y: 0, w: 1000, h: 800 })
   return editor
@@ -474,6 +475,49 @@ describe("run with history: ignore", () => {
       const before = editor.history.getNumUndos()
       editor.run(() => box(editor, 10, 10), { history: "ignore" })
       expect(editor.history.getNumUndos()).toBe(before)
+    } finally {
+      editor.dispose()
+    }
+  })
+})
+
+/**
+ * An editor with no screen.
+ *
+ * The product's headline claim is that a document exists without a browser, and
+ * until now the type made you start by inventing a container to prove it. The
+ * runtime never needed one — `safeContainer` has always treated a missing or
+ * throwing container as "no container" — so this is about the signature the
+ * headless caller meets first.
+ */
+describe("an editor built without a container", () => {
+  it("constructs, writes and reads back", () => {
+    const editor = new Editor({
+      store: createStore(),
+      shapeUtils: [BoxUtil],
+      tools: [],
+      engine: loadEngineSync(readFileSync(wasmPath)),
+    })
+    try {
+      const id = box(editor, 10, 20)
+      expect(editor.getCurrentPageShapes()).toHaveLength(1)
+      expect(editor.getShape(id)!.x).toBe(10)
+      expect(editor.getCurrentPageBounds()).not.toBeNull()
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("says so plainly if something asks for the element", () => {
+    const editor = new Editor({
+      store: createStore(),
+      shapeUtils: [BoxUtil],
+      tools: [],
+      engine: loadEngineSync(readFileSync(wasmPath)),
+    })
+    try {
+      // A sentence, rather than `undefined` crashing two layers further down.
+      expect(() => editor.getContainer()).toThrow(/headless/)
     } finally {
       editor.dispose()
     }

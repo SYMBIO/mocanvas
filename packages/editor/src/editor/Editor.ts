@@ -197,7 +197,17 @@ export interface EditorOptions {
   engine?: EngineBridge
   /** Id of the tool to start in. Defaults to the first tool. */
   initialState?: string
-  getContainer: () => HTMLElement
+  /**
+   * The element the editor lives in. Optional, and optional is the point: an
+   * editor with no screen — an agent on a server, a fold job, a test — has no
+   * element to give, and requiring one made the headless path start by
+   * inventing a fake DOM node. Everything inside already copes (see
+   * `safeContainer`); it was only the type that insisted.
+   *
+   * Omitted, {@link Editor.getContainer} throws if anything asks for it, which
+   * is a sentence rather than a mystery further down.
+   */
+  getContainer?: () => HTMLElement
   options?: Partial<EditorConfig>
   /**
    * Where asset bytes live. Defaults to the store's own
@@ -565,7 +575,14 @@ export class Editor extends EventEmitter<EditorEvents> {
     super()
     this.store = opts.store
     this.engine = opts.engine ?? requireEngine()
-    this.getContainer = opts.getContainer
+    this.getContainer =
+      opts.getContainer ??
+      (() => {
+        throw new Error(
+          "mocanvas: this editor was built without `getContainer`, so it has no container — " +
+            "which is expected for a headless editor. Pass one if something needs the element.",
+        )
+      })
     this.options = { ...DEFAULT_EDITOR_CONFIG, ...opts.options }
     this.sideEffects = this.store.sideEffects
     this.snaps = new SnapManager(this)

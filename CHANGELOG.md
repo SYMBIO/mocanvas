@@ -1,5 +1,27 @@
 # Changelog
 
+## 4.8.3
+
+### `getContainer` is optional, so a headless editor stops inventing a DOM node
+
+The claim this library is sold on is that a document exists without a browser,
+and until now the first thing a headless caller met was a required
+`getContainer: () => HTMLElement`. So every agent on a server, every fold job
+and every test began by fabricating an element:
+
+```ts
+new Editor({ store, shapeUtils, tools, engine, getContainer: () => ({}) as HTMLElement })
+```
+
+Nothing inside ever needed it. `safeContainer()` has always treated a missing or
+throwing container as "no container", which is why that cast worked at all — it
+was the signature insisting, not the runtime. It is optional now, and this
+library's own test harness stopped passing the fake one.
+
+Omit it and `editor.getContainer()` throws a sentence saying the editor is
+headless, rather than handing back something that fails two layers further
+down. Passing one behaves exactly as before.
+
 ## 4.8.2
 
 ### Breaking, and a regression in 4.8.1: `history: "ignore"` stopped ignoring
