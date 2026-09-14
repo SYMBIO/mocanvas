@@ -1,5 +1,33 @@
 # Changelog
 
+## 4.7.1
+
+### Submenus open beside their row, not underneath it
+
+Every submenu in the chrome opened *below* its own row, in the parent menu's
+column — so the parent's remaining rows were pushed out of the way and the
+panel grew towards the bottom of the screen. The longest submenu is the one
+most likely to need the room, and it was the one that ran out of it: after
+4.7.0 put nine toggles behind `Preferences`, opening it on a short window
+pushed the bottom of the list past the edge.
+
+They fly out to the side now, tops aligned with the row that owns them, which
+is what every platform menu does and what keeps the whole chain readable at
+once. `placeNear` gained a `"side"` placement for it:
+
+- to the right of the row, or to its left when the right would overflow —
+  flipping rather than clamping, so a submenu near the right edge never lands
+  on top of its own parent;
+- tops aligned, then clamped, so a submenu longer than the room below its row
+  slides up instead of off the bottom;
+- one taller than the window sits at the top edge.
+
+The chevron on those rows points right rather than down, since a down chevron
+on a row that flies out sideways reads as "this expands in place".
+
+`Side` — the `FloatingLayer` placement — gained `"side"` alongside `"above"`
+and `"below"`; both existing values behave exactly as before.
+
 ## 4.7.0
 
 Two changes to the default chrome, both visible the moment you open it.
