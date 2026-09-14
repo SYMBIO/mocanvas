@@ -240,10 +240,52 @@ describe("the main menu's View submenu", () => {
   })
 })
 
+/** The main menu, then the Preferences row that now holds the toggles. */
+function openPreferences() {
+  openMainMenu()
+  click(row("Preferences"))
+}
+
 describe("the preferences", () => {
+  it("are behind one row rather than listed in the main menu", () => {
+    renderChrome()
+    openMainMenu()
+    const top = rows().map((el) => el.textContent?.trim())
+    expect(top, "the toggles are still listed at the top level").not.toContain("Always snap")
+    expect(top).toContain("Preferences")
+  })
+
+  it("open onto every toggle that used to be in the main menu", () => {
+    renderChrome()
+    openPreferences()
+    // A row's text carries its shortcut ("Tool lockQ"), so match the start.
+    const labels = rows().map((el) => el.textContent?.trim() ?? "")
+    for (const label of ["Always snap", "Tool lock", "Show grid", "Wrap text", "Focus mode", "Edge scrolling", "Dynamic size", "Paste at cursor", "Debug mode"]) {
+      expect(labels.some((l) => l.startsWith(label)), `"${label}" is not reachable any more — rows are: ${labels.join(", ")}`).toBe(true)
+    }
+  })
+
+  it("gather the ones with a subject of their own into submenus", () => {
+    renderChrome()
+    openPreferences()
+    const labels = rows().map((el) => el.textContent?.trim())
+    // Both components existed and were exported; neither was rendered anywhere.
+    expect(labels).toContain("Accessibility")
+    expect(labels).toContain("Input")
+    expect(labels).toContain("Theme")
+  })
+
+  it("still toggle the editor from in there", () => {
+    const parts = renderChrome()
+    openPreferences()
+    expect(parts.editor.getInstanceState().isGridMode).toBe(false)
+    click(row("Show grid"))
+    expect(parts.editor.getInstanceState().isGridMode, "the row moved but changed nothing").toBe(true)
+  })
+
   it("repaints the editor when the theme is changed", () => {
     const parts = renderChrome()
-    openMainMenu()
+    openPreferences()
     click(row("Theme"))
     const sub = document.querySelector(".mocanvas-menu--sub")!
     const dark = Array.from(sub.querySelectorAll<HTMLButtonElement>(".mocanvas-menu-item")).find((el) => el.textContent?.trim() === "Dark")!
@@ -256,7 +298,7 @@ describe("the preferences", () => {
 
   it("shows the theme that is actually in force", () => {
     const parts = renderChrome()
-    openMainMenu()
+    openPreferences()
     click(row("Theme"))
     const sub = () => document.querySelector(".mocanvas-menu--sub")!
     const item = (label: string) =>
@@ -270,7 +312,8 @@ describe("the preferences", () => {
 
   it("answers every press of Reduce motion, and marks the container", () => {
     const parts = renderChrome()
-    openMainMenu()
+    openPreferences()
+    click(row("Accessibility"))
     const reduce = row("Reduce motion")
     expect(reduce.getAttribute("aria-checked")).toBe("false")
     click(reduce)
@@ -327,7 +370,8 @@ describe("the preferences", () => {
     // `useSelectedShapesAnnouncer` consults" — see ui-a11y.test.tsx for the
     // other half, where that state changes what is actually announced.
     const parts = renderChrome()
-    openMainMenu()
+    openPreferences()
+    click(row("Accessibility"))
     expect(row("Enhanced accessibility").getAttribute("aria-checked")).toBe("false")
     click(row("Enhanced accessibility"))
     expect(parts.updateUserPreferences).toHaveBeenCalledWith({ isEnhancedA11yMode: true })
@@ -542,5 +586,39 @@ describe("the style trigger on a narrow layout", () => {
     const trigger = document.querySelector("[aria-label='Style']")
     expect(trigger, "no style trigger on a narrow layout").not.toBeNull()
     expect(trigger!.closest(".mocanvas-panel"), "the trigger is outside every plate — no variables, no placement").not.toBeNull()
+  })
+})
+
+
+/**
+ * The help menu's trigger was a bare `?` with no plate and no placement, so it
+ * sat in the container's top-left corner under the menu plate — the same
+ * failure as the actions row and the style swatch, in the last control that
+ * still had it. Nothing was behind it that the main menu does not already
+ * carry, so it is off by default rather than docked for its own sake.
+ */
+describe("the help menu", () => {
+  it("is not in the default chrome", () => {
+    renderChrome()
+    expect(document.querySelector("[aria-label='Help']"), "the stray ? is back").toBeNull()
+  })
+
+  it("is docked, not stranded, for an app that asks for it", async () => {
+    const { DefaultHelpMenu } = await import("./panel-menus")
+    renderChrome(makeEditor(), undefined, { components: { HelpMenu: DefaultHelpMenu } })
+    const trigger = document.querySelector("[aria-label='Help']")
+    expect(trigger).not.toBeNull()
+    expect(trigger!.closest(".mocanvas-panel"), "filling the slot brings back an unplaced trigger").not.toBeNull()
+  })
+
+  it("still reaches everything it used to, from the main menu", () => {
+    renderChrome()
+    openMainMenu()
+    expect(rows().map((el) => el.textContent?.trim())).toContain("Keyboard shortcuts")
+    // Same open menu, one row deeper — a second `openMainMenu()` would toggle
+    // it shut.
+    click(row("Preferences"))
+    click(row("Accessibility"))
+    expect(rows().map((el) => el.textContent?.trim())).toContain("Enhanced accessibility")
   })
 })

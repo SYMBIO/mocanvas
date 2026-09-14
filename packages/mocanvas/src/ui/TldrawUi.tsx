@@ -81,7 +81,9 @@ const Layout = track(function Layout({ children }: { children?: ReactNode }) {
   const ActionsMenu = slot<object>(c.ActionsMenu, DefaultActionsMenu)
   const QuickActions = slot<object>(c.QuickActions, DefaultQuickActions)
   const HelperButtons = slot<object>(c.HelperButtons, DefaultHelperButtons)
-  const HelpMenu = slot<object>(c.HelpMenu, DefaultHelpMenu)
+  // Not on by default — see `DefaultHelpMenu`. An app that wants it fills
+  // the slot, and gets it docked rather than stranded in the corner.
+  const HelpMenu = slot<object>(c.HelpMenu, null)
   const SharePanel = slot<object>(c.SharePanel, DefaultSharePanel)
   const ImageToolbar = slot<object>(c.ImageToolbar, DefaultImageToolbar)
   const VideoToolbar = slot<object>(c.VideoToolbar, DefaultVideoToolbar)

@@ -601,22 +601,42 @@ export const ToggleEnhancedA11yModeItem = track(function ToggleEnhancedA11yModeI
   )
 })
 
-/** Every preference toggle, as one group. */
+/**
+ * The preferences, behind one row of the main menu.
+ *
+ * They used to be eleven toggles listed flat in the main menu, which made the
+ * menu twice as long as the things people open it for — a menu whose first
+ * screen is "Always snap / Tool lock / Wrap text / Paste at cursor" buries
+ * Edit, View and Export under settings nobody changes twice.
+ *
+ * The three that group into a subject of their own get a submenu each rather
+ * than a longer list: `AccessibilityMenu` and `InputModeMenu` were both written
+ * and exported and had never been rendered anywhere. Language stays outside,
+ * because it is not a preference about the canvas — it is the language the
+ * menu itself is in, and looking for it inside a menu you cannot read is the
+ * one case where nesting costs something real.
+ */
 export function PreferencesGroup() {
   return (
-    <TldrawUiMenuGroup id="preferences" label="Preferences">
-      <ToggleSnapModeItem />
-      <ToggleToolLockItem />
-      <ToggleGridItem />
-      <ToggleWrapModeItem />
-      <ToggleDynamicSizeModeItem />
-      <TogglePasteAtCursorItem />
-      <ToggleEdgeScrollingItem />
-      <ToggleReduceMotionItem />
-      <ToggleEnhancedA11yModeItem />
-      <ToggleFocusModeItem />
-      <ToggleDebugModeItem />
-      <ColorSchemeMenu />
+    <TldrawUiMenuGroup id="preferences">
+      <TldrawUiMenuSubmenu id="preferences-submenu" label="Preferences">
+        <TldrawUiMenuGroup id="preferences-toggles">
+          <ToggleSnapModeItem />
+          <ToggleToolLockItem />
+          <ToggleGridItem />
+          <ToggleWrapModeItem />
+          <ToggleFocusModeItem />
+          <ToggleEdgeScrollingItem />
+          <ToggleDynamicSizeModeItem />
+          <TogglePasteAtCursorItem />
+          <ToggleDebugModeItem />
+        </TldrawUiMenuGroup>
+        <TldrawUiMenuGroup id="preferences-subjects">
+          <AccessibilityMenu />
+          <InputModeMenu />
+          <ColorSchemeMenu />
+        </TldrawUiMenuGroup>
+      </TldrawUiMenuSubmenu>
       <LanguageMenu />
     </TldrawUiMenuGroup>
   )

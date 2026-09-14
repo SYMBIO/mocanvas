@@ -888,6 +888,12 @@
   z-index: 10;
 }
 
+/* The help menu's trigger, for an app that fills the slot: bottom-right. */
+.mocanvas-help-dock {
+  right: var(--mocanvas-ui-inset);
+  bottom: var(--mocanvas-ui-inset);
+}
+
 /*
  * The style popover's trigger, on a layout too narrow for the docked panel.
  * Right end of the actions row's line; the zoom bar holds the left end of the

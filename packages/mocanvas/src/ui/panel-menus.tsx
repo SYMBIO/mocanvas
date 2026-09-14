@@ -328,10 +328,22 @@ export function DefaultHelpMenuContent() {
   )
 }
 
-/** The help menu. */
+/**
+ * The help menu.
+ *
+ * Not in the default chrome, and its trigger is why: it rendered a bare `?`
+ * with no plate and no placement, so it sat in the container's top-left
+ * corner, under the menu plate. Everything in it — the accessibility
+ * preferences, print, the shortcuts dialog — is reachable from the main menu,
+ * so there was nothing behind the `?` that was not already one row away.
+ *
+ * It stays exported and slot-fillable: `components={{ HelpMenu }}` puts it
+ * back, now docked at the bottom-right rather than stranded.
+ */
 export function DefaultHelpMenu({ children }: TLUiHelpMenuProps) {
   const [isOpen, setIsOpen] = useGlobalMenuIsOpen("help-menu")
   return (
+    <div className="mocanvas-panel mocanvas-help-dock">
     <TldrawUiDropdownMenuRoot id="help-menu" open={isOpen} onOpenChange={setIsOpen}>
       <TldrawUiDropdownMenuTrigger label="Help">?</TldrawUiDropdownMenuTrigger>
       <TldrawUiDropdownMenuContent label="Help" side="above">
@@ -340,6 +352,7 @@ export function DefaultHelpMenu({ children }: TLUiHelpMenuProps) {
         </TldrawUiMenuContextProvider>
       </TldrawUiDropdownMenuContent>
     </TldrawUiDropdownMenuRoot>
+    </div>
   )
 }
 
