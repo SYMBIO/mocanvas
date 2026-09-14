@@ -524,3 +524,23 @@ describe("the common actions", () => {
     expect(menuPanel().querySelector('[data-testid="mine"]')).not.toBeNull()
   })
 })
+
+
+/**
+ * The same failure as the actions row, in the other narrow-layout control: a
+ * button rendered outside `.mocanvas-panel` gets none of the variables that
+ * selector declares, so its `width` is dropped along with its placement and it
+ * lands in the container's corner at the size of its icon.
+ */
+describe("the style trigger on a narrow layout", () => {
+  it("is docked in a plate rather than left in the corner", () => {
+    const parts = makeEditor()
+    // The trigger only exists when a style applies; with none it renders
+    // nothing, which is deliberate and not what this test is about.
+    ;(parts.editor as unknown as { getSharedStyles: () => Map<string, unknown> }).getSharedStyles = () => new Map([["color", { type: "shared", value: "black" }]])
+    renderChrome(parts, undefined, { forceMobile: true })
+    const trigger = document.querySelector("[aria-label='Style']")
+    expect(trigger, "no style trigger on a narrow layout").not.toBeNull()
+    expect(trigger!.closest(".mocanvas-panel"), "the trigger is outside every plate — no variables, no placement").not.toBeNull()
+  })
+})

@@ -222,12 +222,14 @@
  * spanning the width and capped at a share of the height.
  */
 @media (max-width: 560px) {
-  .mocanvas-stats {
-    bottom: calc(2 * var(--mocanvas-ui-inset) + 50px);
+  .mocanvas,
+  .mocanvas-panel {
+    /* the stats chip has taken a row of its own, below the zoom bar */
+    --mocanvas-ui-toolbar-bottom: calc(4 * var(--mocanvas-ui-inset) + 2 * var(--mocanvas-ui-row));
   }
 
-  .mocanvas-toolbar {
-    bottom: calc(3 * var(--mocanvas-ui-inset) + 112px);
+  .mocanvas-stats {
+    bottom: calc(2 * var(--mocanvas-ui-inset) + var(--mocanvas-ui-row));
   }
 
   .mocanvas-stylepanel {
@@ -884,6 +886,16 @@
   display: flex;
   gap: var(--mocanvas-ui-gap);
   z-index: 10;
+}
+
+/*
+ * The style popover's trigger, on a layout too narrow for the docked panel.
+ * Right end of the actions row's line; the zoom bar holds the left end of the
+ * line below it.
+ */
+.mocanvas-style-dock {
+  right: var(--mocanvas-ui-inset);
+  bottom: calc(var(--mocanvas-ui-toolbar-bottom) + var(--mocanvas-ui-row) + var(--mocanvas-ui-inset));
 }
 
 /*

@@ -87,6 +87,13 @@ export const DefaultStylePanel = track(function DefaultStylePanel({ isMobile = f
  * The trigger is a colour swatch showing the current colour, which is the one
  * style a user is most likely to be reaching for and the only one that can be
  * shown legibly in a single button.
+ *
+ * It sits in a plate of its own, docked at the right end of the row the common
+ * actions sit in — mirroring the zoom bar at the left end of the row below.
+ * Without the plate it was a button with no placement *and* no variables, so
+ * it rendered at the container's top-left corner at two thirds of its size,
+ * under the menu plate: `--mocanvas-ui-btn` is declared on `.mocanvas-panel`,
+ * and a `width` that reads an undefined variable is dropped.
  */
 export const MobileStylePanel = track(function MobileStylePanel() {
   const editor = useEditor()
@@ -94,6 +101,7 @@ export const MobileStylePanel = track(function MobileStylePanel() {
   const disabled = editor.getIsReadonly()
   if (!styles) return null
   return (
+    <div className="mocanvas-panel mocanvas-style-dock">
     <TldrawUiPopover id="mobile-style-panel" side="above">
       <TldrawUiPopoverTrigger label="Style" className={disabled ? "mocanvas-btn mocanvas-btn--disabled" : "mocanvas-btn"}>
         <Icon name="fill-solid" />
@@ -106,6 +114,7 @@ export const MobileStylePanel = track(function MobileStylePanel() {
         </StylePanelContextProvider>
       </TldrawUiPopoverContent>
     </TldrawUiPopover>
+    </div>
   )
 })
 

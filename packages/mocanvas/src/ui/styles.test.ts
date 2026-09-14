@@ -325,3 +325,46 @@ describe("style panel sections", () => {
     expect(s.shape).toBe(false)
   })
 })
+
+/**
+ * The bottom edge stacks four rows — the actions row, the toolbar, the zoom
+ * bar and the stats chip — and three of them are placed relative to the
+ * toolbar. The toolbar's own offset moves twice as the layout narrows, and
+ * each rule that recomputed it was a chance for the rows above to be left
+ * behind: the actions row shipped drawn on top of the toolbar because two
+ * rules disagreed, and again at phone width because a third one did.
+ *
+ * So the offset is published once, as a variable, and this asserts that it
+ * stays that way — the kind of invariant no rendering test can see, because
+ * jsdom lays nothing out and a screenshot only covers the width you took it at.
+ */
+describe("the bottom edge's stacking", () => {
+  const css = readFileSync(fileURLToPath(new URL("./ui.css", import.meta.url)), "utf8")
+
+  /** Every `bottom:` declaration in a rule whose selector mentions the toolbar. */
+  function toolbarBottomDeclarations(): string[] {
+    const found: string[] = []
+    for (const match of css.matchAll(/\.mocanvas-toolbar[^{]*\{([^}]*)\}/g)) {
+      for (const decl of match[1]!.split(";")) {
+        if (/^\s*bottom\s*:/.test(decl)) found.push(decl.trim())
+      }
+    }
+    return found
+  }
+
+  it("places the toolbar from the published variable and nowhere else", () => {
+    const declarations = toolbarBottomDeclarations()
+    expect(declarations, "the toolbar is not placed at all").toHaveLength(1)
+    expect(declarations[0], "a second rule computes the toolbar's offset — the rows above it will not follow").toBe(
+      "bottom: var(--mocanvas-ui-toolbar-bottom)",
+    )
+  })
+
+  it("stacks everything above the toolbar off that same variable", () => {
+    for (const selector of [".mocanvas-quick-actions", ".mocanvas-style-dock", ".mocanvas-helper-buttons"]) {
+      const rule = css.match(new RegExp(`\\${selector}[^{]*\\{([^}]*)\\}`))
+      expect(rule, `${selector} has no rule`).not.toBeNull()
+      expect(rule![1], `${selector} is placed by its own arithmetic rather than from the toolbar`).toMatch(/--mocanvas-ui-toolbar-bottom/)
+    }
+  })
+})
