@@ -150,7 +150,7 @@ import { loadMocanvasFile } from "@mocanvas/mocanvas"
 
 const result = loadMocanvasFile(editor, await file.text())
 if (!result.ok) console.error("could not read the file", result.error)
-else if (result.warnings.length) showToast(result.warnings.join("\n"))
+else if (result.warnings.length) console.warn(result.warnings.join("\n"))
 ```
 
 `loadMocanvasFile` takes the JSON text or already-parsed JSON. Before the records
@@ -249,14 +249,13 @@ Two escape hatches, both deliberate:
   are still validated; the rest ride along.
 
 The reason is the round trip. A `.tldr` from a newer generation of the format
-legitimately carries props this build has never heard of —
-`binding.props.snap` is in the fixture here — and dropping or rejecting them
-would silently lose the user's data on the next save. Open such a file in an old
-build, move one shape, save, and the newer props are still in it.
-
-This is the *opposite* of the default for a record your app is *making*:
-`createShapeValidator` on its own rejects undeclared props, which is right,
-because there an undeclared prop is a typo or a forgotten migration.
+legitimately carries props this build has never heard of — `binding.props.snap`
+is in the fixture here — and dropping or rejecting them would silently lose the
+user's data on the next save. Open such a file in an old build, move one shape,
+save, and the newer props are still in it. This is the *opposite* of the default
+for a record your app is *making*: `createShapeValidator` on its own rejects
+undeclared props, because there an undeclared prop is a typo or a forgotten
+migration.
 
 A shape whose *type* has no registered util keeps every prop it arrived with,
 and its envelope fields (`x`, `y`, `index`, `parentId`…) are still validated —
@@ -334,16 +333,14 @@ now:  height = (200 + growY) * scale
 ```
 
 Both are self-consistent, which is why nothing caught it: they agree whenever
-`scale` is 1 or `growY` is 0, and every note the library grew itself was
-correct. They disagree about every note arriving from *outside* — a `.tldr`, or
-an app writing records directly — where `growY` is in unscaled units. Such a
-note came out `growY * (scale - 1)` too short: at scale 1.6 it lost 37.5% of its
-overflow and the text ran past the paper.
-
-The fix is one line, `growY / scale`, run once on load. The cost is everything
-round it: a second version, a `down` that multiplies back, defensive readers so
-a broken `scale` cannot divide by zero, and this section. A prop is a public
-interface; changing its meaning is a breaking change you pay for forever.
+`scale` is 1 or `growY` is 0, so every note the library grew itself was correct.
+They disagree about every note arriving from *outside* — a `.tldr`, or an app
+writing records directly — where `growY` is in unscaled units, and such a note
+came out `growY * (scale - 1)` too short. The fix is one line, `growY / scale`,
+run once on load; the cost is everything round it — a second version, a `down`
+that multiplies back, defensive readers so a broken `scale` cannot divide by
+zero, and this section. Changing what a prop means is a breaking change you pay
+for forever.
 
 ---
 
@@ -526,15 +523,8 @@ drag-resize does not re-request every frame, the network's effective type, and
 `shouldResolveToOriginal`, set for copy, paste and export, where a downscaled
 variant would lose data. A store with one URL per asset can ignore all of it.
 
-Pass yours to the component or the store:
-
-```tsx
-<Mocanvas assets={myAssetStore} />
-// or
-createStore({ shapeUtils, bindingUtils, assets: myAssetStore })
-```
-
-It hangs off the *store* rather than the editor, as `store.props.assets`,
+Pass yours as `<Mocanvas assets={myAssetStore} />` or
+`createStore({ …, assets: myAssetStore })`. It hangs off the *store* rather than the editor, as `store.props.assets`,
 because assets are document-scoped: a snapshot loaded into a store, exported
 from it or synced out of it all need the same uploader, and some of that happens
 with no editor mounted. It is always present — an app supplying none gets

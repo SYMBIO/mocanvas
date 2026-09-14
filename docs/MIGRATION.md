@@ -694,7 +694,7 @@ aspirational.
 
 | Gap | Status |
 | --- | ------ |
-| `ShapeUtil.toSvg`, `ShapeUtil.toBackgroundSvg` | Not `ShapeUtil` members. Custom shapes contribute to SVG export through `registerShapeSvgRenderer(type, renderer)`; without one they fall back to `geometryFallbackSvg`. |
+| `ShapeUtil.toSvg`, `ShapeUtil.toBackgroundSvg` | Both are `ShapeUtil` members, and a util's own implementation takes precedence over the registry. `registerShapeSvgRenderer(type, renderer)` is the other way in, for a shape whose util you do not own; a shape with neither falls back to `geometryFallbackSvg`, which draws its outline. See [FILES.md](FILES.md) §4. |
 | Sync protocol | Wire compatibility with tldraw's own sync protocol is not planned. `@mocanvas/sync` is a working transport of its own — presence records, `store.mergeRemoteChanges`, and a relay — but it does not speak tldraw's wire format. |
 | `image` shape on the GPU | The texture path exists in the engine (`StyleWords.texture` + `uploadTexture`) but the `image` shape still draws an `<img>` in the DOM overlay. |
 | `FrameShapeUtil` default size | mocanvas creates a frame at **160×90**; tldraw creates one at 320×180. Same aspect, half the size. It only bites code that creates a frame *programmatically* without passing `w`/`h` — drawing one with the tool sizes it from the drag either way. Pass explicit dimensions if the size matters to you. Aligning the default is a behaviour change and is not being made in a patch release. |

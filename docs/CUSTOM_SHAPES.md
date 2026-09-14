@@ -685,8 +685,13 @@ export function App() {
 }
 ```
 
-The default toolbar does not grow a button for your tool. Until UI slots exist,
-drive it from your own chrome rendered as `children` of `<Mocanvas>`:
+The default toolbar will grow a button for your tool: register it in the UI
+tool list with `overrides.tools` and the toolbar collects any id outside its own
+layout into an extras group after a divider. [TOOLS.md](TOOLS.md) §10 covers
+that, along with the keyboard shortcut.
+
+You can also skip the built-in chrome entirely and drive the tool from your own,
+rendered as `children` of `<Mocanvas>`:
 
 ```tsx
 <Mocanvas shapeUtils={[CalloutShapeUtil]} tools={[CalloutTool]}>

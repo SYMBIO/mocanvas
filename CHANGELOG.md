@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.8.4
+## 4.8.5
 
 ### Four new guides ship with the package
 
@@ -21,7 +21,21 @@ them, in the tarball and on the website, which renders `/docs/<slug>` out of
 - **Saving and exporting.** Snapshots, `.tldr`, what migrations do when an old
   file meets a new build, and image export.
 
-Nothing in the library changed.
+Three corrections to the existing guides went in with them, all found while
+the new ones were being written against the source: CUSTOM_SHAPES.md §9 said
+the default toolbar cannot grow a button for your tool (it can, through
+`overrides.tools`), MIGRATION.md said `ShapeUtil.toSvg` is not a `ShapeUtil`
+member (it is, and a util's own implementation beats the registry), and
+FILES.md was finished after the first commit of it.
+
+Nothing in the library's code changed.
+
+**4.8.4 was abandoned mid-publish.** `@mocanvas/wasm@4.8.4` reached the
+registry before the run was cancelled and the other six did not, so 4.8.4 is a
+version that only one package has. Nothing depends on it — 4.8.3 pins
+`wasm@4.8.3` — and this release supersedes it. Cancelling was the wrong call:
+letting it finish and correcting the guides in the next release would have cost
+a version number instead of leaving an orphan.
 
 ## 4.8.3
 
