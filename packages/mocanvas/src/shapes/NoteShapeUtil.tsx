@@ -222,7 +222,17 @@ export function getNoteDisplayValues(
   }
 }
 
-/** `growY` a note needs so its (centered) text fits; the note keeps its square width. */
+/**
+ * `growY` a note needs so its (centered) text fits; the note keeps its square
+ * width.
+ *
+ * Returned in *unscaled* units — the label is measured at the scale the note
+ * is actually drawn at, and the overflow is then divided back out, because
+ * `growY` is stored as a number of unit-note pixels and multiplied by `scale`
+ * when the height is computed. Returning the scaled overflow instead is what
+ * made a note from a `.tldr` file, where the prop has always meant the
+ * unscaled thing, come out too short for its own text.
+ */
 export function getNoteGrowY(shape: NoteShape, editor?: { getCurrentTheme?(): TLTheme } | null): number {
   const { richText, text, font, scale } = readNoteProps(shape)
   if (!text) return 0
@@ -234,7 +244,7 @@ export function getNoteGrowY(shape: NoteShape, editor?: { getCurrentTheme?(): TL
     padding: NOTE_PADDING * scale,
     editor: (editor ?? null) as never,
   })
-  return computeGrowY(m.h, side)
+  return computeGrowY(m.h, side) / scale
 }
 
 const LABEL_KEYS: readonly (keyof NoteShapeProps)[] = ["richText", "text", "font", "size", "scale", "fontSizeAdjustment"]
@@ -276,7 +286,7 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape, NoteShapeUtilDisplayValu
 
   getGeometry(shape: NoteShape): Geometry2d {
     const { scale, growY } = readNoteProps(shape)
-    return new Rectangle2d({ width: NOTE_SIZE * scale, height: NOTE_SIZE * scale + growY, isFilled: true })
+    return new Rectangle2d({ width: NOTE_SIZE * scale, height: (NOTE_SIZE + growY) * scale, isFilled: true })
   }
 
   override getRenderStyle(shape: NoteShape): StyleWords {
@@ -295,7 +305,7 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape, NoteShapeUtilDisplayValu
     const colors = getThemeColors(this.editor)
     const textColor = display.labelColor
     const w = NOTE_SIZE * scale
-    const h = NOTE_SIZE * scale + growY
+    const h = (NOTE_SIZE + growY) * scale
     return (
       <>
         {/*
@@ -353,7 +363,7 @@ export class NoteShapeUtil extends ShapeUtil<NoteShape, NoteShapeUtilDisplayValu
 
   override getIndicatorPath(shape: NoteShape): Path2D {
     const { scale, growY } = readNoteProps(shape)
-    return rectPath(NOTE_SIZE * scale, NOTE_SIZE * scale + growY)
+    return rectPath(NOTE_SIZE * scale, (NOTE_SIZE + growY) * scale)
   }
 
   /**

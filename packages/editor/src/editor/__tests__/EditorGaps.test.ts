@@ -114,16 +114,40 @@ describe("the deleted-shapes event", () => {
     }
   })
 
-  it("fires after the removal, so a listener sees the document without them", () => {
+  it("fires before the removal, while a before-delete handler can still veto", () => {
     const editor = makeEditor()
     try {
       const id = box(editor, 0, 0)
-      let visibleToListener: unknown = "not called"
-      editor.on("deleted-shapes", () => {
-        visibleToListener = editor.getShape(id)
+      const order: string[] = []
+      editor.on("deleted-shapes", () => order.push("event"))
+      editor.sideEffects.registerBeforeDeleteHandler("shape", () => {
+        order.push("beforeDelete")
       })
       editor.deleteShapes([id])
-      expect(visibleToListener).toBeUndefined()
+      // The before-delete handler is the only place a delete can be refused,
+      // and whether a shape's own parent is going in the same gesture is the
+      // one thing it cannot work out for itself. Announcing the set after the
+      // handlers told it what it needed once the decision was already made.
+      expect(order).toEqual(["event", "beforeDelete"])
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("hands the whole gesture to a handler deciding about one of its shapes", () => {
+    const editor = makeEditor()
+    try {
+      const parent = box(editor, 0, 0)
+      const child = box(editor, 10, 10)
+      editor.reparentShapes([child], parent)
+      let gesture: string[] = []
+      let sawParentGoingToo: boolean | null = null
+      editor.on("deleted-shapes", (ids) => (gesture = [...ids]))
+      editor.sideEffects.registerBeforeDeleteHandler("shape", (shape) => {
+        if (shape.id === child) sawParentGoingToo = gesture.includes(parent)
+      })
+      editor.deleteShapes([parent])
+      expect(sawParentGoingToo, "the child decided without knowing its parent was going too").toBe(true)
     } finally {
       editor.dispose()
     }

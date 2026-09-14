@@ -46,6 +46,17 @@ import { toRichText } from "../text/rich-text"
  * that are absent, and — for a label-bearing shape — derive `richText` from a
  * legacy plain-text label, which is the shape v5 changed the most.
  */
+function backfillUp(defaults: Readonly<Record<string, unknown>>, options: { richTextFromText?: boolean }) {
+  return (props: MigratableProps): void => {
+    if (options.richTextFromText && props["richText"] === undefined) {
+      props["richText"] = toRichText(typeof props["text"] === "string" ? props["text"] : "")
+    }
+    for (const [key, value] of Object.entries(defaults)) {
+      if (props[key] === undefined) props[key] = structuredClone(value)
+    }
+  }
+}
+
 function backfillMigration(
   type: string,
   defaults: Readonly<Record<string, unknown>>,
@@ -53,20 +64,7 @@ function backfillMigration(
 ): PropsMigrations {
   const versions = createBuiltInShapePropsMigrationIds(type, { BackfillMissingProps: 1 })
   return createShapePropsMigrationSequence({
-    sequence: [
-      {
-        id: versions.BackfillMissingProps,
-        up(props: MigratableProps) {
-          if (options.richTextFromText && props["richText"] === undefined) {
-            props["richText"] = toRichText(typeof props["text"] === "string" ? props["text"] : "")
-          }
-          for (const [key, value] of Object.entries(defaults)) {
-            if (props[key] === undefined) props[key] = structuredClone(value)
-          }
-        },
-        down() {},
-      },
-    ],
+    sequence: [{ id: versions.BackfillMissingProps, up: backfillUp(defaults, options), down() {} }],
   })
 }
 
@@ -112,11 +110,64 @@ export const lineShapeMigrations = backfillMigration("line", { spline: "line", s
 export const textShapeMigrations = backfillMigration("text", { autoSize: true, scale: 1 }, { richTextFromText: true })
 
 /** The note shape's props migrations; see the module comment. */
-export const noteShapeMigrations = backfillMigration(
-  "note",
-  { fontSizeAdjustment: 0, growY: 0, url: "", scale: 1 },
-  { richTextFromText: true },
-)
+/** Named versions of the note shape's props; see {@link noteShapeMigrations}. */
+export const noteShapeVersions = createBuiltInShapePropsMigrationIds("note", {
+  BackfillMissingProps: 1,
+  UnscaleGrowY: 2,
+})
+
+/**
+ * The note shape's props migrations.
+ *
+ * Version 2 changes what `growY` *means*. It is how much taller than its
+ * square the note had to be for the text to fit, and it used to be stored in
+ * screen-ish units — measured with the font, width and padding already
+ * multiplied by `scale`, then added to a scaled box:
+ *
+ * ```
+ * was:  height = 200 * scale + growY
+ * now:  height = (200 + growY) * scale
+ * ```
+ *
+ * Self-consistent either way, which is why nothing here ever caught it: the
+ * two agree whenever `scale` is 1 or `growY` is 0, and every note this
+ * codebase grew itself was correct. What they disagree about is every note
+ * that arrives from *outside* — a `.tldr` file, or an app writing records
+ * directly — where `growY` is in unscaled units. Such a note came out
+ * `growY * (scale - 1)` too short, so at scale 1.6 it lost 37.5% of its
+ * overflow and the text ran past the paper.
+ *
+ * So the stored value is divided by the scale it was measured at, once.
+ */
+export const noteShapeMigrations = createShapePropsMigrationSequence({
+  sequence: [
+    {
+      id: noteShapeVersions.BackfillMissingProps,
+      up: backfillUp({ fontSizeAdjustment: 0, growY: 0, url: "", scale: 1 }, { richTextFromText: true }),
+      down() {},
+    },
+    {
+      id: noteShapeVersions.UnscaleGrowY,
+      up(props: MigratableProps) {
+        props["growY"] = readGrowY(props) / readScale(props)
+      },
+      down(props: MigratableProps) {
+        props["growY"] = readGrowY(props) * readScale(props)
+      },
+    },
+  ],
+})
+
+/** A note's `scale`, never zero — a record with a broken one must not divide by it. */
+function readScale(props: MigratableProps): number {
+  const scale = props["scale"]
+  return typeof scale === "number" && Number.isFinite(scale) && scale > 0 ? scale : 1
+}
+
+function readGrowY(props: MigratableProps): number {
+  const growY = props["growY"]
+  return typeof growY === "number" && Number.isFinite(growY) ? growY : 0
+}
 
 /** The frame shape's props migrations; see the module comment. */
 export const frameShapeMigrations = backfillMigration("frame", { name: "" })

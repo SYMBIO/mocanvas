@@ -6,6 +6,7 @@ import { defaultBindingUtils } from "../bindings"
 import {
   arrowBindingMigrations,
   arrowShapeMigrations,
+  noteShapeVersions,
   arrowShapeVersions,
   drawShapeMigrations,
   groupShapeMigrations,
@@ -93,5 +94,47 @@ describe("built-in props migrations", () => {
     const a = up(arrowShapeMigrations, {})
     const b = up(arrowShapeMigrations, {})
     expect(a["richText"]).not.toBe(b["richText"])
+  })
+})
+
+/**
+ * `growY` changed units in version 2 — see {@link noteShapeMigrations}. A
+ * document at rest holds the old, scaled number, so it has to be divided by
+ * the scale it was measured at or every note with `scale !== 1` gets taller
+ * the moment the new formula multiplies it again.
+ */
+describe("the note's growY migration", () => {
+  const up = (props: Record<string, unknown>) => {
+    const migration = noteShapeMigrations.sequence.find((m) => "id" in m && m.id === noteShapeVersions.UnscaleGrowY)
+    ;(migration as { up(p: Record<string, unknown>): void }).up(props)
+    return props
+  }
+
+  it("divides the stored overflow by the scale it was measured at", () => {
+    expect(up({ growY: 160, scale: 1.6 })["growY"]).toBeCloseTo(100, 6)
+  })
+
+  it("leaves an unscaled note alone", () => {
+    expect(up({ growY: 100, scale: 1 })["growY"]).toBe(100)
+  })
+
+  it("keeps a note that never grew at zero", () => {
+    expect(up({ growY: 0, scale: 2 })["growY"]).toBe(0)
+  })
+
+  it("does not divide by a broken scale", () => {
+    // A record with scale 0 or a missing one would otherwise migrate to
+    // Infinity or NaN, and a note that tall takes the page's bounds with it.
+    expect(up({ growY: 40, scale: 0 })["growY"]).toBe(40)
+    expect(up({ growY: 40 })["growY"]).toBe(40)
+    expect(Number.isFinite(up({ growY: 40, scale: Number.NaN })["growY"] as number)).toBe(true)
+  })
+
+  it("round-trips back to the stored number", () => {
+    const migration = noteShapeMigrations.sequence.find((m) => "id" in m && m.id === noteShapeVersions.UnscaleGrowY)
+    const props: Record<string, unknown> = { growY: 160, scale: 1.6 }
+    ;(migration as { up(p: Record<string, unknown>): void }).up(props)
+    ;(migration as { down(p: Record<string, unknown>): void }).down(props)
+    expect(props["growY"]).toBeCloseTo(160, 6)
   })
 })

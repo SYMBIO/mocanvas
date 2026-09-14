@@ -6,6 +6,7 @@ import {
   NOTE_SIZE,
   NoteShapeUtil,
   getNoteDisplayValues,
+  getNoteGrowY,
   type NoteShape,
   type NoteShapeUtilDisplayValues,
 } from "./NoteShapeUtil"
@@ -105,5 +106,58 @@ describe("a note's font faces", () => {
     expect(new Set(faces.map((f) => `${f.style}/${f.weight}`))).toEqual(
       new Set(["normal/normal", "normal/bold", "italic/normal", "italic/bold"]),
     )
+  })
+})
+
+/**
+ * How tall a note is, and in what units `growY` says so.
+ *
+ * `growY` is how much taller than its square a note had to become for its text
+ * to fit. It used to be stored already multiplied by `scale` and added to a
+ * scaled box; it is stored unscaled now and multiplied with the box:
+ *
+ *     was:  200 * scale + growY
+ *     now:  (200 + growY) * scale
+ *
+ * The two agree whenever `scale` is 1 or `growY` is 0, which is why nothing
+ * here caught it: every note this codebase grew itself was internally
+ * consistent. They disagree about every note that arrives from outside — a
+ * `.tldr` file, or an app writing records directly — where the prop has always
+ * been unscaled. The numbers below are the measured tldraw values.
+ */
+describe("a note's height", () => {
+  const heightOf = (scale: number, growY: number): number =>
+    new NoteShapeUtil(stubEditor()).getGeometry(note({ scale, growY })).bounds.h
+
+  it.each([
+    [1, 100, 300],
+    [1.6, 0, 320],
+    [1.6, 100, 480],
+    [1.6, 250, 720],
+    [2, 100, 600],
+    [2, 250, 900],
+  ])("is (200 + growY) * scale — scale %s, growY %s", (scale, growY, expected) => {
+    expect(heightOf(scale, growY)).toBeCloseTo(expected, 6)
+  })
+
+  it("scales the overflow with the note, not just the square", () => {
+    // The half that made this a real bug rather than a number: at scale 1.6 a
+    // note kept 100 units of overflow while its text grew to 160, so the last
+    // lines ran past the paper.
+    const overflowAtOne = heightOf(1, 100) - heightOf(1, 0)
+    const overflowAtTwo = heightOf(2, 100) - heightOf(2, 0)
+    expect(overflowAtTwo).toBeCloseTo(overflowAtOne * 2, 6)
+  })
+
+  it("still grows a scaled note far enough for its own text", () => {
+    // The other direction: whatever the unit, a note this codebase grew must
+    // still be at least as tall as the label it grew for.
+    const util = new NoteShapeUtil(stubEditor())
+    for (const scale of [1, 1.6, 2]) {
+      const shape = note({ scale, richText: toRichText("a line\nand another\nand a third\nand a fourth") })
+      const grown = { ...shape, props: { ...shape.props, growY: getNoteGrowY(shape, stubEditor()) } } as NoteShape
+      const height = util.getGeometry(grown).bounds.h
+      expect(height, `scale ${scale} left the note shorter than its square`).toBeGreaterThanOrEqual(NOTE_SIZE * scale)
+    }
   })
 })

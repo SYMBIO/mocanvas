@@ -1640,6 +1640,19 @@ export class Editor extends EventEmitter<EditorEvents> {
       if (shape && !shape.isLocked) collect(id)
     }
     if (toDelete.size === 0) return this
+    // Before the removal, which is the one thing a before-delete handler
+    // cannot find out for itself: whether its own parent is going in the same
+    // gesture. That handler is the only place a delete can be vetoed, so it
+    // has to know the whole set *while* it is deciding — announcing the set
+    // afterwards tells it what it needed once the decision is already made.
+    //
+    // The cost is the two things the old order bought, and they are worth
+    // saying out loud. A listener now reads the editor with the shapes still
+    // in it, so one that wants the document without them should read it in an
+    // `after-delete` handler instead. And the emit is inside the gesture, so a
+    // listener that throws takes the deletion with it — which is the same
+    // contract every other before-* handler here already has.
+    this.emit("deleted-shapes", [...toDelete])
     this.run(() => {
       const ps = this.getCurrentPageState()
       const selected = ps.selectedShapeIds.filter((id) => !toDelete.has(id))
@@ -1648,10 +1661,6 @@ export class Editor extends EventEmitter<EditorEvents> {
       if (ps.editingShapeId && toDelete.has(ps.editingShapeId)) this.setEditingShape(null)
       this.store.remove([...toDelete])
     })
-    // After the removal, so a listener that reads the editor sees the document
-    // without them; and outside `run`, so a throwing listener cannot roll the
-    // deletion back.
-    this.emit("deleted-shapes", [...toDelete])
     return this
   }
 

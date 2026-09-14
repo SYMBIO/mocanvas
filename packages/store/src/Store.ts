@@ -123,7 +123,15 @@ interface HandlerSets<R extends UnknownRecord> {
 /**
  * Hooks that run around record writes. `before*` handlers may replace the
  * record being written (or veto a delete); `after*` handlers observe.
- * `operationComplete` handlers run once when the outermost operation ends,
+ * `operationComplete` handlers run when the outermost operation ends, and
+ * again for anything they themselves write — the pattern they are written
+ * against is "set a guard on my own write, clear it in the completion that
+ * closes that write", and swallowing the second completion leaves the guard
+ * set so it eats the *next* real gesture. Bounded by
+ * {@link MAX_OPERATION_COMPLETE_ROUNDS}, since a handler that writes every
+ * time it runs would otherwise never settle.
+ *
+ * Originally they ran once when the outermost operation ended,
  * before history listeners are notified.
  */
 export class StoreSideEffects<R extends UnknownRecord> {
@@ -286,6 +294,35 @@ export class StoreSideEffects<R extends UnknownRecord> {
   handleOperationComplete(source: ChangeSource): void {
     for (const handler of this.operationComplete) handler(source)
   }
+}
+
+/**
+ * How many times `operationComplete` handlers may re-run for their own writes
+ * before the store decides they will never settle.
+ *
+ * Generous on purpose: a legitimate cascade is a handler writing something a
+ * second handler reacts to, which is two or three rounds, never a hundred.
+ */
+const MAX_OPERATION_COMPLETE_ROUNDS = 100
+
+/**
+ * Squash `entries` into one per consecutive run of the same source.
+ *
+ * Consecutive rather than global, so a user gesture with a remote merge in the
+ * middle stays in the order it happened instead of being sorted into two piles.
+ */
+function batchBySource<R extends UnknownRecord>(entries: readonly HistoryEntry<R>[]): HistoryEntry<R>[] {
+  const batches: HistoryEntry<R>[] = []
+  for (const entry of entries) {
+    if (isRecordsDiffEmpty(entry.changes)) continue
+    const last = batches[batches.length - 1]
+    if (last && last.source === entry.source) {
+      last.changes = squashRecordDiffs([last.changes, entry.changes])
+    } else {
+      batches.push({ source: entry.source, changes: entry.changes })
+    }
+  }
+  return batches
 }
 
 /* ------------------------------------------------------------------------ */
@@ -676,6 +713,8 @@ export class Store<R extends UnknownRecord = UnknownRecord, Props = unknown> {
   private readonly typeIndexes = new Map<string, TypeIndex<R>>()
   private readonly listeners = new Set<Listener<R>>()
   private pendingEntries: HistoryEntry<R>[] = []
+  /** Monotonic count of recorded changes; see `recordChange`. */
+  private changeCount = 0
   private readonly extractStack: RecordsDiff<R>[] = []
   private depth = 0
   private source: ChangeSource = "user"
@@ -1110,6 +1149,10 @@ export class Store<R extends UnknownRecord = UnknownRecord, Props = unknown> {
   }
 
   private recordChange(id: IdOf<R>, before: R | undefined, after: R | undefined) {
+    // Counted rather than inferred from `pendingEntries`: a write with the
+    // same source appends to the entry already there instead of pushing a new
+    // one, so the array's length says nothing about whether anything happened.
+    this.changeCount++
     const last = this.pendingEntries[this.pendingEntries.length - 1]
     let entry: HistoryEntry<R>
     if (last && last.source === this.source) {
@@ -1131,9 +1174,27 @@ export class Store<R extends UnknownRecord = UnknownRecord, Props = unknown> {
       this.inOperationComplete = true
       const prevSource = this.source
       this.source = source
+      // Writes made by a handler belong to this operation — `depth` stays
+      // above zero so they do not try to complete themselves — but they still
+      // have to *reach* a completion of their own. See the loop below.
       this.depth++
       try {
-        transact(() => unsafe__withoutCapture(() => this.sideEffects.handleOperationComplete(source)))
+        let round = 0
+        for (;;) {
+          const before = this.changeCount
+          transact(() => unsafe__withoutCapture(() => this.sideEffects.handleOperationComplete(source)))
+          if (this.changeCount === before) break
+          if (++round >= MAX_OPERATION_COMPLETE_ROUNDS) {
+            // Stopping is the lesser evil: a handler that writes on every
+            // completion would otherwise spin here forever with the app frozen
+            // and no output. Loud, because the guard below it is now stale.
+            console.error(
+              `mocanvas: operationComplete handlers still wrote after ${MAX_OPERATION_COMPLETE_ROUNDS} rounds; ` +
+                `one of them writes every time it runs. Giving up — later handlers in this operation did not run.`,
+            )
+            break
+          }
+        }
       } finally {
         this.depth--
         this.source = prevSource
@@ -1156,18 +1217,33 @@ export class Store<R extends UnknownRecord = UnknownRecord, Props = unknown> {
     return squashRecordDiffs(diffs)
   }
 
+  /**
+   * Tell the listeners what the operation changed — once.
+   *
+   * Per write was the old behaviour and it defeats the point of a batch: a
+   * listener saw every intermediate state the operation passed through. That
+   * is not a cosmetic difference for the two things people actually put on a
+   * listener. A sync binding published each half-applied step to its peers, so
+   * a peer rendered a state that never existed here as an intended one; and a
+   * save-on-change handler wrote the document once per operation *step*.
+   *
+   * Entries are squashed in consecutive runs of the same source rather than
+   * all together, because one operation can carry both — a remote merge nested
+   * inside a user gesture — and a listener filtered to one source must never
+   * be handed the other's changes, nor have their order rearranged.
+   */
   private flushHistory() {
     const entries = this.pendingEntries
     this.pendingEntries = []
     if (this.listeners.size === 0) return
-    for (const entry of entries) {
-      if (isRecordsDiffEmpty(entry.changes)) continue
+    for (const batch of batchBySource(entries)) {
+      if (isRecordsDiffEmpty(batch.changes)) continue
       for (const listener of Array.from(this.listeners)) {
-        if (listener.filters.source !== "all" && listener.filters.source !== entry.source) continue
+        if (listener.filters.source !== "all" && listener.filters.source !== batch.source) continue
         const changes =
-          listener.filters.scope === "all" ? entry.changes : this.filterDiffByScope(entry.changes, listener.filters.scope)
+          listener.filters.scope === "all" ? batch.changes : this.filterDiffByScope(batch.changes, listener.filters.scope)
         if (isRecordsDiffEmpty(changes)) continue
-        listener.onHistory({ changes, source: entry.source })
+        listener.onHistory({ changes, source: batch.source })
       }
     }
   }

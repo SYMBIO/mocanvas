@@ -534,7 +534,7 @@ describe("side effects", () => {
     expect(Object.keys(entries[0]!.changes.removed).sort()).toEqual([dune.id, herbert.id].sort())
   })
 
-  it("operationComplete runs once per outermost operation and may write", () => {
+  it("runs operationComplete for the outermost operation, and again for what the handler wrote", () => {
     const store = makeStore()
     const complete = vi.fn(() => {
       if (!store.has(herbert.id)) store.put([herbert])
@@ -545,7 +545,11 @@ describe("side effects", () => {
       store.put([dune])
       store.atomic(() => store.put([{ ...dune, pages: 2 }]))
     })
-    expect(complete).toHaveBeenCalledTimes(1)
+    // Twice: once closing the gesture, once closing the handler's own write —
+    // the second is what lets a handler clear a guard it set on that write.
+    // The round that writes nothing is the one that ends the loop.
+    expect(complete).toHaveBeenCalledTimes(2)
+    // Still one operation to the outside, handler's write included.
     expect(entries).toHaveLength(1)
     expect(Object.keys(entries[0]!.changes.added).sort()).toEqual([dune.id, herbert.id].sort())
   })
@@ -629,5 +633,91 @@ describe("scale", () => {
     expect(tPut).toBeLessThan(5000)
     expect(tUpdates).toBeLessThan(2000)
     expect(tInsert).toBeLessThan(200)
+  })
+})
+
+/**
+ * What a batch is worth to the outside.
+ *
+ * Both of these were measured against tldraw by a consumer rather than found
+ * here, and both are the kind of difference types cannot show: the store did
+ * the right thing to the records and told the outside world about it wrongly.
+ */
+describe("an operation, as the outside sees it", () => {
+  it("notifies once, not once per write", () => {
+    const store = makeStore()
+    store.put([herbert])
+    const seen: RecordsDiff<R>[] = []
+    store.listen(({ changes }) => seen.push(changes), { scope: "all", source: "all" })
+    store.atomic(() => {
+      store.update(herbert.id, (a) => ({ ...a, name: "one" }))
+      store.update(herbert.id, (a) => ({ ...a, name: "two" }))
+    })
+    // A batch that reports its own intermediate states is not a batch: a sync
+    // binding on this listener publishes every half-applied step to its peers.
+    expect(seen).toHaveLength(1)
+    expect((seen[0]!.updated[herbert.id] as [Author, Author])[1].name).toBe("two")
+  })
+
+  it("squashes the whole operation into the one notification", () => {
+    const store = makeStore()
+    const seen: RecordsDiff<R>[] = []
+    store.listen(({ changes }) => seen.push(changes), { scope: "all", source: "all" })
+    store.atomic(() => {
+      store.put([herbert])
+      store.put([dune])
+    })
+    expect(seen).toHaveLength(1)
+    expect(Object.keys(seen[0]!.added).sort()).toEqual([herbert.id, dune.id].sort())
+  })
+
+  it("keeps a nested remote merge apart from the gesture around it", () => {
+    const store = makeStore()
+    store.put([herbert])
+    const seen: { source: string; ids: string[] }[] = []
+    store.listen(({ changes, source }) => seen.push({ source, ids: Object.keys({ ...changes.added, ...changes.updated }) }), {
+      scope: "all",
+      source: "all",
+    })
+    store.atomic(() => {
+      store.update(herbert.id, (a) => ({ ...a, name: "mine" }))
+      store.mergeRemoteChanges(() => store.put([dune]))
+    })
+    // Squashed by consecutive run, so a listener filtered to one source is
+    // never handed the other's changes — and the order still holds.
+    expect(seen.map((s) => s.source)).toEqual(["user", "remote"])
+  })
+
+  it("completes again for what an operationComplete handler writes", () => {
+    const store = makeStore()
+    store.put([herbert])
+    const completions: number[] = []
+    let wrote = false
+    store.sideEffects.registerOperationCompleteHandler(() => {
+      completions.push(completions.length)
+      if (wrote) return
+      wrote = true
+      store.update(herbert.id, (a) => ({ ...a, name: "from the handler" }))
+    })
+    store.atomic(() => store.update(herbert.id, (a) => ({ ...a, name: "from the gesture" })))
+    // The pattern these handlers are written against is "set a guard on my own
+    // write, clear it in the completion that closes it". One completion leaves
+    // the guard set, and it then eats the next real gesture.
+    expect(completions.length).toBeGreaterThanOrEqual(2)
+    expect(store.get(herbert.id)!.name).toBe("from the handler")
+  })
+
+  it("stops rather than spinning when a handler writes every time", () => {
+    const store = makeStore()
+    store.put([herbert])
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {})
+    let n = 0
+    store.sideEffects.registerOperationCompleteHandler(() => {
+      store.update(herbert.id, (a) => ({ ...a, name: `round ${++n}` }))
+    })
+    store.atomic(() => store.update(herbert.id, (a) => ({ ...a, name: "start" })))
+    expect(n).toBeLessThan(200)
+    expect(spy.mock.calls.map((c) => String(c[0])).join("")).toMatch(/never settle|Giving up|rounds/)
+    spy.mockRestore()
   })
 })
