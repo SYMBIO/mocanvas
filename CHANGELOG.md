@@ -1,5 +1,39 @@
 # Changelog
 
+## 4.6.0
+
+### The common actions had no home
+
+Undo, redo, delete and duplicate were drawn as a bare row with no
+`mocanvas-panel` class — and that class is the selector the UI's own variables
+are declared on. So `gap` and `bottom` in the row's rule were both invalid at
+computed-value time, which drops them: no gap, no dock, and the buttons landed
+unstyled and cramped at the top edge of the canvas. The actions menu's trigger
+had no placement at all and sat in the container's top-left corner, half under
+the menu plate.
+
+They now live where the room is:
+
+- **Wide** (tablet and up), in the top-left plate beside the page picker,
+  separated by a hairline — one bar that says where you are and what you can do
+  to what you have selected.
+- **Narrow**, docked above the toolbar, a thumb's reach from the tools they
+  follow.
+
+The actions menu rides at the end of that row in both. One row, one place: a
+copy is never drawn in both, and the trigger is never left unplaced.
+
+**`--mocanvas-ui-toolbar-bottom`** is new, and is where the toolbar's bottom
+edge is published. The rows that stack above it — the actions row, "Back to
+content" — derive from it instead of recomputing it, which is how the actions
+row came to be drawn on top of the toolbar on a narrow layout the first time.
+
+**Slots are unchanged.** `components={{ QuickActions: null }}` still removes the
+row, and a replacement still appears in whichever place the row belongs to;
+the panel renders the slot rather than its own copy. Removing the row removes
+the actions menu it carries — replace the row if you want one without the
+other.
+
 ## 4.5.2
 
 ### The grid answered the camera backwards in both directions
