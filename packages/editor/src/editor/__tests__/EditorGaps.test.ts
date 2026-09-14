@@ -396,3 +396,86 @@ describe("editor.run, as the store sees it", () => {
     }
   })
 })
+
+/**
+ * `history: "ignore"` keeps a write out of the undo stack, and it has to keep
+ * working now that `run` opens a store operation.
+ *
+ * The history manager is a *store listener* — it checks its ignore counter
+ * when the notification arrives, not when the write happens. So the counter
+ * has to still be up when the operation ends, which means `ignore` must wrap
+ * the operation rather than sit inside it. With the nesting the other way
+ * round the writes land in the undo stack after all, and the next Cmd+Z takes
+ * them with it: an agent's shape, or a collaborator's committed turn, reverted
+ * as part of a user undoing their own edit — and not restorable, because from
+ * that user's side it was never a step of theirs.
+ */
+describe("run with history: ignore", () => {
+  it("keeps a created shape out of the user's undo", () => {
+    const editor = makeEditor()
+    try {
+      editor.markHistoryStoppingPoint("user-edit")
+      const mine = box(editor, 0, 0)
+      let theirs: string | undefined
+      editor.run(() => {
+        theirs = box(editor, 100, 100)
+      }, { history: "ignore" })
+      editor.undo()
+      expect(editor.getShape(mine as never), "the user's own edit should have gone").toBeUndefined()
+      expect(editor.getShape(theirs as never), "the ignored write went with it").toBeDefined()
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("keeps an update to another shape out of it too", () => {
+    const editor = makeEditor()
+    try {
+      const mine = box(editor, 0, 0)
+      const theirs = box(editor, 200, 200)
+      editor.markHistoryStoppingPoint("user-move")
+      editor.updateShapes([{ id: mine, type: "box", x: 100 }] as never)
+      editor.run(() => editor.updateShapes([{ id: theirs, type: "box", y: 250 }] as never), { history: "ignore" })
+      editor.undo()
+      expect(editor.getShape(mine as never)!.x, "the user's move should have been undone").toBe(0)
+      expect(editor.getShape(theirs as never)!.y, "the ignored update went with it").toBe(250)
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("does NOT protect a write to the very record the user is undoing", () => {
+    // Known, and older than the batching work — it fails the same way on the
+    // implementation `run` had two releases ago. Undo restores whole records,
+    // not fields, so reverting the user's edit to a shape puts back every
+    // field of that shape as it was at the mark, an ignored one included.
+    //
+    // `history: "ignore"` promises that the write is not a *step* in the undo
+    // stack. It cannot promise that a different step will not overwrite it.
+    // Written down so the next person to meet it knows which of the two they
+    // are looking at.
+    const editor = makeEditor()
+    try {
+      const id = box(editor, 0, 0)
+      editor.markHistoryStoppingPoint("user-move")
+      editor.updateShapes([{ id, type: "box", x: 100 }] as never)
+      editor.run(() => editor.updateShapes([{ id, type: "box", y: 250 }] as never), { history: "ignore" })
+      editor.undo()
+      expect(editor.getShape(id as never)!.y).toBe(0)
+    } finally {
+      editor.dispose()
+    }
+  })
+
+  it("adds nothing to the undo stack at all", () => {
+    const editor = makeEditor()
+    try {
+      editor.markHistoryStoppingPoint("start")
+      const before = editor.history.getNumUndos()
+      editor.run(() => box(editor, 10, 10), { history: "ignore" })
+      expect(editor.history.getNumUndos()).toBe(before)
+    } finally {
+      editor.dispose()
+    }
+  })
+})

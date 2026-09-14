@@ -867,10 +867,15 @@ export class Editor extends EventEmitter<EditorEvents> {
    * state of the document. A sync binding published that state to its peers.
    */
   run<T>(fn: () => T, opts: { history?: "record" | "ignore" | "record-preserveRedoStack" } = {}): T {
-    return this.store.atomic(() => {
-      if (opts.history === "ignore") return this.history.ignore(fn)
-      return fn()
-    })
+    // `ignore` OUTSIDE the operation, not inside it. The history manager is a
+    // store listener and reads its ignore counter when the notification
+    // arrives — which, now that the whole callback is one operation, is after
+    // the callback has returned. Nested the other way round the counter was
+    // already back to zero by then, so an "ignored" write landed in the undo
+    // stack and the user's next Cmd+Z reverted an agent's shape or a
+    // collaborator's turn along with their own edit.
+    if (opts.history === "ignore") return this.history.ignore(() => this.store.atomic(fn))
+    return this.store.atomic(fn)
   }
 
   /** @deprecated use `run` */
