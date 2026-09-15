@@ -1,5 +1,39 @@
 # Changelog
 
+## 4.8.10
+
+The bottom edge is one row again.
+
+### The toolbar stays on the zoom bar's row
+
+Below 1290px it moved up to a row of its own, and the row it left behind held
+one 152px zoom bar and 440px of nothing. Two rows of chrome for one row of
+content, on the canvas that had the least to spare.
+
+It reserves the zoom bar's width on its left now and centres in what is left
+of that row — the bargain the actions row already makes beside the style dock.
+The right end is reserved only when the stats chip is actually on the row,
+which outside debug mode it is not. One tool moves into the overflow menu to
+pay for it: eight inline instead of nine on a 606px canvas, and a row of
+canvas back.
+
+Reserving 300px a side is what a bar that has to stay on the container's
+centre costs, and that is still what happens above 1290px, where the canvas
+can pay it.
+
+`--mocanvas-ui-dock-left` and `--mocanvas-ui-dock-right` are the two ends,
+each defaulting to `--mocanvas-ui-dock`, which still means both. All three
+must stay plain lengths or a `var()` to one: `readBarMetrics` reads them with
+`parseFloat` to decide how many tools stay inline, and while `var()` is
+substituted into a custom property's computed value, `calc()` is not.
+
+### A phone with no debug panel gets its empty row back
+
+The phone layout put the toolbar two rows up, clearing the zoom bar and the
+stats chip below it. The stats chip is a debug panel, so on every phone-width
+editor that is not being debugged — all of them — the second row was empty.
+It is counted only when the chip is there.
+
 ## 4.8.9
 
 Three things about a canvas in a column, all of them from the same screenshot.

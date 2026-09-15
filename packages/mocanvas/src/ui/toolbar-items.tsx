@@ -254,12 +254,16 @@ function readBarMetrics(el: HTMLElement): BarMetrics {
   }
   const pad = px("--mocanvas-ui-pad", 4)
   const inset = px("--mocanvas-ui-inset", 12)
-  const dock = px("--mocanvas-ui-dock", 300)
+  // Per side, because the two ends of the row are not always both occupied:
+  // the stats chip is a debug panel, so a narrow editor usually has only the
+  // zoom bar to keep out of, on the left.
+  const dockLeft = px("--mocanvas-ui-dock-left", 300)
+  const dockRight = px("--mocanvas-ui-dock-right", 300)
   return {
     slot: px("--mocanvas-ui-btn", 40) + px("--mocanvas-ui-gap", 2),
     // Matches `.mocanvas-toolbar`'s `max-width`, plus the plate's own padding
     // and 1px border on each side.
-    reserved: 2 * (inset + dock + pad + 1),
+    reserved: 2 * (inset + pad + 1) + dockLeft + dockRight,
   }
 }
 

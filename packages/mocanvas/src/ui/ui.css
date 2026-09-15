@@ -52,8 +52,18 @@
    * Width the bottom-left and bottom-right docks (zoom bar, stats chip) reserve
    * on either side of the centred toolbar. The toolbar wraps rather than grow
    * into that reservation, so the three can never collide.
+   *
+   * Named per side as well, because the two ends of that row are not always
+   * both occupied: the stats chip is a debug panel and is usually absent, so a
+   * narrow editor can give the toolbar everything to the right of the zoom bar
+   * instead of reserving for a plate that is not there. Keep every one of the
+   * three a plain length — `readBarMetrics` reads them with `parseFloat` to
+   * work out how many tools stay inline, and `var()` resolves for it while
+   * `calc()` does not.
    */
   --mocanvas-ui-dock: 300px;
+  --mocanvas-ui-dock-left: var(--mocanvas-ui-dock);
+  --mocanvas-ui-dock-right: var(--mocanvas-ui-dock);
   /* Height the bottom edge occupies; the style panel stops above it. */
   --mocanvas-ui-bottom-dock: 62px;
   --mocanvas-ui-font: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -123,11 +133,11 @@
  * letting the margins centre a `max-content` box has no such cap.
  */
 .mocanvas-toolbar {
-  left: var(--mocanvas-ui-inset);
-  right: var(--mocanvas-ui-inset);
+  left: calc(var(--mocanvas-ui-inset) + var(--mocanvas-ui-dock-left));
+  right: calc(var(--mocanvas-ui-inset) + var(--mocanvas-ui-dock-right));
   bottom: var(--mocanvas-ui-toolbar-bottom);
   width: max-content;
-  max-width: calc(100% - 2 * (var(--mocanvas-ui-inset) + var(--mocanvas-ui-dock)));
+  max-width: calc(100% - 2 * var(--mocanvas-ui-inset) - var(--mocanvas-ui-dock-left) - var(--mocanvas-ui-dock-right));
   margin-inline: auto;
   flex-wrap: wrap;
   justify-content: center;
@@ -216,25 +226,28 @@
  * until it names that container too.
  */
 @container mocanvas-ui (max-width: 1290px) {
-  .mocanvas,
-  .mocanvas-panel {
-    /* the toolbar now has a row of its own above the zoom bar */
-    --mocanvas-ui-bottom-dock: 124px;
-    --mocanvas-ui-toolbar-bottom: calc(2 * var(--mocanvas-ui-inset) + var(--mocanvas-ui-row));
-  }
-
   /*
-   * Nothing shares this row any more, so the reservation is no longer about
-   * collision — it is about the bar staying a plate on a document rather than
-   * a strip across it. A button and a half clear at each end; whatever no
-   * longer fits goes to the overflow menu, which is where a thirteenth tool
-   * belongs on a 600px canvas anyway.
+   * The toolbar stays on the zoom bar's row and takes everything to the right
+   * of it, rather than moving up to a row of its own.
    *
-   * A plain length on purpose. `readBarMetrics` parses this property to decide
-   * how many tools stay inline, and `parseFloat("calc(1.5 * 40px)")` is `NaN`.
+   * Reserving 300px a side is what a bar that has to stay on the container's
+   * centre costs, and below 1290px the canvas cannot pay it — so the bar took
+   * a row instead, and the row below it held one 152px plate and 440px of
+   * nothing. It centres in what is left of the zoom bar's row now, the way the
+   * actions row centres beside the style dock: two rows of chrome become one,
+   * at the price of one tool moving into the overflow menu.
+   *
+   * 176px is the zoom bar at its widest — a five-character readout — plus a
+   * gap. The right end is reserved only when the stats chip is actually there,
+   * which outside debug mode it is not.
    */
   .mocanvas-toolbar {
-    --mocanvas-ui-dock: 60px;
+    --mocanvas-ui-dock-left: 176px;
+    --mocanvas-ui-dock-right: 0px;
+  }
+
+  :has(> .mocanvas-stats) > .mocanvas-toolbar {
+    --mocanvas-ui-dock-right: 176px;
   }
 }
 
@@ -246,8 +259,21 @@
 @container mocanvas-ui (max-width: 560px) {
   .mocanvas,
   .mocanvas-panel {
-    /* the stats chip has taken a row of its own, below the zoom bar */
+    /* a row of its own, above the zoom bar */
+    --mocanvas-ui-toolbar-bottom: calc(2 * var(--mocanvas-ui-inset) + var(--mocanvas-ui-row));
+    --mocanvas-ui-bottom-dock: 124px;
+  }
+
+  /*
+   * One row higher again when the stats chip is there, since it takes a row
+   * below the zoom bar. It was counted unconditionally, so a phone-width
+   * editor with no debug panel — every one of them — kept an empty row
+   * between its toolbar and its zoom bar.
+   */
+  :has(> .mocanvas-stats) > .mocanvas,
+  :has(> .mocanvas-stats) > .mocanvas-panel {
     --mocanvas-ui-toolbar-bottom: calc(4 * var(--mocanvas-ui-inset) + 2 * var(--mocanvas-ui-row));
+    --mocanvas-ui-bottom-dock: 186px;
   }
 
   .mocanvas-stats {
@@ -256,7 +282,8 @@
 
   /* No room to be elegant with: the bar takes the width it has. */
   .mocanvas-toolbar {
-    --mocanvas-ui-dock: 0px;
+    --mocanvas-ui-dock-left: 0px;
+    --mocanvas-ui-dock-right: 0px;
   }
 
   .mocanvas-stylepanel {

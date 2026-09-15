@@ -447,12 +447,26 @@ describe("the chrome measures its container", () => {
 describe("the toolbar's reservation stays readable by both halves", () => {
   const css = readFileSync(fileURLToPath(new URL("./ui.css", import.meta.url)), "utf8")
 
-  it("is a plain length everywhere it is set", () => {
-    const values = [...css.matchAll(/--mocanvas-ui-dock:\s*([^;]+);/g)].map((match) => match[1]!.trim())
+  it("is a plain length everywhere any of the three are set", () => {
+    const values = [...css.matchAll(/--mocanvas-ui-dock(?:-left|-right)?:\s*([^;]+);/g)].map((match) => match[1]!.trim())
     expect(values.length, "nothing reserves room for the docks at all").toBeGreaterThan(0)
     for (const value of values) {
-      expect(value, "a value `parseFloat` cannot read — the bar will fall back to 300px").toMatch(/^\d+(\.\d+)?px$/)
+      // `var()` is substituted into a custom property's computed value, so
+      // `parseFloat` still sees a length through one; `calc()` is not, and
+      // reads as `NaN`.
+      expect(value, "a value `parseFloat` cannot read — the bar will fall back to 300px").toMatch(
+        /^(\d+(\.\d+)?px|var\(--mocanvas-ui-dock\))$/,
+      )
     }
+  })
+
+  it("is read per side by the code that splits the bar", () => {
+    // The stylesheet reserves the two ends separately — the stats chip is a
+    // debug panel and usually absent — and the split has to reserve the same
+    // two, or the bar keeps room for a plate that is not on the row.
+    const bar = readFileSync(fileURLToPath(new URL("./toolbar-items.tsx", import.meta.url)), "utf8")
+    expect(bar, "the split still reserves one symmetric dock").toMatch(/--mocanvas-ui-dock-left/)
+    expect(bar, "the split still reserves one symmetric dock").toMatch(/--mocanvas-ui-dock-right/)
   })
 })
 
