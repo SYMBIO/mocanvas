@@ -367,6 +367,29 @@ describe("the bottom edge's stacking", () => {
       expect(rule![1], `${selector} is placed by its own arithmetic rather than from the toolbar`).toMatch(/--mocanvas-ui-toolbar-bottom/)
     }
   })
+
+  /*
+   * Sharing a line is not the same as fitting on one. The actions row was
+   * centred on the whole container with `translateX(-50%)` while the style
+   * dock held the right end of the same line, and on a phone-width embed the
+   * row grew out from the centre until the two overlapped — the dock drawn on
+   * top of the last action. Same class of bug as the rows above disagreeing
+   * about the toolbar's offset, one axis over.
+   */
+  it("leaves the style dock its end of the actions row's line", () => {
+    const row = css.match(/\.mocanvas-quick-actions[^{]*\{([^}]*)\}/)
+    expect(row![1], "the row is centred on the container, so its width is free to reach the dock").not.toMatch(
+      /translateX/,
+    )
+    expect(row![1], "the row is not centred between the insets the way the toolbar is").toMatch(/margin-inline:\s*auto/)
+    expect(row![1], "a row too wide for its line has nowhere to go but over its neighbours").toMatch(
+      /flex-wrap:\s*wrap/,
+    )
+
+    const reservation = css.match(/:has\(> \.mocanvas-style-dock\) > \.mocanvas-quick-actions\s*\{([^}]*)\}/)
+    expect(reservation, "nothing keeps the row off the dock").not.toBeNull()
+    expect(reservation![1], "the reservation does not account for the dock's width").toMatch(/--mocanvas-ui-row/)
+  })
 })
 
 /**

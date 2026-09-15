@@ -1,5 +1,38 @@
 # Changelog
 
+## 4.8.7
+
+Two more the same screenshot shows, both in the bottom edge of a narrow embed.
+
+### The actions row leaves the style dock its end of the line
+
+`.mocanvas-style-dock` holds the right end of the line the common actions sit
+in — that is what the rule says it is for. The actions row was centred on the
+whole container with `translateX(-50%)`, so it grew out from the middle until
+the two met: on a 333px embed the dock was drawn on top of the last action,
+four pixels of overlap and a button you could not press.
+
+The row is now centred the way the toolbar is, between the insets by auto
+margins, and reserves the dock's width while the dock is on the line. Centred
+in what is left rather than on the container: reserving on both sides to keep
+it on the true centre costs twice the width, and at the widths this dock
+appears at that is width the row does not have. A row wider than its line wraps
+inside it now instead of hanging off both ends.
+
+The same variable comment that promised `--mocanvas-ui-dock` would keep the
+toolbar, zoom bar and stats chip from colliding did not cover the row above
+them; a test asserts the reservation now, next to the one about the offset
+those three share.
+
+### The style swatch follows the same rule as the panel it stands for
+
+A selected shape that declares no styles — every custom shape that has not
+asked for a colour or a dash — still has an opacity, so the docked panel shows
+one. The narrow layout's swatch dropped out on a second, stricter rule and
+rendered nothing, which made opacity a thing you could only reach on a wide
+screen. Both now ask the same question, and a test renders the two layouts
+against the same editor to keep them asking it.
+
 ## 4.8.6
 
 Three things in the default UI that were wrong in a way only a screenshot shows.

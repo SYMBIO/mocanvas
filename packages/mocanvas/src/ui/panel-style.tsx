@@ -113,10 +113,15 @@ export const MobileStylePanel = track(function MobileStylePanel() {
   const editor = useEditor()
   const styles = useRelevantStyles()
   const disabled = editor.getIsReadonly()
-  // Same rule as the docked panel: a swatch that opens a panel about nothing
-  // is the same mistake in less space.
-  if (editor.getSelectedShapeIds().length === 0 && NON_CREATING_TOOLS.has(editor.getCurrentToolId())) return null
-  if (!styles) return null
+  const hasSelection = editor.getSelectedShapeIds().length > 0
+  // Both rules are the docked panel's, and they have to stay its rules: a
+  // swatch that opens a panel about nothing is the same mistake in less space,
+  // and a selection with no styles in common is still a selection with an
+  // opacity. Held apart, the narrow layout was the one that lost — a custom
+  // shape that declares no styles could be faded on a desktop and not on a
+  // phone, where the swatch for it was never drawn.
+  if (!hasSelection && NON_CREATING_TOOLS.has(editor.getCurrentToolId())) return null
+  if (!styles && !hasSelection) return null
   return (
     <div className="mocanvas-panel mocanvas-style-dock">
     <TldrawUiPopover id="mobile-style-panel" side="above">

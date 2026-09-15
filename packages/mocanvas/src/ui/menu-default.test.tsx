@@ -590,6 +590,25 @@ describe("the style trigger on a narrow layout", () => {
     expect(trigger, "no style trigger on a narrow layout").not.toBeNull()
     expect(trigger!.closest(".mocanvas-panel"), "the trigger is outside every plate — no variables, no placement").not.toBeNull()
   })
+
+  /*
+   * The two panels answer the same question and have to answer it the same
+   * way. A shape that declares no styles of its own — every custom shape that
+   * has not asked for colour or dash — still has an opacity, so selecting one
+   * gives the docked panel something to show. The narrow layout dropped out on
+   * a second, stricter rule and showed nothing, which made opacity a thing you
+   * could only reach on a wide screen.
+   */
+  it.each([
+    ["wide", false],
+    ["narrow", true],
+  ])("appears on the %s layout for a selection with no styles in common", (_layout, forceMobile) => {
+    const parts = makeEditor()
+    ;(parts.editor as unknown as { getSharedStyles: () => Map<string, unknown> }).getSharedStyles = () => new Map()
+    ;(parts.editor as unknown as { getSelectedShapeIds: () => string[] }).getSelectedShapeIds = () => ["shape:a"]
+    renderChrome(parts, undefined, { forceMobile })
+    expect(document.querySelector("[aria-label='Style']"), "nothing to style a selected shape with").not.toBeNull()
+  })
 })
 
 

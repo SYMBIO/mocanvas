@@ -890,14 +890,23 @@
 /*
  * Standalone, it docks above the toolbar rather than over the middle of the
  * canvas — the actions are a thumb's reach from the tools they follow.
+ *
+ * Centred the way the toolbar is — between the insets, by auto margins rather
+ * than by `translateX(-50%)` — so that a row wider than the space it has wraps
+ * inside its line instead of hanging off both ends of it.
  */
 .mocanvas-quick-actions,
 .mocanvas-helper-buttons {
   position: absolute;
-  left: 50%;
+  left: var(--mocanvas-ui-inset);
+  right: var(--mocanvas-ui-inset);
   bottom: calc(var(--mocanvas-ui-toolbar-bottom) + var(--mocanvas-ui-row) + var(--mocanvas-ui-inset));
-  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 2 * var(--mocanvas-ui-inset));
+  margin-inline: auto;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: var(--mocanvas-ui-gap);
   z-index: 10;
 }
@@ -916,6 +925,19 @@
 .mocanvas-style-dock {
   right: var(--mocanvas-ui-inset);
   bottom: calc(var(--mocanvas-ui-toolbar-bottom) + var(--mocanvas-ui-row) + var(--mocanvas-ui-inset));
+}
+
+/*
+ * The style dock is the right end of the actions row's line, so the row has to
+ * stop short of it — the bargain `--mocanvas-ui-dock` strikes for the toolbar,
+ * made here only while the dock is actually on the line. Reserved on one side
+ * rather than both: reserving symmetrically to keep the row on the container's
+ * centre costs twice the width, and at the widths this dock appears at, that
+ * is a width the row does not have. It centres in what is left instead.
+ */
+:has(> .mocanvas-style-dock) > .mocanvas-quick-actions {
+  right: calc(var(--mocanvas-ui-inset) + var(--mocanvas-ui-row) + var(--mocanvas-ui-inset));
+  max-width: calc(100% - 3 * var(--mocanvas-ui-inset) - var(--mocanvas-ui-row));
 }
 
 /*
