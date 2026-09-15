@@ -128,7 +128,7 @@ export const MobileStylePanel = track(function MobileStylePanel() {
       <TldrawUiPopoverTrigger label="Style" className={disabled ? "mocanvas-btn mocanvas-btn--disabled" : "mocanvas-btn"}>
         <Icon name="fill-solid" />
       </TldrawUiPopoverTrigger>
-      <TldrawUiPopoverContent label="Style" className="mocanvas-popover--panel">
+      <TldrawUiPopoverContent label="Style">
         <StylePanelContextProvider isMobile>
           <div className="mocanvas-stylepanel mocanvas-stylepanel--mobile">
             <DefaultStylePanelContent />

@@ -311,6 +311,11 @@ export const ICON_ALIASES = {
   // Plain `align-center` is ambiguous between the two axes; the horizontal one
   // is what a toolbar means by it.
   "align-center": "align-center-horizontal",
+  // A paste command is marked with a clipboard. The artwork is spelled
+  // `clipboard-copy` because the docs' copy-to-clipboard button claimed the
+  // name first; the glyph is a plain clipboard and this is what a menu means
+  // by paste.
+  paste: "clipboard-copy",
   // Odds and ends
   "cross-2": "close",
   "question-mark-circle": "help-circle",

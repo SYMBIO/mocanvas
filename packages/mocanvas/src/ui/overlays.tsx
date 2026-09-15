@@ -250,7 +250,9 @@ export function Popover({ anchorRef, open, onClose, label, cols = 5, prefer = "a
   return (
     <div
       ref={ref}
-      className="mocanvas-popover mocanvas-layer"
+      // Lays its children out itself, rather than wrapping them: it keeps the
+      // grid the plate no longer imposes.
+      className="mocanvas-popover mocanvas-popover-grid mocanvas-layer"
       role="menu"
       aria-label={label}
       style={{

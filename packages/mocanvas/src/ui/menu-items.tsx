@@ -49,7 +49,7 @@ export function CopyMenuItem() {
 export function PasteMenuItem() {
   const editor = useEditor()
   const readonly = useReadonly()
-  return <TldrawUiMenuItem id="paste" label="Paste" kbd="mod+v" disabled={readonly} onSelect={() => void pasteFromClipboard(editor)} />
+  return <TldrawUiMenuItem id="paste" label="Paste" icon="paste" kbd="mod+v" disabled={readonly} onSelect={() => void pasteFromClipboard(editor)} />
 }
 
 /** Cut / copy / paste, as one group. */

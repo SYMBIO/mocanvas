@@ -472,26 +472,35 @@ describe("the toolbar's reservation stays readable by both halves", () => {
 
 
 /**
- * A popover holds either a grid of icons or a panel, and the two are different
- * shapes. The style panel is 292px of rows and was being laid out in the first
- * 40px column of the icon grid, so it hung out of its own plate to the right
- * and off the canvas with it. The class that says which is which is written in
- * one file and styled in another; neither notices alone.
+ * The popover plate says nothing about what is in it.
+ *
+ * It was five 40px columns itself, and every popover opened through
+ * `TldrawUiPopoverContent` wraps its children in one element — so those columns
+ * laid nothing out and only fixed the plate at five buttons wide whatever it
+ * held. The toolbar's spill-over is four across and sat there with an empty
+ * fifth column beside it; the style panel is 292px of rows and hung out of the
+ * plate altogether. Two visible bugs from one rule describing the wrong thing.
  */
-describe("a popover that holds a panel", () => {
+describe("the popover plate", () => {
   const css = readFileSync(fileURLToPath(new URL("./ui.css", import.meta.url)), "utf8")
 
-  it("is taken out of the icon grid", () => {
-    const rule = css.match(/\.mocanvas-popover--panel\s*\{([^}]*)\}/)
-    expect(rule, ".mocanvas-popover--panel has no rule, so it is still a five-column grid").not.toBeNull()
-    expect(rule![1], "the panel is still laid out in one 40px column").toMatch(/display:\s*block/)
+  it("does not impose a column count on its contents", () => {
+    const rule = css.match(/\.mocanvas-popover\s*\{([^}]*)\}/)
+    expect(rule, ".mocanvas-popover has no rule at all").not.toBeNull()
+    expect(rule![1], "the plate is a grid again, so its width is a column count rather than its content").not.toMatch(
+      /grid-template-columns/,
+    )
   })
 
-  it("is what the style panel asks for", () => {
-    const component = readFileSync(fileURLToPath(new URL("./panel-style.tsx", import.meta.url)), "utf8")
-    expect(component, "the mobile style panel no longer claims the class the rule styles").toMatch(
-      /className="mocanvas-popover--panel"/,
+  it("leaves the grid to the popover that lays its own children out", () => {
+    // `Popover` in overlays.tsx passes buttons straight in rather than
+    // wrapping them, so for that one the columns are real.
+    const component = readFileSync(fileURLToPath(new URL("./overlays.tsx", import.meta.url)), "utf8")
+    expect(component, "the picker popover no longer carries the class that grids it").toMatch(
+      /mocanvas-popover mocanvas-popover-grid/,
     )
+    const rule = css.match(/\.mocanvas-popover-grid\s*\{([^}]*)\}/)
+    expect(rule![1], "and that class no longer grids anything").toMatch(/grid-template-columns/)
   })
 })
 
@@ -512,7 +521,7 @@ describe("every class the chrome relies on has a rule", () => {
   it.each([
     ["mocanvas-toolbar-overflow", /display:\s*grid/],
     ["mocanvas-action-row", /display:\s*flex/],
-    ["mocanvas-popover", /display:\s*grid/],
+    ["mocanvas-popover", /display:\s*block/],
   ])("%s is laid out, not left to normal flow", (className, expected) => {
     const rule = css.match(new RegExp(`\\.${className}[^{]*\\{([^}]*)\\}`))
     expect(rule, `.${className} has no rule at all`).not.toBeNull()

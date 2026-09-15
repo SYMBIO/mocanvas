@@ -577,12 +577,24 @@
   overscroll-behavior: contain;
 }
 
+/*
+ * The plate a popover is drawn on, and nothing about what is in it.
+ *
+ * It used to be five 40px columns itself. Every popover opened through
+ * `TldrawUiPopoverContent` wraps its children in one element, so those columns
+ * never laid anything out — they only fixed the plate at five buttons wide
+ * whatever it held. The toolbar's spill-over is four across, so it sat in the
+ * first column with an empty fifth beside it, every time; the style panel is
+ * 292px of rows and hung out of the plate entirely.
+ *
+ * A popover that really does lay its children out in a grid — the shape and
+ * tool pickers, which pass buttons straight in — says so with
+ * `.mocanvas-popover-grid` and picks its own column count.
+ */
 .mocanvas-popover {
   position: fixed;
   z-index: 30;
-  display: grid;
-  grid-template-columns: repeat(var(--mocanvas-popover-cols, 5), var(--mocanvas-ui-btn));
-  gap: var(--mocanvas-ui-gap);
+  display: block;
   padding: 6px;
   background: var(--mocanvas-ui-panel);
   border: 1px solid var(--mocanvas-ui-panel-border);
@@ -599,19 +611,6 @@
  * One shared, viewport-clamped tooltip. A CSS-only `::after` version cannot
  * avoid the viewport edge, and is clipped outright inside a scrolling panel.
  */
-/*
- * A popover holding a panel rather than a row of icons.
- *
- * The grid above is the shape and tool pickers' shape — five 40px columns —
- * and the style panel was being put in the first of them. It is 292px wide, so
- * it simply hung out of its own plate to the right: the panel's rows ran past
- * the rounded edge and off the canvas, which is what a narrow embed looked
- * like every time the style swatch was pressed.
- */
-.mocanvas-popover--panel {
-  display: block;
-}
-
 .mocanvas-tooltip {
   position: fixed;
   z-index: 40;

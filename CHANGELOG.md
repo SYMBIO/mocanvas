@@ -1,5 +1,34 @@
 # Changelog
 
+## 4.9.1
+
+### A popover is a plate, not a five-column grid
+
+`.mocanvas-popover` was five 40px columns itself. Every popover opened through
+`TldrawUiPopoverContent` wraps its children in one element, so those columns
+never laid anything out — they only fixed the plate at five buttons wide
+whatever it held.
+
+Two visible bugs from that one rule. The toolbar's spill-over is four across,
+so it sat in the first column with an empty fifth beside it, every time it was
+opened. And the mobile style panel is 292px of rows, so it hung out of the
+plate to the right, which 4.8.9 papered over with a `--panel` modifier rather
+than fixing.
+
+The plate is `display: block` now and takes the size of what is in it: the
+spill-over popover is 180px wide for its 166px of buttons, with the same 7px
+of padding on all four sides. A popover that really does lay its own children
+out — the shape and tool pickers, which pass buttons straight in rather than
+wrapping them — says so with `.mocanvas-popover-grid` and picks its own column
+count. The `--panel` modifier is gone; it has nothing left to do.
+
+### Paste has an icon
+
+It was the one command in the clipboard group without one, so the group read
+as a mistake rather than a choice. `paste` is a second spelling of the
+clipboard glyph, which is already in the set under `clipboard-copy` because
+the docs' copy button claimed the name first.
+
 ## 4.9.0
 
 The default icon set is Phosphor, and `align-left` means what it says.
