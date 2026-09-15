@@ -357,7 +357,7 @@ export function StylePanelColorPicker() {
 const FILL_ICONS: Record<string, IconName> = { none: "fill-none", semi: "fill-semi", solid: "fill-solid", pattern: "fill-pattern" }
 const DASH_ICONS: Record<string, IconName> = { draw: "dash-draw", solid: "dash-solid", dashed: "dash-dashed", dotted: "dash-dotted" }
 const SIZE_ICONS: Record<string, IconName> = { s: "size-s", m: "size-m", l: "size-l", xl: "size-xl" }
-const H_ALIGN_ICONS: Record<string, IconName> = { start: "align-left", middle: "align-center", end: "align-right" }
+const H_ALIGN_ICONS: Record<string, IconName> = { start: "text-align-left", middle: "text-align-center", end: "text-align-right" }
 const V_ALIGN_ICONS: Record<string, IconName> = { start: "valign-top", middle: "valign-middle", end: "valign-bottom" }
 
 /** Fill style. */

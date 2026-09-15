@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react"
-import { Icon, ICONS, type IconName } from "./icons"
+import { Icon, hasIcon } from "./icons"
 
 /**
  * The icon element the UI primitives use.
@@ -41,10 +41,10 @@ export function TldrawUiIcon({ icon, label, small, invertIcon, className, style,
   const transform = invertIcon ? "scaleX(-1)" : undefined
   const size = small ? 16 : 20
 
-  if (Object.prototype.hasOwnProperty.call(ICONS, icon)) {
+  if (hasIcon(icon)) {
     return (
       <span className={classes} style={{ ...style, color, transform, display: "inline-flex" }} {...(label ? { role: "img", "aria-label": label } : { "aria-hidden": true })}>
-        <Icon name={icon as IconName} size={size} />
+        <Icon name={icon} size={size} />
       </span>
     )
   }

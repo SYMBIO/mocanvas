@@ -253,6 +253,14 @@ local persistence, and `onUiEvent`. Those are canvas features.
   screen space is window-relative. mocanvas 1.x had one method that computed
   viewport space under the screen-space name; both now exist and mean what they
   say.
+- **Icon names.** mocanvas ships its own artwork, so the *names* are the compat
+  surface, not the drawings. 154 are drawn and 26 more are aliases onto them,
+  covering the spellings tldraw uses — `tool-*`, `size-small`..`size-extra-large`,
+  `horizontal-align-*`, `vertical-align-*`, `cross-2`. A name the set does not
+  have renders the label's initial rather than an empty box, and `hasIcon(name)`
+  lets you check first. Two of tldraw's fill names, `fill-fill` and
+  `fill-lined-fill`, have no mocanvas equivalent and are not aliased: they name
+  style variants this canvas does not have. See `docs/UI.md` for the whole set.
 - **No watermark, licence key or telemetry.**
 
 ## File format

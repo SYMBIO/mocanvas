@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { GEO_SHAPE_KINDS } from "@mocanvas/editor"
-import { GEO_BOX, getGeoIconBox, Icon, ICONS, ICON_NAMES, type IconName } from "./icons"
+import { GEO_BOX, getGeoIconBox, hasIcon, Icon, ICONS, ICON_ALIASES, ICON_NAMES, resolveIconName, type IconName } from "./icons"
 import { MORE_GEO_KINDS, PRIMARY_GEO_KINDS, TOOLBAR_GROUPS } from "./DefaultUi"
 import { defaultTools } from "../tools"
 
@@ -13,6 +13,31 @@ describe("icon set", () => {
       expect(html, name).toContain("<svg")
       expect(html, name).toContain('viewBox="0 0 24 24"')
       expect(html, name).toContain('stroke="currentColor"')
+    }
+  })
+
+  it("paints Phosphor artwork as fill, scaled onto our grid", () => {
+    // Phosphor draws filled outlines on a 256 grid. Painted with the enclosing
+    // svg's 1.75 stroke, or left unscaled, each one would fill the button with
+    // a blob — so both overrides have to be on the group.
+    const html = renderToStaticMarkup(<Icon name="select" />)
+    expect(html).toContain('fill="currentColor"')
+    expect(html).toContain('stroke="none"')
+    expect(html).toContain(`scale(${24 / 256})`)
+  })
+
+  it("keeps every icon's ink inside the 24×24 box", () => {
+    // Only the hand-drawn icons are checkable this way: their coordinates are
+    // literal. A number outside [-1, 25] means artwork that will clip.
+    for (const name of ICON_NAMES) {
+      if (name in ICON_ALIASES) continue
+      const html = renderToStaticMarkup(<Icon name={name} />)
+      if (html.includes("scale(")) continue // Phosphor, drawn on its own grid
+      for (const n of html.matchAll(/-?\d+\.?\d*/g)) {
+        const v = Number(n[0])
+        if (!Number.isFinite(v)) continue
+        expect(Math.abs(v), `${name} has an out-of-box coordinate ${v}`).toBeLessThan(26)
+      }
     }
   })
 
@@ -35,8 +60,9 @@ describe("icon set", () => {
   it("draws no two icons the same", () => {
     // A duplicate silhouette is a naming bug: "oval" drew the same circle as
     // "ellipse", and the handwriting font drew the same A as the sans one.
+    // Aliases are exempt by definition — they exist to share one drawing.
     const seen = new Map<string, IconName>()
-    for (const name of ICON_NAMES) {
+    for (const name of Object.keys(ICONS) as IconName[]) {
       const art = renderToStaticMarkup(<Icon name={name} />).replace(/^.*?>(?=<)/, "")
       const twin = seen.get(art)
       expect(twin, `${name} is drawn identically to ${twin}`).toBeUndefined()
@@ -68,10 +94,60 @@ describe("icon set", () => {
       "dash-draw", "dash-solid", "dash-dashed", "dash-dotted",
       "size-s", "size-m", "size-l", "size-xl",
       "align-left", "align-center", "align-right",
+      "text-align-left", "text-align-center", "text-align-right",
       "valign-top", "valign-middle", "valign-bottom",
       "font-draw", "font-sans", "font-serif", "font-mono",
     ]
     for (const name of required) expect(ICON_NAMES).toContain(name)
+  })
+
+  it("draws objects and text with different alignment marks", () => {
+    // These were one name for both jobs, so the "align objects" menu showed
+    // three ragged lines of text. They must never converge again.
+    for (const [object, text] of [
+      ["align-left", "text-align-left"],
+      ["align-right", "text-align-right"],
+    ] as const) {
+      const a = renderToStaticMarkup(<Icon name={object} />)
+      const b = renderToStaticMarkup(<Icon name={text} />)
+      expect(a, object).not.toEqual(b)
+    }
+  })
+
+  it("resolves every alias onto artwork that exists", () => {
+    for (const [alias, target] of Object.entries(ICON_ALIASES)) {
+      expect(Object.keys(ICONS), alias).toContain(target)
+      expect(resolveIconName(alias as IconName)).toBe(target)
+      expect(hasIcon(alias)).toBe(true)
+    }
+  })
+
+  it("leaves a name it does not have to the caller's fallback", () => {
+    expect(hasIcon("no-such-icon")).toBe(false)
+  })
+
+  it("answers to the names a tldraw-shaped app asks for", () => {
+    // The spellings molekula and other ported apps use. A miss here is a
+    // fallback initial in their UI, not a crash, which is why it needs a test.
+    const ported = [
+      "tool-pointer", "tool-hand", "tool-pencil", "tool-eraser", "tool-laser", "tool-note",
+      "size-small", "size-medium", "size-large", "size-extra-large",
+      "horizontal-align-start", "horizontal-align-middle", "horizontal-align-end",
+      "vertical-align-start", "vertical-align-middle", "vertical-align-end",
+      "align-top", "align-bottom", "align-center-horizontal", "align-center-vertical",
+      "distribute-horizontal", "distribute-vertical", "stack-horizontal", "stack-vertical",
+      "stretch-horizontal", "stretch-vertical", "pack",
+      "arrowhead-none", "arrowhead-arrow", "arrowhead-bar", "arrowhead-diamond",
+      "arrowhead-dot", "arrowhead-square", "arrowhead-triangle", "arrowhead-triangle-inverted",
+      "bold", "italic", "underline", "strike", "code", "heading", "list", "bulletList",
+      "bring-to-front", "send-to-back", "menu", "dots-horizontal", "dots-vertical",
+      "chevron-left", "check-circle", "cross-2", "cross-circle", "plus", "minus",
+      "info-circle", "warning-triangle", "help-circle", "question-mark-circle",
+      "external-link", "link", "clipboard-copy", "clipboard-copied", "download",
+      "toggle-on", "toggle-off", "rotate-cw", "rotate-ccw", "reset-zoom",
+      "spline-cubic", "spline-line", "arrow-arc", "arrow-elbow", "arrow-cycle",
+    ]
+    for (const name of ported) expect(hasIcon(name), name).toBe(true)
   })
 })
 

@@ -11,11 +11,15 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:rust": "cargo test --workspace --exclude mocanvas-wasm",
-    "lint:rust": "cargo clippy --workspace --all-targets -- -D warnings"
+    "lint:rust": "cargo clippy --workspace --all-targets -- -D warnings",
+    "icons:gallery": "tsx --tsconfig tsconfig.base.json scripts/icon-gallery.tsx",
+    "icons:generate": "node scripts/generate-phosphor-icons.mjs"
   },
   "devDependencies": {
+    "@phosphor-icons/react": "2.1.10",
     "@types/node": "^24.0.0",
     "tsup": "^8.5.1",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0"
   },

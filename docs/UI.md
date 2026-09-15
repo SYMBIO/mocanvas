@@ -31,7 +31,8 @@ Source lives in `packages/mocanvas/src/ui/`:
 | --- | --- |
 | `DefaultUi.tsx` | The toolbar, the zoom bar, the stats chip, and the `DefaultUi` wrapper |
 | `StylePanel.tsx` | The style panel and `getStylePanelSections`, the rule for which rows appear |
-| `icons.tsx` | The whole icon set, plus the geo icons generated from canvas geometry |
+| `icons.tsx` | The icon set: Phosphor artwork, our own drawings, the generated geo icons, and the aliases |
+| `icons-phosphor.ts` | Generated — Phosphor path data. Re-run `pnpm icons:generate`, never edit |
 | `overlays.tsx` | The shared tooltip and popover layers, and `placeNear` |
 | `ui.css` | Every design token and every rule |
 | `useKeyboardShortcuts.ts` | The default key bindings |
@@ -108,9 +109,60 @@ Handles are drawn at 9px (corners), 6px (shape handles) and 5.5px (rotate) in
 screen space, with a 1.5px stroke. Their hit radius is a separate editor
 constant, `HANDLE_HIT_RADIUS` in `packages/editor/src/editor/selectionHandles.ts`.
 
+## Where the icons come from
+
+The set is 154 drawings plus 26 aliases, from three sources. Which one an icon
+uses is decided by what the icon has to say.
+
+| Source | Covers | Count |
+| --- | --- | --- |
+| [Phosphor Icons](https://phosphoricons.com) (MIT, `regular`) | Generic chrome: tools, history, alignment, distribution, text formatting, status, brands | 103 |
+| Our own drawings | Anything describing *this* canvas: fill and dash styles, size steps, font families, text-alignment marks, arrowheads | 31 |
+| The canvas geometry | The `geo-*` icons, generated from `getGeoGeometry` | 20 |
+
+Phosphor's path data is inlined into `icons-phosphor.ts` by
+`scripts/generate-phosphor-icons.mjs` (`pnpm icons:generate`). mocanvas takes no
+runtime dependency on `@phosphor-icons/react` — that package is a devDependency
+used only to run the generator, and the published bundle does not name it.
+`NOTICE` carries the MIT notice we redistribute. Re-run the generator after
+upgrading Phosphor, and review the diff: the map in the script is the only place
+the correspondence is recorded.
+
+Phosphor draws *filled* outlines on a 256 grid rather than strokes on ours, so
+those are scaled into the same 24×24 box and painted with `fill`. The seam is
+invisible at button sizes because Phosphor's `regular` weight is a 16/256
+stroke — 1.5 on our grid, against our 1.75.
+
+## Aliases
+
+`ICON_ALIASES` maps a second spelling onto artwork that already exists, mostly
+tldraw's names, so an app ported from it asks for a name that answers instead of
+falling back to an initial: `tool-pointer` → `select`, `size-small` → `size-s`,
+`horizontal-align-start` → `text-align-left`, and so on.
+
+An alias never introduces a drawing. If two names should look different they
+belong in `ICONS`, and the distinctness test enforces that — aliases are exempt
+by construction, because sharing one drawing is the whole point.
+
+`hasIcon(name)` reports whether the set answers to a name, alias included;
+`resolveIconName(name)` maps an alias to the name that owns the artwork.
+
+### Objects and text align differently
+
+`align-left`, `align-center`, `align-right`, `align-top`, `align-bottom`,
+`align-center-horizontal` and `align-center-vertical` align **objects** to each
+other. `text-align-left`, `text-align-center` and `text-align-right` align
+**text** within its box, and are what a shape label's horizontal alignment uses
+(`horizontal-align-*` aliases onto them).
+
+These were one set of names for both jobs until 4.9.0, which is why the align
+menu used to show three ragged lines of text. A test asserts they never converge
+again.
+
 ## Icon grid rules
 
-Icons are original artwork on a 24×24 viewBox, painted with `currentColor`.
+The hand-drawn icons — everything that is not Phosphor — are original artwork on
+a 24×24 viewBox, painted with `currentColor`.
 
 - **Grid.** 24×24. Ink, stroke included, stays inside it.
 - **Weight.** Stroke 1.75, round caps and joins. Only texture marks deviate and
@@ -130,6 +182,12 @@ Icons are original artwork on a 24×24 viewBox, painted with `currentColor`.
   is fitted into the box `getGeoIconBox(kind)` returns: square at `GEO_BOX` (16)
   by default, and flatter or narrower for kinds whose name implies a proportion
   (`rectangle`, `oval`, the four arrows). The longest side is always `GEO_BOX`.
+- **Arrowheads** share one shaft, drawn by the `SHAFT` helper, so the eight read
+  as a family and the terminal is the only thing that changes between them.
+
+`icons.test.tsx` checks what is checkable from the markup. The rest — whether an
+icon reads heavier than its neighbour, whether two drawings are confusable — is
+the gallery pass: `pnpm icons:gallery` renders every drawing to one page.
 
 Render one with `<Icon name="select" size={20} />`. `size` sets the SVG's
 attributes; buttons additionally take their icon size from `--mocanvas-ui-icon`,

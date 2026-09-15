@@ -41,7 +41,7 @@ const H_ALIGNS: HAlignValue[] = ["start", "middle", "end"]
 const V_ALIGNS: VAlignValue[] = ["start", "middle", "end"]
 
 const FILL_ICON: Record<string, IconName> = { none: "fill-none", semi: "fill-semi", solid: "fill-solid", pattern: "fill-pattern" }
-const H_ALIGN_ICON: Record<string, IconName> = { start: "align-left", middle: "align-center", end: "align-right" }
+const H_ALIGN_ICON: Record<string, IconName> = { start: "text-align-left", middle: "text-align-center", end: "text-align-right" }
 const V_ALIGN_ICON: Record<string, IconName> = { start: "valign-top", middle: "valign-middle", end: "valign-bottom" }
 const H_ALIGN_LABEL: Record<string, string> = { start: "Align left", middle: "Align centre", end: "Align right" }
 const V_ALIGN_LABEL: Record<string, string> = { start: "Align top", middle: "Align middle", end: "Align bottom" }
