@@ -1,6 +1,6 @@
 {
   "name": "@mocanvas/state",
-  "version": "4.8.5",
+  "version": "4.8.6",
   "description": "Signals for mocanvas: atoms, computed values, transactions and React bindings.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",

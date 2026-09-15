@@ -61,16 +61,30 @@ export function DefaultStylePanelContent() {
 }
 
 /**
+ * Tools that never make a shape, so there is nothing for a style panel to be
+ * about. With one of these active and nothing selected, the panel is asking a
+ * question the canvas has not been asked.
+ */
+const NON_CREATING_TOOLS = new Set(["select", "hand", "zoom", "eraser", "laser"])
+
+/**
  * The docked style panel.
  *
- * Renders nothing at all when no style applies — an empty panel in the corner
- * is worse than no panel, because it reads as broken rather than as
- * inapplicable.
+ * It appears when there is something to style: a selection, or a tool that is
+ * about to create a shape. It used to be on permanently, because the styles
+ * a tool *would* apply exist whether or not that tool is the pointer — so
+ * picking the arrow, selecting nothing, and just looking at the board still
+ * put a full panel of colours and fills in the corner, and it covered the
+ * canvas underneath it.
+ *
+ * Renders nothing at all rather than an empty frame, which reads as broken
+ * rather than as inapplicable.
  */
 export const DefaultStylePanel = track(function DefaultStylePanel({ isMobile = false, children }: TLUiStylePanelProps) {
   const styles = useRelevantStyles()
   const editor = useEditor()
   const hasSelection = editor.getSelectedShapeIds().length > 0
+  if (!hasSelection && NON_CREATING_TOOLS.has(editor.getCurrentToolId())) return null
   if (!styles && !hasSelection) return null
   return (
     <StylePanelContextProvider isMobile={isMobile}>
@@ -99,6 +113,9 @@ export const MobileStylePanel = track(function MobileStylePanel() {
   const editor = useEditor()
   const styles = useRelevantStyles()
   const disabled = editor.getIsReadonly()
+  // Same rule as the docked panel: a swatch that opens a panel about nothing
+  // is the same mistake in less space.
+  if (editor.getSelectedShapeIds().length === 0 && NON_CREATING_TOOLS.has(editor.getCurrentToolId())) return null
   if (!styles) return null
   return (
     <div className="mocanvas-panel mocanvas-style-dock">

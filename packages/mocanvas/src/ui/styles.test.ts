@@ -368,3 +368,27 @@ describe("the bottom edge's stacking", () => {
     }
   })
 })
+
+/**
+ * Two class names that were written without a rule.
+ *
+ * Both failed the same way and neither showed up in a test: the element
+ * rendered, the cascade had nothing to say about it, and the browser fell back
+ * to normal flow. The actions row landed unstyled at the top of the canvas;
+ * the toolbar's spill-over became a column of nine buttons taller than the
+ * canvas. A class the markup uses and the stylesheet has never heard of is a
+ * bug that only a screenshot can see — unless something asserts the pair.
+ */
+describe("every class the chrome relies on has a rule", () => {
+  const css = readFileSync(fileURLToPath(new URL("./ui.css", import.meta.url)), "utf8")
+
+  it.each([
+    ["mocanvas-toolbar-overflow", /display:\s*grid/],
+    ["mocanvas-action-row", /display:\s*flex/],
+    ["mocanvas-popover", /display:\s*grid/],
+  ])("%s is laid out, not left to normal flow", (className, expected) => {
+    const rule = css.match(new RegExp(`\\.${className}[^{]*\\{([^}]*)\\}`))
+    expect(rule, `.${className} has no rule at all`).not.toBeNull()
+    expect(rule![1], `.${className} renders but nothing lays it out`).toMatch(expected)
+  })
+})

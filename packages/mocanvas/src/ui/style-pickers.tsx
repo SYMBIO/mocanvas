@@ -391,10 +391,12 @@ export function StylePanelFontPicker() {
 /** Where the label sits inside its shape. */
 export function StylePanelLabelAlignPicker() {
   const { styles } = useStylePanelContext()
-  if (!styles?.get(DefaultHorizontalAlignStyle)) return null
+  const shared = styles?.get(DefaultHorizontalAlignStyle)
+  if (!shared) return null
+  const current = shared.type === "shared" ? shared.value : undefined
   return (
     <>
-      <StylePanelButtonPicker style={DefaultHorizontalAlignStyle} label="Align" items={getStyleItemsForProp(DefaultHorizontalAlignStyle, (v) => H_ALIGN_ICONS[v])} />
+      <StylePanelButtonPicker style={DefaultHorizontalAlignStyle} label="Align" items={alignItems(DefaultHorizontalAlignStyle, current)} />
       {styles?.get(DefaultVerticalAlignStyle) ? (
         <StylePanelButtonPicker style={DefaultVerticalAlignStyle} label="Vertical align" items={getStyleItemsForProp(DefaultVerticalAlignStyle, (v) => V_ALIGN_ICONS[v])} />
       ) : null}
@@ -403,10 +405,30 @@ export function StylePanelLabelAlignPicker() {
 }
 
 /** How the text is aligned within the label box. */
+/**
+ * The horizontal alignments a person can choose.
+ *
+ * `start-legacy`, `end-legacy` and `middle-legacy` stay in the *style* because
+ * a file written by an older tldraw carries them and has to keep loading. They
+ * are not choices, though — they are history, and offering them put three
+ * buttons labelled "Start Legacy" in the panel, wider than the row they sat in,
+ * doing something nobody could explain.
+ *
+ * A shape that already has one keeps showing it, so the panel never claims a
+ * shape is aligned some other way than it is.
+ */
+function alignItems<T extends string>(style: EnumStyleProp<T>, current: unknown) {
+  return getStyleItemsForProp(style, (v) => H_ALIGN_ICONS[v]).filter(
+    (item) => !item.value.endsWith("-legacy") || item.value === current,
+  )
+}
+
 export function StylePanelTextAlignPicker() {
   const { styles } = useStylePanelContext()
-  if (!styles?.get(DefaultTextAlignStyle)) return null
-  return <StylePanelButtonPicker style={DefaultTextAlignStyle} label="Text align" items={getStyleItemsForProp(DefaultTextAlignStyle, (v) => H_ALIGN_ICONS[v])} />
+  const shared = styles?.get(DefaultTextAlignStyle)
+  if (!shared) return null
+  const current = shared.type === "shared" ? shared.value : undefined
+  return <StylePanelButtonPicker style={DefaultTextAlignStyle} label="Text align" items={alignItems(DefaultTextAlignStyle, current)} />
 }
 
 /** The geo kind. */

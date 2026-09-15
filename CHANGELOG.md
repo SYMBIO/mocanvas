@@ -1,5 +1,45 @@
 # Changelog
 
+## 4.8.6
+
+Three things in the default UI that were wrong in a way only a screenshot shows.
+
+### The style panel appears when it has a subject
+
+It was on permanently. The styles a tool *would* apply exist whether or not
+that tool is the pointer, so picking the arrow, selecting nothing and just
+looking at the board still put a full panel of colours, fills and dashes over
+the right-hand side of the canvas.
+
+It now appears when there is something to style: a selection, or a tool that is
+about to create a shape. With `select`, `hand`, `zoom`, `eraser` or `laser`
+active and nothing selected, there is nothing to be about, and it stays away.
+The narrow-layout swatch follows the same rule.
+
+### The legacy alignments are gone from the picker
+
+`start-legacy`, `end-legacy` and `middle-legacy` are in the align style because
+a file written by an older tldraw carries them and has to keep loading. They
+were also offered as choices — and having no icon, they rendered as three text
+buttons reading "Start Legacy", "End Legacy", "Middle Legacy", each wider than
+the row it sat in.
+
+They are no longer offered. A shape that already has one still shows it, so the
+panel never claims a shape is aligned some other way than it is; the style
+itself is unchanged, so nothing stops loading.
+
+### The toolbar's overflow is a grid
+
+`.mocanvas-toolbar-overflow` was written into the markup and never given a
+rule, so the buttons fell back to normal flow: nine tools became a single
+column taller than the canvas they were meant to be used on. It is a four-wide
+grid now, the shape the shape-picker beside it already uses.
+
+A test asserts that each class the chrome positions with actually has a rule.
+This is the third time the same thing has happened — a class name in the markup
+that the stylesheet has never heard of renders, and only a screenshot can see
+it.
+
 ## 4.8.5
 
 ### Four new guides ship with the package

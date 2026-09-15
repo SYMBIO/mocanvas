@@ -1,6 +1,6 @@
 {
   "name": "@mocanvas/store",
-  "version": "4.8.5",
+  "version": "4.8.6",
   "description": "The mocanvas document model: reactive records, schema, migrations and .tldr file IO.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",

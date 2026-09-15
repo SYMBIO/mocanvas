@@ -499,6 +499,20 @@
  * otherwise be clipped by that panel's own scroll container. Placement is
  * computed against the viewport in `overlays.tsx`.
  */
+/*
+ * The toolbar's spill-over: a compact grid, the way a palette reads.
+ *
+ * This class was written and never given a rule, so the buttons fell back to
+ * normal flow and nine tools became a column taller than the canvas they were
+ * meant to be used on. Four across is the shape the eye already knows from the
+ * shape picker beside it.
+ */
+.mocanvas-toolbar-overflow {
+  display: grid;
+  grid-template-columns: repeat(var(--mocanvas-overflow-cols, 4), var(--mocanvas-ui-btn));
+  gap: var(--mocanvas-ui-gap);
+}
+
 .mocanvas-popover {
   position: fixed;
   z-index: 30;

@@ -579,9 +579,12 @@ describe("the common actions", () => {
 describe("the style trigger on a narrow layout", () => {
   it("is docked in a plate rather than left in the corner", () => {
     const parts = makeEditor()
-    // The trigger only exists when a style applies; with none it renders
-    // nothing, which is deliberate and not what this test is about.
+    // The trigger only exists when a style applies AND the current tool is one
+    // that makes shapes — with the select tool and nothing selected there is
+    // nothing to style. Both are deliberate and neither is what this test is
+    // about, so the stand-in is given a creating tool and a style.
     ;(parts.editor as unknown as { getSharedStyles: () => Map<string, unknown> }).getSharedStyles = () => new Map([["color", { type: "shared", value: "black" }]])
+    ;(parts.editor as unknown as { getCurrentToolId: () => string }).getCurrentToolId = () => "geo"
     renderChrome(parts, undefined, { forceMobile: true })
     const trigger = document.querySelector("[aria-label='Style']")
     expect(trigger, "no style trigger on a narrow layout").not.toBeNull()
@@ -620,5 +623,69 @@ describe("the help menu", () => {
     click(row("Preferences"))
     click(row("Accessibility"))
     expect(rows().map((el) => el.textContent?.trim())).toContain("Enhanced accessibility")
+  })
+})
+
+/**
+ * When the style panel is on screen at all.
+ *
+ * It used to be always: the styles a tool *would* apply exist whether or not
+ * that tool is the pointer, so picking the arrow and looking at an empty board
+ * still put a full panel of colours and fills over the canvas. The rule now is
+ * that the panel needs a subject — something selected, or a tool about to make
+ * something.
+ */
+function withTool(toolId: string, selected: string[] = []) {
+  const parts = makeEditor()
+  const editor = parts.editor as unknown as {
+    getCurrentToolId: () => string
+    getSelectedShapeIds: () => string[]
+    getSharedStyles: () => Map<string, unknown>
+  }
+  editor.getCurrentToolId = () => toolId
+  editor.getSelectedShapeIds = () => selected
+  editor.getSharedStyles = () => new Map([["color", { type: "shared", value: "black" }]])
+  return parts
+}
+
+const stylePanel = () => document.querySelector('[aria-label="Style"]')
+
+describe("when the style panel appears", () => {
+  it("stays away for the select tool with nothing selected", () => {
+    withContainerWidth(1200)
+    renderChrome(withTool("select"))
+    expect(stylePanel(), "a panel about nothing, over the canvas").toBeNull()
+  })
+
+  it("stays away for the hand tool", () => {
+    withContainerWidth(1200)
+    renderChrome(withTool("hand"))
+    expect(stylePanel()).toBeNull()
+  })
+
+  it("appears once something is selected", () => {
+    withContainerWidth(1200)
+    renderChrome(withTool("select", ["shape:a"]))
+    expect(stylePanel(), "there is a selection to style and no panel").not.toBeNull()
+  })
+
+  it("appears for a tool that is about to make a shape", () => {
+    withContainerWidth(1200)
+    renderChrome(withTool("geo"))
+    expect(stylePanel(), "the next shape's styles are exactly what this is for").not.toBeNull()
+  })
+})
+
+/**
+ * The legacy alignments are in the style because an older tldraw file carries
+ * them; they are not choices. Offered, they rendered as three text buttons
+ * wider than the row they sat in.
+ */
+describe("the alignment picker", () => {
+  it("offers no legacy alignment", () => {
+    withContainerWidth(1200)
+    renderChrome(withTool("geo", ["shape:a"]))
+    const labels = [...document.querySelectorAll("[aria-label]")].map((el) => el.getAttribute("aria-label") ?? "")
+    expect(labels.some((label) => /legacy/i.test(label)), `found: ${labels.filter((l) => /legacy/i.test(l)).join(", ")}`).toBe(false)
   })
 })
