@@ -240,7 +240,22 @@ export function Mocanvas(props: MocanvasProps) {
 
   return (
     <AssetUrlsProvider assetUrls={assetUrls ?? EMPTY_ASSET_URLS}>
-      <div ref={containerRef} className={className} style={{ position: "relative", width: "100%", height: "100%", ...style }}>
+      {/*
+        `containerType` makes this element a query container named
+        `mocanvas-ui`, which is how the chrome's stylesheet asks how much room
+        it has. It cannot ask a media query: the breakpoint provider measures
+        this element precisely because an editor in a 600px column of a 1600px
+        window is a narrow editor, and the window does not know that. Until
+        this was here the stylesheet asked anyway, and such an editor was
+        handed the desktop reservation — `calc(100% - 624px)` of a 606px
+        container — so the toolbar's width budget went negative and it stacked
+        one button per row down the middle of the canvas.
+      */}
+      <div
+        ref={containerRef}
+        className={className}
+        style={{ position: "relative", width: "100%", height: "100%", containerType: "inline-size", containerName: "mocanvas-ui", ...style }}
+      >
         {editor ? (
           // `TldrawUi` is the documented chrome: it owns the context
           // providers the component slots read from, and renders the canvas as

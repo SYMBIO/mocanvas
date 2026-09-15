@@ -613,6 +613,30 @@ describe("the style trigger on a narrow layout", () => {
 
 
 /**
+ * The share panel is a plate with one thing in it, and that thing renders
+ * nothing when nobody else is on the page. The plate did not follow, so a
+ * single-player editor — every demo on the site, every first look at the
+ * library — had a 10px rounded blob in its top-right corner that nobody could
+ * name. Same failure as the style panel that was on permanently, one step
+ * further out: there the frame had contents nobody wanted, here it had none.
+ */
+describe("the share panel", () => {
+  it("is not there at all when nobody else is", () => {
+    renderChrome()
+    expect(document.querySelector(".mocanvas-share-panel"), "an empty plate in the corner").toBeNull()
+  })
+
+  it("is there when somebody is", () => {
+    const parts = makeEditor()
+    ;(parts.editor as unknown as { getVisibleCollaboratorsOnCurrentPage: () => unknown[] }).getVisibleCollaboratorsOnCurrentPage =
+      () => [{ userId: "user:b", userName: "Someone", color: "#f00" }]
+    renderChrome(parts)
+    expect(document.querySelector(".mocanvas-share-panel"), "nowhere to see who is here").not.toBeNull()
+  })
+})
+
+
+/**
  * The help menu's trigger was a bare `?` with no plate and no placement, so it
  * sat in the container's top-left corner under the menu plate — the same
  * failure as the actions row and the style swatch, in the last control that

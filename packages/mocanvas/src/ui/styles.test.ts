@@ -393,6 +393,49 @@ describe("the bottom edge's stacking", () => {
 })
 
 /**
+ * The chrome's width rules ask the container, never the window.
+ *
+ * `BreakPointProvider` measures the editor's container and says why in its own
+ * comment: an editor embedded in a sidebar is narrow even on a wide screen,
+ * and a media query cannot see that. The stylesheet did not follow. An editor
+ * in a 606px column of a 1600px window kept the desktop reservation, so the
+ * toolbar's `max-width: calc(100% - 624px)` came out negative and the bar
+ * stacked one button per row down the middle of the canvas — on a screen wide
+ * enough that nothing about the window suggested a narrow layout.
+ *
+ * `prefers-color-scheme` and `prefers-reduced-motion` are about the reader,
+ * not the room, and stay media queries.
+ */
+describe("the chrome measures its container", () => {
+  const css = readFileSync(fileURLToPath(new URL("./ui.css", import.meta.url)), "utf8")
+
+  it("asks no media query about width", () => {
+    const widthQueries = [...css.matchAll(/@media[^{]*\((?:max|min)-width[^{]*\{/g)].map((match) => match[0].trim())
+    expect(widthQueries, "a width rule that the window answers and the container cannot").toEqual([])
+  })
+
+  it("asks the container instead", () => {
+    const containerQueries = [...css.matchAll(/@container\s+([\w-]+)\s*\(/g)].map((match) => match[1])
+    expect(containerQueries.length, "no container query at all — the narrow layout has nowhere to come from").toBeGreaterThan(0)
+    for (const name of containerQueries) {
+      expect(name, "a container query naming something other than the container Mocanvas names").toBe("mocanvas-ui")
+    }
+  })
+
+  it("names the container it queries", () => {
+    // The two halves are in different files and neither fails loudly on its
+    // own: a container that is not named answers no query, and every rule in
+    // here quietly reverts to the wide layout.
+    const component = readFileSync(fileURLToPath(new URL("../Mocanvas.tsx", import.meta.url)), "utf8")
+    expect(component, "`Mocanvas` no longer names a container for the stylesheet to ask").toMatch(
+      /containerName:\s*"mocanvas-ui"/,
+    )
+    expect(component, "the named container is not a query container").toMatch(/containerType:\s*"inline-size"/)
+  })
+})
+
+
+/**
  * Two class names that were written without a rule.
  *
  * Both failed the same way and neither showed up in a test: the element

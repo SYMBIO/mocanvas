@@ -202,8 +202,20 @@
  * stats — whose natural widths add up to about 1290px. Below that the toolbar
  * takes a row of its own and stops reserving the docks; below 560px the stats
  * chip moves out of the bottom edge altogether.
+ *
+ * Asked of the editor's own container, not the window. These were media
+ * queries, and an editor in a 606px column of a 1600px window measured as a
+ * desktop: it kept the 300px-a-side reservation, `calc(100% - 624px)` came out
+ * negative, and the toolbar collapsed into a column of single buttons in the
+ * middle of the canvas. The breakpoint the React chrome branches on has always
+ * been the container's width for exactly this reason; this is the stylesheet
+ * catching up with it.
+ *
+ * `mocanvas-ui` is named on the container in `Mocanvas.tsx`. An app that
+ * assembles `TldrawUi` inside a container of its own gets the wide layout
+ * until it names that container too.
  */
-@media (max-width: 1290px) {
+@container mocanvas-ui (max-width: 1290px) {
   .mocanvas,
   .mocanvas-panel {
     /* the toolbar now has a row of its own above the zoom bar */
@@ -221,7 +233,7 @@
  * by side, so each takes a row of its own and the style panel keeps the top,
  * spanning the width and capped at a share of the height.
  */
-@media (max-width: 560px) {
+@container mocanvas-ui (max-width: 560px) {
   .mocanvas,
   .mocanvas-panel {
     /* the stats chip has taken a row of its own, below the zoom bar */

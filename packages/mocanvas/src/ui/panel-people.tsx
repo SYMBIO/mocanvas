@@ -205,14 +205,23 @@ export const DefaultFollowingIndicator = track(function DefaultFollowingIndicato
   )
 })
 
-/** The top-right panel: who is here. */
-export function DefaultSharePanel() {
+/**
+ * The top-right panel: who is here.
+ *
+ * The people menu is the whole of it, and that renders nothing when nobody
+ * else is here — but the plate around it did not, so a single-player editor
+ * had a 10px rounded blob in its top-right corner: a border, a background and
+ * eight pixels of padding around no content at all. Nobody could say what it
+ * was, which is the point. The plate now goes when its contents do.
+ */
+export const DefaultSharePanel = track(function DefaultSharePanel() {
+  if (usePeers().length === 0) return null
   return (
     <div className="mocanvas-panel mocanvas-share-panel">
       <DefaultPeopleMenu />
     </div>
   )
-}
+})
 
 /**
  * The cursor-chat entry field.

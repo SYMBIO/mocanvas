@@ -1,5 +1,41 @@
 # Changelog
 
+## 4.8.8
+
+The chrome measures its container, not the window.
+
+### An editor in a column of a wide window is a narrow editor
+
+`BreakPointProvider` has always measured the editor's container, and says why
+in its own comment: an editor embedded in a sidebar is narrow even on a wide
+screen, and a media query cannot see that. The stylesheet was media queries
+throughout.
+
+So an editor 606px wide in a 1600px window was handed the desktop layout. The
+toolbar reserves 300px on each side for the zoom bar and the stats chip, which
+made its width budget `calc(100% - 624px)` — eighteen pixels less than nothing.
+It collapsed to a 10px column: one button per row, two rows of it, the other
+eleven tools in the overflow menu, standing in the middle of the canvas.
+
+Both width rules are `@container mocanvas-ui` now, and `Mocanvas` names that
+container on the element the chrome positions against. The thresholds are
+unchanged — 1290px for the toolbar's own row, 560px for the phone layout — and
+they now mean what they always said they meant. A test asserts that no width
+rule is a media query; `prefers-color-scheme` and `prefers-reduced-motion` are
+about the reader rather than the room and stay as they are.
+
+An app that assembles `TldrawUi` inside a container of its own gets the wide
+layout until it sets `container-type: inline-size` and `container-name:
+mocanvas-ui` on that container.
+
+### The share panel goes when there is nobody to share with
+
+The people menu renders nothing when nobody else is on the page — that is
+deliberate, and documented on it. The plate around it rendered anyway, so a
+single-player editor had a 10px rounded blob in its top-right corner: a border,
+a background and eight pixels of padding around no content at all. It was on
+every screenshot of this library and nobody could say what it was.
+
 ## 4.8.7
 
 Two more the same screenshot shows, both in the bottom edge of a narrow embed.
