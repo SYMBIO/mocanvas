@@ -223,8 +223,18 @@
     --mocanvas-ui-toolbar-bottom: calc(2 * var(--mocanvas-ui-inset) + var(--mocanvas-ui-row));
   }
 
+  /*
+   * Nothing shares this row any more, so the reservation is no longer about
+   * collision — it is about the bar staying a plate on a document rather than
+   * a strip across it. A button and a half clear at each end; whatever no
+   * longer fits goes to the overflow menu, which is where a thirteenth tool
+   * belongs on a 600px canvas anyway.
+   *
+   * A plain length on purpose. `readBarMetrics` parses this property to decide
+   * how many tools stay inline, and `parseFloat("calc(1.5 * 40px)")` is `NaN`.
+   */
   .mocanvas-toolbar {
-    --mocanvas-ui-dock: 0px;
+    --mocanvas-ui-dock: 60px;
   }
 }
 
@@ -242,6 +252,11 @@
 
   .mocanvas-stats {
     bottom: calc(2 * var(--mocanvas-ui-inset) + var(--mocanvas-ui-row));
+  }
+
+  /* No room to be elegant with: the bar takes the width it has. */
+  .mocanvas-toolbar {
+    --mocanvas-ui-dock: 0px;
   }
 
   .mocanvas-stylepanel {
@@ -525,6 +540,16 @@
   gap: var(--mocanvas-ui-gap);
 }
 
+/*
+ * Every floating layer carries a `max-height` measured from the editor, so
+ * whatever is in it scrolls inside the plate rather than running out of the
+ * bottom of a short embed.
+ */
+.mocanvas-layer {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .mocanvas-popover {
   position: fixed;
   z-index: 30;
@@ -547,6 +572,19 @@
  * One shared, viewport-clamped tooltip. A CSS-only `::after` version cannot
  * avoid the viewport edge, and is clipped outright inside a scrolling panel.
  */
+/*
+ * A popover holding a panel rather than a row of icons.
+ *
+ * The grid above is the shape and tool pickers' shape — five 40px columns —
+ * and the style panel was being put in the first of them. It is 292px wide, so
+ * it simply hung out of its own plate to the right: the panel's rows ran past
+ * the rounded edge and off the canvas, which is what a narrow embed looked
+ * like every time the style swatch was pressed.
+ */
+.mocanvas-popover--panel {
+  display: block;
+}
+
 .mocanvas-tooltip {
   position: fixed;
   z-index: 40;
@@ -958,6 +996,14 @@
  */
 .mocanvas-helper-buttons {
   bottom: calc(var(--mocanvas-ui-toolbar-bottom) + 2 * var(--mocanvas-ui-row) + 2 * var(--mocanvas-ui-inset));
+}
+
+/*
+ * Unless the actions are in the menu plate, in which case the row this was
+ * clearing is not there and the gap it leaves is just a gap.
+ */
+:not(:has(> .mocanvas-quick-actions)) > .mocanvas-helper-buttons {
+  bottom: calc(var(--mocanvas-ui-toolbar-bottom) + var(--mocanvas-ui-row) + var(--mocanvas-ui-inset));
 }
 
 .mocanvas-contextual-toolbar .mocanvas-toolbar {

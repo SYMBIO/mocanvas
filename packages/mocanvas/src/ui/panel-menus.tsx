@@ -264,7 +264,15 @@ export function DefaultQuickActionsContent() {
  */
 export function DefaultQuickActions({ children }: TLUiQuickActionsProps) {
   const hosted = useContext(ActionRowIsHosted)
-  const wide = useBreakpoint() >= PORTRAIT_BREAKPOINT.TABLET
+  // Where it goes: into the menu plate beside the page picker when the two fit
+  // side by side, and onto a row of its own above the toolbar when they do not.
+  //
+  // The threshold was `TABLET` — 840px — which is about twice what the pair
+  // actually needs: a page picker is around 150px and five actions about 220,
+  // so 580px is where they stop crowding each other. Everything between the
+  // two was spending a whole row of the canvas on five buttons that had room
+  // in a plate already on screen.
+  const wide = useBreakpoint() >= PORTRAIT_BREAKPOINT.MOBILE
   const ActionsMenu = useHostedSlot("ActionsMenu", DefaultActionsMenu)
   if (hosted !== wide) return null
   const className = hosted ? "mocanvas-action-row" : "mocanvas-panel mocanvas-action-row mocanvas-quick-actions"

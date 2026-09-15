@@ -1,6 +1,6 @@
 import { EditorPortal } from "@mocanvas/editor"
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react"
-import { placeNear, type Placement } from "./overlays"
+import { placeNear, useLayerBounds, type Placement } from "./overlays"
 
 /**
  * The mechanics every floating layer in the chrome shares: position beside an
@@ -68,9 +68,10 @@ export function useAnchoredPosition(
   anchorRef: RefObject<HTMLElement | null>,
   open: boolean,
   prefer: Side,
-): [RefObject<HTMLDivElement | null>, Placement | null] {
+): [RefObject<HTMLDivElement | null>, AnchoredPlacement | null] {
   const ref = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<Placement | null>(null)
+  const getBounds = useLayerBounds()
+  const [pos, setPos] = useState<AnchoredPlacement | null>(null)
   useLayoutEffect(() => {
     const el = ref.current
     const anchor = anchorRef.current?.getBoundingClientRect() ?? null
@@ -79,10 +80,22 @@ export function useAnchoredPosition(
       return
     }
     const box = el.getBoundingClientRect()
-    setPos(placeNear(anchor, box, prefer, window.innerWidth, window.innerHeight))
-  }, [open, prefer, anchorRef])
+    const bounds = getBounds()
+    // The cap goes on the layer as well as the position: a style panel taller
+    // than the editor it is in has to scroll inside it, not hang out of the
+    // bottom of it, and only the measurement knows how much room there is.
+    setPos({ ...placeNear(anchor, box, prefer, bounds.width, bounds.height, bounds), maxHeight: bounds.height - 2 * EDGE })
+  }, [open, prefer, anchorRef, getBounds])
   return [ref, pos]
 }
+
+/** A {@link Placement} with the room the layer has to fit in. */
+export interface AnchoredPlacement extends Placement {
+  maxHeight: number
+}
+
+/** Matches `EDGE` in `overlays.tsx`: the margin a layer keeps from its bounds. */
+const EDGE = 8
 
 /**
  * Close on Escape or on a pointer press outside both the layer and its anchor.
@@ -236,7 +249,11 @@ export function FloatingLayer({
         className={["mocanvas-layer", className].filter(Boolean).join(" ")}
         role={role}
         {...(label ? { "aria-label": label } : {})}
-        style={pos ? { position: "fixed", left: pos.left, top: pos.top } : { position: "fixed", left: 0, top: 0, visibility: "hidden" }}
+        style={
+          pos
+            ? { position: "fixed", left: pos.left, top: pos.top, maxHeight: pos.maxHeight }
+            : { position: "fixed", left: 0, top: 0, visibility: "hidden" }
+        }
         onPointerDown={(event) => event.stopPropagation()}
       >
         <LayerNestingContext.Provider value={nesting}>{children}</LayerNestingContext.Provider>

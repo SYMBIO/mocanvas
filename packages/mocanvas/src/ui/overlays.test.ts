@@ -82,3 +82,39 @@ describe("placeNear, beside the anchor", () => {
     expect(p.top).toBe(8)
   })
 })
+
+/**
+ * The box a layer stays inside is the editor, not the window.
+ *
+ * Passed only a width and a height, `placeNear` clamps to a box whose corner
+ * is the viewport's. That was the whole story while the chrome measured the
+ * window — and it put the style panel of a 606px editor 74px outside it, on a
+ * 1600px screen where the panel was, by that measure, comfortably on show.
+ */
+describe("placeNear, inside a given box", () => {
+  const box = { left: 300, top: 400, width: 600, height: 500 }
+
+  it("keeps the layer inside the box's right edge, not the window's", () => {
+    // An anchor at the box's right edge: centring would put the layer half out.
+    const p = placeNear(rect(860, 700, 40, 40), { width: 300, height: 200 }, "above", box.width, box.height, box)
+    expect(p.left + 300, "the layer runs past the editor's right edge").toBeLessThanOrEqual(box.left + box.width)
+    expect(p.left, "the layer runs past the editor's left edge").toBeGreaterThanOrEqual(box.left)
+  })
+
+  it("keeps the layer inside the box's top edge, not the window's", () => {
+    // `above` an anchor near the box's top has nowhere to go but below it.
+    const p = placeNear(rect(500, 410, 40, 40), { width: 100, height: 300 }, "above", box.width, box.height, box)
+    expect(p.top, "the layer starts above the editor").toBeGreaterThanOrEqual(box.top)
+  })
+
+  it("clamps a layer taller than the box to its top, not off its bottom", () => {
+    const p = placeNear(rect(500, 800, 40, 40), { width: 100, height: 900 }, "below", box.width, box.height, box)
+    expect(p.top, "a layer too tall for the editor starts outside it").toBeGreaterThanOrEqual(box.top)
+  })
+
+  it("is the viewport when no box is named", () => {
+    const withBox = placeNear(rect(500, 400, 40, 40), { width: 100, height: 22 }, "above", VW, VH, { left: 0, top: 0 })
+    const without = placeNear(rect(500, 400, 40, 40), { width: 100, height: 22 }, "above", VW, VH)
+    expect(without).toEqual(withBox)
+  })
+})

@@ -436,6 +436,53 @@ describe("the chrome measures its container", () => {
 
 
 /**
+ * `--mocanvas-ui-dock` is read by JavaScript as well as by the cascade.
+ *
+ * `readBarMetrics` parses this property to decide how many tools stay inline,
+ * with `Number.parseFloat`. A `calc()` — the obvious way to write "a button and
+ * a half" — parses to `NaN`, the fallback of 300 takes over, and the toolbar
+ * silently collapses to two buttons on a 600px canvas. The declaration has to
+ * stay a plain length.
+ */
+describe("the toolbar's reservation stays readable by both halves", () => {
+  const css = readFileSync(fileURLToPath(new URL("./ui.css", import.meta.url)), "utf8")
+
+  it("is a plain length everywhere it is set", () => {
+    const values = [...css.matchAll(/--mocanvas-ui-dock:\s*([^;]+);/g)].map((match) => match[1]!.trim())
+    expect(values.length, "nothing reserves room for the docks at all").toBeGreaterThan(0)
+    for (const value of values) {
+      expect(value, "a value `parseFloat` cannot read — the bar will fall back to 300px").toMatch(/^\d+(\.\d+)?px$/)
+    }
+  })
+})
+
+
+/**
+ * A popover holds either a grid of icons or a panel, and the two are different
+ * shapes. The style panel is 292px of rows and was being laid out in the first
+ * 40px column of the icon grid, so it hung out of its own plate to the right
+ * and off the canvas with it. The class that says which is which is written in
+ * one file and styled in another; neither notices alone.
+ */
+describe("a popover that holds a panel", () => {
+  const css = readFileSync(fileURLToPath(new URL("./ui.css", import.meta.url)), "utf8")
+
+  it("is taken out of the icon grid", () => {
+    const rule = css.match(/\.mocanvas-popover--panel\s*\{([^}]*)\}/)
+    expect(rule, ".mocanvas-popover--panel has no rule, so it is still a five-column grid").not.toBeNull()
+    expect(rule![1], "the panel is still laid out in one 40px column").toMatch(/display:\s*block/)
+  })
+
+  it("is what the style panel asks for", () => {
+    const component = readFileSync(fileURLToPath(new URL("./panel-style.tsx", import.meta.url)), "utf8")
+    expect(component, "the mobile style panel no longer claims the class the rule styles").toMatch(
+      /className="mocanvas-popover--panel"/,
+    )
+  })
+})
+
+
+/**
  * Two class names that were written without a rule.
  *
  * Both failed the same way and neither showed up in a test: the element

@@ -1,6 +1,6 @@
 {
   "name": "@mocanvas/compat",
-  "version": "4.8.8",
+  "version": "4.8.9",
   "description": "TL-prefixed aliases over the mocanvas API, for projects migrating an existing tldraw app.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Symbio Digital",

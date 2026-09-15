@@ -1,5 +1,51 @@
 # Changelog
 
+## 4.8.9
+
+Three things about a canvas in a column, all of them from the same screenshot.
+
+### The toolbar keeps its ends clear
+
+Below 1290px the bar stops reserving room for the zoom bar and the stats chip,
+because they are on other rows by then — and it took the whole width instead.
+Thirteen tools on a 606px canvas left 26px at each end, which reads as a strip
+of chrome across the document rather than a plate on it.
+
+It now keeps a button and a half clear at each end and spills the rest into the
+overflow menu: nine tools inline instead of thirteen at that width, and still
+all thirteen on anything wider than about 700px. The phone layout is unchanged
+— there is no room there to spend on elegance.
+
+The reservation stays a plain length, and a test says so: `readBarMetrics`
+parses it with `parseFloat` to decide the split, so writing the same value as
+`calc(1.5 * var(--mocanvas-ui-btn))` would read as `NaN`, fall back to 300px,
+and collapse the bar to two buttons.
+
+### The common actions move into the menu plate sooner
+
+Undo, redo, delete and duplicate ride in the menu plate beside the page picker
+when there is room, and take a row of their own above the toolbar when there is
+not. The threshold was 840px, about twice what the pair needs: a page picker is
+around 150px and five actions about 220. It is 580px now, so everything between
+the two stops spending a row of canvas on buttons that had room in a plate
+already on screen. "Back to content" moves down a row to match.
+
+### A floating layer stays inside the editor
+
+`placeNear` clamped to the window, so the style panel of a 606px editor on a
+1600px screen opened beside its trigger, stayed obediently inside the browser,
+and hung 74px outside the editor it belongs to. It now clamps to the editor's
+container, with the window as the fallback for chrome rendered without one, and
+carries a `max-height` measured from that container so a panel taller than a
+short embed scrolls inside the plate instead of running out of the bottom of
+it. `placeNear` takes the box as an optional sixth argument; called as before,
+it behaves as before.
+
+The style panel also had the wrong plate around it. `.mocanvas-popover` is five
+40px columns — the shape the tool and shape pickers want — and the panel is
+292px of rows, so it was being laid out in the first column and hung out of its
+own plate to the right. A popover holding a panel is `display: block` now.
+
 ## 4.8.8
 
 The chrome measures its container, not the window.
