@@ -129,7 +129,7 @@ export function buildDefaultActionItems(editor: Editor): TLUiActionsContextType 
 
     // ---- align / distribute / stack / stretch -----------------------------
     item("align-left", "Align left", () => void editor.alignShapes(selected(), "left"), { icon: "align-left", kbd: "alt+a" }),
-    item("align-center-horizontal", "Align centre horizontally", () => void editor.alignShapes(selected(), "center-horizontal"), { icon: "align-center", kbd: "alt+h" }),
+    item("align-center-horizontal", "Align centre horizontally", () => void editor.alignShapes(selected(), "center-horizontal"), { icon: "align-center-horizontal", kbd: "alt+h" }),
     item("align-right", "Align right", () => void editor.alignShapes(selected(), "right"), { icon: "align-right", kbd: "alt+d" }),
     item("align-top", "Align top", () => void editor.alignShapes(selected(), "top"), { icon: "valign-top", kbd: "alt+w" }),
     item("align-center-vertical", "Align centre vertically", () => void editor.alignShapes(selected(), "center-vertical"), { icon: "valign-middle", kbd: "alt+v" }),

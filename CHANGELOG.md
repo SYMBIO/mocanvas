@@ -1,5 +1,71 @@
 # Changelog
 
+## 4.9.0
+
+The default icon set is Phosphor, and `align-left` means what it says.
+
+### Breaking: `align-left`, `align-center` and `align-right` now align objects
+
+These three names were doing two jobs. `tools-context.ts` used them for the
+align actions, which call `editor.alignShapes`, and `StylePanel` used the same
+names for a label's horizontal alignment inside its shape. One of the two had
+to be wrong on screen, and it was the first: the "align objects" menu drew
+three ragged lines of text.
+
+Text alignment moved to `text-align-left`, `text-align-center` and
+`text-align-right`, which is also what tldraw calls it. The old names now carry
+Phosphor's object-alignment artwork, and `align-top`, `align-bottom`,
+`align-center-horizontal` and `align-center-vertical` join them.
+
+**If you render an icon by name**, an app that passes `align-left` for text
+alignment will now show an object-alignment mark. Rename those three call sites
+to `text-align-*`. Nothing else moved, and no name stopped resolving.
+
+### The generic artwork comes from Phosphor
+
+The hand-drawn set had 46 drawings. It covered what the default UI called for
+and little else, so an app porting from tldraw hit the fallback initial for
+roughly 110 names — an "A" in a button where an alignment icon belonged.
+
+The set is now 154 drawings and 26 aliases, from three sources:
+
+- **Phosphor Icons** (MIT, `regular` weight) for the generic chrome: tools,
+  history, alignment, distribution, text formatting, status, brands. 103 of
+  them.
+- **Our own drawings** for everything that describes this canvas and so has no
+  equivalent in a general-purpose family: the fill and dash styles, the size
+  steps, the font families, the text-alignment marks, and a new family of eight
+  `arrowhead-*` icons drawn on one shared shaft.
+- **The canvas geometry**, unchanged, for the 20 `geo-*` icons.
+
+Phosphor's path data is inlined at build time by
+`scripts/generate-phosphor-icons.mjs`; there is no runtime dependency on
+`@phosphor-icons/react`, and the published bundle names it nowhere. It costs
+about 11KB gzipped. `NOTICE` carries the MIT notice, and `pnpm icons:generate`
+regenerates the module when Phosphor is upgraded.
+
+### Aliases, so a ported app asks for a name that answers
+
+`ICON_ALIASES` maps 26 second spellings onto existing artwork — `tool-pointer`
+to `select`, `size-small` to `size-s`, `horizontal-align-start` to
+`text-align-left`, and so on. An alias never introduces a drawing: two names
+that should look different belong in `ICONS`, and a test enforces that no two
+drawings are identical while exempting aliases by construction.
+
+`hasIcon(name)` is exported for callers that want to know whether the set
+answers to a name before falling back to their own artwork. `TldrawUiIcon` uses
+it, so an override naming a built-in alias now gets the icon rather than the
+label's initial.
+
+### Also
+
+- `pnpm icons:gallery` renders every drawing to one page. The grid rules in
+  `icons.tsx` were always enforced "by the gallery pass"; that pass is a command
+  now.
+- The clean-room policy gained a rule for vendored third-party assets: they
+  follow the same licence allowlist as dependencies and must be listed in
+  `NOTICE`, even though no package manager sees them.
+
 ## 4.8.10
 
 The bottom edge is one row again.

@@ -16,10 +16,14 @@ apps/bench/results/*.png
 *.tsbuildinfo
 
 # Guides copied into packages at prepack; docs/ holds the only edited version.
+packages/*/AGENTS.md
 packages/*/ARCHITECTURE.md
 packages/*/BENCHMARK.md
 packages/*/CLEAN_ROOM.md
 packages/*/COMPAT.md
 packages/*/CUSTOM_SHAPES.md
+packages/*/FILES.md
 packages/*/MIGRATION.md
+packages/*/SYNC.md
+packages/*/TOOLS.md
 packages/*/UI.md

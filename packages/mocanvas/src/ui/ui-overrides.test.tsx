@@ -100,7 +100,7 @@ describe("tools overrides", () => {
       tools["comment"] = {
         id: "comment",
         label: "Comment",
-        icon: "comment",
+        icon: "custom-comment-glyph",
         kbd: "c",
         readonlyOk: true,
         onSelect: () => editor.setCurrentTool("comment"),
@@ -113,7 +113,8 @@ describe("tools overrides", () => {
     const html = renderChrome({ overrides: commentTool })
     expect(html).toContain('data-tool="comment"')
     expect(html).toContain('aria-label="Comment"')
-    // No icon called `comment` ships with mocanvas; the button still renders.
+    // The override names artwork mocanvas does not ship — the button falls back
+    // to the label's initial rather than rendering an empty box.
     expect(html).toContain(">C</span>")
   })
 

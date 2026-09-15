@@ -1,10 +1,25 @@
 /**
- * The default UI icon set: original artwork drawn on a 24×24 grid with a
- * 1.75px stroke, round caps and joins, painted with `currentColor` so buttons
- * control their own colour.
+ * The default UI icon set.
  *
- * Grid rules, enforced by `icons.test.tsx` where they are checkable statically
- * and by the gallery pass otherwise:
+ * Artwork comes from three places, and which one an icon uses is decided by
+ * what the icon has to say:
+ *
+ * - **Phosphor** (MIT, `regular` weight) supplies the generic chrome — tools,
+ *   history, alignment, text formatting, status. It is a large, coherent,
+ *   professionally drawn family, and drawing 100 of those ourselves would have
+ *   produced a worse set more slowly. The path data is inlined by
+ *   `scripts/generate-phosphor-icons.mjs` into `icons-phosphor.ts`; we take no
+ *   runtime dependency on it.
+ * - **Our own drawings** cover everything that describes what *this* canvas
+ *   does and so has no equivalent in a general-purpose family: the fill and
+ *   dash styles, the size steps, the font families, the arrowheads, and the
+ *   text-alignment marks.
+ * - **The canvas geometry itself** supplies the geo icons, generated from the
+ *   same code that draws the shapes, so a toolbar button matches the shape it
+ *   creates.
+ *
+ * The two hand-drawn sources share one grid, enforced by `icons.test.tsx`
+ * where it is checkable statically and by the gallery pass otherwise:
  *
  * - the artwork lives on a 24×24 viewBox; ink (stroke included) stays inside it
  * - ink is optically centred on (12, 12) and spans about 17.75 units at its
@@ -14,13 +29,16 @@
  * - deliberate asymmetry is allowed only when it carries meaning, e.g. the
  *   vertical-align icons sit high or low on purpose
  *
- * Geo icons are generated from the same geometry the canvas draws, so a toolbar
- * button matches the shape it creates.
+ * Phosphor draws filled outlines on a 256 grid instead, so those are scaled
+ * into the same 24×24 box and painted with `fill` rather than `stroke`. The
+ * seam is invisible at button sizes because Phosphor's `regular` weight is a
+ * 16/256 stroke — 1.5 on our grid, against our 1.75.
  */
 import { GEO_SHAPE_KINDS, type GeoShapeKind } from "@mocanvas/editor"
 import type { ReactElement } from "react"
 import { getGeoGeometry } from "../shapes/geo-helpers"
 import { pathWordsToSvgD } from "../shapes/svg-path"
+import { PHOSPHOR_GRID, PHOSPHOR_PATHS } from "./icons-phosphor"
 
 /** Side of the drawing grid. */
 export const ICON_GRID = 24
@@ -30,181 +48,29 @@ export const GEO_BOX = 16
 const solid = { fill: "currentColor", stroke: "none" } as const
 
 // ---------------------------------------------------------------------------
-// Tools
+// Phosphor
 // ---------------------------------------------------------------------------
 
-const TOOL_ICONS = {
-  select: <path d="M6.65 4.05v13.95l3.54-3.35 2.41 5.3 2.33-1.02-2.42-5.21 4.84-.19z" />,
-  hand: (
-    <path d="M8.35 14.6V9.5a1.3 1.3 0 0 1 2.6 0V5.3a1.3 1.3 0 0 1 2.6 0v.5a1.3 1.3 0 0 1 2.6 0v1.9a1.3 1.3 0 0 1 2.6 0v6.75c0 3.15-2.55 5.7-5.7 5.7h-.6c-1.9 0-3.68-.96-4.72-2.55l-1.75-2.65a1.3 1.3 0 0 1 2.17-1.42z" />
-  ),
-  draw: (
-    <>
-      <path d="M4.4 19.6l1.05-3.8L15.5 5.75a2 2 0 0 1 2.83 2.83L8.2 18.55z" />
-      <path d="M13.55 7.7l2.83 2.83" />
-    </>
-  ),
-  eraser: (
-    <>
-      <g transform="translate(12 10.5) rotate(-45)">
-        <rect x="-5.75" y="-3.5" width="11.5" height="7" rx="1.6" />
-        <path d="M0 -3.5V3.5" />
-      </g>
-      <path d="M7 19.4h10.5" />
-    </>
-  ),
-  highlight: (
-    <>
-      {/* A chisel tip over the wet band it has just laid down. */}
-      <path d="M9.15 14.9L6.1 11.85l7.15-6.4a2.15 2.15 0 0 1 3.05 3.05z" />
-      <path d="M8.6 15.7l-2.9.6.5-2.95" />
-      <path d="M5.2 20.05h13.6" strokeWidth={2.8} />
-    </>
-  ),
-  laser: (
-    <>
-      <circle cx="12" cy="12" r="2.55" />
-      <path d="M12 3.1v3.15M12 17.75v3.15M3.1 12h3.15M17.75 12h3.15" />
-      <path d="M5.7 5.7l2.2 2.2M16.1 16.1l2.2 2.2M18.3 5.7l-2.2 2.2M7.9 16.1l-2.2 2.2" />
-    </>
-  ),
-  text: (
-    <>
-      <path d="M5 6.25V4.5h14v1.75" />
-      <path d="M12 4.5v15" />
-      <path d="M8.75 19.5h6.5" />
-    </>
-  ),
-  note: (
-    <>
-      <path d="M4.5 5.75A1.75 1.75 0 0 1 6.25 4h11.5a1.75 1.75 0 0 1 1.75 1.75v8L13.5 20H6.25A1.75 1.75 0 0 1 4.5 18.25z" />
-      <path d="M19.5 13.75h-4.25a1.75 1.75 0 0 0-1.75 1.75V20" />
-    </>
-  ),
-  frame: (
-    <>
-      <path d="M8 4.5v15M16 4.5v15" />
-      <path d="M4.5 8h15M4.5 16h15" />
-    </>
-  ),
-  arrow: (
-    <>
-      <path d="M5.15 18.85L18.85 5.15" />
-      <path d="M12 5.15h6.85V12" />
-    </>
-  ),
-  line: (
-    <>
-      <path d="M7.6 16.4L16.4 7.6" />
-      <circle cx="5.85" cy="18.15" r="1.85" />
-      <circle cx="18.15" cy="5.85" r="1.85" />
-    </>
-  ),
-  image: (
-    <>
-      <rect x="3.9" y="5.25" width="16.2" height="13.5" rx="2.25" />
-      <circle cx="8.9" cy="10" r="1.55" />
-      <path d="M4 16.2l4.75-4.2 3.75 3.25 3-2.5 4.6 4.05" />
-    </>
-  ),
-} as const
+/**
+ * Phosphor artwork, scaled from its 256 grid onto ours and painted as fill.
+ *
+ * The `stroke="none"` matters: the enclosing `<svg>` sets a stroke for the
+ * hand-drawn icons, and without the override Phosphor's filled outlines would
+ * be drawn with a 1.75 stroke on top of themselves and read as blobs.
+ */
+const PHOSPHOR_ICONS = Object.fromEntries(
+  Object.entries(PHOSPHOR_PATHS).map(([name, ds]) => [
+    name,
+    <g fill="currentColor" stroke="none" transform={`scale(${ICON_GRID / PHOSPHOR_GRID})`}>
+      {ds.map((d, i) => (
+        <path key={i} d={d} />
+      ))}
+    </g>,
+  ]),
+) as Record<keyof typeof PHOSPHOR_PATHS, ReactElement>
 
 // ---------------------------------------------------------------------------
-// View, history and object actions
-// ---------------------------------------------------------------------------
-
-const ACTION_ICONS = {
-  "zoom-in": (
-    <>
-      <circle cx="10.75" cy="10.75" r="6.25" />
-      <path d="M15.4 15.4l5.1 5.1" />
-      <path d="M8 10.75h5.5M10.75 8v5.5" />
-    </>
-  ),
-  "zoom-out": (
-    <>
-      <circle cx="10.75" cy="10.75" r="6.25" />
-      <path d="M15.4 15.4l5.1 5.1" />
-      <path d="M8 10.75h5.5" />
-    </>
-  ),
-  "zoom-fit": (
-    <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" />
-  ),
-  undo: (
-    <>
-      <path d="M4.25 8.75h10.25a5.25 5.25 0 0 1 0 10.5H10" />
-      <path d="M8.25 4.75L4.25 8.75l4 4" />
-    </>
-  ),
-  redo: (
-    <>
-      <path d="M19.75 8.75H9.5a5.25 5.25 0 0 0 0 10.5H14" />
-      <path d="M15.75 4.75l4 4-4 4" />
-    </>
-  ),
-  lock: (
-    <>
-      <rect x="4.75" y="10.5" width="14.5" height="9.5" rx="2.25" />
-      <path d="M8.25 10.5V7.75a3.75 3.75 0 0 1 7.5 0v2.75" />
-    </>
-  ),
-  unlock: (
-    <>
-      <rect x="4.75" y="10.5" width="14.5" height="9.5" rx="2.25" />
-      <path d="M8.25 10.5V7.75a3.75 3.75 0 0 1 7.15-1.5" />
-    </>
-  ),
-  duplicate: (
-    <>
-      <rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.25" />
-      <path d="M15.5 4H6.25A2.25 2.25 0 0 0 4 6.25V15.5" />
-    </>
-  ),
-  trash: (
-    <>
-      <path d="M4.5 7h15" />
-      <path d="M9.5 7V5.75A1.5 1.5 0 0 1 11 4.25h2a1.5 1.5 0 0 1 1.5 1.5V7" />
-      <path d="M6.75 7l.75 11.5A1.5 1.5 0 0 0 9 20h6a1.5 1.5 0 0 0 1.5-1.5L17.25 7" />
-      <path d="M10.25 10.5v6M13.75 10.5v6" />
-    </>
-  ),
-  group: (
-    <>
-      <rect x="4" y="4" width="16" height="16" rx="2" strokeDasharray="3 3" />
-      <rect x="7" y="7" width="4.5" height="4.5" rx="1" />
-      <rect x="12.5" y="12.5" width="4.5" height="4.5" rx="1" />
-    </>
-  ),
-  ungroup: (
-    <>
-      <path d="M4 8V5.25A1.25 1.25 0 0 1 5.25 4H8M16 4h2.75A1.25 1.25 0 0 1 20 5.25V8M20 16v2.75A1.25 1.25 0 0 1 18.75 20H16M8 20H5.25A1.25 1.25 0 0 1 4 18.75V16" />
-      <rect x="7" y="7" width="4.5" height="4.5" rx="1" />
-      <rect x="12.5" y="12.5" width="4.5" height="4.5" rx="1" />
-    </>
-  ),
-  "bring-forward": (
-    <>
-      <rect x="4.75" y="11.25" width="14.5" height="8.75" rx="2.25" />
-      <path d="M12 9V4M8.75 7.25L12 4l3.25 3.25" />
-    </>
-  ),
-  "send-backward": (
-    <>
-      <rect x="4.75" y="4" width="14.5" height="8.75" rx="2.25" />
-      <path d="M12 15v5M8.75 16.75L12 20l3.25-3.25" />
-    </>
-  ),
-  "chevron-down": <path d="M6.75 9.75L12 15l5.25-5.25" />,
-  "chevron-up": <path d="M6.75 14.25L12 9l5.25 5.25" />,
-  "chevron-right": <path d="M9.75 6.75L15 12l-5.25 5.25" />,
-  check: <path d="M5 12.5l4.9 4.9L19 6.75" />,
-  close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
-  mixed: <circle cx="12" cy="12" r="7.25" strokeDasharray="2.6 2.8" />,
-} as const
-
-// ---------------------------------------------------------------------------
-// Style properties
+// Style properties — ours, because they describe this canvas's own styles
 // ---------------------------------------------------------------------------
 
 const FILL_BOX = { x: 4.25, y: 4.25, width: 15.5, height: 15.5, rx: 3 } as const
@@ -234,9 +100,13 @@ const STYLE_ICONS = {
   "size-m": <circle cx="12" cy="12" r="3.4" {...solid} />,
   "size-l": <circle cx="12" cy="12" r="4.9" {...solid} />,
   "size-xl": <circle cx="12" cy="12" r="6.6" {...solid} />,
-  "align-left": <path d="M4.5 6.5h15M4.5 12h7.5M4.5 17.5h11.5" />,
-  "align-center": <path d="M4.5 6.5h15M8.25 12h7.5M6.25 17.5h11.5" />,
-  "align-right": <path d="M4.5 6.5h15M12 12h7.5M8 17.5h11.5" />,
+  // Text alignment, as three ragged lines. Distinct from `align-left` and its
+  // neighbours, which align *objects* to each other and come from Phosphor.
+  "text-align-left": <path d="M4.5 6.5h15M4.5 12h7.5M4.5 17.5h11.5" />,
+  "text-align-center": <path d="M4.5 6.5h15M8.25 12h7.5M6.25 17.5h11.5" />,
+  "text-align-right": <path d="M4.5 6.5h15M12 12h7.5M8 17.5h11.5" />,
+  // A label's vertical seat inside its shape: the rule is where the text lands,
+  // the box is the shape. Deliberately off-centre — that is the whole message.
   "valign-top": (
     <>
       <path d="M4.5 4.5h15" />
@@ -283,6 +153,66 @@ const STYLE_ICONS = {
       <path d="M9.6 14.9h4.8" />
       {/* The rails are a frame, not a letter stroke: keep them lighter. */}
       <path d="M4.75 5.75v12.5M19.25 5.75v12.5" strokeWidth={1.4} />
+    </>
+  ),
+  // An indeterminate value across a mixed selection. Ours rather than
+  // Phosphor's `Minus`, which `minus` already uses and which reads as an
+  // action rather than as "these differ".
+  mixed: <circle cx="12" cy="12" r="7.25" strokeDasharray="2.6 2.8" />,
+} as const
+
+// ---------------------------------------------------------------------------
+// Arrowheads — ours, because they name terminals the canvas actually draws
+// ---------------------------------------------------------------------------
+
+/**
+ * The shaft every arrowhead icon sits on, so the eight read as one family and
+ * the terminal is the only thing that changes between them.
+ */
+const SHAFT = (to: number) => <path d={`M4 12h${to - 4}`} />
+
+const ARROWHEAD_ICONS = {
+  "arrowhead-none": SHAFT(19.5),
+  "arrowhead-arrow": (
+    <>
+      {SHAFT(18.5)}
+      <path d="M13.9 7.4L18.5 12l-4.6 4.6" />
+    </>
+  ),
+  "arrowhead-triangle": (
+    <>
+      {SHAFT(13.5)}
+      <path d="M13.5 6.6L20 12l-6.5 5.4z" {...solid} />
+    </>
+  ),
+  "arrowhead-triangle-inverted": (
+    <>
+      {SHAFT(20)}
+      <path d="M20 6.6L13.5 12 20 17.4z" {...solid} />
+    </>
+  ),
+  "arrowhead-square": (
+    <>
+      {SHAFT(13.6)}
+      <rect x="13.6" y="7.8" width="8.4" height="8.4" rx="1.1" {...solid} />
+    </>
+  ),
+  "arrowhead-diamond": (
+    <>
+      {SHAFT(12.4)}
+      <path d="M16.4 6.6L21.2 12l-4.8 5.4L11.6 12z" {...solid} />
+    </>
+  ),
+  "arrowhead-dot": (
+    <>
+      {SHAFT(13.3)}
+      <circle cx="17" cy="12" r="3.7" {...solid} />
+    </>
+  ),
+  "arrowhead-bar": (
+    <>
+      {SHAFT(17.5)}
+      <path d="M17.5 6.2v11.6" />
     </>
   ),
 } as const
@@ -333,13 +263,77 @@ const GEO_ICONS = Object.fromEntries(
   }),
 ) as Record<GeoIconName, ReactElement>
 
-/** Every icon in the set, keyed by name. */
-export const ICONS = { ...TOOL_ICONS, ...ACTION_ICONS, ...STYLE_ICONS, ...GEO_ICONS }
+// ---------------------------------------------------------------------------
+// The set
+// ---------------------------------------------------------------------------
 
-export type IconName = keyof typeof ICONS
+/** Every icon that has artwork of its own, keyed by name. */
+export const ICONS = { ...PHOSPHOR_ICONS, ...STYLE_ICONS, ...ARROWHEAD_ICONS, ...GEO_ICONS }
 
-/** All icon names, sorted — handy for tests and galleries. */
-export const ICON_NAMES = Object.keys(ICONS).sort() as IconName[]
+/** A name with its own artwork. */
+export type DrawnIconName = keyof typeof ICONS
+
+/**
+ * Second spellings for icons that already exist.
+ *
+ * Mostly tldraw's names, so an app ported from it asks for artwork it gets
+ * rather than falling back to an initial. An alias never introduces a drawing:
+ * if two names should look different, they belong in `ICONS`.
+ */
+export const ICON_ALIASES = {
+  // Size steps
+  "size-small": "size-s",
+  "size-medium": "size-m",
+  "size-large": "size-l",
+  "size-extra-large": "size-xl",
+  // Tool names carrying a `tool-` prefix
+  "tool-pointer": "select",
+  "tool-hand": "hand",
+  "tool-pencil": "draw",
+  "tool-eraser": "eraser",
+  "tool-highlight": "highlight",
+  "tool-laser": "laser",
+  "tool-text": "text",
+  "tool-note": "note",
+  "tool-frame": "frame",
+  "tool-arrow": "arrow",
+  "tool-line": "line",
+  "tool-media": "image",
+  "tool-screenshot": "screenshot",
+  // A shape label's alignment within its shape is the same mark as text
+  // alignment within a paragraph.
+  "horizontal-align-start": "text-align-left",
+  "horizontal-align-middle": "text-align-center",
+  "horizontal-align-end": "text-align-right",
+  "vertical-align-start": "valign-top",
+  "vertical-align-middle": "valign-middle",
+  "vertical-align-end": "valign-bottom",
+  // Plain `align-center` is ambiguous between the two axes; the horizontal one
+  // is what a toolbar means by it.
+  "align-center": "align-center-horizontal",
+  // Odds and ends
+  "cross-2": "close",
+  "question-mark-circle": "help-circle",
+} as const satisfies Record<string, DrawnIconName>
+
+/** An alias for a drawn icon. */
+export type IconAlias = keyof typeof ICON_ALIASES
+
+/** Any name the set answers to, drawn or aliased. */
+export type IconName = DrawnIconName | IconAlias
+
+/** Resolves an alias to the name that owns the artwork. Identity otherwise. */
+export function resolveIconName(name: IconName): DrawnIconName {
+  return (ICON_ALIASES as Record<string, DrawnIconName>)[name] ?? (name as DrawnIconName)
+}
+
+/** Whether the set can draw `name`, under that spelling or an alias. */
+export function hasIcon(name: string): name is IconName {
+  return Object.prototype.hasOwnProperty.call(ICONS, name) || Object.prototype.hasOwnProperty.call(ICON_ALIASES, name)
+}
+
+/** All icon names, aliases included, sorted — handy for tests and galleries. */
+export const ICON_NAMES = [...Object.keys(ICONS), ...Object.keys(ICON_ALIASES)].sort() as IconName[]
 
 export interface IconProps {
   name: IconName
@@ -364,7 +358,7 @@ export function Icon({ name, size = 20, className }: IconProps) {
       aria-hidden="true"
       focusable="false"
     >
-      {ICONS[name]}
+      {ICONS[resolveIconName(name)]}
     </svg>
   )
 }

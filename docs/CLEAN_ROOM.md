@@ -22,7 +22,13 @@ that projects can migrate, but it is not derived from it.
 5. **Dependencies must be MIT, Apache-2.0, BSD, ISC, CC0 or 0BSD.** Check the
    license before adding a crate or npm package. `cargo deny` and
    `license-checker` run in CI.
-6. **If in doubt, name it differently** and add an alias in the compat package.
+6. **Vendored third-party assets follow rule 5 and must be listed in `NOTICE`.**
+   Artwork, fonts and data copied into this repository rather than installed
+   count here even though no package manager sees them. Record where the
+   material came from, at which version, and by which script — and never
+   vendor material whose licence rule 5 would not have allowed as a dependency.
+   The icon set's Phosphor artwork is the worked example.
+7. **If in doubt, name it differently** and add an alias in the compat package.
 
 ## The one exception: `apps/bench`
 
