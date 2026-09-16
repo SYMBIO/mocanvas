@@ -98,9 +98,11 @@ export const DefaultStylePanel = track(function DefaultStylePanel({ isMobile = f
 /**
  * The style panel as a popover, for narrow layouts.
  *
- * The trigger is a colour swatch showing the current colour, which is the one
- * style a user is most likely to be reaching for and the only one that can be
- * shown legibly in a single button.
+ * The trigger is a palette, which is what a control that opens a panel of
+ * colours, fills and dashes is marked with everywhere else. It used to be
+ * `fill-solid` — a filled square, meant as a swatch of the current colour but
+ * never wired to one, so it was a black square whatever the shape was, and
+ * read as a stop button rather than as styling.
  *
  * It sits in a plate of its own, docked at the right end of the row the common
  * actions sit in — mirroring the zoom bar at the left end of the row below.
@@ -126,7 +128,7 @@ export const MobileStylePanel = track(function MobileStylePanel() {
     <div className="mocanvas-panel mocanvas-style-dock">
     <TldrawUiPopover id="mobile-style-panel" side="above">
       <TldrawUiPopoverTrigger label="Style" className={disabled ? "mocanvas-btn mocanvas-btn--disabled" : "mocanvas-btn"}>
-        <Icon name="fill-solid" />
+        <Icon name="color" />
       </TldrawUiPopoverTrigger>
       <TldrawUiPopoverContent label="Style">
         <StylePanelContextProvider isMobile>

@@ -1,5 +1,34 @@
 # Changelog
 
+## 4.9.2
+
+Three things about the narrow layout's chrome, all of them how it reads rather
+than where it sits.
+
+### The style trigger is a palette
+
+It was `fill-solid`: a filled square, meant as a swatch of the current colour
+but never wired to one, so it was a black square whatever the shape was — and
+at 40px it reads as a stop button rather than as styling. It is the palette
+now, which is what a control that opens a panel of colours, fills and dashes
+is marked with everywhere else.
+
+### The toolbar lines up with it
+
+Centred in what is left of the zoom bar's row, the bar stopped 22px short of
+the style dock directly above it, and the two read as two separate things.
+It is right-aligned in that row now: both end one inset from the canvas edge,
+and the right-hand chrome reads as one column. The phone layout still centres
+— there is no dock beside it there and no room to spend on alignment.
+
+### The style panel has no rules in it
+
+Each section was ruled off from the one above, so eight sections meant seven
+lines down a 292px panel — more structure than a list of labelled rows needs,
+since the labels already say where each section starts. The last one drew a
+rule under the panel's final control with nothing beneath it. The spacing
+stays; the lines are gone.
+
 ## 4.9.1
 
 ### A popover is a plate, not a five-column grid

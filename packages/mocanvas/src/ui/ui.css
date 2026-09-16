@@ -244,6 +244,15 @@
   .mocanvas-toolbar {
     --mocanvas-ui-dock-left: 176px;
     --mocanvas-ui-dock-right: 0px;
+    /*
+     * Right-aligned rather than centred in what is left of the row, so its end
+     * lines up with the style dock directly above it — both now sit one inset
+     * from the canvas edge. Centred, the bar stopped 22px short of the dock
+     * and the two read as two separate things rather than one right-hand
+     * column of chrome.
+     */
+    margin-left: auto;
+    margin-right: 0;
   }
 
   :has(> .mocanvas-stats) > .mocanvas-toolbar {
@@ -280,10 +289,11 @@
     bottom: calc(2 * var(--mocanvas-ui-inset) + var(--mocanvas-ui-row));
   }
 
-  /* No room to be elegant with: the bar takes the width it has. */
+  /* No room to be elegant with: the bar takes the width it has, centred. */
   .mocanvas-toolbar {
     --mocanvas-ui-dock-left: 0px;
     --mocanvas-ui-dock-right: 0px;
+    margin-inline: auto;
   }
 
   .mocanvas-stylepanel {
@@ -393,9 +403,16 @@
   gap: 8px;
 }
 
+/*
+ * Space between the style panel's sections, and nothing drawn.
+ *
+ * Each one was ruled off from the one above it. Eight sections meant seven
+ * lines down a 292px panel, which is more structure than a list of labelled
+ * rows needs — the labels already say where each section starts — and the last
+ * one drew a rule under the panel's final control with nothing beneath it.
+ */
 .mocanvas-group + .mocanvas-group {
   padding-top: var(--mocanvas-ui-pad-lg);
-  border-top: 1px solid var(--mocanvas-ui-panel-border);
 }
 
 .mocanvas-seg {
