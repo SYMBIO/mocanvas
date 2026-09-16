@@ -1,9 +1,64 @@
+import { readFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
-import { GEO_SHAPE_KINDS } from "@mocanvas/editor"
+import { DEFAULT_FILLS, DEFAULT_FILL_TOKENS, GEO_SHAPE_KINDS } from "@mocanvas/editor"
 import { GEO_BOX, getGeoIconBox, hasIcon, Icon, ICONS, ICON_ALIASES, ICON_NAMES, resolveIconName, type IconName } from "./icons"
 import { MORE_GEO_KINDS, PRIMARY_GEO_KINDS, TOOLBAR_GROUPS } from "./DefaultUi"
 import { defaultTools } from "../tools"
+
+/**
+ * The fill swatches have to show what the fill styles paint.
+ *
+ * The style names and the colour token names overlap without lining up:
+ * `semi` paints the paper, `solid` paints the hue's pale tint (the token
+ * called `semi`), and only `fill` paints the hue at full strength.
+ * `DEFAULT_FILL_TOKENS` says exactly that and warns that reading the token
+ * whose name matches the style is the easy mistake. The picker made it — every
+ * swatch was one step too strong — and the fifth style had no icon at all, so
+ * it rendered as the word "Fill" in a row of drawings.
+ */
+describe("the fill swatches", () => {
+  const EXPECTED: Record<string, string> = {
+    none: "fill-none",
+    semi: "fill-paper",
+    solid: "fill-tint",
+    pattern: "fill-pattern",
+    fill: "fill-full",
+  }
+
+  /** The `{ style: "icon-name" }` literal a picker maps with. */
+  function mapIn(file: string, name: string): Record<string, string> {
+    const source = readFileSync(fileURLToPath(new URL(file, import.meta.url)), "utf8")
+    const literal = source.match(new RegExp(`const ${name}[^=]*=\\s*\\{([^}]*)\\}`))
+    expect(literal, `${name} is no longer an object literal in ${file}`).not.toBeNull()
+    return Object.fromEntries([...literal![1]!.matchAll(/(\w+):\s*"([^"]+)"/g)].map((m) => [m[1]!, m[2]!]))
+  }
+
+  it.each([
+    ["./StylePanel.tsx", "FILL_ICON"],
+    ["./style-pickers.tsx", "FILL_ICONS"],
+  ])("in %s show what each style paints", (file, name) => {
+    expect(mapIn(file, name)).toEqual(EXPECTED)
+  })
+
+  it("covers every fill style there is", () => {
+    // The panel iterates the style's own values, so a style with no entry here
+    // falls back to its name in words.
+    for (const fill of DEFAULT_FILLS) {
+      expect(EXPECTED[fill], `the ${fill} fill has no swatch`).toBeDefined()
+      expect(hasIcon(EXPECTED[fill]!), `${EXPECTED[fill]} is not a drawn icon`).toBe(true)
+    }
+  })
+
+  it("keeps the paper fill separate from the tinted one", () => {
+    // The two the picker used to confuse: `semi` paints the surface, `solid`
+    // paints a tint of the hue, and the swatches have to differ the same way.
+    expect(DEFAULT_FILL_TOKENS.semi).toBe("paper")
+    expect(DEFAULT_FILL_TOKENS.solid).toBe("semi")
+    expect(EXPECTED.semi).not.toBe(EXPECTED.solid)
+  })
+})
 
 describe("icon set", () => {
   it("renders every icon as a 24×24 svg", () => {

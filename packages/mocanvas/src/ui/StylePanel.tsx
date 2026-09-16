@@ -33,14 +33,14 @@ import { Popover } from "./overlays"
 const CREATING_TOOLS = new Set(["geo", "draw", "note", "text", "arrow", "line"])
 
 const SWATCH_COLORS = DEFAULT_COLORS.filter((c) => c !== "white")
-const FILLS: FillValue[] = ["none", "semi", "solid", "pattern"]
+const FILLS: FillValue[] = ["none", "semi", "solid", "pattern", "fill"]
 const DASHES: DashValue[] = ["draw", "solid", "dashed", "dotted"]
 const SIZES: SizeValue[] = ["s", "m", "l", "xl"]
 const FONTS: FontValue[] = ["draw", "sans", "serif", "mono"]
 const H_ALIGNS: HAlignValue[] = ["start", "middle", "end"]
 const V_ALIGNS: VAlignValue[] = ["start", "middle", "end"]
 
-const FILL_ICON: Record<string, IconName> = { none: "fill-none", semi: "fill-semi", solid: "fill-solid", pattern: "fill-pattern" }
+const FILL_ICON: Record<string, IconName> = { none: "fill-none", semi: "fill-paper", solid: "fill-tint", pattern: "fill-pattern", fill: "fill-full" }
 const H_ALIGN_ICON: Record<string, IconName> = { start: "text-align-left", middle: "text-align-center", end: "text-align-right" }
 const V_ALIGN_ICON: Record<string, IconName> = { start: "valign-top", middle: "valign-middle", end: "valign-bottom" }
 const H_ALIGN_LABEL: Record<string, string> = { start: "Align left", middle: "Align centre", end: "Align right" }

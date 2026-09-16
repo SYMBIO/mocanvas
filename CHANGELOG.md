@@ -1,5 +1,38 @@
 # Changelog
 
+## 4.9.3
+
+### The fill swatches show what the fills paint
+
+The style names and the colour token names overlap without lining up, and
+`DEFAULT_FILL_TOKENS` says so in as many words: the style called `semi` paints
+the paper, `solid` paints the hue's pale tint — the token called `semi` — and
+only `fill` paints the hue at full strength. Its comment warns that reading the
+token whose name matches the style is the easy mistake here.
+
+The picker made it. Every swatch was one step too strong: `semi` showed a tint
+where the canvas shows paper, `solid` showed a full block where the canvas
+shows a tint. And the fifth style had no swatch at all, so a row of four
+drawings ended with the word "Fill".
+
+The swatches are named for what they draw now — `fill-paper`, `fill-tint`,
+`fill-full` beside `fill-none` and `fill-pattern` — and a table maps each style
+to one, the way `DEFAULT_FILL_TOKENS` maps each style to a token. `fill-semi`
+and `fill-solid` still resolve, to the artwork they always drew. A test checks
+both pickers against that table and against the style's own list of values, so
+a sixth fill cannot arrive without a swatch again.
+
+`FILLS` in the docked panel listed four of the five, so the full-strength fill
+could not be chosen there at all. It lists all five.
+
+### Known: the pattern fill is not hatched
+
+`pattern` paints a flat 40% tint — the colour meant to be the *stroke* of a
+hatch, used as the fill instead — so it reads as a heavier `solid` rather than
+as texture. Hatching needs geometry or a tiled texture, and the engine's
+texture path stretches one quad over a shape's bounds rather than tiling, so
+this is an engine change rather than a style fix. Not in this release.
+
 ## 4.9.2
 
 Three things about the narrow layout's chrome, all of them how it reads rather

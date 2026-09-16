@@ -75,14 +75,22 @@ const PHOSPHOR_ICONS = Object.fromEntries(
 
 const FILL_BOX = { x: 4.25, y: 4.25, width: 15.5, height: 15.5, rx: 3 } as const
 
+/*
+ * The fill icons are named for what they draw, not for the style that picks
+ * them, because those two do not line up: the style called `semi` paints the
+ * paper, `solid` paints the hue's pale tint, and only `fill` paints the hue.
+ * `DEFAULT_FILL_TOKENS` says so in as many words and warns that reading the
+ * token whose name matches the style is the easy mistake — which is exactly
+ * what the picker did. Every swatch was one step too strong, and the fifth
+ * style had no icon at all.
+ */
 const STYLE_ICONS = {
   "fill-none": <rect {...FILL_BOX} />,
-  "fill-semi": (
-    <>
-      <rect {...FILL_BOX} fill="currentColor" fillOpacity={0.22} />
-    </>
-  ),
-  "fill-solid": <rect {...FILL_BOX} fill="currentColor" />,
+  // Paper, not a tint: `semi` fills a shape with the canvas's own surface, so
+  // the swatch is the plate's surface inside the outline.
+  "fill-paper": <rect {...FILL_BOX} fill="var(--mocanvas-ui-panel)" />,
+  "fill-tint": <rect {...FILL_BOX} fill="currentColor" fillOpacity={0.22} />,
+  "fill-full": <rect {...FILL_BOX} fill="currentColor" />,
   // Hatching is texture, not outline: a lighter stroke keeps the block's weight
   // level with the other three fill icons.
   "fill-pattern": (
@@ -316,6 +324,10 @@ export const ICON_ALIASES = {
   // name first; the glyph is a plain clipboard and this is what a menu means
   // by paste.
   paste: "clipboard-copy",
+  // The fill swatches were named after two of the colour tokens before they
+  // were named after their own artwork. Same drawings, older spellings.
+  "fill-semi": "fill-tint",
+  "fill-solid": "fill-full",
   // Odds and ends
   "cross-2": "close",
   "question-mark-circle": "help-circle",
