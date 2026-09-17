@@ -41,9 +41,31 @@ export const DEFAULT_FILL_TOKENS: Record<DefaultFillStyle, TLDefaultColorVariant
   none: "none",
   semi: "paper",
   solid: "semi",
-  pattern: "pattern",
+  // The paper *behind* the hatch. `pattern` used to paint this table's
+  // `pattern` token as a flat fill, which is the colour meant to be the
+  // hatch's own stroke — so the one style that should read as texture was the
+  // heaviest block of colour on the canvas. The lines themselves come from
+  // `DEFAULT_HATCH_TOKENS`.
+  pattern: "paper",
   fill: "fill",
 }
+
+/**
+ * Which palette token each fill style draws its *hatch* in, for the styles that
+ * have one. A style absent from this table draws no hatch.
+ */
+export const DEFAULT_HATCH_TOKENS: Partial<Record<DefaultFillStyle, TLDefaultColorVariant>> = {
+  pattern: "pattern",
+}
+
+/**
+ * Distance between hatch lines, in page units.
+ *
+ * Page units, so a hatched shape keeps the same texture when the camera moves
+ * and a big shape is not a coarser version of a small one — the same reasoning
+ * that puts stroke widths in page units.
+ */
+export const DEFAULT_HATCH_SPACING = 6
 
 // SEMANTICS-ASSUMED: the dash geometry. Nothing in the consumer's code reads a
 // dash array, so these are picked to look right at every stroke width — dashes

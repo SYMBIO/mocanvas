@@ -60,6 +60,9 @@ const MAP = {
   lock: "Lock",
   unlock: "LockOpen",
   duplicate: "Copy",
+  // Cut used to borrow `trash`, which is what Delete is marked with — two
+  // different destinations, one drawing.
+  cut: "Scissors",
   trash: "Trash",
   group: "SelectionPlus",
   ungroup: "SelectionSlash",

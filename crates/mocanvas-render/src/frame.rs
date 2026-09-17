@@ -321,6 +321,12 @@ impl Renderer {
                 self.batcher.begin(&mut self.out, BatchKey { texture: 0, clip: clip_bits, isolate: 0 });
                 append(&mut self.out, &mesh.fill, &xf, unpack_rgba(sh.style.fill, op));
             }
+            // Over the fill, under the stroke: the hatch is texture inside the
+            // shape, and the outline stays the shape's own edge.
+            if !mesh.hatch.is_empty() {
+                self.batcher.begin(&mut self.out, BatchKey { texture: 0, clip: clip_bits, isolate: 0 });
+                append(&mut self.out, &mesh.hatch, &xf, unpack_rgba(sh.style.hatch, op));
+            }
             if !mesh.stroke.is_empty() {
                 let isolate = if isolation_group(&sh, mesh) {
                     isolate_next += 1;

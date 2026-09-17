@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { DEFAULT_THEME } from "./DEFAULT_THEME"
 import { ThemeManager } from "./ThemeManager"
-import { DEFAULT_FILL_TOKENS, getDefaultDisplayValues, getDisplayValues } from "./displayValues"
+import { DEFAULT_HATCH_TOKENS, DEFAULT_FILL_TOKENS, getDefaultDisplayValues, getDisplayValues } from "./displayValues"
 import type { TLDefaultDisplayValues, TLStyledShape, TLTheme } from "./types"
 
 const LIGHT = DEFAULT_THEME.colors.light
@@ -46,7 +46,16 @@ describe("getDefaultDisplayValues — fill", () => {
     // every filled shape, which is exactly the regression this pins.
     expect(resolve({ color: "blue", fill: "solid" }).fill).toBe(LIGHT.blue.semi)
     expect(resolve({ color: "blue", fill: "fill" }).fill).toBe(LIGHT.blue.fill)
-    expect(resolve({ color: "blue", fill: "pattern" }).fill).toBe(LIGHT.blue.pattern)
+  })
+
+  it("paints paper under `pattern` and keeps that colour for the hatch itself", () => {
+    // `pattern` used to *fill* with the pattern token, which is the colour the
+    // hatch lines are drawn in — so the one style meant to read as texture was
+    // the heaviest block of colour on the canvas. The paper goes underneath;
+    // the token belongs to the lines on top of it.
+    expect(resolve({ color: "blue", fill: "pattern" }).fill).toBe(LIGHT.solid)
+    expect(DEFAULT_HATCH_TOKENS.pattern).toBe("pattern")
+    expect(DEFAULT_HATCH_TOKENS.solid, "a style that is not hatched must not claim a hatch").toBeUndefined()
   })
 
   it("keeps that mapping written down in one place", () => {
@@ -54,7 +63,7 @@ describe("getDefaultDisplayValues — fill", () => {
       none: "none",
       semi: "paper",
       solid: "semi",
-      pattern: "pattern",
+      pattern: "paper",
       fill: "fill",
     })
   })

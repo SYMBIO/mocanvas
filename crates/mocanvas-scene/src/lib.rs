@@ -15,7 +15,7 @@ mod style;
 pub use order::ZKey;
 pub use query::{BoxQueryMode, HitFilter};
 pub use scene::{Scene, ShapeRef, Slot, FLAG_CLIP, FLAG_HIDDEN, FLAG_LABEL, FLAG_LOCKED, FLAG_NO_FILL, FLAG_OVERLAY};
-pub use style::{unpack_rgba, Style};
+pub use style::{unpack_rgba, Style, DEFAULT_HATCH_SPACING};
 
 /// Opaque shape handle assigned by the host. `0` is null.
 pub type Handle = u32;

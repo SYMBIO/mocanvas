@@ -26,7 +26,8 @@ import {
 import type { ReactNode } from "react"
 import { smoothPoints } from "./draw-helpers"
 import { propsOf, readArray, readBoolean, readEnum, readNumber, readStyle } from "./prop-access"
-import { getFillRgba, getStrokeRgba, getDashId, getThemeColors } from "./shape-theme"
+import { DEFAULT_HATCH_SPACING } from "@mocanvas/editor"
+import { getFillRgba, getHatchRgba, getStrokeRgba, getDashId, getThemeColors } from "./shape-theme"
 import { polylinePath } from "./indicator-paths"
 import { drawShapeProps } from "./shape-props"
 import { drawShapeMigrations } from "./shape-migrations"
@@ -236,6 +237,8 @@ export class DrawShapeUtil extends ShapeUtil<DrawShape, DrawShapeUtilDisplayValu
       stroke: getStrokeRgba(color, colors),
       strokeWidth: STROKE_SIZES[size] * scale,
       fill: isClosed && fill !== "none" ? getFillRgba(color, fill, colors) : 0,
+      hatch: isClosed ? getHatchRgba(color, fill, colors) : 0,
+      hatchSpacing: DEFAULT_HATCH_SPACING * scale,
       // `draw` asks the engine to replace an outline with a hand-drawn version of
       // it. A draw shape's points *are* a hand-drawn version already — a recorded
       // pen movement, smoothed — so putting them through it a second time only

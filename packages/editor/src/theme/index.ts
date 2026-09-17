@@ -33,7 +33,7 @@ export {
   createTheme,
 } from "./resolveThemes"
 export { ThemeManager, type ThemeManagerOptions, type TLColorSchemeWindow } from "./ThemeManager"
-export { getDisplayValues, getDefaultDisplayValues, DEFAULT_FILL_TOKENS } from "./displayValues"
+export { getDisplayValues, getDefaultDisplayValues, DEFAULT_FILL_TOKENS, DEFAULT_HATCH_TOKENS, DEFAULT_HATCH_SPACING } from "./displayValues"
 export { useColorMode, useCurrentTheme, useThemeColors } from "./useColorMode"
 export {
   DefaultFontFamilies,

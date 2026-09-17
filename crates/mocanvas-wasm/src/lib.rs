@@ -10,7 +10,7 @@
 use mocanvas_geo::shapes::{catmull_rom_path, geo_path, polyline_path, smooth_freehand, GeoKind};
 use mocanvas_geo::{Box2d, Path, Vec2};
 use mocanvas_render::{dash, draw_passes_with_tremor, Renderer};
-use mocanvas_scene::{BoxQueryMode, Handle, HitFilter, Scene, Style, ZKey};
+use mocanvas_scene::{DEFAULT_HATCH_SPACING, BoxQueryMode, Handle, HitFilter, Scene, Style, ZKey};
 use wasm_bindgen::prelude::*;
 
 /// Command opcodes (first word of each command).
@@ -36,6 +36,11 @@ pub mod op {
     /// `handle flags npoints [x y(f32)]...` (4 + 2n words). Polyline, or polygon
     /// when `flags` bit 0 is set.
     pub const SET_POLY: u32 = 9;
+    /// `handle colour spacing(f32)` (4 words). Colour alpha 0 = no hatch. Sent
+    /// apart from `SET_STYLE` for the same reason `SET_TEXTURE` is: the style
+    /// command has been eight words since the first release, and a shape that
+    /// never hatches should not pay two words a frame for the possibility.
+    pub const SET_HATCH: u32 = 11;
     /// `handle flags nsegments [segflags npoints (x y(f32))...]...`. A freehand
     /// stroke: each segment is smoothed here when its `segflags` bit 0 is set,
     /// then all of them are concatenated into one outline. `flags` bit 0 closes it.
@@ -167,7 +172,10 @@ impl Engine {
                         return self.fail(count, "truncated SET_STYLE");
                     }
                     let c = &self.cmd[i..i + 8];
-                    let texture = self.scene.get(c[1]).map_or(0, |s| s.style.texture);
+                    // Both the texture and the hatch outlive a style change, the
+                    // way they would if they were words of this command.
+                    let kept = self.scene.get(c[1]).map(|s| (s.style.texture, s.style.hatch, s.style.hatch_spacing));
+                    let (texture, hatch, hatch_spacing) = kept.unwrap_or((0, 0, DEFAULT_HATCH_SPACING));
                     let style = Style {
                         fill: c[2],
                         stroke: c[3],
@@ -175,6 +183,8 @@ impl Engine {
                         dash: c[5],
                         opacity: f32::from_bits(c[6]),
                         texture,
+                        hatch,
+                        hatch_spacing,
                         seed: c[7],
                     };
                     self.scene.set_style(c[1], style);
@@ -273,6 +283,13 @@ impl Engine {
                     }
                     self.scene.set_texture(self.cmd[i + 1], self.cmd[i + 2]);
                     i += 3;
+                }
+                op::SET_HATCH => {
+                    if i + 4 > len {
+                        return self.fail(count, "truncated SET_HATCH");
+                    }
+                    self.scene.set_hatch(self.cmd[i + 1], self.cmd[i + 2], f32::from_bits(self.cmd[i + 3]));
+                    i += 4;
                 }
                 op::CLEAR => {
                     self.scene.clear();

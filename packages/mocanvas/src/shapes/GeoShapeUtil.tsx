@@ -38,7 +38,8 @@ import { getGeoGeometry } from "./geo-helpers"
 import { getGeoTypeDefinition, type GeoTypeDefinition } from "./geo-types"
 import { geoShapeProps } from "./shape-props"
 import { propsOf, readBoolean, readNumber, readRichText, readString, readStyle, readText } from "./prop-access"
-import { getDashId, getFillRgba, getLabelFontFaces, getStrokeRgba, getThemeColors } from "./shape-theme"
+import { DEFAULT_HATCH_SPACING } from "@mocanvas/editor"
+import { getDashId, getFillRgba, getHatchRgba, getLabelFontFaces, getStrokeRgba, getThemeColors } from "./shape-theme"
 import { pathWordsToSvgD } from "./svg-path"
 import { svgPath } from "./indicator-paths"
 
@@ -362,6 +363,8 @@ export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
       stroke: getStrokeRgba(color, colors),
       strokeWidth: STROKE_SIZES[size] * scale,
       fill: getFillRgba(color, fill, colors),
+      hatch: getHatchRgba(color, fill, colors),
+      hatchSpacing: DEFAULT_HATCH_SPACING * scale,
       dash: getDashId(dash),
       opacity: 1,
     }

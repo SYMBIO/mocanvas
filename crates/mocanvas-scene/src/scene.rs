@@ -263,6 +263,24 @@ impl Scene {
         true
     }
 
+    /// Set a shape's hatch colour and spacing. Colour alpha 0 removes it.
+    ///
+    /// Separate from [`Self::set_style`] so a style change does not have to
+    /// carry it, the same bargain [`Self::set_texture`] makes.
+    pub fn set_hatch(&mut self, handle: Handle, hatch: u32, spacing: f32) -> bool {
+        let Some(slot) = self.slot(handle) else { return false };
+        let s = slot as usize;
+        if self.style[s].hatch == hatch && self.style[s].hatch_spacing == spacing {
+            return true;
+        }
+        self.epoch += 1;
+        self.style[s].hatch = hatch;
+        self.style[s].hatch_spacing = spacing;
+        // The hatch is geometry, not a colour swap: the mesh has to be rebuilt.
+        self.version[s] = self.version[s].wrapping_add(1);
+        true
+    }
+
     /// Set the fill texture id of a shape (0 = none). The shape must exist.
     pub fn set_texture(&mut self, handle: Handle, texture: u32) -> bool {
         let Some(slot) = self.slot(handle) else { return false };

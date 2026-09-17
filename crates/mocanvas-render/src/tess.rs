@@ -1,6 +1,7 @@
 //! Path → triangles via lyon.
 
-use lyon::math::point;
+use lyon::algorithms::hatching::{HatchSegment, Hatcher, HatchingOptions, RegularHatchingPattern};
+use lyon::math::{point, Angle};
 use lyon::path::Path as LPath;
 use lyon::tessellation::{
     BuffersBuilder, FillOptions, FillRule, FillTessellator, FillVertex, LineCap, LineJoin, StrokeOptions,
@@ -47,6 +48,57 @@ pub struct MeshCache {
     pub fill: MeshPart,
     /// Stroke triangles (empty if the style has no stroke).
     pub stroke: MeshPart,
+    /// Hatch triangles (empty if the style has no hatch): the parallel lines a
+    /// pattern fill is drawn with, already clipped to the shape.
+    pub hatch: MeshPart,
+}
+
+/// The parallel lines of a pattern fill, clipped to the shape and thickened
+/// into triangles.
+///
+/// lyon walks the outline and hands back the segments of each hatch line that
+/// fall *inside* it, so a ring hatches as a ring and a star as a star without
+/// this having to know anything about either. The lines are then stroked like
+/// any other geometry, which is what keeps them crisp at every zoom: they are
+/// drawing, not a texture stretched over the shape's bounds.
+///
+/// Thin on purpose — a fifth of the spacing, and never wider than a third of
+/// it — so the result reads as texture rather than as a second fill. That is
+/// the whole complaint about the flat tint this replaces.
+fn hatch_mesh(path: &Path, style: &Style, tol: f32) -> MeshPart {
+    let spacing = style.hatch_spacing.max(0.25);
+    let filled = to_lyon_closed(path);
+    let mut lines = LPath::builder();
+    let mut hatcher = Hatcher::new();
+    // Diagonal, because that is what the swatch in the style panel draws and a
+    // fill should look like the button that chose it. Lyon's default is
+    // horizontal, which reads as ruled paper rather than as hatching.
+    let opts = HatchingOptions::DEFAULT.with_tolerance(tol).with_angle(Angle::degrees(45.0));
+    hatcher.hatch_path(
+        filled.iter(),
+        &opts,
+        &mut RegularHatchingPattern {
+            interval: spacing,
+            callback: &mut |segment: &HatchSegment| {
+                lines.add_line_segment(&lyon::geom::LineSegment { from: segment.a.position, to: segment.b.position });
+            },
+        },
+    );
+    let lines = lines.build();
+    if lines.iter().next().is_none() {
+        return MeshPart::default();
+    }
+    let mut buf: VertexBuffers<[f32; 2], u32> = VertexBuffers::new();
+    let mut t = StrokeTessellator::new();
+    let width = (spacing * 0.2).min(spacing / 3.0).max(0.1);
+    let opts = StrokeOptions::tolerance(tol).with_line_width(width).with_line_cap(LineCap::Butt);
+    if t
+        .tessellate_path(&lines, &opts, &mut BuffersBuilder::new(&mut buf, |v: StrokeVertex| v.position().to_array()))
+        .is_err()
+    {
+        return MeshPart::default();
+    }
+    drain(buf)
 }
 
 /// Tessellation tolerance, in *screen* pixels.
@@ -204,6 +256,10 @@ pub fn tessellate(path: &Path, style: &Style, geom_version: u32, zoom: f32, zoom
         }
     }
 
+    if style.has_hatch() && path.is_closed() {
+        out.hatch = hatch_mesh(path, style, tol);
+    }
+
     if style.has_stroke() {
         // The hand-drawn style replaces the exact outline with a perturbed one (see
         // `draw_passes`); every other dash style strokes the real geometry. Either
@@ -270,6 +326,40 @@ mod tests {
         let m = tessellate(&p, &Style { fill: 0xffffffff, stroke: 0, ..Style::default() }, 1, 1.0, 0);
         assert_eq!(m.fill.indices.len(), 6);
         assert!(m.stroke.is_empty());
+    }
+
+    #[test]
+    fn hatch_fills_the_shape_with_lines() {
+        let p = Path::rect(&Box2d::from_xywh(0.0, 0.0, 100.0, 100.0));
+        let style = Style { fill: 0xffffffff, hatch: 0x000000ff, hatch_spacing: 10.0, ..Style::default() };
+        let m = tessellate(&p, &style, 1, 1.0, 0);
+        // Each line is a quad — two triangles, six indices. A 100-unit square
+        // hatched every 10 units gives nine of them at lyon's default angle,
+        // which is the point: a flat fill is one quad and could never be
+        // mistaken for this.
+        assert_eq!(m.hatch.indices.len() % 3, 0);
+        let lines = m.hatch.indices.len() / 6;
+        assert!(lines >= 8, "expected the square to be crossed by lines, got {lines}");
+        // The paper underneath is still drawn; the hatch goes over it.
+        assert_eq!(m.fill.indices.len(), 6);
+    }
+
+    #[test]
+    fn hatch_spacing_sets_how_many_lines() {
+        let p = Path::rect(&Box2d::from_xywh(0.0, 0.0, 100.0, 100.0));
+        let coarse = tessellate(&p, &Style { hatch: 0x000000ff, hatch_spacing: 20.0, ..Style::default() }, 1, 1.0, 0);
+        let fine = tessellate(&p, &Style { hatch: 0x000000ff, hatch_spacing: 5.0, ..Style::default() }, 1, 1.0, 0);
+        assert!(fine.hatch.indices.len() > coarse.hatch.indices.len() * 2);
+    }
+
+    #[test]
+    fn no_hatch_without_a_colour_or_on_an_open_path() {
+        let rect = Path::rect(&Box2d::from_xywh(0.0, 0.0, 50.0, 50.0));
+        let uncoloured = tessellate(&rect, &Style { hatch: 0x00000000, hatch_spacing: 5.0, ..Style::default() }, 1, 1.0, 0);
+        assert!(uncoloured.hatch.is_empty());
+        let open = Path::polyline(&[(0.0, 0.0).into(), (50.0, 0.0).into(), (50.0, 50.0).into()]);
+        let opened = tessellate(&open, &Style { hatch: 0x000000ff, hatch_spacing: 5.0, ..Style::default() }, 1, 1.0, 0);
+        assert!(opened.hatch.is_empty(), "an open path has no inside to hatch");
     }
 
     #[test]

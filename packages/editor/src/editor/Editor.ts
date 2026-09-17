@@ -3252,6 +3252,7 @@ export class Editor extends EventEmitter<EditorEvents> {
         for (let k = 0; k < shape.id.length; k++) seed = Math.imul(seed ^ shape.id.charCodeAt(k), 0x01000193)
         this.engine.cmd.setStyle(h, { ...style, opacity: style.opacity * shape.opacity, seed: style.seed ?? seed >>> 0 })
         this.engine.cmd.setTexture(h, style.texture ?? 0)
+        this.engine.cmd.setHatch(h, style.hatch ?? 0, style.hatchSpacing ?? 0)
       }
     }
   }

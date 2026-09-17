@@ -1,5 +1,47 @@
 # Changelog
 
+## 4.10.0
+
+**A `pattern` fill now draws a hatch, so every shape saved with one changes
+how it looks.** The colour is the same; what it paints is not. Nothing else
+about the format moves, and a file written by an older release loads unchanged.
+
+### The pattern fill is hatched
+
+`pattern` painted a flat 40% tint of the colour that the theme calls the
+*stroke* of a hatch — so the one fill style meant to read as texture was the
+heaviest block of colour on the canvas, heavier than `solid` and second only
+to `fill`.
+
+It is now what its name and its own swatch have always claimed: paper
+underneath, and parallel diagonal lines over it, clipped to the shape. A ring
+hatches as a ring and a star as a star, because the lines are generated from
+the outline rather than stretched across the shape's bounds — the engine's
+texture path draws one quad over those bounds, which is why the hatch is
+geometry instead.
+
+The lines are 6 page units apart and a fifth of that wide, both in page units
+so a hatched shape keeps its texture as the camera moves and a big shape is
+not a coarser version of a small one — the same reasoning that puts stroke
+widths in page units. Diagonal, to match the swatch in the style panel.
+
+New in the engine: `SET_HATCH` (opcode 11), carrying a colour and a spacing.
+It is a command of its own rather than two more words of `SET_STYLE`, for the
+reason `SET_TEXTURE` is: the style command has been eight words since the
+first release, and a shape that never hatches should not pay for the
+possibility every frame. A hatch outlives a style change, as a texture does.
+
+`DEFAULT_HATCH_TOKENS` says which fill styles hatch and in which token, beside
+the `DEFAULT_FILL_TOKENS` table that says what each one fills with;
+`DEFAULT_FILL_TOKENS.pattern` is `"paper"` now rather than `"pattern"`, since
+the pattern token belongs to the lines.
+
+### Cut has its own icon
+
+It borrowed `trash`, which is what Delete is marked with: two different
+destinations, one drawing, in the same menu group. It is a pair of scissors,
+generated into the set from Phosphor like the rest.
+
 ## 4.9.3
 
 ### The fill swatches show what the fills paint

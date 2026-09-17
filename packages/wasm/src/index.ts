@@ -19,6 +19,7 @@ export const OP = {
   SET_SPLINE: 8,
   SET_POLY: 9,
   SET_DRAW: 10,
+  SET_HATCH: 11,
 } as const
 
 /**
@@ -195,6 +196,19 @@ export interface StyleWords {
    * over the shape's local bounds (uv 0..1), tinted white × opacity.
    */
   texture?: number
+  /**
+   * Hatch colour, 0xRRGGBBAA (0 or undefined = none). Not part of SET_STYLE;
+   * send it with `CommandWriter.setHatch`. When set, parallel lines are drawn
+   * over the fill and under the stroke, clipped to the shape — the texture a
+   * "pattern" fill wants, rather than a flat tint.
+   */
+  hatch?: number
+  /**
+   * Distance between hatch lines in page units (0 or undefined = the engine's
+   * default). Page units, so the hatch scales with the drawing the way the
+   * stroke width does.
+   */
+  hatchSpacing?: number
   /**
    * Per-shape random seed (0 or undefined = 0). Only `dash: 3` (hand-drawn) reads
    * it: it picks that shape's wobble, so the same seed always redraws the same
@@ -414,6 +428,21 @@ export class CommandWriter {
     v[i++] = s.dash >>> 0
     v[i++] = f32bits(s.opacity)
     v[i++] = (s.seed ?? 0) >>> 0
+    this.len = i
+  }
+
+  /**
+   * Set a shape's hatch: colour (alpha 0 removes it) and line spacing in page
+   * units. Independent of `setStyle`, and outlives one.
+   */
+  setHatch(handle: Handle, hatch: number, spacing: number): void {
+    this.ensure(4)
+    const v = this.view
+    let i = this.len
+    v[i++] = OP.SET_HATCH
+    v[i++] = handle
+    v[i++] = hatch >>> 0
+    v[i++] = f32bits(spacing)
     this.len = i
   }
 

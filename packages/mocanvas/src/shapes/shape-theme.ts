@@ -16,6 +16,7 @@
  */
 import {
   DEFAULT_FILL_TOKENS,
+  DEFAULT_HATCH_TOKENS,
   DEFAULT_THEME,
   DefaultFontFaces,
   getColorValue,
@@ -86,6 +87,22 @@ export function getFillRgba(
   if (token === "none") return 0
   if (token === "paper") return hexToRgba(colors.solid)
   return hexToRgba(getColorValue(colors, color, token))
+}
+
+/**
+ * Engine RGBA for a fill style's hatch, or 0 when that style has no hatch.
+ *
+ * Separate from {@link getFillRgba} because a hatched shape has both: paper
+ * underneath and lines over it. Reading one colour for the pair is what made
+ * `pattern` a flat block of the hatch's own stroke colour.
+ */
+export function getHatchRgba(
+  color: DefaultColorStyle,
+  fill: DefaultFillStyle,
+  colors: TLThemeColors = FALLBACK_THEME_COLORS,
+): number {
+  const token = DEFAULT_HATCH_TOKENS[fill]
+  return token ? hexToRgba(getColorValue(colors, color, token)) : 0
 }
 
 /** Engine RGBA for a sticky note's background. */

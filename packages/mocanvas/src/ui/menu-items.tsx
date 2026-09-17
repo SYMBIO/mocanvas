@@ -35,7 +35,7 @@ import { useReduceMotion } from "./ui-a11y"
 export function CutMenuItem() {
   const editor = useEditor()
   const enabled = useCanApplySelectionAction()
-  return <TldrawUiMenuItem id="cut" label="Cut" icon="trash" kbd="mod+x" disabled={!enabled} onSelect={() => void cutSelectionToClipboard(editor)} />
+  return <TldrawUiMenuItem id="cut" label="Cut" icon="cut" kbd="mod+x" disabled={!enabled} onSelect={() => void cutSelectionToClipboard(editor)} />
 }
 
 /** Copy the selection. */
