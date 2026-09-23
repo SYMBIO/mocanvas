@@ -103,10 +103,34 @@ describe("TextMeasure.measureHtml", () => {
     expect(wrapped.w).toBeLessThanOrEqual(200)
   })
 
-  it("reports the width the content wanted when asked for scrollWidth", () => {
+  /*
+   * `scrollWidth` is the DOM's, and the distinction it draws is the reason to
+   * ask for it: a box overflows only when something in it cannot be broken to
+   * fit. Until 4.11.1 this re-measured the whole text unwrapped, so any label
+   * that took two lines reported as an overflow — and a consumer shrinking
+   * text to fit a sticky note drove the font down to 3px looking for a size
+   * that would fit on one line.
+   */
+  it("reports the wrap width for text that wraps", () => {
     const measure = new TextMeasure()
-    const long = "word ".repeat(20).trim()
-    const measured = measure.measureHtml(`<p>${long}</p>`, { ...opts, maxWidth: 200, measureScrollWidth: true })
+    const sentence = "word ".repeat(20).trim()
+    const measured = measure.measureHtml(`<p>${sentence}</p>`, { ...opts, maxWidth: 200, measureScrollWidth: true })
+    expect(measured.h, "twenty words at this width take more than one line").toBeGreaterThan(opts.fontSize * opts.lineHeight)
+    expect(measured.scrollWidth).toBeLessThanOrEqual(measured.w)
+  })
+
+  it("reports more than the wrap width for a word that cannot be broken", () => {
+    const measure = new TextMeasure()
+    const unbreakable = "w".repeat(80)
+    const measured = measure.measureHtml(`<p>${unbreakable}</p>`, { ...opts, maxWidth: 200, measureScrollWidth: true })
+    expect(measured.scrollWidth).toBeGreaterThan(measured.w)
+  })
+
+  it("tells the two apart in the same text", () => {
+    // A long word among short ones: the box still overflows, by that word.
+    const measure = new TextMeasure()
+    const mixed = `${"word ".repeat(10)}${"w".repeat(80)} ${"word ".repeat(10)}`.trim()
+    const measured = measure.measureHtml(`<p>${mixed}</p>`, { ...opts, maxWidth: 200, measureScrollWidth: true })
     expect(measured.scrollWidth).toBeGreaterThan(measured.w)
   })
 

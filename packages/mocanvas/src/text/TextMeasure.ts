@@ -31,8 +31,13 @@ export interface TextMeasureHtmlOptions {
   /** CSS padding, as a number of px or any padding shorthand (`"0px"`, `"4px 8px"`). */
   padding?: number | string
   /**
-   * Also report `scrollWidth`: the width the content wants before wrapping, so a
-   * shrink-to-fit pass can tell "wraps" from "overflows".
+   * Also report `scrollWidth`, with the DOM property's meaning: the width the
+   * content *cannot* be made to fit in. Text that wraps reports the wrap width;
+   * only something unbreakable — one long word, a URL — reports more.
+   *
+   * That distinction is the whole point of asking: a shrink-to-fit pass tells
+   * "wraps" (fine, keep this size) from "overflows" (too big, shrink) by
+   * comparing it against the wrap width.
    */
   measureScrollWidth?: boolean
   /** Extra CSS declarations applied to the probe, e.g. `{ "font-variant": "small-caps" }`. */
@@ -40,8 +45,27 @@ export interface TextMeasureHtmlOptions {
 }
 
 export interface TextHtmlMeasurement extends TextMeasurement {
-  /** Width the content wants before wrapping. Equals `w` unless `measureScrollWidth` was set. */
+  /**
+   * The DOM's `scrollWidth`: the width below which the content overflows rather
+   * than wraps. Equal to `w` for text that wraps, larger only when an
+   * unbreakable run is wider than the box. Equals `w` unless
+   * `measureScrollWidth` was set.
+   */
   scrollWidth: number
+}
+
+/**
+ * The longest run of text that cannot be broken across lines — a word, a URL —
+ * which is the only thing that makes a box overflow rather than wrap.
+ *
+ * Whitespace is where a line may break. This does not know the finer rules
+ * (soft hyphens, CJK, `overflow-wrap`), which is why it only stands in for the
+ * DOM when there is no DOM to ask.
+ */
+function longestUnbreakableRun(text: string): string {
+  let longest = ""
+  for (const run of text.split(/\s+/)) if (run.length > longest.length) longest = run
+  return longest
 }
 
 const MAX_CACHE_ENTRIES = 2000
@@ -174,9 +198,14 @@ export class TextMeasure {
       ...(opts.maxWidth === undefined || opts.maxWidth === null ? {} : { maxWidth: opts.maxWidth }),
       padding,
     })
-    // Unwrapped, the widest paragraph is what the content wants.
-    const unwrapped = this.estimate(text, { fontFamily: opts.fontFamily, fontSize: opts.fontSize, lineHeight: opts.lineHeight, padding })
-    return { ...base, scrollWidth: opts.measureScrollWidth ? unwrapped.w : base.w }
+    if (!opts.measureScrollWidth) return { ...base, scrollWidth: base.w }
+    // No DOM to ask, so stand in for it: the box overflows only when a single
+    // unbreakable run is wider than it, and wrapping handles everything else.
+    // Measuring the whole text unwrapped instead — which is what this did until
+    // 4.11.1 — says "overflows" about every label that takes two lines.
+    const widestWord = longestUnbreakableRun(text)
+    const unbreakable = this.estimate(widestWord, { fontFamily: opts.fontFamily, fontSize: opts.fontSize, lineHeight: opts.lineHeight, padding })
+    return { ...base, scrollWidth: Math.max(base.w, unbreakable.w) }
   }
 
   private measureHtmlDom(html: string, opts: TextMeasureHtmlOptions): TextHtmlMeasurement {
@@ -200,15 +229,12 @@ export class TextMeasure {
     const lineHeightPx = opts.fontSize * opts.lineHeight
     const contentH = Math.max(0, rect.height - padding * 2)
     const lineCount = lineHeightPx > 0 ? Math.max(1, Math.round(contentH / lineHeightPx)) : 1
-    let scrollWidth = rect.width
-    if (opts.measureScrollWidth) {
-      // `scrollWidth` is an integer and never smaller than the client width, so
-      // an unwrapped re-measure is the only way to learn the wanted width.
-      const previousMax = s.maxWidth
-      s.maxWidth = "none"
-      scrollWidth = el.getBoundingClientRect().width
-      s.maxWidth = previousMax
-    }
+    // The property itself, with the wrap width still applied: an integer, never
+    // below the client width, and above it only when something could not be
+    // broken to fit. Re-measuring unwrapped instead — which is what this did
+    // until 4.11.1 — reports the whole paragraph laid out on one line, so every
+    // label that wraps reads as an overflow.
+    const scrollWidth = opts.measureScrollWidth ? Math.max(rect.width, el.scrollWidth) : rect.width
     return {
       w: Math.ceil(rect.width * 100) / 100,
       h: Math.ceil(rect.height * 100) / 100,

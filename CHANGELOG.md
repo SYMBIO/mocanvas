@@ -1,5 +1,32 @@
 # Changelog
 
+## 4.11.1
+
+### `measureScrollWidth` reports the DOM's `scrollWidth`, not the unwrapped width
+
+It re-measured the text with wrapping turned off and returned how wide the
+whole paragraph would be on one line. So any label that took two lines came
+back claiming it wanted more width — which is every label that wraps, which is
+most of them.
+
+Its own docstring says what it is for: "so a shrink-to-fit pass can tell
+`wraps` from `overflows`". As written it could not tell them apart. A consumer
+fitting text to a sticky note asks for the largest whole-pixel size where the
+text wraps *and* does not overflow, and got "overflows" at every size where the
+text needed a second line — so the search drove the font down to 3–8px, looking
+for a size that fit on one line. The labels had been that small in the stored
+data all along; 4.10 discarded the ratio and hid it.
+
+It is the DOM property now: the width below which the content overflows rather
+than wraps. Text that wraps reports the wrap width; only an unbreakable run — a
+long word, a URL — reports more. The DOM path reads `el.scrollWidth` with the
+wrap width still applied; without a DOM, the estimate measures the longest
+unbreakable run instead of the whole text.
+
+The test that covered this asserted the old behaviour on a sentence of twenty
+short words, which wraps. It now asserts the distinction in both directions,
+and in one text that has both.
+
 ## 4.11.0
 
 **Labels get smaller.** The text inside a geo shape, on a note and on an arrow
