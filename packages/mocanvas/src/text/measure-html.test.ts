@@ -119,18 +119,29 @@ describe("TextMeasure.measureHtml", () => {
     expect(measured.scrollWidth).toBeLessThanOrEqual(measured.w)
   })
 
-  it("reports more than the wrap width for a word that cannot be broken", () => {
+  it("breaks a long word rather than overflowing, as the probe's CSS does", () => {
+    // `overflow-wrap: break-word` on the probe and on the label it stands for:
+    // a word longer than the line is broken, so nothing overflows. Measured in
+    // a browser on a DOM probe, an 80-character word keeps `scrollWidth` at
+    // the wrap width and grows the height, and the estimate has to agree —
+    // it said "overflows" here until the two were compared.
     const measure = new TextMeasure()
-    const unbreakable = "w".repeat(80)
-    const measured = measure.measureHtml(`<p>${unbreakable}</p>`, { ...opts, maxWidth: 200, measureScrollWidth: true })
-    expect(measured.scrollWidth).toBeGreaterThan(measured.w)
+    const long = "w".repeat(80)
+    const measured = measure.measureHtml(`<p>${long}</p>`, { ...opts, maxWidth: 200, measureScrollWidth: true })
+    expect(measured.scrollWidth).toBeLessThanOrEqual(measured.w)
+    expect(measured.h, "the word went onto more than one line").toBeGreaterThan(opts.fontSize * opts.lineHeight)
   })
 
-  it("tells the two apart in the same text", () => {
-    // A long word among short ones: the box still overflows, by that word.
+  it("overflows for a word the caller asked not to break", () => {
+    // The one way to get a run that really cannot be broken.
     const measure = new TextMeasure()
-    const mixed = `${"word ".repeat(10)}${"w".repeat(80)} ${"word ".repeat(10)}`.trim()
-    const measured = measure.measureHtml(`<p>${mixed}</p>`, { ...opts, maxWidth: 200, measureScrollWidth: true })
+    const long = "w".repeat(80)
+    const measured = measure.measureHtml(`<p>${long}</p>`, {
+      ...opts,
+      maxWidth: 200,
+      measureScrollWidth: true,
+      otherStyles: { "overflow-wrap": "normal" },
+    })
     expect(measured.scrollWidth).toBeGreaterThan(measured.w)
   })
 

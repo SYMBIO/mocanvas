@@ -35,13 +35,23 @@ const LOCAL_SOURCES: Record<DefaultFontStyle, string> = {
   mono: "Menlo",
 }
 
-/** The four faces of one family: upright and italic, normal and bold. */
+/**
+ * The four faces of one family: upright and italic, normal and bold.
+ *
+ * A bold face names the bold family first and the plain one after it. All four
+ * said only `local("Comic Sans MS")` until 4.11.2, and a `local()` lookup by
+ * family name answers with the regular file whatever weight is asked for — so
+ * bold text was the same width as normal, which is how a consumer found it:
+ * the same string measured 693px in both weights. Naming the bold family gives
+ * the browser the real file where it is installed, and the plain name is still
+ * there for where it is not.
+ */
 function faceSet(font: DefaultFontStyle): TLFontFaceSet {
   const family = `tldraw_${font}`
   const local = LOCAL_SOURCES[font]
   const face = (style: string, weight: string): TLFontFace => ({
     family,
-    src: `local("${local}")`,
+    src: weight === "bold" ? `local("${local} Bold"), local("${local}")` : `local("${local}")`,
     style,
     weight,
     display: "swap",

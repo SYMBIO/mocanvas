@@ -1,5 +1,37 @@
 # Changelog
 
+## 4.11.2
+
+### The estimate agrees with the DOM about long words
+
+4.11.1 made the estimate report a word wider than its line as an overflow. The
+DOM does not: the probe, and the label it stands for, wrap with
+`overflow-wrap: break-word`, so the word is broken instead. Measured in a
+browser, an 80-character word keeps `scrollWidth` at the wrap width and grows
+the height — so the two paths answered differently on the same input, which
+only showed because someone ran both.
+
+Text now never exceeds the wrap width in either path. A caller that turns the
+breaking off through `otherStyles` — `{ "overflow-wrap": "normal" }` — gets a
+run that really cannot be broken, and an overflow with it.
+
+### Bold text is actually bold
+
+Every built-in face said `src: local("Comic Sans MS")` (or its sans, serif and
+mono equivalents), including the bold ones. A `local()` lookup by family name
+answers with the regular file whatever weight is asked of it, so bold text was
+drawn in the regular face: the same string measured 693px in both weights.
+
+A bold face now names the bold family first — `local("Comic Sans MS Bold"),
+local("Comic Sans MS")` — and keeps the plain name after it for machines that
+have no separate bold file.
+
+This does not change that mocanvas ships no font files. The default faces still
+borrow whatever is on the machine, which is why the same string is narrower
+here than in a canvas that ships its own handwriting webfont. That is the
+stated policy, not a defect, and changing it is a licensing decision rather
+than a rendering one.
+
 ## 4.11.1
 
 ### `measureScrollWidth` reports the DOM's `scrollWidth`, not the unwrapped width

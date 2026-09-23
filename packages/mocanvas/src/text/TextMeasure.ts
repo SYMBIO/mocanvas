@@ -62,6 +62,19 @@ export interface TextHtmlMeasurement extends TextMeasurement {
  * (soft hyphens, CJK, `overflow-wrap`), which is why it only stands in for the
  * DOM when there is no DOM to ask.
  */
+/**
+ * Whether the probe still breaks long words, which is its default and the
+ * label's. A caller overriding `overflow-wrap` or `word-break` through
+ * `otherStyles` is asking for the opposite, and then a long word can overflow.
+ */
+function breaksWords(otherStyles: Record<string, string> | undefined): boolean {
+  const wrap = otherStyles?.["overflow-wrap"] ?? otherStyles?.["overflowWrap"]
+  const brk = otherStyles?.["word-break"] ?? otherStyles?.["wordBreak"]
+  if (wrap !== undefined && wrap !== "break-word" && wrap !== "anywhere") return false
+  if (brk === "keep-all") return false
+  return true
+}
+
 function longestUnbreakableRun(text: string): string {
   let longest = ""
   for (const run of text.split(/\s+/)) if (run.length > longest.length) longest = run
@@ -199,10 +212,15 @@ export class TextMeasure {
       padding,
     })
     if (!opts.measureScrollWidth) return { ...base, scrollWidth: base.w }
-    // No DOM to ask, so stand in for it: the box overflows only when a single
-    // unbreakable run is wider than it, and wrapping handles everything else.
-    // Measuring the whole text unwrapped instead — which is what this did until
-    // 4.11.1 — says "overflows" about every label that takes two lines.
+    // The probe — and the label it stands for — wrap with `overflow-wrap:
+    // break-word`, so a word longer than the line is broken rather than left
+    // to overflow. Text therefore never exceeds the wrap width, and the DOM
+    // path measured on a 80-character word agrees: `scrollWidth` stays at
+    // `maxWidth` and the height grows.
+    //
+    // Unless the caller turned that off through `otherStyles`, which is the
+    // one way to get a run that really cannot be broken.
+    if (breaksWords(opts.otherStyles)) return { ...base, scrollWidth: base.w }
     const widestWord = longestUnbreakableRun(text)
     const unbreakable = this.estimate(widestWord, { fontFamily: opts.fontFamily, fontSize: opts.fontSize, lineHeight: opts.lineHeight, padding })
     return { ...base, scrollWidth: Math.max(base.w, unbreakable.w) }

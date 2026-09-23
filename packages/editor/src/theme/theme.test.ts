@@ -106,6 +106,21 @@ describe("DefaultFontFaces", () => {
       expect(face?.src).toMatch(/^local\(/)
     }
   })
+
+  it("asks for the bold file by name, not just the family", () => {
+    // `local("Comic Sans MS")` answers with the regular file whatever weight
+    // the descriptor asks for, so every bold face was the regular one — the
+    // same string measured the same width in both weights. The bold family is
+    // named first and the plain one kept after it for machines without it.
+    for (const font of ["draw", "sans", "serif", "mono"] as const) {
+      const faces = DefaultFontFaces[`tldraw_${font}`]
+      const bold = faces?.normal?.bold
+      const normal = faces?.normal?.normal
+      expect(bold?.weight, font).toBe("bold")
+      expect(bold?.src, font).toMatch(/Bold"\), local\(/)
+      expect(bold?.src, font).not.toBe(normal?.src)
+    }
+  })
 })
 
 // ---- reading a ramp --------------------------------------------------------
