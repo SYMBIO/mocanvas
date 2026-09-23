@@ -1,5 +1,5 @@
 /** The theme every board starts from. */
-import { FONT_SIZES, STROKE_SIZES } from "../records/styles"
+import { ARROW_LABEL_FONT_SIZES, FONT_SIZES, LABEL_FONT_SIZES, STROKE_SIZES } from "../records/styles"
 import { DEFAULT_DARK_COLORS, DEFAULT_LIGHT_COLORS } from "./colors"
 import { DEFAULT_FONT_FAMILIES } from "./fonts"
 import type { TLTheme } from "./types"
@@ -21,6 +21,8 @@ export const DEFAULT_THEME: TLTheme = Object.freeze({
   colors: Object.freeze({ light: DEFAULT_LIGHT_COLORS, dark: DEFAULT_DARK_COLORS }),
   fonts: DEFAULT_FONT_FAMILIES,
   fontSize: FONT_SIZES,
+  labelFontSize: LABEL_FONT_SIZES,
+  arrowLabelFontSize: ARROW_LABEL_FONT_SIZES,
   lineHeight: DEFAULT_LINE_HEIGHT,
   strokeWidth: STROKE_SIZES,
 })

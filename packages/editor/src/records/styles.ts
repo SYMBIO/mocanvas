@@ -103,6 +103,26 @@ export type ElbowArrowSnapMode = (typeof ELBOW_ARROW_SNAP_MODES)[number]
 export const STROKE_SIZES: Record<DefaultSizeStyle, number> = { s: 2, m: 3.5, l: 5, xl: 10 }
 export const FONT_SIZES: Record<DefaultSizeStyle, number> = { s: 18, m: 24, l: 36, xl: 44 }
 
+/**
+ * Font size per size style for a *label* — the text inside a geo shape or on a
+ * note, as opposed to a text shape, which is its own text and uses
+ * {@link FONT_SIZES}.
+ *
+ * A label is text in a box it has to share, so it steps up more gently: the
+ * gap between `m` and `xl` is 10px here against 20px for a text shape. Both
+ * scales were measured from the reference, per shape type, rather than assumed
+ * to be one table — which is what they were here until 4.11.0, so every label
+ * above `s` was drawn too large, an `xl` one by 37%.
+ */
+export const LABEL_FONT_SIZES: Record<DefaultSizeStyle, number> = { s: 18, m: 22, l: 26, xl: 32 }
+
+/**
+ * Font size per size style for an arrow's label, which steps up more gently
+ * still: an arrow's text sits on a line rather than in a box, and has no
+ * width of its own to grow into.
+ */
+export const ARROW_LABEL_FONT_SIZES: Record<DefaultSizeStyle, number> = { s: 18, m: 20, l: 24, xl: 28 }
+
 export interface ThemeColor {
   solid: string
   semi: string

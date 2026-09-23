@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { createShapeId, type Editor, type PageId, type ShapeId, type UnknownShape } from "@mocanvas/editor"
+import { createShapeId, LABEL_FONT_SIZES, type Editor, type PageId, type ShapeId, type UnknownShape } from "@mocanvas/editor"
 import type { IndexKey } from "@mocanvas/store"
 import { toRichText } from "../text/rich-text"
 import { LINE_HEIGHT } from "./text-helpers"
@@ -106,10 +106,12 @@ describe("GeoShapeUtil growY", () => {
   it("computes growY from the label height", () => {
     const props = { ...util.getDefaultProps(), w: 100, h: 40 }
     expect(getGeoGrowY(props)).toBe(0)
-    // 100px wide with 16px padding → 68px inner → 4 chars per line at 14.4px
+    // 100px wide with 16px padding either side leaves 68px of line, which at
+    // the label scale's `m` takes 40 x's onto eight lines. The line count
+    // follows the font size, so both come from the same constant.
     const tall = { ...props, text: "x".repeat(40) }
     const growY = getGeoGrowY(tall)
-    expect(growY).toBeCloseTo(10 * 24 * LINE_HEIGHT + 32 - 40)
+    expect(growY).toBeCloseTo(8 * LABEL_FONT_SIZES.m * LINE_HEIGHT + 32 - 40)
     // a taller box absorbs the label
     expect(getGeoGrowY({ ...tall, h: 1000 })).toBe(0)
   })
@@ -121,7 +123,7 @@ describe("GeoShapeUtil growY", () => {
     expect(util.getGeometry(created).bounds.h).toBeCloseTo(40 + created.props.growY)
 
     const shrunk = util.onBeforeUpdate(created, { ...created, props: { ...created.props, text: "x" } })!
-    expect(shrunk.props.growY).toBeCloseTo(24 * LINE_HEIGHT + 32 - 40)
+    expect(shrunk.props.growY).toBeCloseTo(LABEL_FONT_SIZES.m * LINE_HEIGHT + 32 - 40)
     const cleared = util.onBeforeUpdate(shrunk, { ...shrunk, props: { ...shrunk.props, text: "" } })!
     expect(cleared.props.growY).toBe(0)
 

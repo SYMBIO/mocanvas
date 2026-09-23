@@ -167,8 +167,16 @@ export interface TLTheme {
   colors: { light: TLThemeColors; dark: TLThemeColors }
   /** CSS font stacks per font style. */
   fonts: TLThemeFonts
-  /** Rendered font size, in page units, per size style. */
+  /** Rendered font size, in page units, per size style, for a text shape. */
   fontSize: Record<SizeValue, number>
+  /**
+   * The same for a label — text inside a geo shape or on a note. Optional: a
+   * theme that omits it gets the default scale, so a theme written before
+   * labels had one of their own keeps working.
+   */
+  labelFontSize?: Record<SizeValue, number>
+  /** The same again for an arrow's label, which steps up more gently still. */
+  arrowLabelFontSize?: Record<SizeValue, number>
   // SEMANTICS-ASSUMED: a single multiplier rather than a per-size table. The
   // consumer only asserts that a theme carries `lineHeight` and passes it
   // through untouched, so the simpler shape wins.

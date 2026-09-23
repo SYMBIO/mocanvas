@@ -35,6 +35,8 @@ export {
   LINE_SPLINE_KINDS,
   STROKE_SIZES,
   FONT_SIZES,
+  LABEL_FONT_SIZES,
+  ARROW_LABEL_FONT_SIZES,
   LIGHT_THEME,
   hexToRgba,
   type GeoShapeKind,

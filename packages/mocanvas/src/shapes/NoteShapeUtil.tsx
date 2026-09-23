@@ -1,3 +1,4 @@
+import { LABEL_FONT_SIZES } from "@mocanvas/editor"
 import {
   DEFAULT_THEME,
   Rectangle2d,
@@ -123,7 +124,10 @@ export function readNoteProps(shape: { props?: unknown }): ResolvedNoteProps {
  */
 export function getNoteBaseFontSize(shape: { props?: unknown }, theme: TLTheme = DEFAULT_THEME): number {
   const { size, scale } = readNoteProps(shape)
-  return (theme.fontSize[size] ?? DEFAULT_THEME.fontSize[size]) * scale
+  // A note's text is a label, not a text shape: its own scale, which steps up
+  // more gently than `fontSize` does. They were the same table until 4.11.0.
+  const sizes = theme.labelFontSize ?? LABEL_FONT_SIZES
+  return (sizes[size] ?? LABEL_FONT_SIZES[size]) * scale
 }
 
 /**

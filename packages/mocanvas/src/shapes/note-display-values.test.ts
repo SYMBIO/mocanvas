@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { DEFAULT_THEME, getColorValue, getDisplayValues, type Editor } from "@mocanvas/editor"
+import { LABEL_FONT_SIZES } from "@mocanvas/editor"
 import { toRichText } from "../text/rich-text"
 import {
   NOTE_PADDING,
@@ -43,15 +44,15 @@ describe("note display values", () => {
     expect(values.noteWidth).toBeCloseTo(NOTE_SIZE * 1.6, 6)
     expect(values.noteHeight).toBeCloseTo(NOTE_SIZE * 1.6, 6)
     expect(values.labelPadding).toBeCloseTo(NOTE_PADDING * 1.6, 6)
-    expect(values.labelFontSize).toBeCloseTo(DEFAULT_THEME.fontSize.m * 1.6, 6)
+    expect(values.labelFontSize).toBeCloseTo(LABEL_FONT_SIZES.m * 1.6, 6)
   })
 
   it("shrinks the label by a stored fontSizeAdjustment", () => {
     // A fraction of the styled size, not a size of its own: a quarter is a
     // quarter of whatever the size style says, at whatever scale.
-    expect(displayOf(note({ size: "xl", fontSizeAdjustment: 0.25 })).labelFontSize).toBeCloseTo(DEFAULT_THEME.fontSize.xl * 0.25, 6)
-    expect(displayOf(note({ size: "m", fontSizeAdjustment: 1 })).labelFontSize).toBe(DEFAULT_THEME.fontSize.m)
-    expect(displayOf(note({ size: "m", fontSizeAdjustment: 0 })).labelFontSize).toBe(DEFAULT_THEME.fontSize.m)
+    expect(displayOf(note({ size: "xl", fontSizeAdjustment: 0.25 })).labelFontSize).toBeCloseTo(LABEL_FONT_SIZES.xl * 0.25, 6)
+    expect(displayOf(note({ size: "m", fontSizeAdjustment: 1 })).labelFontSize).toBe(LABEL_FONT_SIZES.m)
+    expect(displayOf(note({ size: "m", fontSizeAdjustment: 0 })).labelFontSize).toBe(LABEL_FONT_SIZES.m)
   })
 
   it("publishes the size the adjustment is a fraction of", () => {
@@ -59,7 +60,7 @@ describe("note display values", () => {
     // had to shrink. Reading `labelFontSize` for that compounds the shrink on
     // every pass.
     const shrunk = displayOf(note({ size: "m", fontSizeAdjustment: 0.25, scale: 1.6 }))
-    expect(shrunk.labelBaseFontSize).toBeCloseTo(DEFAULT_THEME.fontSize.m * 1.6, 6)
+    expect(shrunk.labelBaseFontSize).toBeCloseTo(LABEL_FONT_SIZES.m * 1.6, 6)
     expect(shrunk.labelFontSize).toBeCloseTo(shrunk.labelBaseFontSize * 0.25, 6)
   })
 
@@ -105,7 +106,7 @@ describe("note display values", () => {
   it("survives a note whose props never arrived", () => {
     const values = displayOf({ id: "shape:n", type: "note", props: {} } as unknown as NoteShape)
     expect(values.noteWidth).toBe(NOTE_SIZE)
-    expect(values.labelFontSize).toBe(DEFAULT_THEME.fontSize.m)
+    expect(values.labelFontSize).toBe(LABEL_FONT_SIZES.m)
   })
 })
 

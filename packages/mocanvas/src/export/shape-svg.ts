@@ -11,6 +11,8 @@ import type { ReactElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import {
   FONT_SIZES,
+  LABEL_FONT_SIZES,
+  ARROW_LABEL_FONT_SIZES,
   LIGHT_THEME,
   hexToRgba,
   type Editor,
@@ -123,7 +125,7 @@ const geoSvg: ShapeSvgRenderer<GeoShape> = (editor, shape) => {
   if (!box) return out
   out += textToSvg(text, box, {
     fontFamily: getFontFamily(font),
-    fontSize: FONT_SIZES[size] * scale,
+    fontSize: LABEL_FONT_SIZES[size] * scale,
     color: getTextCssColor(labelColor),
     align,
     verticalAlign,
@@ -146,7 +148,7 @@ const arrowSvg: ShapeSvgRenderer<ArrowShape> = (editor, shape, ctx) => {
   out += `<rect ${attrs({ x: box.x, y: box.y, width: box.w, height: box.h, rx: 4, fill: ctx.background })}/>`
   out += textToSvg(text, box, {
     fontFamily: getFontFamily(font),
-    fontSize: FONT_SIZES[size] * scale,
+    fontSize: ARROW_LABEL_FONT_SIZES[size] * scale,
     color: getTextCssColor(labelColor),
     align: "middle",
     verticalAlign: "middle",

@@ -1,5 +1,5 @@
 import {
-  FONT_SIZES,
+  ARROW_LABEL_FONT_SIZES,
   Group2d,
   Rectangle2d,
   ShapeUtil,
@@ -267,7 +267,7 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape, ArrowShapeUtilDisplayV
     if (!text) return null
     const m = measureLabel(readRichText(shape.props), {
       fontFamily: font,
-      fontSize: FONT_SIZES[size] * scale,
+      fontSize: ARROW_LABEL_FONT_SIZES[size] * scale,
       padding: LABEL_PADDING * scale,
       editor: this.editor,
     })
@@ -364,7 +364,7 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape, ArrowShapeUtilDisplayV
           style={{
             position: "relative",
             width: "max-content",
-            transform: `translateY(${-getLabelOpticalLift({ fontFamily: font, fontSize: FONT_SIZES[size] * scale })}px)`,
+            transform: `translateY(${-getLabelOpticalLift({ fontFamily: font, fontSize: ARROW_LABEL_FONT_SIZES[size] * scale })}px)`,
           }}
         >
           <TextLabel
@@ -373,7 +373,7 @@ export class ArrowShapeUtil extends ShapeUtil<ArrowShape, ArrowShapeUtilDisplayV
             richText={richText}
             isEditing={isEditing}
             fontFamily={font}
-            fontSize={FONT_SIZES[size] * scale}
+            fontSize={ARROW_LABEL_FONT_SIZES[size] * scale}
             color={display.labelColor}
             textAlign="middle"
             verticalAlign="middle"

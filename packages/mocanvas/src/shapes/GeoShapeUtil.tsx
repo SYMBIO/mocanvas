@@ -3,7 +3,7 @@ import {
   GEO_KIND,
   createBuiltInShapePropsMigrationIds,
   createShapePropsMigrationSequence,
-  FONT_SIZES,
+  LABEL_FONT_SIZES,
   Group2d,
   Rectangle2d,
   STROKE_SIZES,
@@ -197,7 +197,7 @@ export function measureGeoLabel(
   const w = readNumber(props, "w", 100)
   return measureLabel(richText, {
     fontFamily: font,
-    fontSize: FONT_SIZES[size] * scale,
+    fontSize: LABEL_FONT_SIZES[size] * scale,
     maxWidth: Math.max(1, w),
     padding: LABEL_PADDING * scale,
     editor: (editor ?? null) as never,
@@ -387,7 +387,7 @@ export class GeoShapeUtil extends BaseBoxShapeUtil<GeoShape> {
         richText={richText}
         isEditing={isEditing}
         fontFamily={font}
-        fontSize={FONT_SIZES[size] * scale}
+        fontSize={LABEL_FONT_SIZES[size] * scale}
         color={display.labelColor}
         textAlign={align}
         verticalAlign={verticalAlign}

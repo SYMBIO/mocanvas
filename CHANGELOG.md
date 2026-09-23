@@ -1,5 +1,37 @@
 # Changelog
 
+## 4.11.0
+
+**Labels get smaller.** The text inside a geo shape, on a note and on an arrow
+was drawn at the text shape's scale; each has its own, and each is smaller. An
+`xl` geo label loses 37%, an `xl` arrow label 36%. Text shapes are unchanged.
+Nothing in the format moves and nothing needs migrating — it is what the same
+records are painted at.
+
+### Three type scales, not one
+
+`FONT_SIZES` was read for every piece of text in the library. Measured against
+the reference, per shape type, it is right for exactly one of them:
+
+    size                 s    m    l    xl
+    text shape          18   24   36   44     FONT_SIZES, unchanged
+    geo and note label  18   22   26   32     LABEL_FONT_SIZES, new
+    arrow label         18   20   24   28     ARROW_LABEL_FONT_SIZES, new
+
+A label is text in a box it has to share, so it steps up more gently than text
+that is its own shape; an arrow's label has no box at all and steps up more
+gently still. One table for all three made every label above `s` too large,
+which is the kind of thing that only shows up beside the real thing.
+
+The two new scales are on the theme as `labelFontSize` and `arrowLabelFontSize`,
+both optional — a theme that omits them gets the defaults, so a theme written
+before labels had a scale of their own keeps working.
+
+The numbers came from a consumer measuring rendered labels in a browser, shape
+type by shape type, not from reading anything. The first measurement covered
+notes alone; taking it for the whole library would have shrunk text shapes by
+the same amount and been wrong in the other direction.
+
 ## 4.10.1
 
 **A note whose label was auto-shrunk now renders at the size it was shrunk to,
