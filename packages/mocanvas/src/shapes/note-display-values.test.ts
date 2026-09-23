@@ -46,10 +46,21 @@ describe("note display values", () => {
     expect(values.labelFontSize).toBeCloseTo(DEFAULT_THEME.fontSize.m * 1.6, 6)
   })
 
-  it("lets a stored fontSizeAdjustment win over the size style", () => {
-    expect(displayOf(note({ size: "xl", fontSizeAdjustment: 11 })).labelFontSize).toBe(11)
-    // Anything too small to be a font size reads as "unset" instead.
+  it("shrinks the label by a stored fontSizeAdjustment", () => {
+    // A fraction of the styled size, not a size of its own: a quarter is a
+    // quarter of whatever the size style says, at whatever scale.
+    expect(displayOf(note({ size: "xl", fontSizeAdjustment: 0.25 })).labelFontSize).toBeCloseTo(DEFAULT_THEME.fontSize.xl * 0.25, 6)
     expect(displayOf(note({ size: "m", fontSizeAdjustment: 1 })).labelFontSize).toBe(DEFAULT_THEME.fontSize.m)
+    expect(displayOf(note({ size: "m", fontSizeAdjustment: 0 })).labelFontSize).toBe(DEFAULT_THEME.fontSize.m)
+  })
+
+  it("publishes the size the adjustment is a fraction of", () => {
+    // What a host fitting text to the square divides by to record how far it
+    // had to shrink. Reading `labelFontSize` for that compounds the shrink on
+    // every pass.
+    const shrunk = displayOf(note({ size: "m", fontSizeAdjustment: 0.25, scale: 1.6 }))
+    expect(shrunk.labelBaseFontSize).toBeCloseTo(DEFAULT_THEME.fontSize.m * 1.6, 6)
+    expect(shrunk.labelFontSize).toBeCloseTo(shrunk.labelBaseFontSize * 0.25, 6)
   })
 
   it("paints the body and the ink from the palette's NOTE tokens, not the fill styles", () => {

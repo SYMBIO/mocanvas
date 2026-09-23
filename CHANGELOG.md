@@ -1,5 +1,48 @@
 # Changelog
 
+## 4.10.1
+
+**A note whose label was auto-shrunk now renders at the size it was shrunk to,
+so any note carrying a `fontSizeAdjustment` changes how it looks.** The file
+format is untouched and nothing needs migrating.
+
+### `fontSizeAdjustment` is a fraction, not a size
+
+It was read as an absolute size in px, with anything below 4 dismissed as "not
+a font size anyone meant". So a label shrunk to a fifth of its styled size —
+stored as `0.2` — had that discarded and came out at full size, four to eight
+times too large, running off its own note and over the ones beside it.
+
+It is a fraction of the styled size: `1` is a label that fits as it is, `0.25`
+a label at a quarter, and `0` — the backfill for a record written before the
+prop existed — means the same as `1`.
+
+The absolute reading was never supported by anything. The only sample in this
+repository carries `1`, which both readings render identically, which is why no
+test caught it; the tests that pinned it were written to the assumption rather
+than to data. A consumer's 258 shrunk notes all carry fractions, and those
+fractions recover whole-pixel font sizes when multiplied back out — 3, 4, 5, 6,
+7, 8 px — which is what a binary search for the largest whole pixel that fits
+leaves behind. An absolute size does not divide into round numbers by accident.
+
+`labelBaseFontSize` joins the note's display values: the styled size × scale,
+*before* the adjustment. Anything that writes an adjustment needs it as the
+denominator — reading `labelFontSize` for that compounds the shrink on every
+pass, and until now it only worked because the adjustment was being thrown
+away.
+
+### Two guards for a stylesheet that never arrived
+
+`<Mocanvas>` warns, in development, when `mocanvas.css` is not loaded: the
+chrome renders without any of its metrics, which reads as a bug in the library
+rather than a missing import.
+
+`assertCompatStylesLoaded()` in `@mocanvas/compat` is the same check for
+`compat.css`, whose absence leaves every `--tl-*` empty and collapses the
+`calc()`s that use them — found by a consumer whose headings came out at a
+constant tiny size. Opt-in and not automatic: most consumers never load
+`compat.css` and should not be warned about it.
+
 ## 4.10.0
 
 **A `pattern` fill now draws a hatch, so every shape saved with one changes

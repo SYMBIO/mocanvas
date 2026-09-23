@@ -137,6 +137,38 @@ export interface MocanvasProps {
 const EMPTY_ASSET_URLS: TLAssetUrls = {}
 
 /** Batteries-included canvas: default shapes, tools, shortcuts and UI. */
+/**
+ * Say so, once, when the stylesheet never arrived.
+ *
+ * Every panel's metrics — button size, padding, the plate's own colours — are
+ * custom properties declared in `mocanvas.css`. Without it the chrome still
+ * renders, and renders wrong in ways that read as bugs in the library: buttons
+ * at their content's size, a toolbar with no plate behind it. The component
+ * cannot import the stylesheet itself (a bundler that cannot handle a CSS
+ * import from a dependency is a worse failure than this warning), so it checks
+ * and says so.
+ *
+ * Dev only: the check costs a `getComputedStyle` per mount, and in production
+ * the branch is stripped.
+ *
+ * It deliberately does *not* check `--tl-zoom`, the tldraw-compat variable.
+ * That one comes from `@mocanvas/compat/compat.css`, which most consumers have
+ * no reason to load, so a warning about it here would cry wolf at everyone who
+ * is not migrating. `assertCompatStylesLoaded` in `@mocanvas/compat` is the
+ * check for that, and a migrating app calls it where it wants it.
+ */
+function warnIfStylesheetMissing(container: HTMLElement | null): void {
+  if (process.env["NODE_ENV"] === "production") return
+  if (!container || typeof getComputedStyle !== "function") return
+  const probe = container.querySelector(".mocanvas") ?? container
+  if (getComputedStyle(probe).getPropertyValue("--mocanvas-ui-panel").trim()) return
+  // eslint-disable-next-line no-console
+  console.warn(
+    "[mocanvas] The chrome's stylesheet is not loaded, so panels will render without their metrics or colours. " +
+      'Add `import "@mocanvas/mocanvas/mocanvas.css"` where you import the component.',
+  )
+}
+
 export function Mocanvas(props: MocanvasProps) {
   const {
     store,
@@ -167,6 +199,8 @@ export function Mocanvas(props: MocanvasProps) {
   } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const [editor, setEditor] = useState<Editor | null>(null)
+
+  useEffect(() => warnIfStylesheetMissing(containerRef.current), [])
 
   useEffect(() => {
     let disposed = false

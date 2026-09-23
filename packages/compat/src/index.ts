@@ -2,9 +2,43 @@
  * Migration aliases. Projects moving from a `TL`-prefixed API can switch their
  * imports to `@mocanvas/compat` first and rename at their own pace.
  *
- * Every alias here is a pure re-export; there is no runtime code.
+ * Every alias here is a pure re-export. The one function with a body,
+ * `assertCompatStylesLoaded`, is opt-in and does nothing unless called.
  */
 export * from "@mocanvas/mocanvas"
+
+/**
+ * Warn when `compat.css` is missing, for an app that is migrating.
+ *
+ * The tldraw-compat rules are `calc()` over `--tl-*` variables that this
+ * package's stylesheet declares. Without it they resolve to nothing and the
+ * `calc()`s collapse: type that should scale with the camera comes out at a
+ * constant, tiny size. Nothing throws, so it reads as a rendering bug in the
+ * library rather than a missing import — which is exactly how it was found.
+ *
+ * Opt-in rather than automatic, and not in `<Mocanvas>`: most consumers never
+ * load `compat.css` and should not be told to. Call this from a migrating
+ * app's dev entry point. Returns whether the stylesheet was found, so a test
+ * can assert on it; warns only in development.
+ */
+export function assertCompatStylesLoaded(): boolean {
+  if (typeof document === "undefined" || typeof getComputedStyle !== "function") return true
+  const probe = document.createElement("div")
+  probe.className = "mocanvas"
+  probe.style.position = "absolute"
+  probe.style.visibility = "hidden"
+  document.body.appendChild(probe)
+  const loaded = getComputedStyle(probe).getPropertyValue("--tl-zoom").trim() !== ""
+  probe.remove()
+  if (!loaded && process.env["NODE_ENV"] !== "production") {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[mocanvas/compat] compat.css is not loaded, so every --tl-* variable is empty and the rules that " +
+        'use them collapse. Add `import "@mocanvas/compat/compat.css"`.',
+    )
+  }
+  return loaded
+}
 
 import type {
   ArrowBinding,

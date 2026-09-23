@@ -113,23 +113,39 @@ export function readNoteProps(shape: { props?: unknown }): ResolvedNoteProps {
   }
 }
 
-/** Below this, a stored `fontSizeAdjustment` is not a font size anyone meant. */
-const MIN_NOTE_FONT_SIZE = 4
+/**
+ * The label's size before any shrinking: the size style, scaled.
+ *
+ * This is the denominator a `fontSizeAdjustment` is a fraction of, so anything
+ * that *writes* one — a host fitting text to the square and recording how far
+ * it had to shrink — needs this rather than the size the label ends up at.
+ * Published as `labelBaseFontSize` for exactly that reason.
+ */
+export function getNoteBaseFontSize(shape: { props?: unknown }, theme: TLTheme = DEFAULT_THEME): number {
+  const { size, scale } = readNoteProps(shape)
+  return (theme.fontSize[size] ?? DEFAULT_THEME.fontSize[size]) * scale
+}
 
 /**
- * Effective font size: an explicit adjustment (auto-shrunk text) wins over the
- * size style.
+ * Effective font size: the size style, shrunk by `fontSizeAdjustment`.
  *
- * `fontSizeAdjustment` is an absolute size in px, written when a label had to
- * shrink to fit; `0` means "unset". Files exist that write a small placeholder
- * there instead (a `1` on a note that was never shrunk), which would render the
- * label at one pixel, so anything too small to be a font size is also read as
- * unset and the size style takes over.
+ * `fontSizeAdjustment` is a *fraction* of the styled size, written when a label
+ * had to shrink to fit its square: `1` is a label that fits as it is, `0.25` a
+ * label at a quarter. `0` is the backfill for a record written before the prop
+ * existed and means the same as `1`.
+ *
+ * It was read as an absolute size in px until 4.10.1, with anything below 4
+ * dismissed as "not a font size anyone meant". Nothing ever wrote such a value:
+ * the only sample in this repository carries `1`, which both readings render
+ * the same way, and a consumer's live records carry fractions between 0.078 and
+ * 0.21 — which the threshold discarded, so every shrunk label came out at full
+ * size and ran off its note. A fraction is also what a `.tldr` file means by it.
  */
 export function getNoteFontSize(shape: { props?: unknown }, theme: TLTheme = DEFAULT_THEME): number {
-  const { size, scale, fontSizeAdjustment } = readNoteProps(shape)
-  const styled = theme.fontSize[size] ?? DEFAULT_THEME.fontSize[size]
-  return (fontSizeAdjustment >= MIN_NOTE_FONT_SIZE ? fontSizeAdjustment : styled) * scale
+  const { fontSizeAdjustment } = readNoteProps(shape)
+  const base = getNoteBaseFontSize(shape, theme)
+  const ratio = Number.isFinite(fontSizeAdjustment) && fontSizeAdjustment > 0 ? fontSizeAdjustment : 1
+  return base * ratio
 }
 
 /**
@@ -156,6 +172,11 @@ export interface NoteShapeUtilDisplayValues extends TLDefaultDisplayValues {
   labelPadding: number
   /** The label's font size in page units, after any `fontSizeAdjustment`. */
   labelFontSize: number
+  /**
+   * The label's font size in page units *before* `fontSizeAdjustment`: the
+   * size style, scaled. The denominator that adjustment is a fraction of.
+   */
+  labelBaseFontSize: number
   /** The label's CSS font stack. */
   labelFontFamily: string
   /** The label's CSS `font-style`. */
@@ -211,6 +232,7 @@ export function getNoteDisplayValues(
     noteHeight: side,
     labelPadding: (options.labelPadding ?? NOTE_PADDING) * props.scale,
     labelFontSize: fontSize,
+    labelBaseFontSize: getNoteBaseFontSize(shape, theme),
     labelFontFamily: theme.fonts[props.font] ?? theme.fonts.draw,
     // SEMANTICS-ASSUMED: a note's label is upright, regular and unshaped. Rich
     // text carries its own bold/italic runs as marks, so the shape-level

@@ -27,6 +27,7 @@ import {
   NoteShapeUtil,
   TextShapeUtil,
   getNoteFontSize,
+  type NoteShapeProps,
   getNoteBodyGradientCss,
   getNoteFillCssColor,
   getNoteGradientTopCssColor,
@@ -610,13 +611,18 @@ describe("NoteShapeUtil", () => {
     expect(style.strokeWidth).toBe(0)
   })
 
-  it("uses the size style unless the stored adjustment is a plausible font size", () => {
+  it("reads the stored adjustment as a fraction of the size style", () => {
     const props = { ...util.getDefaultProps(), text: "Sticky note" }
-    expect(getNoteFontSize(makeShape<NoteShape>("note", { ...props, fontSizeAdjustment: 0 }))).toBe(FONT_SIZES.m)
-    // A placeholder `1` would otherwise render the label at one pixel.
-    expect(getNoteFontSize(makeShape<NoteShape>("note", { ...props, fontSizeAdjustment: 1 }))).toBe(FONT_SIZES.m)
-    expect(getNoteFontSize(makeShape<NoteShape>("note", { ...props, fontSizeAdjustment: 14 }))).toBe(14)
-    expect(getNoteFontSize(makeShape<NoteShape>("note", { ...props, fontSizeAdjustment: 14, scale: 2 }))).toBe(28)
+    const at = (p: Partial<NoteShapeProps>) => getNoteFontSize(makeShape<NoteShape>("note", { ...props, ...p }))
+    // `1` and the backfilled `0` both mean "this label fits as it is".
+    expect(at({ fontSizeAdjustment: 0 })).toBe(FONT_SIZES.m)
+    expect(at({ fontSizeAdjustment: 1 })).toBe(FONT_SIZES.m)
+    // A shrunk label. Read as an absolute size, as it was until 4.10.1, this
+    // came out at the full styled size and ran off the note.
+    expect(at({ fontSizeAdjustment: 0.25 })).toBeCloseTo(FONT_SIZES.m * 0.25, 6)
+    expect(at({ fontSizeAdjustment: 0.25, scale: 2 })).toBeCloseTo(FONT_SIZES.m * 0.5, 6)
+    // Scale still multiplies, adjustment or not.
+    expect(at({ fontSizeAdjustment: 1, scale: 2 })).toBe(FONT_SIZES.m * 2)
   })
 
   it("reads a shape whose props are missing or misshapen without throwing", () => {
