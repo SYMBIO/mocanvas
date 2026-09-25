@@ -1,5 +1,72 @@
 # Changelog
 
+## 4.12.0
+
+Everything in this release came from a consumer running mocanvas and tldraw
+side by side on the same application, and none of it from our own suite.
+
+### Breaking: an explicit hit-test margin is page units, not screen px
+
+`getShapeAtPoint` and `getShapesAtPoint` divided `opts.margin` by the zoom
+level. That is right for the default — `hitTestMargin` is 8px of cursor
+tolerance on screen — and wrong for a margin the caller passed, which tldraw
+takes in page units. With `margin: 8` at zoom 0.12, mocanvas hit a shape from
+70 page units away; tldraw stops at 8, at every zoom.
+
+**If you pass `margin` yourself**, it now means page units. A call site working
+from a screen distance divides by the zoom itself, as tldraw's callers do:
+`editor.getShapeAtPoint(p, { margin: editor.getHitTestMargin() / editor.getZoomLevel() })`.
+Omitting `margin` is unchanged.
+
+It bit us twice over: `interaction/pointer.ts` already converted before passing
+the result as `margin`, so a canvas pointer-down divided by the zoom twice — at
+zoom 0.05 the pointer picked up anything within ~3200 page units.
+
+### The canvas gets the slots an app passes it
+
+`components` is one map in tldraw: the panels and the editor's own layers.
+mocanvas renders the two in different places, and `TldrawUi`'s layout — which
+is what `Mocanvas` renders — read no editor slots at all. So
+`components.Background`, `components.Grid` and `components.InFrontOfTheCanvas`
+were dropped in silence. An app that put its selection toolbar, its comment
+pins and its agent cursors in that slot had no front layer and nothing in the
+console to say why.
+
+`Mocanvas` now routes the canvas's share of `components` to `<Canvas>`; an
+explicit `canvasComponents` still wins, being the more specific prop.
+`InFrontOfTheCanvas` is a canvas slot now, so it survives `hideUi`, as it does
+in tldraw.
+
+Still not rendered: `OnTheCanvas`, which is page space rather than screen
+space, and the rest of `TLEditorComponents`. The type promises twelve slots and
+the canvas renders four of them.
+
+### The HTML text probe puts its own styles back
+
+`measureHtml` cleared the previous call's `otherStyles` with `removeProperty`,
+which is right for a property the probe does not set itself and wrong for one
+it does: the base rules are written once, when the element is created, so
+removing `overflow-wrap` left the CSS initial `normal` rather than the probe's
+`break-word`. Every later measurement then let long words overflow instead of
+breaking, until a reload built a fresh probe. Passing `break-word` explicitly
+poisoned it just the same — the cleanup never looked at the value.
+
+`measureText` was unaffected: its probe takes no `otherStyles`.
+
+### Four smaller divergences from tldraw
+
+- **A point exactly on the outline.** `hitInside: false` goes to the engine and
+  `hitInside: true` goes to `Geometry2d`, and they disagreed about a point
+  sitting on an ellipse, a hexagon, an octagon or an oval: the nearest point on
+  a curved outline comes back about 1e-15 away, so `distance <= 0` read as a
+  miss. `hitInside: true` is meant to be a superset of `hitInside: false`.
+- **A note placed by a click** was offset by half of the unscaled `NOTE_SIZE`,
+  so a note with `scale: 1.6` landed 60 units down and right of the cursor. It
+  centres on its own bounds now.
+- **A frame placed by a click** was 640x480, against tldraw's 320x180.
+- **An empty text shape's minimum width** was 8, against tldraw's 20. It is
+  still a minimum, not a starting width.
+
 ## 4.11.2
 
 ### The estimate agrees with the DOM about long words
