@@ -1,5 +1,40 @@
 # Changelog
 
+## 4.13.0
+
+Two divergences from tldraw in how a drag lands, both found by a consumer
+running the two side by side.
+
+### Breaking: the accelerator asks for shape snapping, and no longer refuses it
+
+mocanvas lined the selection up with other shapes whenever ctrl/cmd was *not*
+held. tldraw asks the other way round: the accelerator asks for snapping, and
+`isSnapMode` in the user's preferences turns that around, so with it on the
+accelerator suppresses snapping instead.
+
+**If your app relied on dragging to snap with no modifier**, turn on
+`editor.user.updateUserPreferences({ isSnapMode: true })` and it behaves as
+before.
+
+### Breaking: grid mode moves and resizes in grid steps
+
+"Show grid" drew dots and changed nothing about where a drag landed. A drag now
+moves in steps of the document's `gridSize`, and a resize puts the edge its
+handle drags on the grid while the opposite edge stays where it was. An axis a
+shift-drag has locked is left alone, off-grid start and all.
+
+**mocanvas turns the grid on by default** (tldraw does not), so an app that has
+never touched `isGridMode` will see its drags step by 10 from this version. An
+app that wants free movement sets `editor.updateInstanceState({ isGridMode:
+false })`, which also stops drawing the dots.
+
+The two kinds of snapping do not stack: rounding a shape to the grid after it
+lined up with another shape's edge would pull it straight back off.
+
+Measured against tldraw 5.4.2 on the same gestures: a shape at x=20 dragged 37
+units lands on 60, not 57 and not 55; a 150x100 dragged 51.2/38.4 at its
+bottom-right corner becomes 200x140.
+
 ## 4.12.3
 
 ### A menu portalled out of the canvas keeps its own clicks
