@@ -29,6 +29,7 @@ import { defaultTools } from "./tools"
 import { defaultOverlayUtils } from "./indicators"
 import { TldrawUi } from "./ui/TldrawUi"
 import type { TLUiComponents } from "./ui/ui-components"
+import { pickCanvasSlots } from "./canvas-slots"
 import type { TLUiEventHandler } from "./ui/ui-events"
 import { useKeyboardShortcuts } from "./ui/useKeyboardShortcuts"
 import { useExternalContent } from "./external/useExternalContent"
@@ -262,14 +263,27 @@ export function Mocanvas(props: MocanvasProps) {
 
   // The canvas goes through the `Canvas` chrome slot rather than wrapping the
   // chrome, so a `components.ContextMenu` can render it inside its own trigger.
+  // tldraw keeps the editor's own layers in the same `components` map as the
+  // panels, so an app that passes `Background`, `Grid` or `InFrontOfTheCanvas`
+  // there means the canvas. Route them to it: the chrome cannot render them,
+  // and silently dropping them loses a whole layer of the app — a toolbar
+  // pinned over the selection, comment pins, an agent's cursor — with nothing
+  // on screen to say why. `canvasComponents` still wins where both name a slot,
+  // being the more specific prop.
+  const mergedCanvasComponents = useMemo(() => {
+    const fromComponents = pickCanvasSlots(components as Record<string, unknown> | undefined)
+    if (!fromComponents && !canvasComponents) return undefined
+    return { ...fromComponents, ...canvasComponents }
+  }, [components, canvasComponents])
+
   const canvas = useMemo(
     () =>
       editor ? (
-        <Canvas editor={editor} {...(canvasComponents ? { components: canvasComponents } : {})}>
+        <Canvas editor={editor} {...(mergedCanvasComponents ? { components: mergedCanvasComponents } : {})}>
           {children}
         </Canvas>
       ) : null,
-    [editor, canvasComponents, children],
+    [editor, mergedCanvasComponents, children],
   )
 
   return (
