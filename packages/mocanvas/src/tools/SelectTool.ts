@@ -6,6 +6,7 @@ import {
   StateNode,
   Vec,
   type ClickEventInfo,
+  type Editor,
   type KeyboardEventInfo,
   type PointerEventInfo,
   type SelectionHandle,
@@ -306,6 +307,27 @@ class PointingShape extends StateNode {
   }
 }
 
+/**
+ * Whether a drag lines the selection up with other shapes.
+ *
+ * tldraw's rule, and the one an app's users will expect: the accelerator key
+ * asks for shape snapping, and "always snap" in the user's preferences turns
+ * that around so the key asks for the opposite. mocanvas used to snap to shapes
+ * whenever the key was *not* held, which is neither of those.
+ */
+function snapsToShapes(editor: Editor): boolean {
+  const { ctrlKey, accelKey } = editor.inputs
+  const asked = ctrlKey || accelKey
+  return editor.user.getIsSnapMode() ? !asked : asked
+}
+
+/** The grid step to move and resize in, or 0 when the grid is off. */
+function gridStep(editor: Editor): number {
+  if (!editor.getInstanceState().isGridMode) return 0
+  const size = editor.getDocumentSettings().gridSize
+  return Number.isFinite(size) && size > 0 ? size : 0
+}
+
 class Translating extends StateNode {
   static override id = "translating"
   private initialShapes = new Map<ShapeId, UnknownShape>()
@@ -356,7 +378,7 @@ class Translating extends StateNode {
 
   private update(): void {
     const editor = this.editor
-    const { originPagePoint, currentPagePoint, shiftKey, ctrlKey } = editor.inputs
+    const { originPagePoint, currentPagePoint, shiftKey } = editor.inputs
     let delta = Vec.Sub(currentPagePoint, originPagePoint)
     let lockX = false
     let lockY = false
@@ -370,10 +392,10 @@ class Translating extends StateNode {
         lockX = true
       }
     }
-    if (!ctrlKey && editor.inputs.isDragging) {
-      this.initialBounds ??= Box.Common(
-        [...this.initialShapes.values()].map((s) => editor.getShapePageBounds(s)).filter((b): b is Box => !!b),
-      )
+    this.initialBounds ??= Box.Common(
+      [...this.initialShapes.values()].map((s) => editor.getShapePageBounds(s)).filter((b): b is Box => !!b),
+    )
+    if (snapsToShapes(editor) && editor.inputs.isDragging) {
       if (this.initialBounds) {
         const moving = new Box(this.initialBounds.x + delta.x, this.initialBounds.y + delta.y, this.initialBounds.w, this.initialBounds.h)
         const { nudge } = editor.snaps.snapTranslate(moving, new Set(this.initialShapes.keys()), { lockX, lockY })
@@ -381,6 +403,15 @@ class Translating extends StateNode {
       }
     } else {
       editor.snaps.clearLines()
+      // Grid mode moves in grid steps. Not both at once: shape snapping already
+      // decides where the shape lands, and rounding that to the grid afterwards
+      // would pull it back off the edge it just lined up with.
+      const grid = gridStep(editor)
+      if (grid && this.initialBounds) {
+        const moved = new Vec(this.initialBounds.x + delta.x, this.initialBounds.y + delta.y)
+        const snapped = moved.clone().snapToGrid(grid)
+        delta = new Vec(lockX ? delta.x : delta.x + (snapped.x - moved.x), lockY ? delta.y : delta.y + (snapped.y - moved.y))
+      }
     }
     const updates: ShapePartial[] = []
     for (const [id, initial] of this.initialShapes) {
@@ -606,12 +637,23 @@ class Resizing extends StateNode {
     if (h.includes("right")) maxX += delta.x
     if (h.includes("top")) minY += delta.y
     if (h.includes("bottom")) maxY += delta.y
+    // Grid mode resizes in grid steps: the edge the handle drags lands on the
+    // grid, and the edge it does not stays where it was.
+    const grid = gridStep(editor)
+    if (grid) {
+      const toGrid = (v: number) => Math.round(v / grid) * grid
+      if (h.includes("left")) minX = toGrid(minX)
+      if (h.includes("right")) maxX = toGrid(maxX)
+      if (h.includes("top")) minY = toGrid(minY)
+      if (h.includes("bottom")) maxY = toGrid(maxY)
+    }
     if (altKey) {
-      // symmetric about the center
-      if (h.includes("left")) maxX -= delta.x
-      if (h.includes("right")) minX -= delta.x
-      if (h.includes("top")) maxY -= delta.y
-      if (h.includes("bottom")) minY -= delta.y
+      // Symmetric about the centre, mirroring the edge as it ended up — which
+      // in grid mode is the snapped one, so the two sides stay equal.
+      if (h.includes("left")) maxX = b0.maxX + (b0.x - minX)
+      if (h.includes("right")) minX = b0.x - (maxX - b0.maxX)
+      if (h.includes("top")) maxY = b0.maxY + (b0.y - minY)
+      if (h.includes("bottom")) minY = b0.y - (maxY - b0.maxY)
     }
     let scaleX = b0.w === 0 ? 1 : (maxX - minX) / b0.w
     let scaleY = b0.h === 0 ? 1 : (maxY - minY) / b0.h
