@@ -15,6 +15,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { act } from "react"
+import { createPortal } from "react-dom"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { loadEngineSync } from "@mocanvas/wasm"
@@ -245,5 +246,119 @@ describe("pointer events from the layer", () => {
 
     expect(seen).toContain("pointer:pointer_down")
     expect(seen).toContain("pointer:pointer_up")
+  })
+})
+
+/**
+ * A press that began somewhere else.
+ *
+ * Every popover library portals its menu into `<body>`, outside the canvas and
+ * outside the layer in front of it. The menu closes on the press, so by the
+ * time the release fires the node under the pointer is gone and the browser
+ * sends the release to the canvas — which read it as a click on empty canvas,
+ * cleared the selection, and left the menu item's own click unfired.
+ */
+describe("a press that started outside the canvas", () => {
+  it("does not make its release a click on the canvas", () => {
+    installPointerEvents()
+    mount()
+    const seen: string[] = []
+    const original = editor!.dispatch.bind(editor!)
+    ;(editor as unknown as { dispatch: (info: { type: string; name: string }) => void }).dispatch = (info) => {
+      seen.push(`${info.type}:${info.name}`)
+      original(info as never)
+    }
+
+    // The press lands on a node outside the canvas, as a portalled menu is.
+    const outside = document.createElement("div")
+    document.body.appendChild(outside)
+    act(() => {
+      outside.dispatchEvent(pointerEvent("pointerdown"))
+    })
+    // The node goes away with the menu, and the release arrives here instead.
+    outside.remove()
+    act(() => {
+      host!.querySelector('[data-testid="mocanvas-container"]')!.dispatchEvent(pointerEvent("pointerup"))
+    })
+
+    expect(seen).toEqual([])
+  })
+
+  it("still handles a press and release of its own", () => {
+    installPointerEvents()
+    mount()
+    const seen: string[] = []
+    const original = editor!.dispatch.bind(editor!)
+    ;(editor as unknown as { dispatch: (info: { type: string; name: string }) => void }).dispatch = (info) => {
+      seen.push(`${info.type}:${info.name}`)
+      original(info as never)
+    }
+    const container = host!.querySelector('[data-testid="mocanvas-container"]')!
+    act(() => {
+      container.dispatchEvent(pointerEvent("pointerdown"))
+    })
+    act(() => {
+      container.dispatchEvent(pointerEvent("pointerup"))
+    })
+    expect(seen).toContain("pointer:pointer_down")
+    expect(seen).toContain("pointer:pointer_up")
+  })
+})
+
+/**
+ * A menu a panel portals into `<body>`.
+ *
+ * React delivers events along its own tree, not the DOM's, so a portal is a
+ * child of whatever rendered it however far away the node sits. A colour
+ * swatch in a menu portalled out of the canvas's own chrome therefore ran the
+ * canvas's `pointerdown` — which captured the pointer, so the release was
+ * retargeted to the canvas and the swatch never saw its own click. That is the
+ * consumer's whole toolbar: colour, fill, font, size, alignment.
+ */
+describe("a menu portalled out of the canvas", () => {
+  it("keeps its press and its click to itself", () => {
+    installPointerEvents()
+    host = document.createElement("div")
+    document.body.appendChild(host)
+    editor = new Editor({
+      store: createStore(),
+      shapeUtils: [],
+      tools: [SelectTool],
+      engine: loadEngineSync(readFileSync(wasmPath)),
+      getContainer: () => host!,
+    })
+    let clicks = 0
+    function Menu() {
+      return createPortal(
+        <button type="button" data-testid="swatch" onClick={() => (clicks += 1)}>
+          Red
+        </button>,
+        document.body,
+      )
+    }
+    root = createRoot(host)
+    act(() => root!.render(<Canvas editor={editor!} components={{ InFrontOfTheCanvas: () => <Menu /> }} />))
+
+    const seen: string[] = []
+    const original = editor.dispatch.bind(editor)
+    ;(editor as unknown as { dispatch: (info: { type: string; name: string }) => void }).dispatch = (info) => {
+      seen.push(`${info.type}:${info.name}`)
+      original(info as never)
+    }
+
+    const swatch = document.querySelector('[data-testid="swatch"]')!
+    expect(swatch.closest(".mocanvas")).toBeNull()
+    act(() => {
+      swatch.dispatchEvent(pointerEvent("pointerdown"))
+    })
+    act(() => {
+      swatch.dispatchEvent(pointerEvent("pointerup"))
+    })
+    act(() => {
+      swatch.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    })
+
+    expect(seen).toEqual([])
+    expect(clicks).toBe(1)
   })
 })

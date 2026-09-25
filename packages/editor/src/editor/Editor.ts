@@ -1948,7 +1948,11 @@ export class Editor extends EventEmitter<EditorEvents> {
       }
       if (patches.length) this.updateShapes(patches)
     })
-    return ids.map((id) => idMap.get(id)!)
+    const duplicates = ids.map((id) => idMap.get(id)!)
+    // Select the copies, as tldraw does. A toolbar that offers "duplicate" and
+    // then "delete" would otherwise delete the original.
+    this.setSelectedShapes(duplicates)
+    return duplicates
   }
 
   /** Serializable content for the clipboard: shapes (with descendants) and bindings between them. */

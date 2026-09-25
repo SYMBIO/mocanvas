@@ -120,9 +120,41 @@ export function useCanvasEvents(editor: Editor) {
     const isInFrontOfCanvas = (target: EventTarget | null) =>
       target instanceof Element && target.closest(IN_FRONT_OF_CANVAS_SELECTOR) !== null
 
+    /**
+     * Whether the event happened somewhere else in the DOM entirely.
+     *
+     * React does not deliver events along the DOM tree but along its own, and a
+     * portal is a child of the component that renders it however far away the
+     * node sits. So a menu portalled into `<body>` by a panel *inside* the
+     * canvas still runs these handlers, with a target the canvas does not
+     * contain: a press on a colour swatch read as a press on empty canvas, and
+     * the swatch's own click never happened.
+     *
+     * Testing containment rather than the target's class covers that case and
+     * every other portal an app might use, wherever it puts the node.
+     */
+    const isElsewhere = (e: { currentTarget: unknown; target: unknown }) =>
+      e.currentTarget instanceof Node && e.target instanceof Node && !e.currentTarget.contains(e.target)
+
+    /**
+     * Pointers whose press this canvas took.
+     *
+     * A release is only this canvas's business when the press was. A menu
+     * portalled into `<body>` — which is where every popover library puts one
+     * — closes on the press, so the node under the pointer is gone by the time
+     * the release fires and the browser sends it here instead. Without this,
+     * that release read as a click on empty canvas: the selection cleared, and
+     * the menu item never ran, because the click it was waiting for landed on
+     * the canvas.
+     *
+     * Moves are not gated: a pointer crossing the canvas with a button held
+     * elsewhere still updates what is hovered, as it does in a browser.
+     */
+    const ownPointers = new Set<number>()
+
     return {
       onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-        if (isHandled(e) || isInFrontOfCanvas(e.target)) return
+        if (isHandled(e) || isInFrontOfCanvas(e.target) || isElsewhere(e)) return
         if (e.button === 2) {
           editor.dispatch(pointerInfo(e, "right_click"))
           return
@@ -130,6 +162,7 @@ export function useCanvasEvents(editor: Editor) {
         if (e.button === 1) {
           editor.dispatch(pointerInfo(e, "middle_click"))
         }
+        ownPointers.add(e.pointerId)
         ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
         editor.getContainer().focus({ preventScroll: true })
         const down = pointerInfo(e, "pointer_down")
@@ -141,17 +174,20 @@ export function useCanvasEvents(editor: Editor) {
         editor.dispatch(down)
       },
       onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-        if (isHandled(e) || isInFrontOfCanvas(e.target)) return
+        if (isHandled(e) || isInFrontOfCanvas(e.target) || isElsewhere(e)) return
         if (e.pointerType === "mouse" && e.buttons === 0 && editor.inputs.isPointing) {
           // Missed a pointer up (e.g. released outside the window).
+          ownPointers.delete(e.pointerId)
           editor.dispatch(pointerInfo(e, "pointer_up"))
           return
         }
         editor.dispatch(pointerInfo(e, "pointer_move"))
       },
       onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-        if (isHandled(e) || isInFrontOfCanvas(e.target)) return
+        if (isHandled(e) || isInFrontOfCanvas(e.target) || isElsewhere(e)) return
         if (e.button === 2) return
+        // Not our press, not our release.
+        if (!ownPointers.delete(e.pointerId)) return
         const el = e.currentTarget as HTMLElement
         if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
         const up = pointerInfo(e, "pointer_up")
@@ -161,14 +197,15 @@ export function useCanvasEvents(editor: Editor) {
         editor.click.handlePointerEvent(up)
       },
       onPointerCancel(e: React.PointerEvent<HTMLDivElement>) {
-        if (isHandled(e) || isInFrontOfCanvas(e.target)) return
+        if (isHandled(e) || isInFrontOfCanvas(e.target) || isElsewhere(e)) return
+        if (!ownPointers.delete(e.pointerId)) return
         editor.dispatch(pointerInfo(e, "pointer_up"))
         editor.cancel()
       },
       onWheel(e: WheelEvent) {
         // A panel in the front layer scrolls itself; the canvas does not zoom
         // under it.
-        if (isHandled(e) || isInFrontOfCanvas(e.target)) return
+        if (isHandled(e) || isInFrontOfCanvas(e.target) || isElsewhere(e)) return
         e.preventDefault()
         const point = localPoint(editor, e)
         const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1
@@ -182,7 +219,7 @@ export function useCanvasEvents(editor: Editor) {
         editor.dispatch(info)
       },
       onContextMenu(e: React.MouseEvent) {
-        if (isInFrontOfCanvas(e.target)) return
+        if (isInFrontOfCanvas(e.target) || isElsewhere(e)) return
         e.preventDefault()
       },
       onKeyDown(e: KeyboardEvent) {
