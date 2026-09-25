@@ -11,12 +11,14 @@ class Idle extends StateNode {
     const { originPagePoint } = editor.inputs
     editor.markHistoryStoppingPoint("create note")
     const id = createShapeId()
-    editor.createShape({
-      id,
-      type: "note",
-      x: originPagePoint.x - 100,
-      y: originPagePoint.y - 100,
-    })
+    editor.createShape({ id, type: "note", x: originPagePoint.x, y: originPagePoint.y })
+    // Centre on the size the note actually has, not on half of the unscaled 200:
+    // `scale` makes a note bigger without changing `NOTE_SIZE`, so a scaled one
+    // landed with its top-left corner near the cursor instead of its middle.
+    const bounds = editor.getShapePageBounds(id)
+    if (bounds) {
+      editor.updateShape({ id, type: "note", x: originPagePoint.x - bounds.w / 2, y: originPagePoint.y - bounds.h / 2 })
+    }
     editor.select(id)
     editor.setEditingShape(id)
     if (!editor.getInstanceState().isToolLocked) editor.setCurrentTool("select")

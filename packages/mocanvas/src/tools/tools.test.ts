@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url"
 import { beforeEach, describe, expect, it } from "vitest"
 import { createStore, Editor, loadEngineSync, type ShapeId, type UnknownShape } from "@mocanvas/editor"
 import { defaultBindingUtils, type ArrowBinding } from "../bindings"
-import { defaultShapeUtils, getLinePoints, type ArrowShape, type FrameShape, type GeoShape, type LineShape } from "../shapes"
+import { defaultShapeUtils, getLinePoints, NoteShapeUtil, type ArrowShape, type FrameShape, type GeoShape, type LineShape } from "../shapes"
 import { BaseBoxShapeTool, defaultShapeTools, defaultTools } from "./index"
 
 const wasmPath = fileURLToPath(new URL("../../../wasm/pkg/mocanvas_bg.wasm", import.meta.url))
@@ -268,14 +268,14 @@ describe("FrameTool", () => {
     expect(small.props.name).toBe("Frame 2")
   })
 
-  it("clicks out a default 640x480 frame centred on the point", () => {
+  it("clicks out a default 320x180 frame centred on the point", () => {
     editor.setCurrentTool("frame")
     click(editor, 500, 400)
 
     const frame = shapesOfType<FrameShape>(editor, "frame")[0]!
-    expect(frame.props).toMatchObject({ w: 640, h: 480 })
-    expect(frame.x).toBe(180)
-    expect(frame.y).toBe(160)
+    expect(frame.props).toMatchObject({ w: 320, h: 180 })
+    expect(frame.x).toBe(340)
+    expect(frame.y).toBe(310)
   })
 
   it("adopts shapes fully inside it and leaves the others alone", () => {
@@ -517,6 +517,45 @@ describe("frame-like drop targets while translating", () => {
     pressShape(editor.getShape(geo.id)!, 160, 160)
     pointer(editor, "pointer_up", 160, 160)
     expect(editor.getShape(geo.id)!.parentId).toBe(pageId)
+  })
+})
+
+describe("NoteTool", () => {
+  it("centres the note it places on the point", () => {
+    const editor = makeEditor()
+    editor.setCurrentTool("note")
+    click(editor, 500, 400)
+    const bounds = editor.getShapePageBounds(shapesOfType<UnknownShape>(editor, "note")[0]!.id)!
+    expect(bounds.midX).toBeCloseTo(500)
+    expect(bounds.midY).toBeCloseTo(400)
+    editor.dispose()
+  })
+
+  it("centres a scaled note on its own size, not on the unscaled one", () => {
+    // `scale` makes a note bigger without changing `NOTE_SIZE`, so a tool that
+    // offsets by half of 200 drops a 320-wide note down and to the right of the
+    // cursor — 60 units of it, which is what Molekula sees with its own default.
+    class ScaledNoteUtil extends NoteShapeUtil {
+      override getDefaultProps(): ReturnType<NoteShapeUtil["getDefaultProps"]> {
+        return { ...super.getDefaultProps(), scale: 1.6 }
+      }
+    }
+    const editor = new Editor({
+      store: createStore(),
+      shapeUtils: defaultShapeUtils.map((u) => (u === NoteShapeUtil ? ScaledNoteUtil : u)),
+      bindingUtils: defaultBindingUtils,
+      tools: defaultTools,
+      engine: loadEngineSync(readFileSync(wasmPath)),
+      getContainer: () => ({}) as HTMLElement,
+    })
+    editor.updateViewportScreenBounds({ x: 0, y: 0, w: 1000, h: 800 })
+    editor.setCurrentTool("note")
+    click(editor, 500, 400)
+    const bounds = editor.getShapePageBounds(shapesOfType<UnknownShape>(editor, "note")[0]!.id)!
+    expect(bounds.w).toBeCloseTo(320)
+    expect(bounds.midX).toBeCloseTo(500)
+    expect(bounds.midY).toBeCloseTo(400)
+    editor.dispose()
   })
 })
 

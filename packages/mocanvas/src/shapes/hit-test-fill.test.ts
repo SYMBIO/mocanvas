@@ -45,6 +45,23 @@ function withRect(fill: string) {
   return editor
 }
 
+/** One unfilled 240×160 shape of the given geo type at the origin. */
+function withGeo(geo: string) {
+  const editor = new Editor({
+    store: createStore({ shapeUtils: defaultShapeUtils }),
+    shapeUtils: defaultShapeUtils,
+    tools: [TestTool],
+    engine: loadEngineSync(readFileSync(wasmPath)),
+    getContainer: () => ({}) as HTMLElement,
+  })
+  editors.push(editor)
+  editor.updateViewportScreenBounds({ x: 0, y: 0, w: 1000, h: 800 })
+  editor.createShapes([
+    { id: "shape:s", type: "geo", x: 0, y: 0, props: { geo, w: 240, h: 160, fill: "none" } },
+  ] as never)
+  return editor
+}
+
 const CENTRE = { x: 50, y: 50 }
 const ON_OUTLINE = { x: 0, y: 50 }
 
@@ -96,5 +113,23 @@ describe("the two paths agree", () => {
         expect(viaEngine, `fill=${fill} hitInside=${hitInside}`).toBe(viaGeometry)
       }
     }
+  })
+})
+
+/**
+ * A point exactly on the outline, at margin 0.
+ *
+ * `hitInside: false` goes to the engine and `hitInside: true` goes to the
+ * geometry, and the two answered differently: the nearest point on a curved or
+ * diagonal outline comes back about 1e-15 away, so `distance <= 0` was false
+ * for a point sitting on the shape. `hitInside: true` is meant to be a superset
+ * of `hitInside: false`, never a smaller set.
+ */
+describe("a point exactly on the outline", () => {
+  it.each(["ellipse", "hexagon", "octagon", "oval", "rectangle"])("hits %s either way", (geo) => {
+    const editor = withGeo(geo)
+    const left = { x: 0, y: 80 }
+    expect(editor.getShapeAtPoint(left, { margin: 0, hitInside: false })?.id, "hitInside: false").toBe("shape:s")
+    expect(editor.getShapeAtPoint(left, { margin: 0, hitInside: true })?.id, "hitInside: true").toBe("shape:s")
   })
 })

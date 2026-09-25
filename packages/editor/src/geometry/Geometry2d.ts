@@ -95,6 +95,21 @@ export interface TransformedGeometry2dOptions {
 }
 
 /** Base class for shape geometry. */
+/**
+ * Slack for floating-point dust in a zero-margin hit test.
+ *
+ * A point *exactly* on a curved or diagonal outline comes back about 1e-15 away
+ * from the nearest point the maths returns — an ellipse's leftmost point, a
+ * hexagon's corner — so `distance <= 0` answered "miss" for a point that is
+ * literally on the shape, while the engine's own hit test said hit. It made
+ * `hitInside: true` (which goes the geometry way) fail where `hitInside: false`
+ * (which goes to the engine) succeeded, though the first is meant to be a
+ * superset of the second.
+ *
+ * A nanometre of page space is far below anything a person can point at.
+ */
+export const HIT_TEST_EPSILON = 1e-9
+
 export abstract class Geometry2d {
   readonly isFilled: boolean
   readonly isClosed: boolean
@@ -253,7 +268,7 @@ export abstract class Geometry2d {
    */
   hitTestPoint(point: VecLike, margin = 0, hitInside = false, _filters?: Geometry2dFilters): boolean {
     if ((hitInside || this.isFilled) && this.isClosed && pointInPolygon(point, this.vertices)) return true
-    return Vec.Dist(point, this.nearestPoint(point)) <= margin
+    return Vec.Dist(point, this.nearestPoint(point)) <= margin + HIT_TEST_EPSILON
   }
 
   /** Whether `point` lies within the bounding box, which is the cheap pre-test. */
@@ -485,7 +500,7 @@ export class TransformedGeometry2d extends Geometry2d {
   override hitTestPoint(point: VecLike, margin = 0, hitInside = false, filters?: Geometry2dFilters): boolean {
     // Same rule as the base: filled OR asked for. See `Geometry2d.hitTestPoint`.
     if ((hitInside || this.isFilled) && this.isClosed && pointInPolygon(point, this.vertices)) return true
-    return Vec.Dist(point, this.nearestPoint(point, filters)) <= margin
+    return Vec.Dist(point, this.nearestPoint(point, filters)) <= margin + HIT_TEST_EPSILON
   }
 
   override ignoreHit(point: VecLike): boolean {
