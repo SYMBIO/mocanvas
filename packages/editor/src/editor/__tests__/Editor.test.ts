@@ -91,6 +91,31 @@ describe("Editor", () => {
     expect(editor.getShapePageBounds(editor.getCurrentPageShapes()[1]!)?.toJson()).toEqual({ x: 200, y: 0, w: 50, h: 50 })
   })
 
+  it("takes an explicit hit-test margin in page units, at any zoom", () => {
+    editor.createShape<BoxShape>({ type: "box", x: 0, y: 0 })
+    const near = { x: -7, y: 50 }
+    const far = { x: -9, y: 50 }
+    for (const z of [1, 0.25, 0.12]) {
+      editor.setCamera({ x: 0, y: 0, z })
+      expect(editor.getShapeAtPoint(near, { margin: 8 })).toBeDefined()
+      expect(editor.getShapeAtPoint(far, { margin: 8 })).toBeUndefined()
+      expect(editor.getShapesAtPoint(near, { margin: 8 })).toHaveLength(1)
+      expect(editor.getShapesAtPoint(far, { margin: 8 })).toHaveLength(0)
+    }
+  })
+
+  it("still reads the default margin as a screen distance", () => {
+    editor.createShape<BoxShape>({ type: "box", x: 0, y: 0 })
+    // The default is `hitTestMargin` (8px) for a fine pointer: 8 page units at
+    // zoom 1, and 32 of them at zoom 0.25, so the same page point falls either
+    // side of it.
+    const point = { x: -20, y: 50 }
+    editor.setCamera({ x: 0, y: 0, z: 1 })
+    expect(editor.getShapeAtPoint(point)).toBeUndefined()
+    editor.setCamera({ x: 0, y: 0, z: 0.25 })
+    expect(editor.getShapeAtPoint(point)).toBeDefined()
+  })
+
   it("updates, deletes and keeps the engine in sync", () => {
     editor.createShape<BoxShape>({ type: "box", x: 0, y: 0 })
     const shape = editor.getCurrentPageShapes()[0]!
