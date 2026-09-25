@@ -4,6 +4,7 @@ import {
   EditorProvider,
   AssetUrlsProvider,
   Canvas,
+  CanvasComponentsProvider,
   createStore,
   Editor,
   loadEngine,
@@ -158,8 +159,24 @@ const EMPTY_ASSET_URLS: TLAssetUrls = {}
  * is not migrating. `assertCompatStylesLoaded` in `@mocanvas/compat` is the
  * check for that, and a migrating app calls it where it wants it.
  */
+/** Whether this is a production build, in whatever way the host says so. */
+function isProduction(): boolean {
+  try {
+    if (typeof process !== "undefined" && process.env?.["NODE_ENV"] === "production") return true
+  } catch {
+    // A getter that throws is not an answer about the build.
+  }
+  // Unknown: warn. A spurious console line in an odd host beats silence in the
+  // case the warning exists for.
+  return false
+}
+
 function warnIfStylesheetMissing(container: HTMLElement | null): void {
-  if (process.env["NODE_ENV"] === "production") return
+  // `process` is a Node global. A bundler that replaces `process.env.NODE_ENV`
+  // does not replace this bracketed form, and one that replaces neither leaves
+  // the name undefined — so reading it bare threw a `ReferenceError` out of an
+  // effect, taking the whole editor down over a development-only warning.
+  if (isProduction()) return
   if (!container || typeof getComputedStyle !== "function") return
   const probe = container.querySelector(".mocanvas") ?? container
   if (getComputedStyle(probe).getPropertyValue("--mocanvas-ui-panel").trim()) return
@@ -316,6 +333,13 @@ export function Mocanvas(props: MocanvasProps) {
           // to measure the editor for the breakpoint, which is what makes the
           // chrome respond to an embed's width rather than the window's.
           <EditorProvider editor={editor}>
+            {/*
+              The canvas's own slots, published rather than only handed to the
+              `<Canvas>` below: the chrome renders an app's `ContextMenu`
+              instead of the canvas, and that component renders the canvas
+              itself — with no props — so a prop alone never reaches it.
+            */}
+            <CanvasComponentsProvider components={mergedCanvasComponents}>
             <ContainerProvider container={editor.getContainer()}>
               <TldrawUi
                 {...(components ? { components: components as TLUiComponents } : {})}
@@ -327,6 +351,7 @@ export function Mocanvas(props: MocanvasProps) {
                 {canvas}
               </TldrawUi>
             </ContainerProvider>
+            </CanvasComponentsProvider>
           </EditorProvider>
         ) : (
           <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#9ca3af", fontFamily: "system-ui" }}>loading engine…</div>

@@ -207,13 +207,48 @@ function hasFrameWork(editor: Editor): boolean {
  * — and for any util still on the deprecated `indicator()` hook.
  */
 export function Canvas(props: CanvasProps) {
+  // Slots reach the canvas two ways: as this prop, and from a provider above
+  // it. The second is what carries them to a canvas the *app* renders — from
+  // inside a `ContextMenu` slot that has to wrap it, which is the documented
+  // way to put a menu around the canvas — since that one is constructed with
+  // no props at all. Per key, the prop wins.
+  const components = useInheritedCanvasComponents(props.components)
   return (
-    <CanvasComponentsContext.Provider value={props.components}>
+    <CanvasComponentsContext.Provider value={components}>
       <EditorBoundary>
-        <CanvasBody {...props} />
+        <CanvasBody {...props} {...(components ? { components } : {})} />
       </EditorBoundary>
     </CanvasComponentsContext.Provider>
   )
+}
+
+/** `own` over whatever a provider above set, key by key. */
+function useInheritedCanvasComponents(own: Partial<CanvasComponents> | undefined): Partial<CanvasComponents> | undefined {
+  const outer = useContext(CanvasComponentsContext)
+  return useMemo(() => {
+    if (outer === undefined) return own
+    if (own === undefined) return outer
+    return { ...outer, ...own }
+  }, [outer, own])
+}
+
+/**
+ * Publishes the canvas's slots to every `<Canvas>` below, whoever renders it.
+ *
+ * `Mocanvas` wraps the editor in this, so the slots an app passed in
+ * `components` reach the canvas even when the app builds it itself — the
+ * `ContextMenu` case, where the chrome renders the app's component and the app
+ * renders `DefaultCanvas`, which takes no props.
+ */
+export function CanvasComponentsProvider({
+  components,
+  children,
+}: {
+  components: Partial<CanvasComponents> | undefined
+  children: ReactNode
+}) {
+  const value = useInheritedCanvasComponents(components)
+  return <CanvasComponentsContext.Provider value={value}>{children}</CanvasComponentsContext.Provider>
 }
 
 /**

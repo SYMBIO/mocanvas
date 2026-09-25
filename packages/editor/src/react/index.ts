@@ -1,4 +1,4 @@
-export { Canvas, getShapeIndicatorNode, type CanvasProps, type CanvasComponents, type TLCanvasComponentProps } from "./Canvas"
+export { Canvas, CanvasComponentsProvider, getShapeIndicatorNode, type CanvasProps, type CanvasComponents, type TLCanvasComponentProps } from "./Canvas"
 export { useEditor, useMaybeEditor, EditorProvider, EditorContext, type EditorProviderProps } from "./EditorContext"
 export { HTMLContainer, SVGContainer, stopEventPropagation, type HTMLContainerProps, type SVGContainerProps } from "./containers"
 export { CANVAS_THEME_VARS, getCameraCssVars, getThemeCssVars, useCameraCssVars, useThemeCssVars } from "./themeVars"

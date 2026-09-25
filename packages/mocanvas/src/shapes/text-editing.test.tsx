@@ -5,6 +5,7 @@ import { toRichText } from "../text/rich-text"
 import { LINE_HEIGHT } from "./text-helpers"
 import { GeoShapeUtil, getGeoGrowY, type GeoShape } from "./GeoShapeUtil"
 import { NoteShapeUtil, NOTE_SIZE, type NoteShape } from "./NoteShapeUtil"
+import { TEXT_SHAPE_MIN_WIDTH } from "../text/text-layout"
 import { TextShapeUtil, type TextShape } from "./TextShapeUtil"
 import { ArrowShapeUtil, type ArrowShape } from "./ArrowShapeUtil"
 import { FrameShapeUtil, type FrameShape } from "./FrameShapeUtil"
@@ -51,9 +52,11 @@ describe("TextShapeUtil auto-size", () => {
   const base = () => makeShape<TextShape>("text", util.getDefaultProps())
 
   it("fits w to the text on create and on text change", () => {
-    const created = util.onBeforeCreate(base())!
-    expect(created.props.w).toBeGreaterThan(0)
-    expect(created.props.w).toBeLessThan(100)
+    // An empty text already measures to the minimum width, which is what the
+    // default props carry, so there is nothing for the create hook to change.
+    expect(util.onBeforeCreate(base())).toBeUndefined()
+    const created = base()
+    expect(created.props.w).toBe(TEXT_SHAPE_MIN_WIDTH)
 
     const prev = created
     const next = { ...prev, props: { ...prev.props, text: "hello world" } }

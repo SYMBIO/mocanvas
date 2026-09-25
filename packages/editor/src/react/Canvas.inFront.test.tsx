@@ -21,7 +21,9 @@ import { loadEngineSync } from "@mocanvas/wasm"
 import { Editor } from "../editor/Editor"
 import { createStore } from "../editor/createStore"
 import { StateNode } from "../tools/StateNode"
-import { Canvas } from "./Canvas"
+import { Canvas, CanvasComponentsProvider } from "./Canvas"
+import { DefaultCanvas } from "./defaultEditorComponents"
+import { EditorProvider } from "./EditorContext"
 
 const fakeBackend = {
   kind: "webgl2" as const,
@@ -100,5 +102,55 @@ describe("InFrontOfTheCanvas", () => {
     mount({ InFrontOfTheCanvas: () => <button type="button">Duplicate</button> })
     // Empty space over the canvas still pans it; the button is still clickable.
     expect((layer() as HTMLElement).style.pointerEvents).toBe("none")
+  })
+})
+
+/**
+ * The canvas an APP renders.
+ *
+ * Routing the slots as a prop from `Mocanvas` was not enough: fill the
+ * `ContextMenu` slot and the chrome renders that component instead of the
+ * canvas, and it renders the canvas itself — as `DefaultCanvas`, which takes no
+ * props. Molekula does exactly this, so the first fix left its front layer
+ * missing for the same reason as before.
+ */
+describe("a canvas rendered by the app", () => {
+  function mountUnderProvider(components: Parameters<typeof Canvas>[0]["components"], inner: () => React.ReactNode) {
+    host = document.createElement("div")
+    document.body.appendChild(host)
+    editor = new Editor({
+      store: createStore(),
+      shapeUtils: [],
+      tools: [SelectTool],
+      engine: loadEngineSync(readFileSync(wasmPath)),
+      getContainer: () => host!,
+    })
+    root = createRoot(host)
+    act(() =>
+      root!.render(
+        <EditorProvider editor={editor!}>
+          <CanvasComponentsProvider components={components}>{inner()}</CanvasComponentsProvider>
+        </EditorProvider>,
+      ),
+    )
+  }
+
+  it("inherits the slots from the provider, with no props of its own", () => {
+    mountUnderProvider({ InFrontOfTheCanvas: () => <button type="button">Duplicate</button> }, () => <DefaultCanvas />)
+    expect(layer()?.querySelector("button")?.textContent).toBe("Duplicate")
+  })
+
+  it("lets its own prop win over the provider, slot by slot", () => {
+    mountUnderProvider({ InFrontOfTheCanvas: () => <span>from the provider</span> }, () => (
+      <Canvas editor={editor!} components={{ InFrontOfTheCanvas: () => <span>from the prop</span> }} />
+    ))
+    expect(layer()?.textContent).toBe("from the prop")
+  })
+
+  it("keeps a provider slot the prop does not mention", () => {
+    mountUnderProvider({ InFrontOfTheCanvas: () => <span>still here</span> }, () => (
+      <Canvas editor={editor!} components={{ Grid: null }} />
+    ))
+    expect(layer()?.textContent).toBe("still here")
   })
 })
