@@ -13,7 +13,7 @@ import { Vec } from "../geometry"
 import { EditorProvider } from "./EditorContext"
 import { useEditorComponents } from "./ui-context"
 import { useCameraCssVars, useThemeCssVars } from "./themeVars"
-import { useCanvasEvents } from "./useCanvasEvents"
+import { IN_FRONT_OF_CANVAS_CLASS, useCanvasEvents } from "./useCanvasEvents"
 import { getSelectionHandlePositions } from "../editor/selectionHandles"
 import { ShapeIndicatorCompositor, type TLIndicatorHost } from "../indicators/ShapeIndicatorCompositor"
 import { getIndicatorSource } from "../indicators/resolve"
@@ -441,7 +441,7 @@ function CanvasBody({ editor, className, style, children, components, indicatorO
         </svg>
         {children}
         {InFrontOfTheCanvas ? (
-          <div className="mocanvas-in-front-of-canvas" style={{ ...layerStyle, pointerEvents: "none" }}>
+          <div className={IN_FRONT_OF_CANVAS_CLASS} style={{ ...layerStyle, pointerEvents: "none" }}>
             <InFrontOfTheCanvas />
           </div>
         ) : null}
