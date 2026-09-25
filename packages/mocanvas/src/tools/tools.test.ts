@@ -520,6 +520,21 @@ describe("frame-like drop targets while translating", () => {
   })
 })
 
+describe("TextTool", () => {
+  it("places an empty text at the minimum width, which is the default prop", () => {
+    const editor = makeEditor()
+    editor.setCurrentTool("text")
+    click(editor, 300, 300)
+    const text = shapesOfType<UnknownShape>(editor, "text")[0]!
+    // An auto-sized shape writes its measured width back into `props.w`, so a
+    // default of 20 in `getDefaultProps` alone meant nothing: an empty text
+    // came out at the measuring floor, which was 8 against tldraw's 20.
+    expect((text.props as { w: number }).w).toBe(20)
+    expect(editor.getShapePageBounds(text.id)!.w).toBe(20)
+    editor.dispose()
+  })
+})
+
 describe("NoteTool", () => {
   it("centres the note it places on the point", () => {
     const editor = makeEditor()

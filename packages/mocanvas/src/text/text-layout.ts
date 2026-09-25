@@ -131,8 +131,13 @@ function getOpticalCentreLift(fontFamily: string): number {
   return lift
 }
 
-/** Minimum width of an auto-sized text shape so an empty one still shows a caret area. */
-export const TEXT_SHAPE_MIN_WIDTH = 8
+/**
+ * Minimum width of an auto-sized text shape, so an empty one still shows a
+ * caret area. tldraw's number for the same thing, and the default `props.w` a
+ * text shape is created with — an auto-sized shape writes its measured width
+ * back into `props.w`, so this is what an empty one ends up reading.
+ */
+export const TEXT_SHAPE_MIN_WIDTH = 20
 
 export interface TextShapeSizeInput {
   /** The label, in either spelling: a plain string or a rich-text document. */

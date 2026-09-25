@@ -1,5 +1,36 @@
 # Changelog
 
+## 4.12.1
+
+Three things 4.12.0 got wrong, all of them found by the consumer running it.
+
+### The canvas's slots are published, not only passed
+
+4.12.0 routed `components` to the `<Canvas>` that `Mocanvas` renders — which is
+not the canvas an app necessarily gets. Fill the `ContextMenu` slot and the
+chrome renders that component instead, and it renders the canvas itself, as
+`DefaultCanvas`, which takes no props. An app doing that still had no
+`InFrontOfTheCanvas`, no `Background` and no `Grid`.
+
+`Mocanvas` now wraps the editor in `CanvasComponentsProvider`, and `<Canvas>`
+merges what a provider above it set with its own `components` prop, key by key,
+the prop winning. Any canvas below gets the slots, whoever renders it.
+
+### `process` is not defined in a browser
+
+`warnIfStylesheetMissing` read `process.env["NODE_ENV"]` bare. A bundler that
+replaces `process.env.NODE_ENV` does not replace the bracketed form, and one
+that replaces neither leaves the name undefined — so a development-only warning
+threw a `ReferenceError` out of an effect and took the editor down with it. In
+a Vite app consuming the source, `<Mocanvas>` did not mount at all.
+
+### An empty text shape is 20 wide, for real this time
+
+4.12.0 changed `getDefaultProps().w` to 20 and said so in the notes. An
+auto-sized text shape overwrites `props.w` with its measured width on create,
+and the floor that measurement clamps to — `TEXT_SHAPE_MIN_WIDTH` — was still
+8, so a clicked text was 8 wide. The floor is 20 now.
+
 ## 4.12.0
 
 Everything in this release came from a consumer running mocanvas and tldraw
