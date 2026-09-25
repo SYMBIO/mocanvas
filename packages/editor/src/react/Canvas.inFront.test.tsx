@@ -154,3 +154,96 @@ describe("a canvas rendered by the app", () => {
     expect(layer()?.textContent).toBe("still here")
   })
 })
+
+/**
+ * A press on something in the layer is not a press on the canvas.
+ *
+ * The layer renders inside the element the canvas's pointer handlers sit on,
+ * so the app's own button also read as a click on empty canvas: the selection
+ * cleared, the canvas took the pointer capture, and the button never saw the
+ * `pointerup` or the click at all. Molekula's selection toolbar did nothing on
+ * 4.12.1 for exactly this reason.
+ */
+/**
+ * jsdom has neither `PointerEvent` nor pointer capture, and React only listens
+ * for pointer events when `window.PointerEvent` exists — a `MouseEvent` named
+ * `pointerdown` reaches no handler at all, which makes a test written that way
+ * pass while proving nothing.
+ */
+function installPointerEvents(): void {
+  class FakePointerEvent extends MouseEvent {
+    pointerId: number
+    pointerType: string
+    isPrimary = true
+    constructor(type: string, init: MouseEventInit & { pointerId?: number; pointerType?: string } = {}) {
+      super(type, init)
+      this.pointerId = init.pointerId ?? 1
+      this.pointerType = init.pointerType ?? "mouse"
+    }
+  }
+  ;(globalThis as { PointerEvent?: unknown }).PointerEvent = FakePointerEvent
+  ;(window as unknown as { PointerEvent?: unknown }).PointerEvent = FakePointerEvent
+  const el = Element.prototype as unknown as Record<string, unknown>
+  el["setPointerCapture"] ??= function () {}
+  el["releasePointerCapture"] ??= function () {}
+  el["hasPointerCapture"] ??= function () {
+    return false
+  }
+}
+
+function pointerEvent(type: string): Event {
+  const Ctor = (globalThis as { PointerEvent: new (t: string, i: unknown) => Event }).PointerEvent
+  return new Ctor(type, { bubbles: true, cancelable: true, button: 0, buttons: 1, clientX: 40, clientY: 40, pointerId: 1, pointerType: "mouse" })
+}
+
+describe("pointer events from the layer", () => {
+  /** What the canvas told the editor, which is the only thing that separates the two cases. */
+  function recordDispatches(ed: Editor): string[] {
+    const seen: string[] = []
+    const original = ed.dispatch.bind(ed)
+    ;(ed as unknown as { dispatch: (info: { type: string; name: string }) => void }).dispatch = (info) => {
+      seen.push(`${info.type}:${info.name}`)
+      original(info as never)
+    }
+    return seen
+  }
+
+  function press(el: Element): void {
+    for (const type of ["pointerdown", "pointerup"]) {
+      act(() => {
+        el.dispatchEvent(pointerEvent(type))
+      })
+    }
+  }
+
+  it("does not reach the editor, and the button keeps its click", () => {
+    installPointerEvents()
+    let clicks = 0
+    mount({
+      InFrontOfTheCanvas: () => (
+        <button type="button" onClick={() => (clicks += 1)}>
+          Duplicate
+        </button>
+      ),
+    })
+    const seen = recordDispatches(editor!)
+    const button = layer()!.querySelector("button")!
+
+    press(button)
+    act(() => button.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    expect(clicks).toBe(1)
+    expect(seen.filter((e) => e.startsWith("pointer:"))).toEqual([])
+  })
+
+  it("still reaches the editor from the canvas itself", () => {
+    installPointerEvents()
+    mount({ InFrontOfTheCanvas: () => <button type="button">Duplicate</button> })
+    const seen = recordDispatches(editor!)
+
+    press(host!.querySelector('[data-testid="mocanvas-container"]')!)
+
+    expect(seen).toContain("pointer:pointer_down")
+    expect(seen).toContain("pointer:pointer_up")
+  })
+})

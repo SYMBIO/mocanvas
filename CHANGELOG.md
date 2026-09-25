@@ -1,5 +1,21 @@
 # Changelog
 
+## 4.12.2
+
+### A press on the layer in front of the canvas is not a press on the canvas
+
+`InFrontOfTheCanvas` renders inside the element the canvas's pointer handlers
+sit on, so a press on an app's own button there was also a press on empty
+canvas: the selection cleared, the canvas took the pointer capture, and the
+button never saw its `pointerup` or its click at all. A selection toolbar put
+in that slot in 4.12.1 did nothing when clicked.
+
+The canvas now ignores any pointer event whose target sits inside the layer,
+and any `wheel` — a panel there scrolls itself rather than zooming the canvas
+under it. An app does not have to call `markEventAsHandled` on every control it
+puts in the slot. The layer still takes no pointer events itself, so empty
+space over the canvas pans it as before.
+
 ## 4.12.1
 
 Three things 4.12.0 got wrong, all of them found by the consumer running it.

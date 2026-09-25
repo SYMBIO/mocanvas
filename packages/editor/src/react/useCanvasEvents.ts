@@ -68,6 +68,13 @@ function resolveTarget(editor: Editor, point: { x: number; y: number }): Pointer
   return { target: "canvas" }
 }
 
+/**
+ * The layer `TLEditorComponents.InFrontOfTheCanvas` renders into. Kept here as
+ * well as in `Canvas` because the canvas's event handlers have to recognise it.
+ */
+export const IN_FRONT_OF_CANVAS_CLASS = "mocanvas-in-front-of-canvas"
+const IN_FRONT_OF_CANVAS_SELECTOR = `.${IN_FRONT_OF_CANVAS_CLASS}`
+
 /** DOM handlers that translate browser events into editor events. */
 export function useCanvasEvents(editor: Editor) {
   return useMemo(() => {
@@ -97,9 +104,25 @@ export function useCanvasEvents(editor: Editor) {
      */
     const isHandled = (e: { nativeEvent?: unknown } | Event) => editor.isEventHandled(e)
 
+    /**
+     * Whether the event came out of the layer in front of the canvas.
+     *
+     * That layer is an app's own — a toolbar over the selection, a comment pin
+     * — and it renders *inside* the element these handlers sit on, so without
+     * this a press on one of its buttons also read as a press on empty canvas:
+     * the selection cleared, the canvas captured the pointer, and the button
+     * never saw the `pointerup` or the click. An app should not have to call
+     * `markEventAsHandled` on every control it puts there.
+     *
+     * The layer itself takes no pointer events, so this only ever sees a
+     * press on something the app deliberately made interactive.
+     */
+    const isInFrontOfCanvas = (target: EventTarget | null) =>
+      target instanceof Element && target.closest(IN_FRONT_OF_CANVAS_SELECTOR) !== null
+
     return {
       onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-        if (isHandled(e)) return
+        if (isHandled(e) || isInFrontOfCanvas(e.target)) return
         if (e.button === 2) {
           editor.dispatch(pointerInfo(e, "right_click"))
           return
@@ -118,7 +141,7 @@ export function useCanvasEvents(editor: Editor) {
         editor.dispatch(down)
       },
       onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-        if (isHandled(e)) return
+        if (isHandled(e) || isInFrontOfCanvas(e.target)) return
         if (e.pointerType === "mouse" && e.buttons === 0 && editor.inputs.isPointing) {
           // Missed a pointer up (e.g. released outside the window).
           editor.dispatch(pointerInfo(e, "pointer_up"))
@@ -127,7 +150,7 @@ export function useCanvasEvents(editor: Editor) {
         editor.dispatch(pointerInfo(e, "pointer_move"))
       },
       onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-        if (isHandled(e)) return
+        if (isHandled(e) || isInFrontOfCanvas(e.target)) return
         if (e.button === 2) return
         const el = e.currentTarget as HTMLElement
         if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
@@ -138,12 +161,14 @@ export function useCanvasEvents(editor: Editor) {
         editor.click.handlePointerEvent(up)
       },
       onPointerCancel(e: React.PointerEvent<HTMLDivElement>) {
-        if (isHandled(e)) return
+        if (isHandled(e) || isInFrontOfCanvas(e.target)) return
         editor.dispatch(pointerInfo(e, "pointer_up"))
         editor.cancel()
       },
       onWheel(e: WheelEvent) {
-        if (isHandled(e)) return
+        // A panel in the front layer scrolls itself; the canvas does not zoom
+        // under it.
+        if (isHandled(e) || isInFrontOfCanvas(e.target)) return
         e.preventDefault()
         const point = localPoint(editor, e)
         const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1
@@ -157,6 +182,7 @@ export function useCanvasEvents(editor: Editor) {
         editor.dispatch(info)
       },
       onContextMenu(e: React.MouseEvent) {
+        if (isInFrontOfCanvas(e.target)) return
         e.preventDefault()
       },
       onKeyDown(e: KeyboardEvent) {
