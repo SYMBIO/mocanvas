@@ -81,6 +81,36 @@ function longestUnbreakableRun(text: string): string {
   return longest
 }
 
+/**
+ * The probe's own layout rules, mirroring the CSS `<TextLabel>` renders with. Written once, when the
+ * element is created, so `otherStyles` from a `measureHtml` call must put back any it overwrites.
+ */
+const PROBE_BASE_STYLE = {
+  position: "fixed",
+  top: "-10000px",
+  left: "-10000px",
+  visibility: "hidden",
+  pointerEvents: "none",
+  whiteSpace: "pre-wrap",
+  overflowWrap: "break-word",
+  wordBreak: "normal",
+  width: "max-content",
+  boxSizing: "border-box",
+  margin: "0",
+  border: "0",
+  zIndex: "-1",
+} satisfies Partial<CSSStyleDeclaration>
+
+/** The same rules keyed by CSS property name, to look up the value an `otherStyles` entry overwrote. */
+const PROBE_BASE_DECLARATIONS: Record<string, string> = Object.fromEntries(
+  Object.entries(PROBE_BASE_STYLE).map(([name, value]) => [cssPropertyName(name), value]),
+)
+
+/** `overflowWrap` and `overflow-wrap` name one declaration; `setProperty` only takes the latter. */
+function cssPropertyName(name: string): string {
+  return name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)
+}
+
 const MAX_CACHE_ENTRIES = 2000
 
 /** Placeholder so an empty text (or a trailing newline) still occupies one line. */
@@ -236,8 +266,15 @@ export class TextMeasure {
     s.lineHeight = String(opts.lineHeight)
     s.padding = typeof opts.padding === "number" ? `${opts.padding}px` : (opts.padding ?? "0px")
     s.maxWidth = opts.maxWidth === undefined || opts.maxWidth === null ? "none" : `${Math.max(1, opts.maxWidth)}px`
-    // `removeProperty` first, so a probe reused with fewer styles is not measured with the last call's.
-    for (const name of readCustomStyleNames(el)) s.removeProperty(name)
+    // Clear the last call's styles first, so a probe reused with fewer of them is not measured with
+    // them still on. One that overwrote a rule of the probe's own goes back to that rule: removing it
+    // would leave the CSS initial value (`overflow-wrap: normal`) and change every later measurement.
+    for (const name of readCustomStyleNames(el)) {
+      const property = cssPropertyName(name)
+      const base = PROBE_BASE_DECLARATIONS[property]
+      if (base === undefined) s.removeProperty(property)
+      else s.setProperty(property, base)
+    }
     for (const [name, value] of Object.entries(opts.otherStyles ?? {})) s.setProperty(name, value)
     writeCustomStyleNames(el, Object.keys(opts.otherStyles ?? {}))
     el.innerHTML = html
@@ -267,21 +304,7 @@ export class TextMeasure {
     const el = document.createElement("div")
     el.setAttribute("aria-hidden", "true")
     el.className = "mocanvas-text-measure-html"
-    Object.assign(el.style, {
-      position: "fixed",
-      top: "-10000px",
-      left: "-10000px",
-      visibility: "hidden",
-      pointerEvents: "none",
-      whiteSpace: "pre-wrap",
-      overflowWrap: "break-word",
-      wordBreak: "normal",
-      width: "max-content",
-      boxSizing: "border-box",
-      margin: "0",
-      border: "0",
-      zIndex: "-1",
-    } satisfies Partial<CSSStyleDeclaration>)
+    Object.assign(el.style, PROBE_BASE_STYLE)
     document.body.appendChild(el)
     this.htmlElement = el
     return el
@@ -292,21 +315,7 @@ export class TextMeasure {
     const el = document.createElement("div")
     el.setAttribute("aria-hidden", "true")
     el.className = "mocanvas-text-measure"
-    Object.assign(el.style, {
-      position: "fixed",
-      top: "-10000px",
-      left: "-10000px",
-      visibility: "hidden",
-      pointerEvents: "none",
-      whiteSpace: "pre-wrap",
-      overflowWrap: "break-word",
-      wordBreak: "normal",
-      width: "max-content",
-      boxSizing: "border-box",
-      margin: "0",
-      border: "0",
-      zIndex: "-1",
-    } satisfies Partial<CSSStyleDeclaration>)
+    Object.assign(el.style, PROBE_BASE_STYLE)
     document.body.appendChild(el)
     this.element = el
     return el
