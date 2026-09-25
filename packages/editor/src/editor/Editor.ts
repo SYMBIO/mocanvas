@@ -323,6 +323,12 @@ export const DEFAULT_EDITOR_CONFIG: EditorConfig = {
 }
 
 export interface HitTestOptions {
+  /**
+   * Extra tolerance around the shape, in page units — a caller working from a
+   * screen distance divides it by the zoom level itself, as tldraw's callers do.
+   * Defaults to the hit-test margin for the current pointer, which is a screen
+   * distance and is converted here.
+   */
   margin?: number
   hitInside?: boolean
   hitLocked?: boolean
@@ -1464,7 +1470,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   getShapeAtPoint(point: VecLike, opts: HitTestOptions = {}): UnknownShape | undefined {
     this.flushEngine()
-    const margin = (opts.margin ?? this.getHitTestMargin()) / this.getZoomLevel()
+    const margin = opts.margin ?? this.getHitTestMargin() / this.getZoomLevel()
     const filter = this.hitFilter(opts)
     // The engine already answers "the interior of a FILLED shape, or the
     // outline of any shape", which is this method's default. Bit 4 is its
@@ -1488,7 +1494,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   /** Shapes under a point, topmost first. */
   getShapesAtPoint(point: VecLike, opts: HitTestOptions = {}): UnknownShape[] {
     this.flushEngine()
-    const margin = (opts.margin ?? this.getHitTestMargin()) / this.getZoomLevel()
+    const margin = opts.margin ?? this.getHitTestMargin() / this.getZoomLevel()
     const filter = this.hitFilter(opts)
     const out: UnknownShape[] = []
     // Candidates, topmost first.
