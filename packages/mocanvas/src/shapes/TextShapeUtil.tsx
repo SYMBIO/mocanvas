@@ -203,8 +203,9 @@ export class TextShapeUtil extends ShapeUtil<TextShape, TextShapeUtilDisplayValu
       // A MINIMUM width, not a starting one: `getTextShapeBox` takes
       // `max(measured, props.w)` while `autoSize` is on. At 100 a new text
       // shape was a hundred pixels wide before a character was typed, which is
-      // the opposite of what auto-sizing means.
-      w: 8,
+      // the opposite of what auto-sizing means. 20 is tldraw's number for the
+      // same prop, and an empty text shape is a caret's width either way.
+      w: 20,
       richText: toRichText(""),
       scale: 1,
       autoSize: true,

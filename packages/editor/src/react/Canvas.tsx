@@ -67,6 +67,16 @@ export interface CanvasComponents {
    */
   Grid: ((props: TLGridProps) => ReactNode) | null
   /**
+   * Drawn over the canvas, in screen space, under whatever chrome the app puts
+   * on top. The layer itself takes no pointer events and its children take
+   * them normally, so a badge pinned to a shape is clickable while the empty
+   * space around it still pans the canvas.
+   *
+   * It belongs to the canvas rather than to the chrome, which is what makes it
+   * survive `hideUi` — an app with no panels still gets its own overlay.
+   */
+  InFrontOfTheCanvas: (() => ReactNode) | null
+  /**
    * Rendered in place of the whole editor once it has thrown. `null` renders
    * nothing — the choice a host with its own error UI outside the canvas
    * wants, rather than two competing messages. Omitted uses
@@ -360,6 +370,7 @@ function CanvasBody({ editor, className, style, children, components, indicatorO
   const Indicators = components?.Indicators ?? DefaultIndicators
   const Brush = components?.Brush ?? (hasOverlay(editor, "brush") ? null : DefaultBrush)
   const Background = components?.Background
+  const InFrontOfTheCanvas = components?.InFrontOfTheCanvas
 
   return (
     <EditorProvider editor={editor}>
@@ -394,6 +405,11 @@ function CanvasBody({ editor, className, style, children, components, indicatorO
           {Brush ? <Brush editor={editor} /> : null}
         </svg>
         {children}
+        {InFrontOfTheCanvas ? (
+          <div className="mocanvas-in-front-of-canvas" style={{ ...layerStyle, pointerEvents: "none" }}>
+            <InFrontOfTheCanvas />
+          </div>
+        ) : null}
       </div>
     </EditorProvider>
   )

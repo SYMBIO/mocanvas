@@ -1,8 +1,8 @@
 import { dropShapesOnFrameLike, type Editor, type ShapeId, type UnknownShape } from "@mocanvas/editor"
 import { BaseBoxShapeTool, type BoxSize } from "./BaseBoxShapeTool"
 
-/** Size of the frame created by a click without a drag. */
-const DEFAULT_FRAME_SIZE: BoxSize = { w: 640, h: 480 }
+/** Size of the frame created by a click without a drag: tldraw's, twice the default props. */
+const DEFAULT_FRAME_SIZE: BoxSize = { w: 320, h: 180 }
 /** Smallest frame a drag can produce. */
 const MIN_FRAME_SIZE = 32
 
