@@ -1,5 +1,28 @@
 # Changelog
 
+## 4.12.3
+
+### A menu portalled out of the canvas keeps its own clicks
+
+React delivers events along its own tree, not the DOM's, and a portal is a
+child of whatever rendered it however far away the node sits. So a menu
+portalled into `<body>` by a panel inside the canvas still ran the canvas's
+`pointerdown`: the canvas captured the pointer, the release was retargeted to
+the canvas, and the item never saw its own click. A selection toolbar's colour,
+fill, font, size and alignment menus all opened and then did nothing, and the
+selection cleared underneath them.
+
+4.12.2 tested whether the target sat inside the layer in front of the canvas,
+which answers "no" for a node in `<body>`. The canvas now ignores any event
+whose target it does not contain, whoever rendered it and wherever the node
+lives — and any release for a pointer whose press it did not take, since a menu
+that closes on the press leaves no node for the release to land on.
+
+### `duplicateShapes` selects the copies
+
+As tldraw's does. A toolbar offering "duplicate" and then "delete" was deleting
+the original.
+
 ## 4.12.2
 
 ### A press on the layer in front of the canvas is not a press on the canvas
