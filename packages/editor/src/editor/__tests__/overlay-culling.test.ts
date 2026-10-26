@@ -76,6 +76,34 @@ class PanelUtil extends BaseBoxShapeUtil<PanelShape> {
   }
 }
 
+type BadgeShape = BaseShape<"badge", { w: number; h: number }>
+
+/** Drawn on the GPU with a DOM label on top (`FLAG.LABEL`), and not to be culled. */
+class BadgeUtil extends BaseBoxShapeUtil<BadgeShape> {
+  static override type = "badge" as const
+  getDefaultProps() {
+    return { w: 100, h: 100 }
+  }
+  override getGeometry(shape: BadgeShape) {
+    return new Rectangle2d({ width: shape.props.w, height: shape.props.h, isFilled: true })
+  }
+  component() {
+    return null
+  }
+  override indicator() {
+    return null
+  }
+  override getRenderStyle(): StyleWords {
+    return { fill: 0xff0000ff, stroke: 0, strokeWidth: 0, dash: 0, opacity: 1 }
+  }
+  override hasOverlayLabel(): boolean {
+    return true
+  }
+  canCull(): boolean {
+    return false
+  }
+}
+
 class Idle extends StateNode {
   static override id = "idle"
 }
@@ -89,11 +117,12 @@ const backend = {
   dispose() {},
 }
 
-function makeEditor(withLive = true) {
+function makeEditor(withLive = true, hidden: readonly string[] = []) {
   const engine = loadEngineSync(readFileSync(wasmPath))
   const editor = new Editor({
     store: createStore(),
-    shapeUtils: withLive ? [CardUtil, LiveUtil, PanelUtil] : [CardUtil],
+    shapeUtils: withLive ? [CardUtil, LiveUtil, PanelUtil, BadgeUtil] : [CardUtil],
+    getShapeVisibility: (shape) => (hidden.includes(String(shape.meta.name)) ? "hidden" : "inherit"),
     tools: [Idle],
     engine,
     getContainer: () => ({}) as HTMLElement,
@@ -171,5 +200,45 @@ describe("DOM overlay and canCull", () => {
     editor.renderFrame(backend)
     expect(ids(editor)).toEqual(["inside"])
     expect(editor.getOverlayClips()[0]).toEqual(panelClip)
+  })
+
+  it("keeps a GPU shape with a DOM label, but never a hidden one", () => {
+    const editor = makeEditor(true, ["hidden-live"])
+    editor.createShapes([
+      { type: "badge", x: 5000, y: 10, meta: { name: "badge-off" } },
+      { type: "live", x: 6000, y: 10, meta: { name: "hidden-live" } },
+    ])
+    editor.renderFrame(backend)
+    expect(ids(editor)).toEqual(["badge-off"])
+  })
+
+  it("leaves the engine's list alone on a page with no kept shape, even when a util could keep one", () => {
+    const editor = makeEditor()
+    editor.createShapes([
+      { type: "card", x: 300, y: 10, meta: { name: "second" } },
+      { type: "card", x: 10, y: 10, meta: { name: "first" } },
+      { type: "card", x: 5000, y: 10, meta: { name: "off" } },
+    ])
+    editor.renderFrame(backend)
+    const plain = makeEditor(false)
+    plain.createShapes([
+      { type: "card", x: 300, y: 10, meta: { name: "second" } },
+      { type: "card", x: 10, y: 10, meta: { name: "first" } },
+      { type: "card", x: 5000, y: 10, meta: { name: "off" } },
+    ])
+    plain.renderFrame(backend)
+    expect(ids(editor)).toEqual(ids(plain))
+  })
+
+  it("clips a kept shape like its non-kept sibling under the same axis-aligned ancestor", () => {
+    const editor = makeEditor()
+    editor.createShapes([{ id: "shape:panel" as ShapeId, type: "panel", x: 0, y: 0 }])
+    editor.createShapes([
+      { type: "live", parentId: "shape:panel" as ShapeId, x: 20, y: 20, meta: { name: "kept" } },
+      { type: "card", parentId: "shape:panel" as ShapeId, x: 200, y: 20, meta: { name: "plain" } },
+    ])
+    editor.renderFrame(backend)
+    expect(ids(editor)).toEqual(["kept", "plain"])
+    expect(editor.getOverlayClips()[0]).toEqual(editor.getOverlayClips()[1])
   })
 })

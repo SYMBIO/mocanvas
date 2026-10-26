@@ -1150,8 +1150,9 @@ export class Editor extends EventEmitter<EditorEvents> {
    *
    * The engine reports only the overlay shapes inside the viewport, so without this a shape that
    * must outlive the viewport — a live embed, a playing video — was unmounted the moment it was
-   * panned or zoomed out of view, and rebuilt when it came back. Recomputed when the page's shapes
-   * change, never per frame, and never at all on a page whose utils do not implement `canCull`.
+   * panned or zoomed out of view, and rebuilt when it came back. Recomputed whenever a shape record
+   * on the page changes — every frame of a drag, but never for a camera move — and never at all
+   * when no registered util implements `canCull`.
    */
   private readonly _keptOverlay: Computed<{
     ids: readonly ShapeId[]
@@ -1167,12 +1168,17 @@ export class Editor extends EventEmitter<EditorEvents> {
     const ids: ShapeId[] = []
     const clips = new Map<ShapeId, ClipRect | undefined>()
     for (const shape of sorted) {
+      // `overlayFlaggedIds` is a plain Set, not a signal. That is safe because the flags it holds
+      // are derived from the shape record, so the record change that moves a shape in or out of it
+      // already invalidates this computed.
       if (!this.overlayFlaggedIds.has(shape.id)) continue
       const util = this.shapeUtils[shape.type] as { canCull?(shape: UnknownShape): boolean } | undefined
       if (!util?.canCull || util.canCull(shape)) continue
       if (isShapeHidden(this, shape)) continue
-      // The same clip the engine gives a shape on screen, so the overlay's DOM keeps its shape
-      // whichever side of the viewport edge it is on. Clipped away entirely, it is not drawn.
+      // The box around the ancestors' clip mask. A kept shape always uses this one, on screen and
+      // off, so its DOM keeps its shape at the viewport edge. It equals the engine's clip for
+      // axis-aligned clipping ancestors; under a rotated one or a custom `getClipPath` it can be
+      // tighter than the engine's box-of-boxes. Clipped away entirely, the shape is not kept.
       const mask = this.getShapeMask(shape)
       let clip: ClipRect | undefined
       if (mask !== undefined) {
