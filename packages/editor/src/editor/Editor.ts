@@ -547,6 +547,8 @@ export class Editor extends EventEmitter<EditorEvents> {
   private syncedPageId: PageId | null = null
   /** Shapes whose last write to the engine threw; they are warned about once. */
   private readonly brokenShapeIds = new Set<ShapeId>()
+  /** Shapes on the synced page the engine reports to the DOM overlay (`FLAG.OVERLAY` or `FLAG.LABEL`). */
+  private readonly overlayFlaggedIds = new Set<ShapeId>()
   /** Handle of the camera animation in flight, if any. */
   private cameraAnimation: number | undefined
   /**
@@ -1139,6 +1141,58 @@ export class Editor extends EventEmitter<EditorEvents> {
   private readonly _currentPageShapes: Computed<UnknownShape[]> = computed("editor.currentPageShapes", () => {
     const pageId = this.getCurrentPageId()
     return this._allShapes.get().filter((s) => this.getAncestorPageId(s) === pageId)
+  })
+
+  /**
+   * The DOM-overlay shapes whose util opts out of culling (`canCull() === false`), each with the
+   * clip its ancestors give it, plus the paint rank of every shape on the page; `null` when there
+   * are none.
+   *
+   * The engine reports only the overlay shapes inside the viewport, so without this a shape that
+   * must outlive the viewport — a live embed, a playing video — was unmounted the moment it was
+   * panned or zoomed out of view, and rebuilt when it came back. Recomputed whenever a shape record
+   * on the page changes — every frame of a drag, but never for a camera move — and never at all
+   * when no registered util implements `canCull`.
+   */
+  private readonly _keptOverlay: Computed<{
+    ids: readonly ShapeId[]
+    clips: ReadonlyMap<ShapeId, ClipRect | undefined>
+    rank: ReadonlyMap<ShapeId, number>
+  } | null> = computed("editor.keptOverlay", () => {
+    // Duck-typed like `getCulledShapes`: a util without `canCull` is willing to be culled.
+    const optsOut = Object.values(this.shapeUtils).some(
+      (util) => typeof (util as { canCull?: unknown }).canCull === "function",
+    )
+    if (!optsOut) return null
+    const sorted = this.getCurrentPageShapesSorted()
+    const ids: ShapeId[] = []
+    const clips = new Map<ShapeId, ClipRect | undefined>()
+    for (const shape of sorted) {
+      // `overlayFlaggedIds` is a plain Set, not a signal. That is safe because the flags it holds
+      // are derived from the shape record, so the record change that moves a shape in or out of it
+      // already invalidates this computed.
+      if (!this.overlayFlaggedIds.has(shape.id)) continue
+      const util = this.shapeUtils[shape.type] as { canCull?(shape: UnknownShape): boolean } | undefined
+      if (!util?.canCull || util.canCull(shape)) continue
+      if (isShapeHidden(this, shape)) continue
+      // The box around the ancestors' clip mask. A kept shape always uses this one, on screen and
+      // off, so its DOM keeps its shape at the viewport edge. It equals the engine's clip for
+      // axis-aligned clipping ancestors; under a rotated one or a custom `getClipPath` it can be
+      // tighter than the engine's box-of-boxes. Clipped away entirely, the shape is not kept.
+      const mask = this.getShapeMask(shape)
+      let clip: ClipRect | undefined
+      if (mask !== undefined) {
+        if (mask.length === 0) continue
+        const box = Box.FromPoints(mask.map((p) => new Vec(p.x, p.y)))
+        const bounds = this.getShapePageBounds(shape)
+        if (!bounds || !bounds.collides(box)) continue
+        clip = [box.minX, box.minY, box.maxX, box.maxY]
+      }
+      ids.push(shape.id)
+      clips.set(shape.id, clip)
+    }
+    if (ids.length === 0) return null
+    return { ids, clips, rank: new Map(sorted.map((shape, index) => [shape.id, index])) }
   })
 
   private readonly _currentPageShapeIds: Computed<Set<ShapeId>> = computed("editor.currentPageShapeIds", () => {
@@ -3136,6 +3190,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     }
     for (const rec of Object.values(changes.removed)) {
       if (rec.typeName !== "shape") continue
+      this.overlayFlaggedIds.delete(rec.id)
       const h = this.handles.release(rec.id)
       if (h !== undefined) {
         this.engine.cmd.remove(h)
@@ -3152,6 +3207,7 @@ export class Editor extends EventEmitter<EditorEvents> {
       if (next.typeName !== "shape" || prev.typeName !== "shape") continue
       const onPage = this.getAncestorPageId(next) === pageId
       if (!onPage) {
+        this.overlayFlaggedIds.delete(next.id)
         const h = this.handles.release(next.id)
         if (h !== undefined) {
           this.engine.cmd.remove(h)
@@ -3191,6 +3247,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   private syncPage(pageId: PageId): void {
     this.syncedPageId = pageId
     this.handles.clear()
+    this.overlayFlaggedIds.clear()
     this.engine.cmd.clear()
     for (const shape of this.getCurrentPageShapesSorted()) {
       this.writeShapeToEngine(shape, true)
@@ -3247,6 +3304,8 @@ export class Editor extends EventEmitter<EditorEvents> {
     } else {
       flags |= FLAG.OVERLAY
     }
+    if (flags & (FLAG.OVERLAY | FLAG.LABEL)) this.overlayFlaggedIds.add(shape.id)
+    else this.overlayFlaggedIds.delete(shape.id)
     const bw = engineGeometry?.w ?? geometry?.bounds.w ?? 0
     const bh = engineGeometry?.h ?? geometry?.bounds.h ?? 0
     this.engine.cmd.upsert(h, this.kindId(shape.type), parent, zlo, zhi, flags, shape.x, shape.y, shape.rotation, bw, bh)
@@ -3320,6 +3379,7 @@ export class Editor extends EventEmitter<EditorEvents> {
         clips.push(o.clip)
       }
     }
+    unsafe__withoutCapture(() => this.keepUncullableOverlay(ids, clips))
     unsafe__withoutCapture(() => {
       const prev = this._overlayShapeIds.get()
       if (prev.length !== ids.length || prev.some((id, i) => id !== ids[i])) this._overlayShapeIds.set(ids)
@@ -3330,6 +3390,29 @@ export class Editor extends EventEmitter<EditorEvents> {
       this.performance.emit("frame", { drawn: frame.drawn, culled: frame.culled, ms })
     })
     return frame
+  }
+
+  /**
+   * Add the overlay shapes that may not be culled to this frame's overlay list, off screen or not,
+   * and put the whole list in paint order. The order must not depend on what is on screen: a shape
+   * that changes place among its siblings is moved in the DOM by React, which restyles and lays out
+   * all of it — the very cost keeping it mounted avoids. A kept shape always carries the clip its
+   * ancestors give it, on screen or off, so its DOM never changes shape at the viewport edge.
+   */
+  private keepUncullableOverlay(ids: ShapeId[], clips: (ClipRect | undefined)[]): void {
+    const kept = this._keptOverlay.get()
+    if (!kept) return
+    const entries = ids.map((id, i) => ({ id, clip: kept.clips.has(id) ? kept.clips.get(id) : clips[i] }))
+    const present = new Set(ids)
+    for (const id of kept.ids) if (!present.has(id)) entries.push({ id, clip: kept.clips.get(id) })
+    const rank = (id: ShapeId) => kept.rank.get(id) ?? Number.MAX_SAFE_INTEGER
+    entries.sort((a, b) => rank(a.id) - rank(b.id))
+    ids.length = 0
+    clips.length = 0
+    for (const entry of entries) {
+      ids.push(entry.id)
+      clips.push(entry.clip)
+    }
   }
 
   // ---- textures ----------------------------------------------------------
