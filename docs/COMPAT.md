@@ -96,6 +96,10 @@ predicates (`canTabTo`, `canResizeChildren`, `canBeLaidOut`, `canCull`,
 `canEditInReadonly`, …) and `createShapeForAsset`. **That is where the remaining
 work is**, not in the symbol tables above.
 
+`canCull` is absent from the class but honoured where it matters: a util that
+implements it and returns `false` keeps its shape in the DOM overlay while the
+shape is off screen (4.12.4), and out of `getCulledShapes()`.
+
 You can measure a real application against this surface rather than trusting the
 tables: `scripts/compat-parity.mjs` type-checks a consumer app with `tldraw`
 remapped onto `@mocanvas/compat` and reports what breaks, grouped by symbol.

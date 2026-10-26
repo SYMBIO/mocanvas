@@ -1,5 +1,25 @@
 # Changelog
 
+## 4.12.4
+
+### A shape that cannot be culled stays mounted off screen
+
+`ShapeUtil.canCull()` returning `false` now keeps the shape in the DOM overlay
+while it is outside the viewport, as tldraw's does. Before, the overlay list
+came from the engine alone, which reports only what is on screen, so the hook
+changed `getCulledShapes()` and nothing else: a live embed or a banner panned
+or zoomed out of view was unmounted and rebuilt when it came back. On a canvas
+of 29 live banners that was one remount per frame while zooming, and every
+long frame of the gesture.
+
+The overlay list is now in paint order whenever such a shape is on the page,
+so a kept shape coming back on screen does not change its place among its
+siblings (React would move its DOM node, which restyles and lays out all of
+it). A kept shape carries the clip its ancestors give it whether it is on
+screen or not, so its DOM does not change shape at the viewport edge, and a
+shape its ancestors clip away entirely is not kept. A page whose utils do not
+implement `canCull` pays nothing for any of this.
+
 ## 4.12.3
 
 ### A menu portalled out of the canvas keeps its own clicks
