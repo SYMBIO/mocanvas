@@ -2,6 +2,7 @@ import { compressLegacySegments, createShapeId, loadMocanvasFile, Mocanvas, type
 
 import { BaseBoxShapeUtil, HTMLContainer } from "@mocanvas/editor"
 import { makeGalleryCardUtil } from "../gallery-card"
+import { DOM_CARD_LIVE_TYPE, DOM_CARD_TYPE, makeDomCardUtils } from "../dom-card"
 import {
   buildSpecs,
   cameraAt,
@@ -63,6 +64,14 @@ function toCreate(spec: ShapeSpec): ShapeCreate {
         y: spec.y,
         props: { color: spec.color, text: spec.text, w: 160, autoSize: false },
       }
+    case "card":
+      return {
+        id: createShapeId(),
+        type: spec.live ? DOM_CARD_LIVE_TYPE : DOM_CARD_TYPE,
+        x: spec.x,
+        y: spec.y,
+        props: { w: spec.w, h: spec.h, index: spec.index },
+      } as unknown as ShapeCreate
   }
 }
 
@@ -121,6 +130,11 @@ function install(editor: Editor): BenchApi {
     gpuInfo,
     compressSegments: (segments) => compressLegacySegments(segments as never) as unknown[],
     fitCamera,
+    setCamera: (cam) => setCam(cam),
+    getCamera: () => {
+      const c = editor.getCamera()
+      return { x: c.x, y: c.y, z: c.z }
+    },
 
     shapeBoxes(): ShapeBox[] {
       const cam = editor.getCamera()
@@ -135,12 +149,12 @@ function install(editor: Editor): BenchApi {
       return out
     },
 
-    async create(n: number, kind: Kind = "geo") {
+    async create(n: number, kind: Kind = "geo", fit = true) {
       const creates = buildSpecs(n, kind).map(toCreate)
       const t0 = performance.now()
       editor.run(() => editor.createShapes(creates), { history: "ignore" })
       const t1 = performance.now()
-      fitCamera()
+      if (fit) fitCamera()
       await settleFrames(2)
       return { ms: t1 - t0, firstFrameMs: performance.now() - t0, count: editor.getCurrentPageShapeIds().size }
     },
@@ -235,13 +249,14 @@ function install(editor: Editor): BenchApi {
  * extension points rather than of two different shapes.
  */
 const galleryCardUtil = makeGalleryCardUtil({ BaseBoxShapeUtil, HTMLContainer } as never) as never
+const domCardUtils = makeDomCardUtils({ BaseBoxShapeUtil, HTMLContainer } as never) as unknown as never[]
 ;(globalThis as { __GALLERY_HAS_CUSTOM__?: boolean }).__GALLERY_HAS_CUSTOM__ = true
 
 export default function MocanvasPage() {
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       <Mocanvas
-        shapeUtils={[galleryCardUtil]}
+        shapeUtils={[galleryCardUtil, ...domCardUtils]}
         hideUi
         showStats={false}
         options={{ maxShapesPerPage: 1_000_000 }}
