@@ -129,6 +129,14 @@ export function makeDomCardUtils({ BaseBoxShapeUtil, HTMLContainer }: DomCardDep
       const { w, h } = { ...DEFAULTS, ...shape.props }
       return <rect width={w} height={h} rx={10} />
     }
+    // tldraw 5 strokes indicators from this and throws without it; mocanvas
+    // prefers it over `indicator()` too, so both draw the outline on a canvas.
+    getIndicatorPath(shape: { props: DomCardProps }): Path2D {
+      const { w, h } = { ...DEFAULTS, ...shape.props }
+      const path = new Path2D()
+      path.roundRect(0, 0, w, h, 10)
+      return path
+    }
   }
 
   class DomCardLiveUtil extends DomCardUtil {
