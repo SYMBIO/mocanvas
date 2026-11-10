@@ -31,6 +31,7 @@
  * Usage:
  *   pnpm --filter bench dom-overlay -- --label=baseline
  *   pnpm --filter bench dom-overlay -- --n=50,200 --repeats=1 --gestures=pan --label=quick
+ *   pnpm --filter bench dom-overlay -- --grid=off --label=nogrid   (mocanvas starts in grid mode)
  *   node scripts/dom-overlay.mjs --compare=results/dom-overlay-baseline.json,results/dom-overlay-after.json
  */
 import { chromium } from "playwright"
@@ -77,7 +78,7 @@ const REACT_HOOK = `(() => {
 })()`
 
 function parseArgs(argv) {
-  const opts = { n: [50, 200, 1000], kinds: KINDS, gestures: GESTURES, libs: ["mocanvas"], repeats: 3, label: "run", build: true, gl: process.platform === "darwin" ? "hardware" : "auto", compare: null }
+  const opts = { n: [50, 200, 1000], kinds: KINDS, gestures: GESTURES, libs: ["mocanvas"], repeats: 3, grid: "default", label: "run", build: true, gl: process.platform === "darwin" ? "hardware" : "auto", compare: null }
   for (const a of argv) {
     const [k, v] = a.replace(/^--/, "").split("=")
     if (k === "n") opts.n = v.split(",").map(Number)
@@ -89,6 +90,7 @@ function parseArgs(argv) {
     else if (k === "no-build") opts.build = false
     else if (k === "gl") opts.gl = v
     else if (k === "compare") opts.compare = v.split(",")
+    else if (k === "grid") opts.grid = v
   }
   return opts
 }
@@ -383,6 +385,9 @@ async function main() {
             for (let rep = 0; rep < opts.repeats; rep++) {
               const { page, errors } = await openPage(browser, preview.url, lib)
               try {
+                // mocanvas starts in grid mode and tldraw does not; `--grid=off`
+                // measures both without one, `--grid=on` both with.
+                if (opts.grid !== "default") await page.evaluate((on) => window.editor.updateInstanceState({ isGridMode: on }), opts.grid === "on")
                 await page.evaluate((cam) => window.bench.setCamera(cam), startCamera(gesture, n))
                 await page.evaluate(([count, k]) => window.bench.create(count, k, false), [n, kind])
                 await settle(page, 20)
@@ -418,6 +423,7 @@ async function main() {
       gl: launched.mode,
       viewport: VIEWPORT,
       repeats: opts.repeats,
+      grid: opts.grid,
     },
     results,
   }
