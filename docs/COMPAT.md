@@ -98,7 +98,10 @@ work is**, not in the symbol tables above.
 
 `canCull` is absent from the class but honoured where it matters: a util that
 implements it and returns `false` keeps its shape in the DOM overlay while the
-shape is off screen (4.12.4), and out of `getCulledShapes()`.
+shape is off screen (4.12.4), and out of `getCulledShapes()`. Every other overlay
+shape that leaves the viewport stays mounted but hidden until
+`options.overlayRetainLimit` newer ones displace it; the option is mocanvas's
+own.
 
 You can measure a real application against this surface rather than trusting the
 tables: `scripts/compat-parity.mjs` type-checks a consumer app with `tldraw`

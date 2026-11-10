@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### A pan or zoom is no React render, and a card crossing the viewport edge is not rebuilt
+
+Measured with a new DOM-overlay benchmark (`pnpm --filter bench dom-overlay`,
+results in `docs/BENCHMARK-DOM-OVERLAY.md`): app-style `ShapeUtil.component`
+cards of ~150 nodes, 50 to 1,000 of them, panned, zoomed, dragged and hovered.
+
+- **The camera is a transform written from a signal reaction.** The overlay
+  layer rendered it, so every pan or zoom frame re-rendered the layer through
+  React and walked every mounted shape; the canvas body also re-rendered on
+  every zoom frame to restamp `--mocanvas-zoom` / `--mocanvas-scale`, and on
+  every pan frame for the grid even with grid mode off. Now a camera move with
+  nothing selected commits nothing to React. The grid, when on, is the one
+  layer that still re-renders, because its slot is handed the camera as props.
+- **Recently culled overlay shapes stay mounted, hidden.** The engine culls the
+  overlay to the viewport exactly, so every card crossing the edge of a pan was
+  unmounted and built again when the pan came back. The most recently culled
+  shapes now stay in the overlay with `content-visibility: hidden`, up to the
+  new `options.overlayRetainLimit` (default 256; `0` restores the old
+  behaviour). `editor.getOverlayShapeIds()` includes them;
+  `editor.getOverlayRetainedShapeIds()` names them.
+- **A shape body re-renders on its `props` and `meta`, not its position.**
+  Dragging a card re-rendered its whole body every frame, because its record
+  changed; the wrapper already carries position, rotation and opacity.
+
 ## 4.12.4
 
 ### A shape that cannot be culled stays mounted off screen

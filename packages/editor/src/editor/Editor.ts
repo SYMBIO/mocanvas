@@ -300,6 +300,24 @@ export interface EditorConfig extends TldrawOptions {
    * enough to debounce at all, and how much movement is worth publishing.
    */
   debouncedZoomOctaves: number
+  /**
+   * How many DOM-overlay shapes that left the viewport stay mounted, hidden, so
+   * coming back into view costs a style change instead of a React remount.
+   *
+   * The engine culls the overlay to the viewport exactly, so without this every
+   * card that crosses the viewport edge during a pan or a zoom is unmounted and
+   * rebuilt from nothing when the gesture comes back — on a board of heavy React
+   * cards, dozens of remounts per gesture. Retained shapes are the most recently
+   * culled ones (least recently visible are evicted first), they are listed in
+   * {@link Editor.getOverlayRetainedShapeIds}, and the canvas hides them with
+   * `content-visibility: hidden`, which keeps their DOM and layout but skips
+   * their rendering.
+   *
+   * The bound is the memory cost: up to this many shapes' DOM is kept alive off
+   * screen. `0` turns retention off and unmounts at the edge, as every release before
+   * this option did.
+   */
+  overlayRetainLimit: number
 }
 
 export const DEFAULT_EDITOR_CONFIG: EditorConfig = {
@@ -320,6 +338,10 @@ export const DEFAULT_EDITOR_CONFIG: EditorConfig = {
   // SEMANTICS-ASSUMED: half an octave is the smallest zoom change a rasteriser
   // should care about.
   debouncedZoomOctaves: 0.5,
+  // SEMANTICS-ASSUMED: a few screens' worth of cards on a dense board. Measured
+  // in apps/bench (`dom-overlay.mjs`): a pan or zoom there and back stops
+  // remounting at this size; the cost is the DOM of this many off-screen shapes.
+  overlayRetainLimit: 256,
 }
 
 export interface HitTestOptions {
@@ -540,6 +562,15 @@ export class Editor extends EventEmitter<EditorEvents> {
   private readonly _frameEpoch: Atom<number>
   private readonly _overlayShapeIds: Atom<readonly ShapeId[]>
   private readonly _overlayClips: Atom<readonly (ClipRect | undefined)[]>
+  private readonly _overlayRetained: Atom<ReadonlySet<ShapeId>>
+  /**
+   * Overlay shapes the engine culled that are still mounted, oldest first: a
+   * `Map` iterates in insertion order, which is the LRU order eviction wants.
+   * Each carries the clip it had when it was last on screen.
+   */
+  private readonly overlayRetained = new Map<ShapeId, ClipRect | undefined>()
+  /** Last frame's on-screen overlay shapes (engine list plus kept ones), with their clips. */
+  private overlayOnScreen = new Map<ShapeId, ClipRect | undefined>()
   private readonly _isDisposed: Atom<boolean>
   private readonly _lastFrame: Atom<{ drawn: number; culled: number; ms: number }>
   private readonly _cameraOptions: Atom<TLCameraOptions>
@@ -619,6 +650,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     })
     this._overlayShapeIds = atom<readonly ShapeId[]>("editor.overlayShapeIds", [])
     this._overlayClips = atom<readonly (ClipRect | undefined)[]>("editor.overlayClips", [])
+    this._overlayRetained = atom<ReadonlySet<ShapeId>>("editor.overlayRetained", EMPTY_ID_SET)
     this._isDisposed = atom("editor.isDisposed", false)
     this._isMounted = atom("editor.isMounted", false)
     this._lastFrame = atom("editor.lastFrame", { drawn: 0, culled: 0, ms: 0 })
@@ -865,9 +897,22 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this._lastFrame.get()
   }
 
-  /** Shapes the DOM overlay must render this frame, in draw order. */
+  /**
+   * Shapes the DOM overlay must keep mounted this frame, in draw order: the ones
+   * on screen, plus those listed by {@link getOverlayRetainedShapeIds}, which are
+   * off screen and mounted only so that coming back does not rebuild them.
+   */
   getOverlayShapeIds(): readonly ShapeId[] {
     return this._overlayShapeIds.get()
+  }
+
+  /**
+   * The subset of {@link getOverlayShapeIds} that the engine culled and the
+   * overlay keeps mounted but hidden — see `options.overlayRetainLimit`. Empty
+   * when nothing is retained.
+   */
+  getOverlayRetainedShapeIds(): ReadonlySet<ShapeId> {
+    return this._overlayRetained.get()
   }
 
   /**
@@ -3380,10 +3425,12 @@ export class Editor extends EventEmitter<EditorEvents> {
       }
     }
     unsafe__withoutCapture(() => this.keepUncullableOverlay(ids, clips))
+    const retained = unsafe__withoutCapture(() => this.retainCulledOverlay(ids, clips))
     unsafe__withoutCapture(() => {
       const prev = this._overlayShapeIds.get()
       if (prev.length !== ids.length || prev.some((id, i) => id !== ids[i])) this._overlayShapeIds.set(ids)
       if (!sameClips(this._overlayClips.get(), clips)) this._overlayClips.set(clips)
+      if (!sameIdSet(this._overlayRetained.get(), retained)) this._overlayRetained.set(retained)
       const ms = performance.now() - t0
       this._lastFrame.set({ drawn: frame.drawn, culled: frame.culled, ms })
       this.emit("frame", { drawn: frame.drawn, culled: frame.culled, ms })
@@ -3414,6 +3461,75 @@ export class Editor extends EventEmitter<EditorEvents> {
       clips.push(entry.clip)
     }
   }
+
+  /**
+   * Keep the overlay shapes that just left the viewport mounted, up to
+   * `options.overlayRetainLimit`, and put the whole list in paint order.
+   *
+   * A shape that the engine stops reporting moves into a bounded LRU; one that
+   * comes back moves out of it. Either way its entry in the list — and so its
+   * React element and DOM — is untouched; only its retained flag flips. The list
+   * is sorted by paint rank whenever anything is retained, so a shape crossing
+   * the viewport edge never changes position among its siblings either: React
+   * would move its DOM for that, and moving a node with an iframe in it reloads
+   * the iframe.
+   *
+   * Returns the retained ids, which the canvas hides.
+   */
+  private retainCulledOverlay(ids: ShapeId[], clips: (ClipRect | undefined)[]): ReadonlySet<ShapeId> {
+    const limit = Math.max(0, Math.floor(this.options.overlayRetainLimit))
+    const lastOnScreen = this.overlayOnScreen
+    const onScreen = new Map<ShapeId, ClipRect | undefined>()
+    for (let i = 0; i < ids.length; i++) onScreen.set(ids[i]!, clips[i])
+    this.overlayOnScreen = onScreen
+    const retainedMap = this.overlayRetained
+    if (limit === 0) {
+      retainedMap.clear()
+      return EMPTY_ID_SET
+    }
+    for (const id of onScreen.keys()) retainedMap.delete(id)
+    // Left the viewport this frame: newest entries go last, so they are evicted last.
+    for (const [id, clip] of lastOnScreen) {
+      if (onScreen.has(id)) continue
+      retainedMap.delete(id)
+      retainedMap.set(id, clip)
+    }
+    if (retainedMap.size === 0) return EMPTY_ID_SET
+    const pageId = this.getCurrentPageId()
+    for (const id of [...retainedMap.keys()]) {
+      const shape = this.getShape<UnknownShape>(id)
+      // Gone, no longer drawn in the DOM, on another page, or hidden by the host:
+      // none of those is a shape that may come back by moving the camera.
+      if (!shape || !this.overlayFlaggedIds.has(id) || this.getAncestorPageId(shape) !== pageId || isShapeHidden(this, shape)) {
+        retainedMap.delete(id)
+      }
+    }
+    while (retainedMap.size > limit) retainedMap.delete(retainedMap.keys().next().value!)
+    if (retainedMap.size === 0) return EMPTY_ID_SET
+
+    const rank = this._paintRank.get()
+    const entries: { id: ShapeId; clip: ClipRect | undefined }[] = []
+    for (const [id, clip] of onScreen) entries.push({ id, clip })
+    for (const [id, clip] of retainedMap) entries.push({ id, clip })
+    const rankOf = (id: ShapeId) => rank.get(id) ?? Number.MAX_SAFE_INTEGER
+    entries.sort((a, b) => rankOf(a.id) - rankOf(b.id))
+    ids.length = 0
+    clips.length = 0
+    for (const entry of entries) {
+      ids.push(entry.id)
+      clips.push(entry.clip)
+    }
+    return new Set(retainedMap.keys())
+  }
+
+  /**
+   * Every shape on the current page by paint order. Recomputed when a shape
+   * record changes — not when the camera moves, which is when the overlay
+   * needs it.
+   */
+  private readonly _paintRank: Computed<ReadonlyMap<ShapeId, number>> = computed("editor.paintRank", () => {
+    return new Map(this.getCurrentPageShapesSorted().map((shape, index) => [shape.id, index]))
+  })
 
   // ---- textures ----------------------------------------------------------
 
@@ -4854,6 +4970,15 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   /** Which menus are open right now. Backed by the `instance` session record. */
   readonly menus: MenuManager = new MenuManager(this)
+}
+
+const EMPTY_ID_SET: ReadonlySet<ShapeId> = new Set()
+
+function sameIdSet(a: ReadonlySet<ShapeId>, b: ReadonlySet<ShapeId>): boolean {
+  if (a === b) return true
+  if (a.size !== b.size) return false
+  for (const id of a) if (!b.has(id)) return false
+  return true
 }
 
 function sameClips(a: readonly (ClipRect | undefined)[], b: readonly (ClipRect | undefined)[]): boolean {

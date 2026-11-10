@@ -197,6 +197,21 @@ geometry bounds, with `pointerEvents: "none"` unless the shape is being edited.
 Render in shape-local space starting at `(0, 0)`; do not apply the camera or
 the shape transform yourself.
 
+**When it re-renders.** The body is a function of the shape's `props` and
+`meta`: it re-renders when either changes, and when a signal it read during its
+last render changes (`useValue`, `editor.get*`). Moving, rotating or fading the
+shape changes only the wrapper's transform and opacity, so a body that reads
+`shape.x`, `shape.y`, `shape.rotation` or `shape.opacity` sees the value from its
+last render. Read the position through a signal if you need it.
+A pan or zoom re-renders nothing: the camera is a transform on the overlay layer.
+
+**Off screen.** A body is mounted while its shape is on screen. When the shape
+leaves the viewport it stays mounted, hidden with `content-visibility: hidden`,
+until `options.overlayRetainLimit` (default 256) more recently culled shapes
+push it out; coming back on screen then costs a style change, not a remount.
+`0` unmounts at the viewport edge. A util whose `canCull()` returns `false` is
+never unmounted and never hidden for being off screen.
+
 ### `getIndicatorPath` — the selection outline
 
 ```ts

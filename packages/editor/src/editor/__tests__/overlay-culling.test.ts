@@ -126,6 +126,9 @@ function makeEditor(withLive = true, hidden: readonly string[] = []) {
     tools: [Idle],
     engine,
     getContainer: () => ({}) as HTMLElement,
+    // These tests are about `canCull`; retention of recently culled shapes has
+    // its own file (`overlay-retain.test.ts`), so it is off here.
+    options: { overlayRetainLimit: 0 },
   })
   editor.updateViewportScreenBounds({ x: 0, y: 0, w: 1000, h: 800 })
   return editor
