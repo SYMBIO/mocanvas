@@ -568,6 +568,14 @@ function useCameraCssVarsOnElement(editor: Editor, ref: { current: HTMLElement |
  * the shapes that asked. Written from a reaction, like the container's, so a
  * zoom frame sets a property and renders nothing — and restyles this shape's
  * subtree alone.
+ *
+ * Not while the shape is retained. A retained shape is off screen and kept only
+ * so that coming back is not a rebuild; writing the camera to it every frame
+ * restyles its root and whatever the hiding does not cover — `content-visibility:
+ * hidden` skips rendering a subtree, not the style of the element that declares
+ * it. A consumer measured a retained board paying 21.8 ms p95 where the same
+ * board with retention off paid 3.5. The values are written again when the shape
+ * comes back, before it is painted.
  */
 function useCameraCssVarsOnShape(editor: Editor, enabled: boolean) {
   const ref = useRef<HTMLDivElement>(null)
@@ -697,7 +705,8 @@ const OverlayShape = track(function OverlayShape({
   // read the camera variables, which is what every shape did before the overlay
   // stopped inheriting them.
   const asksForCamera = (util as { usesCameraCssVars?(shape: UnknownShape): boolean }).usesCameraCssVars?.(shape) === true
-  const cameraRef = useCameraCssVarsOnShape(editor, asksForCamera)
+  // Off while the shape is retained: nobody can see it, and the write is not free.
+  const cameraRef = useCameraCssVarsOnShape(editor, asksForCamera && !isRetained)
   // The clip rect is page-space and the shape may be rotated, so it is applied
   // by an unrotated wrapper placed at the rect; the shape is offset back into it.
   const offset = clip ? `translate(${-clip[0]}px, ${-clip[1]}px) ` : ""
