@@ -1,5 +1,41 @@
 # Changelog
 
+## 4.16.0
+
+### Breaking: grid mode is off by default, as it is in tldraw
+
+It was on, from a time when the grid only drew dots and the choice cost
+nothing. 4.13.0 made the grid step a drag and a resize, which turned that
+default into a behaviour change for every app that had never asked for a grid:
+a consumer's boards, which mount with the grid on by their own preference,
+would have snapped on the first drag after upgrading, and so would everyone
+else's. The default that changes what a drag does should be the one you opted
+into.
+
+**If your app draws the grid today without setting `isGridMode`**, set it:
+
+```ts
+editor.updateInstanceState({ isGridMode: true })
+```
+
+Apps that already set it either way are unaffected, and the dots and the
+stepping stay tied together — turning the grid on still means drags step by the
+document's `gridSize`, as in tldraw.
+
+### Fix: a retained shape no longer gets the camera written to it
+
+A shape kept mounted off screen (`options.overlayRetainLimit`) that also
+returns `true` from `usesCameraCssVars()` was still handed the live camera on
+every frame of a zoom. Nobody could see it, and it was not free: `content-visibility:
+hidden` skips rendering a subtree, not the style of the element that declares
+it. A consumer measured a retained board at 21.8 ms p95 crossing a
+level-of-detail threshold, against 3.5 ms with retention off; this was half of
+that. The values are written again when the shape comes back, before it is
+painted.
+
+If you turned retention off to get the cost back, it is worth re-measuring with
+it on.
+
 ## 4.15.1
 
 ### Fix: a shape that asked for the camera got `--tl-scale: 1` through compat

@@ -339,6 +339,47 @@ describe("the camera variables in the overlay", () => {
     expect(counts.renders).toBe(renders)
   })
 
+  it("stops writing them to a shape that is only being retained", () => {
+    // A retained shape is off screen and kept so that coming back is not a
+    // rebuild. Writing the camera to it on every frame restyles its root for
+    // nobody: `content-visibility: hidden` skips rendering the subtree, not the
+    // style of the element that declares it. A consumer measured 21.8 ms p95
+    // against 3.5 with retention off, and this was half of it.
+    host = document.createElement("div")
+    document.body.appendChild(host)
+    editor = new Editor({
+      store: createStore(),
+      shapeUtils: [ZoomCardUtil as never],
+      tools: [SelectTool],
+      engine: loadEngineSync(readFileSync(wasmPath)),
+      getContainer: () => host!,
+    })
+    editor.createShapes([
+      { type: "card", x: 10, y: 10, meta: { name: "a" } },
+      { type: "card", x: 1500, y: 10, meta: { name: "b" } },
+    ])
+    editor.updateInstanceState({ isGridMode: false })
+    root = createRoot(host)
+    act(() => root!.render(<Canvas editor={editor!} />))
+    runUntilIdle()
+
+    expect(cardElement("a")!.style.getPropertyValue("--mocanvas-zoom")).toBe("1")
+
+    // `a` leaves the viewport and is kept, hidden.
+    move(() => editor!.setCamera({ x: -1450, y: 0, z: 1 }))
+    expect(cardElement("a")!.dataset.retained).toBe("true")
+
+    // A zoom while it is out there writes nothing to it.
+    move(() => editor!.setCamera({ x: -1450, y: 0, z: 4 }))
+    expect(cardElement("a")!.style.getPropertyValue("--mocanvas-zoom")).toBe("")
+
+    // Back on screen: current again, before anything paints.
+    move(() => editor!.setCamera({ x: 0, y: 0, z: 4 }))
+    expect(cardElement("a")!.dataset.retained).toBeUndefined()
+    expect(cardElement("a")!.style.getPropertyValue("--mocanvas-zoom")).toBe("4")
+    expect(cardElement("a")!.style.getPropertyValue("--mocanvas-scale")).toBe("0.25")
+  })
+
   it("lets an app keep the old inheritance", () => {
     const editor = mountWith([CardUtil], { overlayCameraCssVars: "inherit" })
     move(() => editor.setCamera({ x: 0, y: 0, z: 2 }))

@@ -131,10 +131,12 @@ export const InstanceRecordType = createRecordType<Instance>("instance", { scope
     isFocusMode: false,
     isDebugMode: false,
     isToolLocked: false,
-    // On by default: a canvas is a drawing surface and the grid is how a
-    // person judges size and alignment on one. An app that wants a blank page
-    // sets it false on its instance record.
-    isGridMode: true,
+    // Off by default, as tldraw has it. It was on, from a time when the grid
+    // only drew dots and the choice cost nothing. Since 4.13.0 the grid also
+    // moves and resizes in steps, so leaving it on handed that to every app
+    // that had never asked for a grid — a consumer's boards snapped on the
+    // first drag after an upgrade. An app that wants the grid turns it on.
+    isGridMode: false,
     isReadonly: false,
     isFocused: false,
     isPenMode: false,
