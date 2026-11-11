@@ -30,6 +30,11 @@ class CardUtil extends BaseBoxShapeUtil<CardShape> {
 `@mocanvas/compat` recomputes `--tl-zoom` / `--tl-scale` inside the overlay from
 the local value, so a migrated stylesheet sees a consistent pair either way.
 
+**If you already cut the variables yourself** — setting them to `initial` on
+your shapes' content roots was the known workaround, and is where this fix came
+from — you can drop that code: the overlay does it for you now. Keep whatever
+puts a label or a ring *outside* your own cut, and give those shapes the hook.
+
 Measured with `pnpm --filter bench dom-overlay` (`--n=200,1000 --kinds=dom-live
 --gestures=zoom --repeats=2 --grid=off`):
 
