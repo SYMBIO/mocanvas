@@ -1,5 +1,25 @@
 # Changelog
 
+## 4.15.1
+
+### Fix: a shape that asked for the camera got `--tl-scale: 1` through compat
+
+`var()` is substituted where the declaration sits, and descendants inherit the
+computed value rather than the expression. 4.15.0 recomputed the tldraw aliases
+only on the overlay layer, where `--mocanvas-scale` is the constant the layer
+declares — so a shape whose util returns `true` from `usesCameraCssVars()` got
+the live `--mocanvas-*` on its wrapper and `--tl-scale: 1` from compat, and a
+migrated stylesheet's counter-scale quietly stopped holding its size. Found by a
+consumer, in a browser, the day 4.15.0 shipped.
+
+`compat.css` now recomputes them on `.mocanvas-shape` as well. A shape that did
+not ask still sits under constants, so this costs it nothing on a zoom.
+
+No test in the repo could see this: jsdom does not resolve `var()`, so a unit
+test reading `--tl-scale` passes against the broken stylesheet just as happily.
+`pnpm --filter bench compat-vars` now checks it in a real engine against the DOM
+the canvas builds, and fails against 4.15.0.
+
 ## 4.15.0
 
 ### Breaking: the overlay no longer inherits the zoom custom properties
