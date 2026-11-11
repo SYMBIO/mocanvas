@@ -1,0 +1,151 @@
+{
+  "meta": {
+    "label": "zoomvar-base",
+    "date": "2026-11-11T08:05:59.026Z",
+    "rev": "778a97c",
+    "machine": "Apple M5 Pro, 18 cores, 64 GB",
+    "os": "Darwin 27.2.0 (arm64)",
+    "node": "v26.8.2",
+    "browser": "151.0.7922.34",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+    "gl": "hardware",
+    "viewport": {
+      "width": 1200,
+      "height": 800
+    },
+    "repeats": 2,
+    "grid": "off"
+  },
+  "results": [
+    {
+      "lib": "mocanvas",
+      "n": 200,
+      "kind": "dom-live",
+      "gesture": "zoom",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 62,
+          "mainP50": 13.489,
+          "mainP95": 21.479,
+          "mainTotal": 880.683,
+          "traceStyleMs": 517.816,
+          "traceLayoutMs": 0,
+          "wallMs": 898.847,
+          "styleMsPerStep": 8.631983333333332,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.39616666666666667,
+          "taskMsPerStep": 14.672183333333333,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0
+        },
+        {
+          "steps": 60,
+          "frames": 62,
+          "mainP50": 14.272,
+          "mainP95": 20.224,
+          "mainTotal": 903.668,
+          "traceStyleMs": 515.613,
+          "traceLayoutMs": 0,
+          "wallMs": 914.101,
+          "styleMsPerStep": 8.595266666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.3812333333333333,
+          "taskMsPerStep": 15.055150000000001,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0
+        }
+      ],
+      "median": {
+        "mainP50": 13.880500000000001,
+        "mainP95": 20.8515,
+        "mainTotal": 892.1755,
+        "styleMsPerStep": 8.613624999999999,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 0.3887,
+        "taskMsPerStep": 14.863666666666667,
+        "commits": 0,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 62,
+        "wallMs": 906.4739999999999
+      }
+    },
+    {
+      "lib": "mocanvas",
+      "n": 1000,
+      "kind": "dom-live",
+      "gesture": "zoom",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 62,
+          "mainP50": 64.8,
+          "mainP95": 90.08,
+          "mainTotal": 3959.322,
+          "traceStyleMs": 2471.559,
+          "traceLayoutMs": 0,
+          "wallMs": 3976.568,
+          "styleMsPerStep": 41.19565,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.7220166666666666,
+          "taskMsPerStep": 65.98185,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 57,
+          "loafBlockingMs": 357.2
+        },
+        {
+          "steps": 60,
+          "frames": 62,
+          "mainP50": 64.277,
+          "mainP95": 87.383,
+          "mainTotal": 3929.869,
+          "traceStyleMs": 2438.048,
+          "traceLayoutMs": 0,
+          "wallMs": 3943.913,
+          "styleMsPerStep": 40.63748333333333,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.6121166666666668,
+          "taskMsPerStep": 65.4918,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 56,
+          "loafBlockingMs": 333.4
+        }
+      ],
+      "median": {
+        "mainP50": 64.5385,
+        "mainP95": 88.7315,
+        "mainTotal": 3944.5955000000004,
+        "styleMsPerStep": 40.91656666666667,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 0.6670666666666667,
+        "taskMsPerStep": 65.736825,
+        "commits": 0,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 56.5,
+        "loafBlockingMs": 345.29999999999995,
+        "frames": 62,
+        "wallMs": 3960.2405
+      }
+    }
+  ]
+}

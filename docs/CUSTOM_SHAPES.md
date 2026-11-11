@@ -212,6 +212,25 @@ push it out; coming back on screen then costs a style change, not a remount.
 `0` unmounts at the viewport edge. A util whose `canCull()` returns `false` is
 never unmounted and never hidden for being off screen.
 
+**The zoom in your CSS.** `--mocanvas-zoom` and `--mocanvas-scale` are live on
+the canvas container, but the overlay declares them as constants so that a zoom
+does not restyle every node of every mounted shape — the single largest cost of
+a zoom gesture on a board of DOM cards. A shape whose own CSS reads them says so:
+
+```ts
+class CardUtil extends BaseBoxShapeUtil<CardShape> {
+  override usesCameraCssVars() {
+    return true // this card counter-scales its label
+  }
+}
+```
+
+That shape then gets the live values on its own wrapper, and its subtree is the
+only one that restyles on a zoom. `options.overlayCameraCssVars: "inherit"`
+turns the mechanism off altogether, for an app that would rather pay than name
+its shapes. Everything outside the overlay — your own chrome, panels, menus —
+reads the live values as before.
+
 ### `getIndicatorPath` — the selection outline
 
 ```ts

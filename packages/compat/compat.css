@@ -30,6 +30,18 @@
  * tldraw editor somewhere on the page keeps its own values.
  */
 
+/*
+ * Inside the DOM overlay the camera variables are constants unless the shape
+ * asked for them (`ShapeUtil.usesCameraCssVars`), so the tldraw aliases have to
+ * be recomputed there from the local value. Without this they would carry the
+ * container's live zoom into a subtree whose `--mocanvas-scale` is 1, which is
+ * both wrong and the restyle the overlay just avoided.
+ */
+.mocanvas-overlay {
+  --tl-zoom: var(--mocanvas-zoom, 1);
+  --tl-scale: var(--mocanvas-scale, 1);
+}
+
 .mocanvas,
 .tl-container {
   /* ---- camera ---------------------------------------------------------
