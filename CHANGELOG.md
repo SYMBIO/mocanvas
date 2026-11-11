@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 4.14.0
 
 ### A pan or zoom is no React render, and a card crossing the viewport edge is not rebuilt
 
