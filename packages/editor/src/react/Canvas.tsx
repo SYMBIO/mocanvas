@@ -680,6 +680,20 @@ const overlayLayerStyleCut: CSSProperties = {
  * hidden` keeps the subtree's DOM and its layout state and skips rendering it,
  * so showing it again is a style change rather than a rebuild; `visibility`
  * covers a browser without it.
+ *
+ * **Not `<Activity mode="hidden">`**, though it looks like the same idea with
+ * React's blessing and would additionally stop a retained body re-rendering —
+ * which is the one cost `content-visibility` leaves on the table, and a real one
+ * for an app whose shape subscribes to the camera. Hidden `Activity` unmounts
+ * the subtree's effects and re-runs them on return. For a retained shape that is
+ * backwards: the point of keeping it mounted is that coming back costs nothing,
+ * and an app's effects are where a card sets up its subscriptions, observers and
+ * hosts. A consumer has already paid for this once elsewhere, and their cards
+ * carry exactly that kind of effect, so retention plus `Activity` would hand
+ * back on return what it saved at the edge.
+ *
+ * A shape that *wants* to stop working while it is off screen has `canCull()`
+ * and the app's own signal reads to say so.
  */
 const RETAINED_STYLE: CSSProperties = { contentVisibility: "hidden", visibility: "hidden" } as CSSProperties
 
