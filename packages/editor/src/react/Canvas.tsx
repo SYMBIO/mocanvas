@@ -3,7 +3,7 @@ import { track, useValue } from "@mocanvas/state/react"
 import { DefaultGrid, DefaultShapeErrorFallback } from "./defaultEditorComponents"
 import type { TLGridProps } from "./ui-types"
 import { DefaultErrorFallback, ErrorBoundary, type TLErrorFallbackProps } from "./ErrorBoundary"
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react"
+import { createContext, memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react"
 import type { ClipRect } from "@mocanvas/wasm"
 import { DEFAULT_EDITOR_CONFIG, type Editor } from "../editor/Editor"
 import type { RenderBackend } from "../render/backend"
@@ -12,7 +12,7 @@ import type { UnknownShape } from "../records/base"
 import { Vec } from "../geometry"
 import { EditorProvider } from "./EditorContext"
 import { useEditorComponents } from "./ui-context"
-import { useCameraCssVars, useThemeCssVars } from "./themeVars"
+import { getCameraCssVars, useThemeCssVars } from "./themeVars"
 import { IN_FRONT_OF_CANVAS_CLASS, useCanvasEvents } from "./useCanvasEvents"
 import { getSelectionHandlePositions } from "../editor/selectionHandles"
 import { ShapeIndicatorCompositor, type TLIndicatorHost } from "../indicators/ShapeIndicatorCompositor"
@@ -394,13 +394,13 @@ function CanvasBody({ editor, className, style, children, components, indicatorO
   // comes after, so a caller can still override an individual variable.
   const themeVars = useThemeCssVars(editor)
   // The camera, for CSS that has to hold a constant on-screen size while the
-  // canvas zooms. Restamped on zoom, not per frame.
-  const cameraVars = useCameraCssVars(editor)
-  // Grid mode, the camera and the document's step — the three things the grid
-  // slot is given rather than subscribing to itself, so a pan redraws it once.
+  // canvas zooms: written to the container from a reaction, not rendered. As a
+  // React value it re-rendered this whole body on every zoom frame.
+  useCameraCssVarsOnElement(editor, containerRef, style)
+  // Only whether the grid is on. The camera is read by `GridLayer`, which exists
+  // only in grid mode — read here, it re-rendered the body on every pan frame
+  // of a canvas with no grid at all.
   const isGridMode = useValue("isGridMode", () => editor.getInstanceState().isGridMode, [editor])
-  const camera = useValue("camera", () => editor.getCamera(), [editor])
-  const gridSize = useValue("gridSize", () => editor.getDocumentSettings().gridSize, [editor])
   const Grid = components?.Grid === undefined ? DefaultGrid : components.Grid
   const Indicators = components?.Indicators ?? DefaultIndicators
   const Brush = components?.Brush ?? (hasOverlay(editor, "brush") ? null : DefaultBrush)
@@ -412,7 +412,7 @@ function CanvasBody({ editor, className, style, children, components, indicatorO
       <div
         ref={containerRef}
         className={className ? `mocanvas ${className}` : "mocanvas"}
-        style={{ ...containerStyle, background: backgroundFor(editor), ...themeVars, ...cameraVars, ...style, cursor }}
+        style={{ ...containerStyle, background: backgroundFor(editor), ...themeVars, ...style, cursor }}
         tabIndex={0}
         onPointerDown={events.onPointerDown}
         onPointerMove={events.onPointerMove}
@@ -430,7 +430,7 @@ function CanvasBody({ editor, className, style, children, components, indicatorO
           either. So "Show grid" ticked a box and drew nothing, which is the
           worst kind of dead control: the menu says the feature exists.
         */}
-        {Grid !== null && isGridMode ? <Grid x={camera.x} y={camera.y} z={camera.z} size={gridSize} /> : null}
+        {Grid !== null && isGridMode ? <GridLayer editor={editor} Grid={Grid} /> : null}
         <canvas ref={canvasRef} style={{ ...layerStyle, display: "block" }} />
         <OverlayLayer editor={editor} />
         <IndicatorCanvas editor={editor} util={indicatorOverlayUtil ?? ShapeIndicatorCompositor} />
@@ -537,42 +537,106 @@ function IndicatorCanvas({ editor, util }: { editor: Editor; util: typeof ShapeI
   return <canvas ref={canvasRef} style={{ ...layerStyle, pointerEvents: "none", display: "block" }} />
 }
 
-/** Shapes rendered by their ShapeUtil.component, positioned in page space via a camera transform. */
+/**
+ * The camera's zoom as `--mocanvas-zoom` / `--mocanvas-scale` on `ref`'s
+ * element, kept current by a reaction rather than by rendering.
+ *
+ * A variable the caller set in `style` is theirs and is left alone, which is
+ * what spreading `style` after the camera variables used to guarantee.
+ */
+function useCameraCssVarsOnElement(editor: Editor, ref: { current: HTMLElement | null }, style: CSSProperties | undefined) {
+  const own = style as Record<string, unknown> | undefined
+  const ownZoom = own?.["--mocanvas-zoom"] !== undefined
+  const ownScale = own?.["--mocanvas-scale"] !== undefined
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    return reactSignal("canvas.cameraCssVars", () => {
+      const vars = getCameraCssVars(editor.getZoomLevel()) as Record<string, string>
+      if (!ownZoom) el.style.setProperty("--mocanvas-zoom", vars["--mocanvas-zoom"]!)
+      if (!ownScale) el.style.setProperty("--mocanvas-scale", vars["--mocanvas-scale"]!)
+    })
+  }, [editor, ref, ownZoom, ownScale])
+}
+
+/**
+ * The grid slot, handed the camera and the document's step. Mounted only in grid
+ * mode, so the camera subscription that redraws it on a pan exists only then.
+ */
+const GridLayer = track(function GridLayer({ editor, Grid }: { editor: Editor; Grid: (props: TLGridProps) => ReactNode }) {
+  const camera = editor.getCamera()
+  const size = editor.getDocumentSettings().gridSize
+  return <Grid x={camera.x} y={camera.y} z={camera.z} size={size} />
+})
+
+/**
+ * Shapes rendered by their ShapeUtil.component, positioned in page space via a
+ * camera transform.
+ *
+ * The transform is written to the layer by a reaction, not rendered: a pan or
+ * zoom frame changes one CSS property and nothing else, where rendering it made
+ * React walk every overlay shape on every frame of the gesture. The layer
+ * re-renders only when the set of mounted shapes, their clips, the retained set
+ * or the editing shape changes.
+ */
 const OverlayLayer = track(function OverlayLayer({ editor }: { editor: Editor }) {
   const ids = editor.getOverlayShapeIds()
   const clips = editor.getOverlayClips()
-  const cam = editor.getCamera()
+  const retained = editor.getOverlayRetainedShapeIds()
   const editingId = editor.getEditingShapeId()
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    return reactSignal("canvas.overlayTransform", () => {
+      const cam = editor.getCamera()
+      el.style.transform = `scale(${cam.z}) translate(${cam.x}px, ${cam.y}px)`
+    })
+  }, [editor])
   return (
-    <div
-      className="mocanvas-overlay"
-      style={{
-        ...layerStyle,
-        pointerEvents: "none",
-        transformOrigin: "0 0",
-        transform: `scale(${cam.z}) translate(${cam.x}px, ${cam.y}px)`,
-      }}
-    >
+    <div ref={ref} className="mocanvas-overlay" style={overlayLayerStyle}>
       {ids.map((id, i) => {
         const shape = editor.getShape(id)
         if (!shape) return null
-        return <OverlayShape key={id} editor={editor} shape={shape} isEditing={editingId === id} clip={clips[i]} />
+        return (
+          <OverlayShape
+            key={id}
+            editor={editor}
+            shape={shape}
+            isEditing={editingId === id}
+            clip={clips[i]}
+            isRetained={retained.has(id)}
+          />
+        )
       })}
     </div>
   )
 })
+
+const overlayLayerStyle: CSSProperties = { ...layerStyle, pointerEvents: "none", transformOrigin: "0 0" }
+
+/**
+ * How a retained shape — culled, but kept mounted — is hidden. `content-visibility:
+ * hidden` keeps the subtree's DOM and its layout state and skips rendering it,
+ * so showing it again is a style change rather than a rebuild; `visibility`
+ * covers a browser without it.
+ */
+const RETAINED_STYLE: CSSProperties = { contentVisibility: "hidden", visibility: "hidden" } as CSSProperties
 
 const OverlayShape = track(function OverlayShape({
   editor,
   shape,
   isEditing,
   clip,
+  isRetained,
 }: {
   editor: Editor
   shape: UnknownShape
   isEditing: boolean
   /** Page-space clip rect inherited from a clipping ancestor (a frame). */
   clip: ClipRect | undefined
+  /** Off screen, mounted only so that coming back does not rebuild it: hidden. */
+  isRetained: boolean
 }) {
   const util = editor.getShapeUtil(shape)
   const m = editor.getShapePageTransform(shape)
@@ -585,6 +649,7 @@ const OverlayShape = track(function OverlayShape({
       className="mocanvas-shape"
       data-shape-id={shape.id}
       data-shape-type={shape.type}
+      data-retained={isRetained && !clip ? "true" : undefined}
       style={{
         position: "absolute",
         left: 0,
@@ -595,6 +660,7 @@ const OverlayShape = track(function OverlayShape({
         transform: `${offset}matrix(${m.a}, ${m.b}, ${m.c}, ${m.d}, ${m.e}, ${m.f})`,
         opacity: shape.opacity,
         pointerEvents: isEditing ? "auto" : "none",
+        ...(isRetained && !clip ? RETAINED_STYLE : null),
       }}
     >
       {/*
@@ -613,6 +679,7 @@ const OverlayShape = track(function OverlayShape({
   return (
     <div
       className="mocanvas-shape-clip"
+      data-retained={isRetained ? "true" : undefined}
       style={{
         position: "absolute",
         left: clip[0],
@@ -621,6 +688,7 @@ const OverlayShape = track(function OverlayShape({
         height: Math.max(0, clip[3] - clip[1]),
         overflow: "hidden",
         pointerEvents: "none",
+        ...(isRetained ? RETAINED_STYLE : null),
       }}
     >
       {el}
@@ -701,9 +769,12 @@ const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor:
   const bounds = editor.getSelectionPageBounds()
   const hovered = editor.getHoveredShape()
   const selected = editor.getSelectedShapes()
+  const tool = editor.getCurrentToolId()
+  // Nothing to outline: return before reading the camera, so a pan over a board
+  // with nothing hovered or selected does not re-render this layer every frame.
+  if (!bounds && selected.length === 0 && !(hovered && tool === "select")) return null
   const cam = editor.getCamera()
   const z = cam.z
-  const tool = editor.getCurrentToolId()
   const toScreen = (x: number, y: number) => [(x + cam.x) * z, (y + cam.y) * z] as const
   const items: ReactNode[] = []
 
@@ -875,9 +946,24 @@ export { useValue }
  * scope it runs in: a body that reads a signal was re-rendered by the overlay's
  * own tracking before, and would otherwise now read once and freeze.
  */
-const ShapeBody = track(function ShapeBody({ editor, shape }: { editor: Editor; shape: UnknownShape }) {
-  return <>{editor.getShapeUtil(shape).component(shape)}</>
-})
+const ShapeBody = track(
+  memo(
+    function ShapeBody({ editor, shape }: { editor: Editor; shape: UnknownShape }) {
+      return <>{editor.getShapeUtil(shape).component(shape)}</>
+    },
+    // A body is a function of its shape's content, not of where the shape is:
+    // the wrapper above carries position, rotation and opacity as a transform.
+    // Comparing the whole record re-rendered every card under a drag on every
+    // frame, though nothing it draws had changed. Signals the body reads still
+    // re-render it through `track`.
+    (prev, next) =>
+      prev.editor === next.editor &&
+      prev.shape.id === next.shape.id &&
+      prev.shape.type === next.shape.type &&
+      prev.shape.props === next.shape.props &&
+      prev.shape.meta === next.shape.meta,
+  ),
+)
 
 /**
  * The boundary around one shape's body.

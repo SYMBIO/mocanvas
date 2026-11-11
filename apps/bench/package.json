@@ -8,6 +8,7 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "bench": "node scripts/bench.mjs",
+    "dom-overlay": "node scripts/dom-overlay.mjs",
     "fixture": "node scripts/make-fixture.mjs",
     "shape-fixtures": "node ../../node_modules/.pnpm/vite-node@*/node_modules/vite-node/vite-node.mjs scripts/dump-shape-fixtures.mts",
     "geo-microbench": "node ../../node_modules/.pnpm/vite-node@*/node_modules/vite-node/vite-node.mjs scripts/geo-microbench.mts",

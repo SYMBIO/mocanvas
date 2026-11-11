@@ -8,7 +8,12 @@
  */
 
 export type Lib = "mocanvas" | "tldraw"
-export type Kind = "geo" | "draw" | "mixed"
+/**
+ * `dom` and `dom-live` are app-style shapes whose body is ~150 nodes of React DOM
+ * (`dom-card.tsx`): `dom` may be culled, `dom-live` opts out (`canCull() === false`).
+ * They are driven by `scripts/dom-overlay.mjs`, not by `scripts/bench.mjs`.
+ */
+export type Kind = "geo" | "draw" | "mixed" | "dom" | "dom-live"
 
 export interface Vec {
   x: number
@@ -84,7 +89,8 @@ export interface GpuInfo {
 export interface BenchApi {
   lib: Lib
   isReady(): boolean
-  create(n: number, kind?: Kind): Promise<CreateResult>
+  /** `fit: false` leaves the camera where it is, so nothing off screen is ever mounted. */
+  create(n: number, kind?: Kind, fit?: boolean): Promise<CreateResult>
   clear(): Promise<void>
   panZoomRun(frames?: number): Promise<FrameRunResult>
   selectAllDragRun(frames?: number): Promise<FrameRunResult>
@@ -93,6 +99,9 @@ export interface BenchApi {
   loadTldr(json: unknown): Promise<LoadResult>
   screenshotReady(): Promise<boolean>
   fitCamera(): CameraLike | null
+  /** Move the camera with no animation. */
+  setCamera(cam: CameraLike): void
+  getCamera(): CameraLike
   shapeCount(): number
   /**
    * Every shape on the page as a screen-space box, using the *current* camera.
@@ -170,6 +179,7 @@ export type ShapeSpec =
   | { kind: "arrow"; x: number; y: number; color: SpecColor; start: Vec; end: Vec; bend: number }
   | { kind: "note"; x: number; y: number; color: SpecColor; text: string }
   | { kind: "text"; x: number; y: number; color: SpecColor; text: string }
+  | { kind: "card"; x: number; y: number; w: number; h: number; index: number; live: boolean }
 
 function lcg(seed: number): () => number {
   let s = seed >>> 0 || 1
@@ -179,9 +189,19 @@ function lcg(seed: number): () => number {
   }
 }
 
-export function gridPos(i: number, n: number): Vec {
+export function gridPos(i: number, n: number, cell = CELL): Vec {
   const cols = Math.ceil(Math.sqrt(n))
-  return { x: (i % cols) * CELL, y: Math.floor(i / cols) * CELL }
+  return { x: (i % cols) * cell, y: Math.floor(i / cols) * cell }
+}
+
+/** Grid cell for the DOM cards: a 280×200 card with a gutter, roughly a product board's density. */
+export const DOM_CELL = { x: 320, y: 240 } as const
+export const DOM_CARD = { w: 280, h: 200 } as const
+
+/** Page position of DOM card `i` of `n`. */
+export function domCardPos(i: number, n: number): Vec {
+  const cols = Math.ceil(Math.sqrt(n))
+  return { x: (i % cols) * DOM_CELL.x, y: Math.floor(i / cols) * DOM_CELL.y }
 }
 
 /** 'mixed' = 60% geo, 25% draw, 10% arrows, 5% notes/text (alternating). */
@@ -207,6 +227,13 @@ export function strokePoints(i: number): Vec[] {
 
 export function buildSpecs(n: number, kind: Kind): ShapeSpec[] {
   const out: ShapeSpec[] = []
+  if (kind === "dom" || kind === "dom-live") {
+    for (let i = 0; i < n; i++) {
+      const pos = domCardPos(i, n)
+      out.push({ kind: "card", x: pos.x, y: pos.y, w: DOM_CARD.w, h: DOM_CARD.h, index: i, live: kind === "dom-live" })
+    }
+    return out
+  }
   for (let i = 0; i < n; i++) {
     const pos = gridPos(i, n)
     const color = COLORS[i % COLORS.length]!

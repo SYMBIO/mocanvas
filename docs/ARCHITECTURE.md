@@ -233,9 +233,13 @@ engine.selection_bounds(ptr_handles, len) -> ptr to 4 f32
    level-of-detail quads until a later frame reaches them.
 4. Append transformed vertices into the frame vertex buffer, batching by
    texture. Shapes flagged `OVERLAY` skip the mesh and go into the overlay list.
-5. TS uploads the buffers (unless the engine reports them unchanged) and draws. Overlay list is diffed against the React
-   overlay layer, which positions DOM shapes with `transform` and passes
-   pointer events through except when editing.
+5. TS uploads the buffers (unless the engine reports them unchanged) and draws. The overlay list
+   gains the shapes that left the viewport recently (a bounded LRU,
+   `options.overlayRetainLimit`) and is diffed against the React overlay layer,
+   which positions DOM shapes with `transform`, hides the retained ones with
+   `content-visibility: hidden`, and passes pointer events through except when
+   editing. The camera is a transform on the layer, written by a signal
+   reaction: a pan or zoom frame is no React render at all.
 
 Stroke widths are in page units and scale with zoom, so meshes never need
 retessellation while zooming. Dash patterns (`dash` style word: 0 solid,
