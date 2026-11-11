@@ -87,14 +87,43 @@ function mount(components?: Parameters<typeof Canvas>[0]["components"]): Editor 
   })
   root = createRoot(host)
   act(() => root!.render(<Canvas editor={editor!} {...(components ? { components } : {})} />))
+  // The grid is off by default since 4.16.0 — these tests are about what it
+  // draws once an app asks for it, so they ask.
+  act(() => void editor!.updateInstanceState({ isGridMode: true }))
+  return editor
+}
+
+/** A canvas left exactly as a host gets it, for the default itself. */
+function mountUntouched(): Editor {
+  host = document.createElement("div")
+  document.body.appendChild(host)
+  editor = new Editor({
+    store: createStore(),
+    shapeUtils: [],
+    tools: [SelectTool],
+    engine: loadEngineSync(readFileSync(wasmPath)),
+    getContainer: () => host!,
+  })
+  root = createRoot(host)
+  act(() => root!.render(<Canvas editor={editor!} />))
   return editor
 }
 
 const grid = () => host!.querySelector(".mocanvas-grid")
 
 describe("grid mode", () => {
-  it("is on by default, because a canvas is a drawing surface", () => {
-    mount()
+  it("is off by default, as it is in tldraw", () => {
+    // It used to be on, from when the grid only drew dots. Since 4.13.0 it also
+    // steps a drag and a resize, and that is not something to hand an app that
+    // never asked for a grid.
+    const e = mountUntouched()
+    expect(grid()).toBeNull()
+    expect(e.getInstanceState().isGridMode).toBe(false)
+  })
+
+  it("draws once an app turns it on", () => {
+    const e = mountUntouched()
+    act(() => void e.updateInstanceState({ isGridMode: true }))
     expect(grid()).not.toBeNull()
   })
 

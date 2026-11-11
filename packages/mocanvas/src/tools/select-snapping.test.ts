@@ -128,7 +128,8 @@ describe("what asks for shape snapping", () => {
 
   beforeEach(() => {
     editor = makeEditor()
-    // The grid is on by default in mocanvas; this is about the other snapping.
+    // Explicit, not because the default is on — it is not since 4.16.0 — but
+    // because this describe is about the other kind of snapping.
     editor.updateInstanceState({ isGridMode: false })
     // A shape whose right edge sits at 155, to line up with.
     anchor = geo(editor, 55, 300, 100, 100).id
