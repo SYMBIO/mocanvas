@@ -78,7 +78,7 @@ const REACT_HOOK = `(() => {
 })()`
 
 function parseArgs(argv) {
-  const opts = { n: [50, 200, 1000], kinds: KINDS, gestures: GESTURES, libs: ["mocanvas"], repeats: 3, grid: "default", label: "run", build: true, gl: process.platform === "darwin" ? "hardware" : "auto", compare: null }
+  const opts = { n: [50, 200, 1000], kinds: KINDS, gestures: GESTURES, libs: ["mocanvas"], repeats: 3, grid: "default", label: "run", build: true, gl: process.platform === "darwin" ? "hardware" : "auto", compare: null, retain: null }
   for (const a of argv) {
     const [k, v] = a.replace(/^--/, "").split("=")
     if (k === "n") opts.n = v.split(",").map(Number)
@@ -91,6 +91,7 @@ function parseArgs(argv) {
     else if (k === "gl") opts.gl = v
     else if (k === "compare") opts.compare = v.split(",")
     else if (k === "grid") opts.grid = v
+    else if (k === "retain") opts.retain = Number(v)
   }
   return opts
 }
@@ -195,13 +196,13 @@ async function runGesture(page, gesture) {
   throw new Error(`unknown gesture ${gesture}`)
 }
 
-async function openPage(browser, url, lib) {
+async function openPage(browser, url, lib, extraQuery = "") {
   const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 })
   page.setDefaultTimeout(180_000)
   const errors = []
   page.on("pageerror", (e) => errors.push(e.message))
   await page.addInitScript(REACT_HOOK)
-  await page.goto(`${url}/?lib=${lib}`, { waitUntil: "load" })
+  await page.goto(`${url}/?lib=${lib}${extraQuery}`, { waitUntil: "load" })
   await page.waitForFunction(() => Boolean(window.bench?.isReady()), null, { timeout: 120_000 })
   await page.evaluate(() => window.bench.screenshotReady())
   return { page, errors }
@@ -383,7 +384,7 @@ async function main() {
           for (const gesture of opts.gestures) {
             const runs = []
             for (let rep = 0; rep < opts.repeats; rep++) {
-              const { page, errors } = await openPage(browser, preview.url, lib)
+              const { page, errors } = await openPage(browser, preview.url, lib, opts.retain === null ? "" : `&retain=${opts.retain}`)
               try {
                 // mocanvas starts in grid mode and tldraw does not; `--grid=off`
                 // measures both without one, `--grid=on` both with.

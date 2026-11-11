@@ -259,7 +259,14 @@ export default function MocanvasPage() {
         shapeUtils={[galleryCardUtil, ...domCardUtils]}
         hideUi
         showStats={false}
-        options={{ maxShapesPerPage: 1_000_000 }}
+        options={{
+          maxShapesPerPage: 1_000_000,
+          // `?retain=0` turns overlay retention off, so a run can measure what
+          // keeping culled shapes mounted actually costs on this board.
+          ...(new URLSearchParams(location.search).has("retain")
+            ? { overlayRetainLimit: Number(new URLSearchParams(location.search).get("retain")) }
+            : {}),
+        }}
         onMount={(editor) => {
           ;(window as unknown as { editor: Editor }).editor = editor
           window.bench = install(editor)
