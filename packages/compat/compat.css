@@ -36,8 +36,16 @@
  * be recomputed there from the local value. Without this they would carry the
  * container's live zoom into a subtree whose `--mocanvas-scale` is 1, which is
  * both wrong and the restyle the overlay just avoided.
+ *
+ * Both selectors, and that is the whole point: `var()` is substituted where the
+ * declaration sits, and descendants inherit the *computed value*, not the
+ * expression. Recomputing only on the layer would hand every shape the layer's
+ * answer — 1 — however live the shape's own `--mocanvas-scale` is. A shape that
+ * did not ask sits under constants, so this re-declaration costs it nothing on
+ * a zoom.
  */
-.mocanvas-overlay {
+.mocanvas-overlay,
+.mocanvas-shape {
   --tl-zoom: var(--mocanvas-zoom, 1);
   --tl-scale: var(--mocanvas-scale, 1);
 }

@@ -14,7 +14,8 @@
     "geo-microbench": "node ../../node_modules/.pnpm/vite-node@*/node_modules/vite-node/vite-node.mjs scripts/geo-microbench.mts",
     "snap-cost": "node ../../node_modules/.pnpm/vite-node@*/node_modules/vite-node/vite-node.mjs scripts/snap-cost.mts",
     "arrow-shot": "node scripts/arrow-shot.mjs",
-    "api-coverage": "node scripts/api-coverage.mjs"
+    "api-coverage": "node scripts/api-coverage.mjs",
+    "compat-vars": "node scripts/compat-vars.mjs"
   },
   "dependencies": {
     "@mocanvas/editor": "workspace:*",

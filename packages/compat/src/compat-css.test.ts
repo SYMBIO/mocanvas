@@ -78,3 +78,34 @@ describe("compat.css", () => {
     expect(pkg.sideEffects).not.toBe(false)
   })
 })
+
+/**
+ * Where the camera aliases are re-declared, which is not a detail.
+ *
+ * `var()` is substituted where the declaration sits, and descendants inherit
+ * the computed value rather than the expression. The overlay declares
+ * `--mocanvas-zoom` / `--mocanvas-scale` as constants so that a zoom does not
+ * restyle every mounted shape, and a shape whose util returns `true` from
+ * `usesCameraCssVars()` gets the live values back on its own wrapper. If the
+ * tldraw aliases are recomputed only on the layer, that shape still reads the
+ * layer's answer — 1 — and a migrated stylesheet's counter-scale silently stops
+ * working. 4.15.0 shipped that bug and a consumer found it in a browser.
+ *
+ * This assertion is structural because jsdom does not resolve `var()` at all:
+ * a test reading `--tl-scale` here passes against the broken stylesheet just as
+ * happily. `pnpm --filter bench compat-vars` is the real check, in a real
+ * engine, and it fails against 4.15.0.
+ */
+describe("the camera aliases", () => {
+  // Every rule that declares both, by the selectors it declares them for.
+  const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "")
+  const selectors = [...withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, , body]) => body!.includes("--tl-zoom:") && body!.includes("--tl-scale:"))
+    .flatMap(([, selector]) => selector!.split(",").map((s) => s.trim()).filter(Boolean))
+
+  it("are recomputed on the shape wrapper, not only on the overlay layer", () => {
+    expect(selectors).toContain(".mocanvas")
+    expect(selectors).toContain(".mocanvas-overlay")
+    expect(selectors, "a shape that asked for the camera reads the layer's constant without this").toContain(".mocanvas-shape")
+  })
+})
