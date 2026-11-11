@@ -387,6 +387,22 @@ export abstract class ShapeUtil<T extends UnknownShape = UnknownShape, D extends
   }
 
   /**
+   * Whether this shape's own CSS reads `--mocanvas-zoom` / `--mocanvas-scale`.
+   *
+   * The overlay stops those variables inheriting into mounted shapes, because a
+   * custom property that changes on every zoom frame restyles every node below
+   * it — the cost of a zoom on a board of DOM cards. A shape that says `true`
+   * here gets the live values on its own wrapper, and pays that restyle for
+   * itself: the counter-scaled label, the hairline that must stay 1px.
+   *
+   * Default `false`. `options.overlayCameraCssVars: "inherit"` turns the whole
+   * mechanism off for an app that would rather not name its shapes.
+   */
+  usesCameraCssVars(_shape: T): boolean {
+    return false
+  }
+
+  /**
    * Whether `component` should be rendered in the DOM overlay *in addition to*
    * the GPU geometry (e.g. a text label on a filled shape).
    */

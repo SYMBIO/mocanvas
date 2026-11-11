@@ -167,9 +167,24 @@ step differs from mocanvas's, so its zoom rows are not the same gesture.
 
 ## What is left
 
-**The zoom custom properties dominate a zoom over many mounted shapes.** The
-canvas publishes `--mocanvas-zoom` and `--mocanvas-scale` on its container, and
-a changed inherited custom property restyles every descendant. An experiment
+**The zoom custom properties dominated a zoom over many mounted shapes** until
+4.15.0, and the section below is kept as the measurement that led to the fix.
+The canvas publishes `--mocanvas-zoom` and `--mocanvas-scale` on its container,
+and a changed inherited custom property restyles every descendant. The overlay
+now declares the two itself, so the walk stops there; a shape whose util says
+`usesCameraCssVars()` gets the live values on its own wrapper. Re-measured on an
+M5 Pro, `--n=200,1000 --kinds=dom-live --gestures=zoom --repeats=2 --grid=off`:
+
+| N | style ms/step before | after | every card opted in |
+| --: | --: | --: | --: |
+| 200 | 8.61 | 0.07 | 9.04 |
+| 1,000 | 40.92 | 0.09 | 43.74 |
+
+Main-thread p50 at 1,000 goes 64.5 → 24.3 ms and the 57 long animation frames
+go to none. The third column is the cost of the hook: a board where every card
+asks for the variables pays what it paid before, so it is worth naming only the
+shapes that truly counter-scale. Registering the two with `@property`
+(`syntax: "<number>"`) was measured first and changed nothing (41.79 ms/step). An experiment
 with the two writes disabled (not shipped, one repeat, grid off):
 
 | N | kind | zoom: main p50 | style ms/step |

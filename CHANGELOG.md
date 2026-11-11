@@ -1,5 +1,53 @@
 # Changelog
 
+## 4.15.0
+
+### Breaking: the overlay no longer inherits the zoom custom properties
+
+`--mocanvas-zoom` and `--mocanvas-scale` are rewritten on the canvas container
+on every frame of a zoom, and a changed inherited custom property restyles
+every descendant — under the DOM overlay that is every node of every mounted
+shape. With React already out of a camera move (4.14.0), this was what a zoom
+gesture cost: 41 ms of style recalculation per step over 1,000 live cards, and
+57 long animation frames in a 60-step gesture.
+
+The overlay now declares the two variables itself, so the value below it never
+changes and the engine stops descending at the layer. Outside the overlay —
+your own chrome, panels and menus — nothing changes.
+
+**If a shape's own CSS reads the live zoom**, say so and it gets the real
+values on its wrapper:
+
+```ts
+class CardUtil extends BaseBoxShapeUtil<CardShape> {
+  override usesCameraCssVars() {
+    return true
+  }
+}
+```
+
+**Or turn the whole thing off** with `options.overlayCameraCssVars: "inherit"`.
+`@mocanvas/compat` recomputes `--tl-zoom` / `--tl-scale` inside the overlay from
+the local value, so a migrated stylesheet sees a consistent pair either way.
+
+**If you already cut the variables yourself** — setting them to `initial` on
+your shapes' content roots was the known workaround, and is where this fix came
+from — you can drop that code: the overlay does it for you now. Keep whatever
+puts a label or a ring *outside* your own cut, and give those shapes the hook.
+
+Measured with `pnpm --filter bench dom-overlay` (`--n=200,1000 --kinds=dom-live
+--gestures=zoom --repeats=2 --grid=off`):
+
+| N | style ms/step before | after | every card opted in |
+| --: | --: | --: | --: |
+| 200 | 8.61 | 0.07 | 9.04 |
+| 1,000 | 40.92 | 0.09 | 43.74 |
+
+Main-thread p50 at 1,000 cards goes 64.5 → 24.3 ms, and the long animation
+frames go to none. The third column is the price of the hook — a board where
+every card asks pays what it paid before — so it is worth naming only the
+shapes that truly counter-scale.
+
 ## 4.14.0
 
 ### A pan or zoom is no React render, and a card crossing the viewport edge is not rebuilt

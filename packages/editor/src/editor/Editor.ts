@@ -318,6 +318,23 @@ export interface EditorConfig extends TldrawOptions {
    * this option did.
    */
   overlayRetainLimit: number
+  /**
+   * Whether the DOM overlay lets `--mocanvas-zoom` / `--mocanvas-scale` inherit
+   * into the shapes below it.
+   *
+   * `"cut"` (the default) has the overlay declare them as constants, so the
+   * container's — rewritten on every frame of a zoom — stop there. A changed
+   * inherited custom property restyles every descendant, and on a board of
+   * mounted DOM cards that is every node of every shape: 41 ms of style
+   * recalculation per zoom step over 1,000 live cards, against 0.1 ms with the
+   * inheritance cut (`apps/bench`, `dom-overlay.mjs`).
+   *
+   * A shape that reads the live zoom in its own CSS says so with
+   * `ShapeUtil.usesCameraCssVars()` and gets the real values on its wrapper.
+   * `"inherit"` restores the old behaviour for an app whose shape CSS reads the
+   * variables and that would rather pay than name the shapes.
+   */
+  overlayCameraCssVars: "cut" | "inherit"
 }
 
 export const DEFAULT_EDITOR_CONFIG: EditorConfig = {
@@ -342,6 +359,7 @@ export const DEFAULT_EDITOR_CONFIG: EditorConfig = {
   // in apps/bench (`dom-overlay.mjs`): a pan or zoom there and back stops
   // remounting at this size; the cost is the DOM of this many off-screen shapes.
   overlayRetainLimit: 256,
+  overlayCameraCssVars: "cut",
 }
 
 export interface HitTestOptions {

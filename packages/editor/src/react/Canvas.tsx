@@ -560,6 +560,35 @@ function useCameraCssVarsOnElement(editor: Editor, ref: { current: HTMLElement |
 }
 
 /**
+ * The live camera variables on one shape's wrapper, for a shape that says it
+ * reads them.
+ *
+ * The overlay declares `--mocanvas-zoom` / `--mocanvas-scale` as constants so a
+ * zoom does not restyle every mounted shape; this hands the real values back to
+ * the shapes that asked. Written from a reaction, like the container's, so a
+ * zoom frame sets a property and renders nothing — and restyles this shape's
+ * subtree alone.
+ */
+function useCameraCssVarsOnShape(editor: Editor, enabled: boolean) {
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    if (!enabled) {
+      el.style.removeProperty("--mocanvas-zoom")
+      el.style.removeProperty("--mocanvas-scale")
+      return
+    }
+    return reactSignal("canvas.shapeCameraCssVars", () => {
+      const vars = getCameraCssVars(editor.getZoomLevel()) as Record<string, string>
+      el.style.setProperty("--mocanvas-zoom", vars["--mocanvas-zoom"]!)
+      el.style.setProperty("--mocanvas-scale", vars["--mocanvas-scale"]!)
+    })
+  }, [editor, enabled])
+  return ref
+}
+
+/**
  * The grid slot, handed the camera and the document's step. Mounted only in grid
  * mode, so the camera subscription that redraws it on a pan exists only then.
  */
@@ -593,8 +622,9 @@ const OverlayLayer = track(function OverlayLayer({ editor }: { editor: Editor })
       el.style.transform = `scale(${cam.z}) translate(${cam.x}px, ${cam.y}px)`
     })
   }, [editor])
+  const cut = editor.options.overlayCameraCssVars !== "inherit"
   return (
-    <div ref={ref} className="mocanvas-overlay" style={overlayLayerStyle}>
+    <div ref={ref} className="mocanvas-overlay" style={cut ? overlayLayerStyleCut : overlayLayerStyle}>
       {ids.map((id, i) => {
         const shape = editor.getShape(id)
         if (!shape) return null
@@ -614,6 +644,28 @@ const OverlayLayer = track(function OverlayLayer({ editor }: { editor: Editor })
 })
 
 const overlayLayerStyle: CSSProperties = { ...layerStyle, pointerEvents: "none", transformOrigin: "0 0" }
+
+/**
+ * The same layer, declaring the camera variables itself so that the
+ * container's — which change on every frame of a zoom — stop here.
+ *
+ * A changed inherited custom property restyles every descendant, and the
+ * descendants here are every node of every mounted shape: 41 ms of style
+ * recalculation per zoom step over 1,000 live cards, measured in
+ * `apps/bench` (`dom-overlay.mjs`), against 0.1 ms with the variables stopped.
+ * Re-declaring them with a constant is what stops the walk — the engine sees
+ * the inherited value is unchanged for this subtree and does not descend.
+ *
+ * A shape that actually reads the live zoom says so with
+ * `ShapeUtil.usesCameraCssVars()`, and gets the real values on its own
+ * wrapper. The cost is then proportional to the shapes that asked for it
+ * rather than to the whole board.
+ */
+const overlayLayerStyleCut: CSSProperties = {
+  ...overlayLayerStyle,
+  ["--mocanvas-zoom" as string]: "1",
+  ["--mocanvas-scale" as string]: "1",
+} as CSSProperties
 
 /**
  * How a retained shape — culled, but kept mounted — is hidden. `content-visibility:
@@ -641,11 +693,17 @@ const OverlayShape = track(function OverlayShape({
   const util = editor.getShapeUtil(shape)
   const m = editor.getShapePageTransform(shape)
   const bounds = editor.getShapeGeometryBounds(shape)
+  // Duck-typed like `canCull`: a util that does not implement the hook does not
+  // read the camera variables, which is what every shape did before the overlay
+  // stopped inheriting them.
+  const asksForCamera = (util as { usesCameraCssVars?(shape: UnknownShape): boolean }).usesCameraCssVars?.(shape) === true
+  const cameraRef = useCameraCssVarsOnShape(editor, asksForCamera)
   // The clip rect is page-space and the shape may be rotated, so it is applied
   // by an unrotated wrapper placed at the rect; the shape is offset back into it.
   const offset = clip ? `translate(${-clip[0]}px, ${-clip[1]}px) ` : ""
   const el = (
     <div
+      ref={cameraRef}
       className="mocanvas-shape"
       data-shape-id={shape.id}
       data-shape-type={shape.type}

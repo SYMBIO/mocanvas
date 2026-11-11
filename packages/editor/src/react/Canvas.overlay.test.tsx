@@ -275,3 +275,75 @@ describe("moving a shape does not re-render its body", () => {
     expect(counts.renders).toBe(renders + 1)
   })
 })
+
+/**
+ * Who sees the camera variables, and what that costs.
+ *
+ * `--mocanvas-zoom` / `--mocanvas-scale` are written to the container on every
+ * frame of a zoom, and a changed inherited custom property restyles every
+ * descendant — on a board of mounted DOM cards, every node of every shape: 41 ms
+ * per zoom step over 1,000 live cards in `apps/bench`, against 0.1 ms with the
+ * inheritance stopped at the overlay. The shapes that actually read the live
+ * zoom ask for it and pay for themselves.
+ */
+describe("the camera variables in the overlay", () => {
+  class ZoomCardUtil extends CardUtil {
+    static override type = "card" as const
+    override usesCameraCssVars() {
+      return true
+    }
+  }
+
+  function mountWith(utils: (typeof CardUtil)[], options: { overlayCameraCssVars?: "cut" | "inherit" } = {}): Editor {
+    host = document.createElement("div")
+    document.body.appendChild(host)
+    editor = new Editor({
+      store: createStore(),
+      shapeUtils: utils as never,
+      tools: [SelectTool],
+      engine: loadEngineSync(readFileSync(wasmPath)),
+      getContainer: () => host!,
+      options,
+    })
+    editor.createShapes([{ type: "card", x: 10, y: 10, meta: { name: "a" } }])
+    editor.updateInstanceState({ isGridMode: false })
+    root = createRoot(host)
+    act(() => root!.render(<Canvas editor={editor!} />))
+    runUntilIdle()
+    return editor
+  }
+
+  it("stops the container's variables at the overlay layer", () => {
+    const editor = mountWith([CardUtil])
+    move(() => editor.setCamera({ x: 0, y: 0, z: 2 }))
+
+    const container = host!.querySelector(".mocanvas") as HTMLElement
+    expect(container.style.getPropertyValue("--mocanvas-zoom")).toBe("2")
+    // The layer declares its own, so the live value never reaches the shapes.
+    expect(overlayLayer().style.getPropertyValue("--mocanvas-zoom")).toBe("1")
+    expect(overlayLayer().style.getPropertyValue("--mocanvas-scale")).toBe("1")
+    expect(cardElement("a")!.style.getPropertyValue("--mocanvas-zoom")).toBe("")
+  })
+
+  it("hands the live values to a shape that asks, and keeps them current", () => {
+    const editor = mountWith([ZoomCardUtil])
+    const card = cardElement("a")!
+    expect(card.style.getPropertyValue("--mocanvas-zoom")).toBe("1")
+
+    const renders = counts.renders
+    move(() => editor.setCamera({ x: 0, y: 0, z: 2 }))
+
+    expect(card.style.getPropertyValue("--mocanvas-zoom")).toBe("2")
+    expect(card.style.getPropertyValue("--mocanvas-scale")).toBe("0.5")
+    // Written from a reaction: the shape restyles, it does not re-render.
+    expect(counts.renders).toBe(renders)
+  })
+
+  it("lets an app keep the old inheritance", () => {
+    const editor = mountWith([CardUtil], { overlayCameraCssVars: "inherit" })
+    move(() => editor.setCamera({ x: 0, y: 0, z: 2 }))
+
+    expect(overlayLayer().style.getPropertyValue("--mocanvas-zoom")).toBe("")
+    expect(cardElement("a")!.style.getPropertyValue("--mocanvas-zoom")).toBe("")
+  })
+})

@@ -273,7 +273,7 @@ it. Two groups are worth knowing about:
 
 | tldraw token | What you get |
 | --- | --- |
-| `--tl-zoom`, `--tl-scale` | Real values. mocanvas now stamps `--mocanvas-zoom` and `--mocanvas-scale` on the canvas container and restamps them on zoom, so `calc()` rules that hold a constant on-screen size keep working. |
+| `--tl-zoom`, `--tl-scale` | Real values. mocanvas stamps `--mocanvas-zoom` and `--mocanvas-scale` on the canvas container and restamps them on zoom, so `calc()` rules that hold a constant on-screen size keep working. Inside the DOM overlay they are constants unless the shape's util says `usesCameraCssVars()` — a tldraw shape whose CSS counter-scales with `--tl-scale` needs that line, or `options.overlayCameraCssVars: "inherit"`. |
 | `--tl-color-overlay`, `--tl-color-background-overlay`, `--tl-color-warn` | A static fallback. mocanvas has no equivalent, so these do not follow your theme — set them yourself if they matter. |
 
 Everything else maps onto a themed mocanvas variable and follows a theme swap
