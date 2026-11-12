@@ -1,7 +1,7 @@
 import { useEditor, type DefaultFontStyle, type DefaultHorizontalAlignStyle, type DefaultVerticalAlignStyle, type UnknownShape } from "@mocanvas/editor"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react"
 import { getFontFamily } from "../shapes/shape-theme"
-import { LINE_HEIGHT } from "../shapes/text-helpers"
+import { getLineHeight } from "../shapes/text-helpers"
 import { getRichTextExtensions, renderHtmlFromRichTextForMeasurement } from "./measure-html"
 import { applyPlainTextToRichText, isRichText, richTextToText, type RichText, type RichTextSource } from "./rich-text"
 import { RICH_TEXT_BLOCK_CSS, toDisplayText } from "./TextMeasure"
@@ -131,7 +131,7 @@ export function TextLabel(props: TextLabelProps): ReactNode {
     fontFamily: getFontFamily(font),
     fontSize,
     fontWeight: "normal",
-    lineHeight: LINE_HEIGHT,
+    lineHeight: getLineHeight(fontSize),
     color,
     textAlign: alignToTextAlign(align),
     whiteSpace: wrap ? "pre-wrap" : "pre",

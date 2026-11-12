@@ -388,6 +388,16 @@ const galleryCardUtil = makeGalleryCardUtil({ BaseBoxShapeUtil, HTMLContainer } 
 const domCardUtils = makeDomCardUtils({ BaseBoxShapeUtil, HTMLContainer } as never) as unknown as never[]
 ;(globalThis as { __GALLERY_HAS_CUSTOM__?: boolean }).__GALLERY_HAS_CUSTOM__ = true
 
+/**
+ * What `oracle/probes.mjs` may reach for on this page.
+ *
+ * A probe is one body of code run against both libraries, so it cannot import
+ * anything: whatever it needs in this library's own spelling — a rich-text
+ * document, an index key — it asks this object for. Each page installs its own,
+ * from its own package.
+ */
+;(window as unknown as { oracleKit: Record<string, unknown> }).oracleKit = { toRichText, createShapeId, getIndices }
+
 export default function TldrawPage() {
   return (
     <div style={{ position: "absolute", inset: 0 }}>

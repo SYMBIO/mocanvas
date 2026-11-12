@@ -1,0 +1,2938 @@
+{
+  "at": "2026-11-12T09:29:29.171Z",
+  "browser": "151.0.7922.34",
+  "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+  "probes": 29,
+  "agreed": 19,
+  "known": 66,
+  "open": 47,
+  "new": 0,
+  "unusedAccepted": [],
+  "results": [
+    {
+      "id": "instance-defaults",
+      "title": "Instance state a fresh editor mounts with",
+      "about": "4.16.0 turned grid mode off here. It had been on since 4.5.0, and from 4.13.0 that silently changed what a drag does.",
+      "mocanvas": {
+        "exportBackground": true,
+        "isDebugMode": false,
+        "isFocusMode": false,
+        "isGridMode": false,
+        "isPenMode": false,
+        "isReadonly": false,
+        "isToolLocked": false
+      },
+      "tldraw": {
+        "exportBackground": true,
+        "isDebugMode": false,
+        "isFocusMode": false,
+        "isGridMode": false,
+        "isPenMode": false,
+        "isReadonly": false,
+        "isToolLocked": false
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "user-preference-defaults",
+      "title": "User preferences a fresh editor mounts with",
+      "about": "4.13.0: the accelerator asks for snapping, and `isSnapMode` turns that around. The default decides which way a plain drag behaves.",
+      "mocanvas": {
+        "animationSpeed": null,
+        "edgeScrollSpeed": null,
+        "isDynamicSizeMode": null,
+        "isPasteAtCursorMode": null,
+        "isSnapMode": null,
+        "isWrapMode": null
+      },
+      "tldraw": {
+        "animationSpeed": 1,
+        "edgeScrollSpeed": null,
+        "isDynamicSizeMode": null,
+        "isPasteAtCursorMode": null,
+        "isSnapMode": false,
+        "isWrapMode": false
+      },
+      "known": [
+        {
+          "path": "animationSpeed",
+          "kind": "value",
+          "mocanvas": null,
+          "tldraw": 1,
+          "reason": "mocanvas keeps the raw preferences sparse on purpose — an unset key means 'whatever the editor's default is', and `UserPreferencesManager`'s getters resolve it — so `getUserPreferences().animationSpeed` is undefined where tldraw's is 1. An app that multiplies a duration by it gets NaN. Decide: resolve in the getter, or keep the distinction and say so in COMPAT.md.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "isSnapMode",
+          "kind": "value",
+          "mocanvas": null,
+          "tldraw": false,
+          "reason": "Same sparse-preferences design: undefined rather than false. Falsy either way, so behaviour matches; a `=== false` check does not. See the animationSpeed entry, which is the one that actually breaks.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "isWrapMode",
+          "kind": "value",
+          "mocanvas": null,
+          "tldraw": false,
+          "reason": "Same sparse-preferences design as isSnapMode.",
+          "status": "open",
+          "since": "2026-11-12"
+        }
+      ],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "document-defaults",
+      "title": "Document settings and page count",
+      "about": null,
+      "mocanvas": {
+        "gridSize": 10,
+        "meta": {},
+        "pages": 1
+      },
+      "tldraw": {
+        "gridSize": 10,
+        "meta": {},
+        "pages": 1
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "shape-default-props",
+      "title": "`getDefaultProps()` for every built-in shape",
+      "about": "4.4.0 shipped these as a table. A table is exactly the kind of thing that drifts without anyone noticing.",
+      "mocanvas": {
+        "geo": {
+          "align": "middle",
+          "color": "black",
+          "dash": "draw",
+          "fill": "none",
+          "flipX": false,
+          "flipY": false,
+          "font": "draw",
+          "geo": "rectangle",
+          "growY": 0,
+          "h": 100,
+          "labelColor": "black",
+          "richText": {
+            "richTextPlain": "<doc>"
+          },
+          "scale": 1,
+          "size": "m",
+          "url": "",
+          "verticalAlign": "middle",
+          "w": 100
+        },
+        "text": {
+          "autoSize": true,
+          "color": "black",
+          "font": "draw",
+          "richText": {
+            "richTextPlain": "<doc>"
+          },
+          "scale": 1,
+          "size": "m",
+          "textAlign": "start",
+          "w": 20
+        },
+        "note": {
+          "align": "middle",
+          "color": "black",
+          "font": "draw",
+          "fontSizeAdjustment": 0,
+          "growY": 0,
+          "labelColor": "black",
+          "richText": {
+            "richTextPlain": "<doc>"
+          },
+          "scale": 1,
+          "size": "m",
+          "url": "",
+          "verticalAlign": "middle"
+        },
+        "arrow": {
+          "arrowheadEnd": "arrow",
+          "arrowheadStart": "none",
+          "bend": 0,
+          "color": "black",
+          "dash": "draw",
+          "elbowMidPoint": 0.5,
+          "end": {
+            "x": 2,
+            "y": 0
+          },
+          "fill": "none",
+          "font": "draw",
+          "kind": "arc",
+          "labelColor": "black",
+          "labelPosition": 0.5,
+          "richText": {
+            "richTextPlain": "<doc>"
+          },
+          "scale": 1,
+          "size": "m",
+          "start": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "line": {
+          "color": "black",
+          "dash": "draw",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 100,
+              "y": 100
+            }
+          ],
+          "scale": 1,
+          "size": "m",
+          "spline": "line"
+        },
+        "draw": {
+          "color": "black",
+          "dash": "draw",
+          "fill": "none",
+          "isClosed": false,
+          "isComplete": false,
+          "isPen": false,
+          "scale": 1,
+          "segments": [],
+          "size": "m"
+        },
+        "frame": {
+          "h": 90,
+          "name": "",
+          "w": 160
+        },
+        "highlight": {
+          "color": "black",
+          "isComplete": false,
+          "isPen": false,
+          "scale": 1,
+          "segments": [],
+          "size": "m"
+        },
+        "image": {
+          "altText": "",
+          "assetId": null,
+          "crop": null,
+          "flipX": false,
+          "flipY": false,
+          "h": 100,
+          "playing": true,
+          "url": "",
+          "w": 100
+        },
+        "video": {
+          "altText": "",
+          "assetId": null,
+          "h": 360,
+          "playing": true,
+          "time": 0,
+          "url": "",
+          "w": 640
+        },
+        "bookmark": {
+          "assetId": null,
+          "h": 320,
+          "url": "",
+          "w": 300
+        },
+        "embed": {
+          "h": 500,
+          "url": "",
+          "w": 720
+        },
+        "group": {}
+      },
+      "tldraw": {
+        "geo": {
+          "align": "middle",
+          "color": "black",
+          "dash": "draw",
+          "fill": "none",
+          "flipX": false,
+          "flipY": false,
+          "font": "draw",
+          "geo": "rectangle",
+          "growY": 0,
+          "h": 100,
+          "labelColor": "black",
+          "richText": {
+            "richTextPlain": "<doc>"
+          },
+          "scale": 1,
+          "size": "m",
+          "url": "",
+          "verticalAlign": "middle",
+          "w": 100
+        },
+        "text": {
+          "autoSize": true,
+          "color": "black",
+          "font": "draw",
+          "richText": {
+            "richTextPlain": "<doc>"
+          },
+          "scale": 1,
+          "size": "m",
+          "textAlign": "start",
+          "w": 8
+        },
+        "note": {
+          "align": "middle",
+          "color": "black",
+          "font": "draw",
+          "fontSizeAdjustment": 1,
+          "growY": 0,
+          "labelColor": "black",
+          "richText": {
+            "richTextPlain": "<doc>"
+          },
+          "scale": 1,
+          "size": "m",
+          "textLastEditedBy": null,
+          "url": "",
+          "verticalAlign": "middle"
+        },
+        "arrow": {
+          "arrowheadEnd": "arrow",
+          "arrowheadStart": "none",
+          "bend": 0,
+          "color": "black",
+          "dash": "draw",
+          "elbowMidPoint": 0.5,
+          "end": {
+            "x": 2,
+            "y": 0
+          },
+          "fill": "none",
+          "font": "draw",
+          "kind": "arc",
+          "labelColor": "black",
+          "labelPosition": 0.5,
+          "richText": {
+            "richTextPlain": "<doc>"
+          },
+          "scale": 1,
+          "size": "m",
+          "start": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "line": {
+          "color": "black",
+          "dash": "draw",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.1,
+              "y": 0.1
+            }
+          ],
+          "scale": 1,
+          "size": "m",
+          "spline": "line"
+        },
+        "draw": {
+          "color": "black",
+          "dash": "draw",
+          "fill": "none",
+          "isClosed": false,
+          "isComplete": false,
+          "isPen": false,
+          "scale": 1,
+          "scaleX": 1,
+          "scaleY": 1,
+          "segments": [],
+          "size": "m"
+        },
+        "frame": {
+          "color": "black",
+          "h": 180,
+          "name": "",
+          "w": 320
+        },
+        "highlight": {
+          "color": "black",
+          "isComplete": false,
+          "isPen": false,
+          "scale": 1,
+          "scaleX": 1,
+          "scaleY": 1,
+          "segments": [],
+          "size": "m"
+        },
+        "image": {
+          "altText": "",
+          "assetId": null,
+          "crop": null,
+          "flipX": false,
+          "flipY": false,
+          "h": 100,
+          "playing": true,
+          "url": "",
+          "w": 100
+        },
+        "video": {
+          "altText": "",
+          "assetId": null,
+          "autoplay": true,
+          "h": 100,
+          "playing": true,
+          "time": 0,
+          "url": "",
+          "w": 100
+        },
+        "bookmark": {
+          "assetId": null,
+          "h": 320,
+          "url": "",
+          "w": 300
+        },
+        "embed": {
+          "h": 300,
+          "url": "",
+          "w": 300
+        },
+        "group": {}
+      },
+      "known": [
+        {
+          "path": "draw.scaleX",
+          "kind": "only-tldraw",
+          "tldraw": 1,
+          "reason": "A draw shape carries scaleX/scaleY in tldraw and not in mocanvas. Missing props, not different values: code that reads or writes them is a type error after migration.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "draw.scaleY",
+          "kind": "only-tldraw",
+          "tldraw": 1,
+          "reason": "See draw.scaleX.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "embed.h",
+          "kind": "number",
+          "mocanvas": 500,
+          "tldraw": 300,
+          "delta": 200,
+          "reason": "See embed.w.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "embed.w",
+          "kind": "number",
+          "mocanvas": 720,
+          "tldraw": 300,
+          "delta": 420,
+          "reason": "720x500 here, 300x300 there. mocanvas's is the better default for an embed and tldraw's is what a migrated layout expects; this one is a genuine choice rather than an oversight.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "frame.color",
+          "kind": "only-tldraw",
+          "tldraw": "black",
+          "reason": "tldraw's frame carries a `color` prop; mocanvas's does not. A migrated app that sets a frame's colour writes a prop no validator here knows.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "frame.h",
+          "kind": "number",
+          "mocanvas": 90,
+          "tldraw": 180,
+          "delta": -90,
+          "reason": "See frame.w.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "frame.w",
+          "kind": "number",
+          "mocanvas": 160,
+          "tldraw": 320,
+          "delta": -160,
+          "reason": "A frame created with no size is 160x90 here and 320x180 there — the same 16:9, at half the size. Drawn-by-hand frames are unaffected; a frame created from code is half as big.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "highlight.scaleX",
+          "kind": "only-tldraw",
+          "tldraw": 1,
+          "reason": "See draw.scaleX; the highlight shape has the same pair.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "highlight.scaleY",
+          "kind": "only-tldraw",
+          "tldraw": 1,
+          "reason": "See draw.scaleX.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "line.points.1.x",
+          "kind": "number",
+          "mocanvas": 100,
+          "tldraw": 0.1,
+          "delta": 99.9,
+          "reason": "A default line runs to (100, 100) here and to (0.1, 0.1) there — tldraw's default line is effectively a point, waiting for the tool to drag its second handle out. A line created from code with no points is a 141-unit diagonal here and invisible there.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "line.points.1.y",
+          "kind": "number",
+          "mocanvas": 100,
+          "tldraw": 0.1,
+          "delta": 99.9,
+          "reason": "See line.points.1.x.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "note.fontSizeAdjustment",
+          "kind": "number",
+          "mocanvas": 0,
+          "tldraw": 1,
+          "delta": -1,
+          "reason": "0 here, 1 there. 4.10.1 established that this is a fraction rather than a size, and a fraction's identity is 1 — so a default of 0 is either a different meaning again or a bug. Worth settling before anything else reads it.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "note.textLastEditedBy",
+          "kind": "only-tldraw",
+          "tldraw": null,
+          "reason": "A collaboration field tldraw's note carries and mocanvas's does not.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "text.w",
+          "kind": "number",
+          "mocanvas": 20,
+          "tldraw": 8,
+          "delta": 12,
+          "reason": "20 here, 8 there — and 4.12.1 shipped the 20 on the belief that it was tldraw's number. The oracle says otherwise. See the `text-empty-width` entries, which are the same number seen from the other end.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "video.autoplay",
+          "kind": "only-tldraw",
+          "tldraw": true,
+          "reason": "tldraw's video defaults carry `autoplay: true`; mocanvas has no such prop.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "video.h",
+          "kind": "number",
+          "mocanvas": 360,
+          "tldraw": 100,
+          "delta": 260,
+          "reason": "See video.w.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "video.w",
+          "kind": "number",
+          "mocanvas": 640,
+          "tldraw": 100,
+          "delta": 540,
+          "reason": "640x360 here, 100x100 there. Same shape of question as embed.w.",
+          "status": "open",
+          "since": "2026-11-12"
+        }
+      ],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "geo-created-size",
+      "title": "A geo shape created with no size",
+      "about": "4.4.2: one placed by a click was half the size it should be.",
+      "mocanvas": {
+        "rectangle": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        },
+        "ellipse": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        },
+        "triangle": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        },
+        "diamond": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        },
+        "hexagon": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        },
+        "star": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        },
+        "cloud": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        }
+      },
+      "tldraw": {
+        "rectangle": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        },
+        "ellipse": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        },
+        "triangle": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        },
+        "diamond": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        },
+        "hexagon": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        },
+        "star": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        },
+        "cloud": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 100,
+          "h": 100
+        }
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "text-empty-width",
+      "title": "An empty text shape's width",
+      "about": "4.12.1: 20, for real this time.",
+      "mocanvas": {
+        "shape": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 20
+        },
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "w": 20,
+          "h": 32
+        }
+      },
+      "tldraw": {
+        "shape": {
+          "x": 0,
+          "y": 0,
+          "rotation": 0,
+          "w": 8
+        },
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "w": 16,
+          "h": 32
+        }
+      },
+      "known": [
+        {
+          "path": "bounds.w",
+          "kind": "number",
+          "mocanvas": 20,
+          "tldraw": 16,
+          "delta": 4,
+          "reason": "And measures 20 wide here against 16 there — so the two disagree about the caret area of an empty text shape as well as about the stored prop.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "shape.w",
+          "kind": "number",
+          "mocanvas": 20,
+          "tldraw": 8,
+          "delta": 12,
+          "reason": "An empty text shape stores w=20 here and w=8 there; see shape-default-props text.w.",
+          "status": "open",
+          "since": "2026-11-12"
+        }
+      ],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "text-shape-size-by-font",
+      "title": "An auto-sized text shape, per font and size",
+      "about": "End to end: the font stack the library ships, its line height and its measurement, in the two numbers a consumer's layout actually reads.",
+      "mocanvas": {
+        "draw/s": {
+          "w": 144.21,
+          "h": 24
+        },
+        "draw/m": {
+          "w": 192.29,
+          "h": 32
+        },
+        "draw/l": {
+          "w": 288.41,
+          "h": 49
+        },
+        "draw/xl": {
+          "w": 352.5,
+          "h": 59
+        },
+        "sans/s": {
+          "w": 138.35,
+          "h": 24
+        },
+        "sans/m": {
+          "w": 177.44,
+          "h": 32
+        },
+        "sans/l": {
+          "w": 264.15,
+          "h": 49
+        },
+        "sans/xl": {
+          "w": 321.55,
+          "h": 59
+        },
+        "serif/s": {
+          "w": 139.68,
+          "h": 24
+        },
+        "serif/m": {
+          "w": 186.24,
+          "h": 32
+        },
+        "serif/l": {
+          "w": 279.35,
+          "h": 49
+        },
+        "serif/xl": {
+          "w": 341.43,
+          "h": 59
+        },
+        "mono/s": {
+          "w": 162.57,
+          "h": 24
+        },
+        "mono/m": {
+          "w": 216.75,
+          "h": 32
+        },
+        "mono/l": {
+          "w": 325.11,
+          "h": 49
+        },
+        "mono/xl": {
+          "w": 397.36,
+          "h": 59
+        }
+      },
+      "tldraw": {
+        "draw/s": {
+          "w": 158.64,
+          "h": 24
+        },
+        "draw/m": {
+          "w": 211.17,
+          "h": 32
+        },
+        "draw/l": {
+          "w": 316.27,
+          "h": 49
+        },
+        "draw/xl": {
+          "w": 386.31,
+          "h": 59
+        },
+        "sans/s": {
+          "w": 142.8,
+          "h": 24
+        },
+        "sans/m": {
+          "w": 190.06,
+          "h": 32
+        },
+        "sans/l": {
+          "w": 284.58,
+          "h": 49
+        },
+        "sans/xl": {
+          "w": 347.59,
+          "h": 59
+        },
+        "serif/s": {
+          "w": 152.19,
+          "h": 24
+        },
+        "serif/m": {
+          "w": 202.58,
+          "h": 32
+        },
+        "serif/l": {
+          "w": 303.38,
+          "h": 49
+        },
+        "serif/xl": {
+          "w": 370.56,
+          "h": 59
+        },
+        "mono/s": {
+          "w": 163,
+          "h": 24
+        },
+        "mono/m": {
+          "w": 217,
+          "h": 32
+        },
+        "mono/l": {
+          "w": 325,
+          "h": 49
+        },
+        "mono/xl": {
+          "w": 397,
+          "h": 59
+        }
+      },
+      "known": [
+        {
+          "path": "draw/l.w",
+          "kind": "number",
+          "mocanvas": 288.41,
+          "tldraw": 316.27,
+          "delta": -27.859999999999957,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "draw/m.w",
+          "kind": "number",
+          "mocanvas": 192.29,
+          "tldraw": 211.17,
+          "delta": -18.879999999999995,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "draw/s.w",
+          "kind": "number",
+          "mocanvas": 144.21,
+          "tldraw": 158.64,
+          "delta": -14.429999999999978,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "draw/xl.w",
+          "kind": "number",
+          "mocanvas": 352.5,
+          "tldraw": 386.31,
+          "delta": -33.81,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "mono/l.w",
+          "kind": "number",
+          "mocanvas": 325.11,
+          "tldraw": 325,
+          "delta": 0.11000000000001364,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "mono/m.w",
+          "kind": "number",
+          "mocanvas": 216.75,
+          "tldraw": 217,
+          "delta": -0.25,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "mono/s.w",
+          "kind": "number",
+          "mocanvas": 162.57,
+          "tldraw": 163,
+          "delta": -0.4300000000000068,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "mono/xl.w",
+          "kind": "number",
+          "mocanvas": 397.36,
+          "tldraw": 397,
+          "delta": 0.36000000000001364,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "sans/l.w",
+          "kind": "number",
+          "mocanvas": 264.15,
+          "tldraw": 284.58,
+          "delta": -20.430000000000007,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "sans/m.w",
+          "kind": "number",
+          "mocanvas": 177.44,
+          "tldraw": 190.06,
+          "delta": -12.620000000000005,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "sans/s.w",
+          "kind": "number",
+          "mocanvas": 138.35,
+          "tldraw": 142.8,
+          "delta": -4.450000000000017,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "sans/xl.w",
+          "kind": "number",
+          "mocanvas": 321.55,
+          "tldraw": 347.59,
+          "delta": -26.039999999999964,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "serif/l.w",
+          "kind": "number",
+          "mocanvas": 279.35,
+          "tldraw": 303.38,
+          "delta": -24.029999999999973,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "serif/m.w",
+          "kind": "number",
+          "mocanvas": 186.24,
+          "tldraw": 202.58,
+          "delta": -16.340000000000003,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "serif/s.w",
+          "kind": "number",
+          "mocanvas": 139.68,
+          "tldraw": 152.19,
+          "delta": -12.509999999999991,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "serif/xl.w",
+          "kind": "number",
+          "mocanvas": 341.43,
+          "tldraw": 370.56,
+          "delta": -29.129999999999995,
+          "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this — 4.17.0 aligned it exactly.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        }
+      ],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "text-shape-props-after-create",
+      "title": "What a text shape stores in `props` once it has measured itself",
+      "about": "Separate from the size it reports, because the two libraries disagree about whether an auto-sized shape writes its measured width back into `props.w`. A consumer reading `props.w` gets one answer or the other.",
+      "mocanvas": {
+        "propsW": 177.44,
+        "hasPropsH": false,
+        "autoSize": true,
+        "bounds": {
+          "w": 177.44,
+          "h": 32
+        }
+      },
+      "tldraw": {
+        "propsW": 8,
+        "hasPropsH": false,
+        "autoSize": true,
+        "bounds": {
+          "w": 190.06,
+          "h": 32
+        }
+      },
+      "known": [
+        {
+          "path": "bounds.w",
+          "kind": "number",
+          "mocanvas": 177.44,
+          "tldraw": 190.06,
+          "delta": -12.620000000000005,
+          "reason": "The width difference itself, which is the typeface difference; see text-shape-size-by-font, decided and written up in docs/COMPAT.md.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "propsW",
+          "kind": "number",
+          "mocanvas": 177.44,
+          "tldraw": 8,
+          "delta": 169.44,
+          "reason": "An auto-sized text shape writes its measured width back into `props.w` here (177.44) and leaves the default there (8), deriving the width from measurement at read time. A consumer reading `props.w` gets a usable number from one library and a placeholder from the other.",
+          "status": "open",
+          "since": "2026-11-12"
+        }
+      ],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "text-shape-line-height",
+      "title": "Height of a text shape at one, two and three lines",
+      "about": "The implied line height, read off the differences rather than from a constant: h(3) - h(2) is one line box whatever the padding around it.",
+      "mocanvas": {
+        "draw/s": {
+          "h1": 24,
+          "h2": 48,
+          "h3": 72,
+          "lineBox": 24
+        },
+        "draw/m": {
+          "h1": 32,
+          "h2": 64,
+          "h3": 96,
+          "lineBox": 32
+        },
+        "draw/l": {
+          "h1": 49,
+          "h2": 98,
+          "h3": 147,
+          "lineBox": 49
+        },
+        "draw/xl": {
+          "h1": 59,
+          "h2": 118,
+          "h3": 177,
+          "lineBox": 59
+        },
+        "sans/s": {
+          "h1": 24,
+          "h2": 48,
+          "h3": 72,
+          "lineBox": 24
+        },
+        "sans/m": {
+          "h1": 32,
+          "h2": 64,
+          "h3": 96,
+          "lineBox": 32
+        },
+        "sans/l": {
+          "h1": 49,
+          "h2": 98,
+          "h3": 147,
+          "lineBox": 49
+        },
+        "sans/xl": {
+          "h1": 59,
+          "h2": 118,
+          "h3": 177,
+          "lineBox": 59
+        },
+        "serif/s": {
+          "h1": 24,
+          "h2": 48,
+          "h3": 72,
+          "lineBox": 24
+        },
+        "serif/m": {
+          "h1": 32,
+          "h2": 64,
+          "h3": 96,
+          "lineBox": 32
+        },
+        "serif/l": {
+          "h1": 49,
+          "h2": 98,
+          "h3": 147,
+          "lineBox": 49
+        },
+        "serif/xl": {
+          "h1": 59,
+          "h2": 118,
+          "h3": 177,
+          "lineBox": 59
+        },
+        "mono/s": {
+          "h1": 24,
+          "h2": 48,
+          "h3": 72,
+          "lineBox": 24
+        },
+        "mono/m": {
+          "h1": 32,
+          "h2": 64,
+          "h3": 96,
+          "lineBox": 32
+        },
+        "mono/l": {
+          "h1": 49,
+          "h2": 98,
+          "h3": 147,
+          "lineBox": 49
+        },
+        "mono/xl": {
+          "h1": 59,
+          "h2": 118,
+          "h3": 177,
+          "lineBox": 59
+        }
+      },
+      "tldraw": {
+        "draw/s": {
+          "h1": 24,
+          "h2": 48,
+          "h3": 72,
+          "lineBox": 24
+        },
+        "draw/m": {
+          "h1": 32,
+          "h2": 64,
+          "h3": 96,
+          "lineBox": 32
+        },
+        "draw/l": {
+          "h1": 49,
+          "h2": 98,
+          "h3": 147,
+          "lineBox": 49
+        },
+        "draw/xl": {
+          "h1": 59,
+          "h2": 118,
+          "h3": 177,
+          "lineBox": 59
+        },
+        "sans/s": {
+          "h1": 24,
+          "h2": 48,
+          "h3": 72,
+          "lineBox": 24
+        },
+        "sans/m": {
+          "h1": 32,
+          "h2": 64,
+          "h3": 96,
+          "lineBox": 32
+        },
+        "sans/l": {
+          "h1": 49,
+          "h2": 98,
+          "h3": 147,
+          "lineBox": 49
+        },
+        "sans/xl": {
+          "h1": 59,
+          "h2": 118,
+          "h3": 177,
+          "lineBox": 59
+        },
+        "serif/s": {
+          "h1": 24,
+          "h2": 48,
+          "h3": 72,
+          "lineBox": 24
+        },
+        "serif/m": {
+          "h1": 32,
+          "h2": 64,
+          "h3": 96,
+          "lineBox": 32
+        },
+        "serif/l": {
+          "h1": 49,
+          "h2": 98,
+          "h3": 147,
+          "lineBox": 49
+        },
+        "serif/xl": {
+          "h1": 59,
+          "h2": 118,
+          "h3": 177,
+          "lineBox": 59
+        },
+        "mono/s": {
+          "h1": 24,
+          "h2": 48,
+          "h3": 72,
+          "lineBox": 24
+        },
+        "mono/m": {
+          "h1": 32,
+          "h2": 64,
+          "h3": 96,
+          "lineBox": 32
+        },
+        "mono/l": {
+          "h1": 49,
+          "h2": 98,
+          "h3": 147,
+          "lineBox": 49
+        },
+        "mono/xl": {
+          "h1": 59,
+          "h2": 118,
+          "h3": 177,
+          "lineBox": 59
+        }
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "measure-text-shared-font",
+      "title": "`textMeasure.measureText` with the same family on both sides",
+      "about": "Arial and an explicit line height, so neither library's own stack nor its own constant is in the answer: what is left is the wrapping and the box arithmetic.",
+      "mocanvas": {
+        "__error": "measure-text-shared-font: page.evaluate: ReferenceError: LOREM is not defined\n    at eval (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:5:17)\n    at eval (eval at evaluate (:311:30), <anonymous>:4:27)\n    at UtilityScript.evaluate (<anonymous>:313:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
+      },
+      "tldraw": {
+        "__error": "measure-text-shared-font: page.evaluate: ReferenceError: LOREM is not defined\n    at eval (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:5:17)\n    at eval (eval at evaluate (:311:30), <anonymous>:4:27)\n    at UtilityScript.evaluate (<anonymous>:313:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "note-grow",
+      "title": "A sticky note grown by its text",
+      "about": "4.8.0 made `growY` unscaled. It is the number a consumer's layout reads back.",
+      "mocanvas": {
+        "__error": "note-grow: page.evaluate: ReferenceError: LOREM is not defined\n    at eval (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:5:96)\n    at eval (eval at evaluate (:311:30), <anonymous>:4:27)\n    at UtilityScript.evaluate (<anonymous>:313:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
+      },
+      "tldraw": {
+        "__error": "note-grow: page.evaluate: ReferenceError: LOREM is not defined\n    at eval (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:5:96)\n    at eval (eval at evaluate (:311:30), <anonymous>:4:27)\n    at UtilityScript.evaluate (<anonymous>:313:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "geo-label-grow",
+      "title": "A geo shape grown by its label",
+      "about": null,
+      "mocanvas": {
+        "__error": "geo-label-grow: page.evaluate: ReferenceError: LOREM is not defined\n    at eval (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:9:75)\n    at eval (eval at evaluate (:311:30), <anonymous>:4:27)\n    at UtilityScript.evaluate (<anonymous>:313:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
+      },
+      "tldraw": {
+        "__error": "geo-label-grow: page.evaluate: ReferenceError: LOREM is not defined\n    at eval (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:9:75)\n    at eval (eval at evaluate (:311:30), <anonymous>:4:27)\n    at UtilityScript.evaluate (<anonymous>:313:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "fractional-indices",
+      "title": "`getIndices(n)`",
+      "about": "4.3.0: n + 1 keys, starting at a1.",
+      "mocanvas": {
+        "n0": {
+          "count": 1,
+          "firstStartsWithA1": true,
+          "strictlyAscending": true,
+          "allDistinct": true
+        },
+        "n1": {
+          "count": 2,
+          "firstStartsWithA1": true,
+          "strictlyAscending": true,
+          "allDistinct": true
+        },
+        "n5": {
+          "count": 6,
+          "firstStartsWithA1": true,
+          "strictlyAscending": true,
+          "allDistinct": true
+        }
+      },
+      "tldraw": {
+        "n0": {
+          "count": 1,
+          "firstStartsWithA1": true,
+          "strictlyAscending": true,
+          "allDistinct": true
+        },
+        "n1": {
+          "count": 2,
+          "firstStartsWithA1": true,
+          "strictlyAscending": true,
+          "allDistinct": true
+        },
+        "n5": {
+          "count": 6,
+          "firstStartsWithA1": true,
+          "strictlyAscending": true,
+          "allDistinct": true
+        }
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "rotate-wrap",
+      "title": "`rotateShapesBy` past a full turn",
+      "about": "4.4.1: the stored angle wraps.",
+      "mocanvas": {
+        "0.25turn": {
+          "rotation": 1.570796,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          }
+        },
+        "1turn": {
+          "rotation": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          }
+        },
+        "1.5turn": {
+          "rotation": 3.141593,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          }
+        },
+        "3turn": {
+          "rotation": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          }
+        },
+        "-0.25turn": {
+          "rotation": 4.712389,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          }
+        }
+      },
+      "tldraw": {
+        "0.25turn": {
+          "rotation": 1.570796,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          }
+        },
+        "1turn": {
+          "rotation": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          }
+        },
+        "1.5turn": {
+          "rotation": 3.141593,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          }
+        },
+        "3turn": {
+          "rotation": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          }
+        },
+        "-0.25turn": {
+          "rotation": 4.712389,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          }
+        }
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "duplicate-selection",
+      "title": "What is selected after `duplicateShapes`",
+      "about": "4.12.3: the copies.",
+      "mocanvas": {
+        "copiesMade": 1,
+        "selectedCount": 1,
+        "selectedIsTheCopy": true,
+        "shapesOnPage": 2,
+        "copyBounds": {
+          "x": 20,
+          "y": 20,
+          "w": 100,
+          "h": 100
+        }
+      },
+      "tldraw": {
+        "copiesMade": 1,
+        "selectedCount": 1,
+        "selectedIsTheCopy": true,
+        "shapesOnPage": 2,
+        "copyBounds": {
+          "x": 0,
+          "y": 0,
+          "w": 100,
+          "h": 100
+        }
+      },
+      "known": [
+        {
+          "path": "copyBounds.x",
+          "kind": "number",
+          "mocanvas": 20,
+          "tldraw": 0,
+          "delta": 20,
+          "reason": "`duplicateShapes(ids)` with no offset leaves the copy 20 units down and right here, and exactly on top of the original there. mocanvas's signature defaults `offset` to {x:20,y:20}; tldraw's default is no offset at all.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "copyBounds.y",
+          "kind": "number",
+          "mocanvas": 20,
+          "tldraw": 0,
+          "delta": 20,
+          "reason": "See copyBounds.x.",
+          "status": "open",
+          "since": "2026-11-12"
+        }
+      ],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "hit-test-margin",
+      "title": "`getShapeAtPoint` on filled and unfilled shapes",
+      "about": "4.4.0 made a filled shape clickable in the middle; 4.12.0 made an explicit margin page units rather than screen px. Both are this call's answer.",
+      "mocanvas": {
+        "none": {
+          "middle": null,
+          "middleHitInside": "geo",
+          "onEdge": "geo",
+          "justOutside": "geo",
+          "outsideMargin8": "geo",
+          "outsideMargin0": null,
+          "farOutside": null
+        },
+        "semi": {
+          "middle": "geo",
+          "middleHitInside": "geo",
+          "onEdge": "geo",
+          "justOutside": "geo",
+          "outsideMargin8": "geo",
+          "outsideMargin0": null,
+          "farOutside": null
+        },
+        "solid": {
+          "middle": "geo",
+          "middleHitInside": "geo",
+          "onEdge": "geo",
+          "justOutside": "geo",
+          "outsideMargin8": "geo",
+          "outsideMargin0": null,
+          "farOutside": null
+        }
+      },
+      "tldraw": {
+        "none": {
+          "middle": null,
+          "middleHitInside": "geo",
+          "onEdge": "geo",
+          "justOutside": null,
+          "outsideMargin8": "geo",
+          "outsideMargin0": null,
+          "farOutside": null
+        },
+        "semi": {
+          "middle": "geo",
+          "middleHitInside": "geo",
+          "onEdge": "geo",
+          "justOutside": null,
+          "outsideMargin8": "geo",
+          "outsideMargin0": null,
+          "farOutside": null
+        },
+        "solid": {
+          "middle": "geo",
+          "middleHitInside": "geo",
+          "onEdge": "geo",
+          "justOutside": null,
+          "outsideMargin8": "geo",
+          "outsideMargin0": null,
+          "farOutside": null
+        }
+      },
+      "known": [
+        {
+          "path": "none.justOutside",
+          "kind": "value",
+          "mocanvas": "geo",
+          "tldraw": null,
+          "reason": "A point 4 units outside the shape's edge finds the shape here and finds nothing there, at the default margin and whatever the fill. With the margin stated the two agree exactly (margin 0 misses on both, margin 8 hits on both), so this is the default alone — mocanvas's is larger.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "semi.justOutside",
+          "kind": "value",
+          "mocanvas": "geo",
+          "tldraw": null,
+          "reason": "See none.justOutside: the same default, independent of fill.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "solid.justOutside",
+          "kind": "value",
+          "mocanvas": "geo",
+          "tldraw": null,
+          "reason": "See none.justOutside.",
+          "status": "open",
+          "since": "2026-11-12"
+        }
+      ],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "resize-shape",
+      "title": "`resizeShape` with a scale and an origin",
+      "about": null,
+      "mocanvas": {
+        "afterOrigin": {
+          "shape": {
+            "x": 100,
+            "y": 100,
+            "rotation": 0,
+            "w": 300,
+            "h": 50
+          },
+          "bounds": {
+            "x": 100,
+            "y": 100,
+            "w": 300,
+            "h": 50
+          }
+        },
+        "afterCentre": {
+          "shape": {
+            "x": -50,
+            "y": 75,
+            "rotation": 0,
+            "w": 600,
+            "h": 100
+          },
+          "bounds": {
+            "x": -50,
+            "y": 75,
+            "w": 600,
+            "h": 100
+          }
+        }
+      },
+      "tldraw": {
+        "afterOrigin": {
+          "shape": {
+            "x": 100,
+            "y": 100,
+            "rotation": 0,
+            "w": 300,
+            "h": 50
+          },
+          "bounds": {
+            "x": 100,
+            "y": 100,
+            "w": 300,
+            "h": 50
+          }
+        },
+        "afterCentre": {
+          "shape": {
+            "x": -50,
+            "y": 75,
+            "rotation": 0,
+            "w": 600,
+            "h": 100
+          },
+          "bounds": {
+            "x": -50,
+            "y": 75,
+            "w": 600,
+            "h": 100
+          }
+        }
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "flip-shapes",
+      "title": "`flipShapes` over a pair",
+      "about": null,
+      "mocanvas": {
+        "horizontal": {
+          "a": {
+            "x": 160,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          "b": {
+            "x": 0,
+            "y": 100,
+            "w": 60,
+            "h": 120
+          }
+        },
+        "vertical": {
+          "a": {
+            "x": 160,
+            "y": 170,
+            "w": 100,
+            "h": 50
+          },
+          "b": {
+            "x": 0,
+            "y": 0,
+            "w": 60,
+            "h": 120
+          }
+        }
+      },
+      "tldraw": {
+        "horizontal": {
+          "a": {
+            "x": 160,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          "b": {
+            "x": 0,
+            "y": 100,
+            "w": 60,
+            "h": 120
+          }
+        },
+        "vertical": {
+          "a": {
+            "x": 160,
+            "y": 170,
+            "w": 100,
+            "h": 50
+          },
+          "b": {
+            "x": 0,
+            "y": 0,
+            "w": 60,
+            "h": 120
+          }
+        }
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "align-and-distribute",
+      "title": "`alignShapes` and `distributeShapes`",
+      "about": null,
+      "mocanvas": {
+        "align:left": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 0,
+            "y": 70,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 0,
+            "y": 20,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "align:right": [
+          {
+            "x": 340,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 380,
+            "y": 70,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 400,
+            "y": 20,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "align:top": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 130,
+            "y": 0,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 400,
+            "y": 0,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "align:bottom": [
+          {
+            "x": 0,
+            "y": 110,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 130,
+            "y": 70,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 400,
+            "y": 120,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "align:center-horizontal": [
+          {
+            "x": 170,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 190,
+            "y": 70,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 200,
+            "y": 20,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "align:center-vertical": [
+          {
+            "x": 0,
+            "y": 55,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 130,
+            "y": 35,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 400,
+            "y": 60,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "distribute:horizontal": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 220,
+            "y": 70,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 400,
+            "y": 20,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "distribute:vertical": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 130,
+            "y": 70,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 400,
+            "y": 40,
+            "w": 40,
+            "h": 40
+          }
+        ]
+      },
+      "tldraw": {
+        "align:left": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 0,
+            "y": 70,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 0,
+            "y": 20,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "align:right": [
+          {
+            "x": 340,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 380,
+            "y": 70,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 400,
+            "y": 20,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "align:top": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 130,
+            "y": 0,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 400,
+            "y": 0,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "align:bottom": [
+          {
+            "x": 0,
+            "y": 110,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 130,
+            "y": 70,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 400,
+            "y": 120,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "align:center-horizontal": [
+          {
+            "x": 170,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 190,
+            "y": 70,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 200,
+            "y": 20,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "align:center-vertical": [
+          {
+            "x": 0,
+            "y": 55,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 130,
+            "y": 35,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 400,
+            "y": 60,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "distribute:horizontal": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 220,
+            "y": 70,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 400,
+            "y": 20,
+            "w": 40,
+            "h": 40
+          }
+        ],
+        "distribute:vertical": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          {
+            "x": 130,
+            "y": 70,
+            "w": 60,
+            "h": 90
+          },
+          {
+            "x": 400,
+            "y": 40,
+            "w": 40,
+            "h": 40
+          }
+        ]
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "group-bounds",
+      "title": "Grouping and ungrouping a pair",
+      "about": null,
+      "mocanvas": {
+        "grouped": {
+          "groupBounds": {
+            "x": 0,
+            "y": 0,
+            "w": 260,
+            "h": 190
+          },
+          "childrenParented": true,
+          "selected": 1
+        },
+        "afterUngroup": {
+          "a": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          "b": {
+            "x": 200,
+            "y": 100,
+            "w": 60,
+            "h": 90
+          },
+          "shapes": 2
+        }
+      },
+      "tldraw": {
+        "grouped": {
+          "groupBounds": {
+            "x": 0,
+            "y": 0,
+            "w": 260,
+            "h": 190
+          },
+          "childrenParented": true,
+          "selected": 1
+        },
+        "afterUngroup": {
+          "a": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 50
+          },
+          "b": {
+            "x": 200,
+            "y": 100,
+            "w": 60,
+            "h": 90
+          },
+          "shapes": 2
+        }
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "zoom-to-fit",
+      "title": "`zoomToFit`, by default and at stated insets",
+      "about": "Split in two on purpose: with the inset stated, this is the fit arithmetic; with it left out, it is only the default, and a difference in one is a different bug from a difference in the other.",
+      "mocanvas": {
+        "viewport": {
+          "h": 800,
+          "w": 1200,
+          "x": 0,
+          "y": 0
+        },
+        "defaultInset": {
+          "x": 322.059,
+          "y": 164.706,
+          "z": 0.77714
+        },
+        "inset0": {
+          "x": 75,
+          "y": 0,
+          "z": 1.14286
+        },
+        "inset64": {
+          "x": 120.652,
+          "y": 30.435,
+          "z": 1.05143
+        },
+        "inset128": {
+          "x": 175,
+          "y": 66.667,
+          "z": 0.96
+        },
+        "inset256": {
+          "x": 322.059,
+          "y": 164.706,
+          "z": 0.77714
+        }
+      },
+      "tldraw": {
+        "viewport": {
+          "h": 800,
+          "w": 1200,
+          "x": 0,
+          "y": 0
+        },
+        "defaultInset": {
+          "x": 175,
+          "y": 66.667,
+          "z": 0.96
+        },
+        "inset0": {
+          "x": 75,
+          "y": 0,
+          "z": 1.14286
+        },
+        "inset64": {
+          "x": 120.652,
+          "y": 30.435,
+          "z": 1.05143
+        },
+        "inset128": {
+          "x": 175,
+          "y": 66.667,
+          "z": 0.96
+        },
+        "inset256": {
+          "x": 322.059,
+          "y": 164.706,
+          "z": 0.77714
+        }
+      },
+      "known": [
+        {
+          "path": "defaultInset.x",
+          "kind": "number",
+          "mocanvas": 322.059,
+          "tldraw": 175,
+          "delta": 147.05900000000003,
+          "reason": "`zoomToFit()` with no inset leaves twice the margin here. The arithmetic is identical — at a stated inset of 0, 64, 128 or 256 both land on the same camera to five decimals — so the whole difference is the default: mocanvas uses min(256, viewportWidth * 0.28), which is 256 in a 1200x800 viewport, against tldraw's 128. A migrated app that calls zoomToFit sees its content smaller.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "defaultInset.y",
+          "kind": "number",
+          "mocanvas": 164.706,
+          "tldraw": 66.667,
+          "delta": 98.03899999999999,
+          "reason": "`zoomToFit()` with no inset leaves twice the margin here. The arithmetic is identical — at a stated inset of 0, 64, 128 or 256 both land on the same camera to five decimals — so the whole difference is the default: mocanvas uses min(256, viewportWidth * 0.28), which is 256 in a 1200x800 viewport, against tldraw's 128. A migrated app that calls zoomToFit sees its content smaller.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "defaultInset.z",
+          "kind": "number",
+          "mocanvas": 0.77714,
+          "tldraw": 0.96,
+          "delta": -0.1828599999999999,
+          "reason": "`zoomToFit()` with no inset leaves twice the margin here. The arithmetic is identical — at a stated inset of 0, 64, 128 or 256 both land on the same camera to five decimals — so the whole difference is the default: mocanvas uses min(256, viewportWidth * 0.28), which is 256 in a 1200x800 viewport, against tldraw's 128. A migrated app that calls zoomToFit sees its content smaller.",
+          "status": "open",
+          "since": "2026-11-12"
+        }
+      ],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "arrow-bound-geometry",
+      "title": "An arrow bound between two shapes",
+      "about": null,
+      "mocanvas": {
+        "arrowBounds": {
+          "x": 128.362,
+          "y": 80.717,
+          "w": 263.275,
+          "h": 139.198
+        },
+        "bindings": 2,
+        "geometryVerts": [
+          {
+            "x": 128.36,
+            "y": 80.72
+          },
+          {
+            "x": 391.64,
+            "y": 219.28
+          }
+        ]
+      },
+      "tldraw": {
+        "arrowBounds": {
+          "x": 120,
+          "y": 76.316,
+          "w": 268.054,
+          "h": 141.081
+        },
+        "bindings": 2,
+        "geometryVerts": [
+          {
+            "x": 120,
+            "y": 76.32
+          },
+          {
+            "x": 388.05,
+            "y": 217.4
+          }
+        ]
+      },
+      "known": [
+        {
+          "path": "arrowBounds.h",
+          "kind": "number",
+          "mocanvas": 139.198,
+          "tldraw": 141.081,
+          "delta": -1.8829999999999814,
+          "reason": "A bound arrow leaves and meets its shapes a few units from where tldraw's does (start 128.4,80.7 against 120,76.3). Shape routing, not binding: the bindings themselves are there and the arrow follows the shape when it moves. Same cause as the fx-arrow rows in tldr-fixture-bounds.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "arrowBounds.w",
+          "kind": "number",
+          "mocanvas": 263.275,
+          "tldraw": 268.054,
+          "delta": -4.778999999999996,
+          "reason": "A bound arrow leaves and meets its shapes a few units from where tldraw's does (start 128.4,80.7 against 120,76.3). Shape routing, not binding: the bindings themselves are there and the arrow follows the shape when it moves. Same cause as the fx-arrow rows in tldr-fixture-bounds.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "arrowBounds.x",
+          "kind": "number",
+          "mocanvas": 128.362,
+          "tldraw": 120,
+          "delta": 8.361999999999995,
+          "reason": "A bound arrow leaves and meets its shapes a few units from where tldraw's does (start 128.4,80.7 against 120,76.3). Shape routing, not binding: the bindings themselves are there and the arrow follows the shape when it moves. Same cause as the fx-arrow rows in tldr-fixture-bounds.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "arrowBounds.y",
+          "kind": "number",
+          "mocanvas": 80.717,
+          "tldraw": 76.316,
+          "delta": 4.400999999999996,
+          "reason": "A bound arrow leaves and meets its shapes a few units from where tldraw's does (start 128.4,80.7 against 120,76.3). Shape routing, not binding: the bindings themselves are there and the arrow follows the shape when it moves. Same cause as the fx-arrow rows in tldr-fixture-bounds.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "geometryVerts.0.x",
+          "kind": "number",
+          "mocanvas": 128.36,
+          "tldraw": 120,
+          "delta": 8.360000000000014,
+          "reason": "A bound arrow leaves and meets its shapes a few units from where tldraw's does (start 128.4,80.7 against 120,76.3). Shape routing, not binding: the bindings themselves are there and the arrow follows the shape when it moves. Same cause as the fx-arrow rows in tldr-fixture-bounds.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "geometryVerts.0.y",
+          "kind": "number",
+          "mocanvas": 80.72,
+          "tldraw": 76.32,
+          "delta": 4.400000000000006,
+          "reason": "A bound arrow leaves and meets its shapes a few units from where tldraw's does (start 128.4,80.7 against 120,76.3). Shape routing, not binding: the bindings themselves are there and the arrow follows the shape when it moves. Same cause as the fx-arrow rows in tldr-fixture-bounds.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "geometryVerts.1.x",
+          "kind": "number",
+          "mocanvas": 391.64,
+          "tldraw": 388.05,
+          "delta": 3.589999999999975,
+          "reason": "A bound arrow leaves and meets its shapes a few units from where tldraw's does (start 128.4,80.7 against 120,76.3). Shape routing, not binding: the bindings themselves are there and the arrow follows the shape when it moves. Same cause as the fx-arrow rows in tldr-fixture-bounds.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "geometryVerts.1.y",
+          "kind": "number",
+          "mocanvas": 219.28,
+          "tldraw": 217.4,
+          "delta": 1.8799999999999955,
+          "reason": "A bound arrow leaves and meets its shapes a few units from where tldraw's does (start 128.4,80.7 against 120,76.3). Shape routing, not binding: the bindings themselves are there and the arrow follows the shape when it moves. Same cause as the fx-arrow rows in tldr-fixture-bounds.",
+          "status": "open",
+          "since": "2026-11-12"
+        }
+      ],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "tldr-fixture-bounds",
+      "title": "Every shape of `compare.tldr`, by page bounds",
+      "about": "The fixture carries its own ids, so the two libraries' answers line up shape for shape: this is the whole file's geometry in one probe.",
+      "mocanvas": {
+        "shapes": {
+          "shape:fx-arrow-bent": {
+            "type": "arrow",
+            "bounds": {
+              "x": 306.13,
+              "y": 212.01,
+              "w": 173.87,
+              "h": 207.99
+            }
+          },
+          "shape:fx-arrow-straight": {
+            "type": "arrow",
+            "bounds": {
+              "x": 620,
+              "y": 320,
+              "w": 200,
+              "h": 82.31
+            }
+          },
+          "shape:fx-draw": {
+            "type": "draw",
+            "bounds": {
+              "x": 100,
+              "y": 330.65,
+              "w": 260.05,
+              "h": 58.7
+            }
+          },
+          "shape:fx-ellipse": {
+            "type": "geo",
+            "bounds": {
+              "x": 380,
+              "y": 100,
+              "w": 160,
+              "h": 160
+            }
+          },
+          "shape:fx-frame": {
+            "type": "frame",
+            "bounds": {
+              "x": 700,
+              "y": 500,
+              "w": 400,
+              "h": 260
+            }
+          },
+          "shape:fx-frame-child-1": {
+            "type": "geo",
+            "bounds": {
+              "x": 730,
+              "y": 540,
+              "w": 120,
+              "h": 80
+            }
+          },
+          "shape:fx-frame-child-2": {
+            "type": "geo",
+            "bounds": {
+              "x": 920,
+              "y": 560,
+              "w": 120,
+              "h": 120
+            }
+          },
+          "shape:fx-hexagon": {
+            "type": "geo",
+            "bounds": {
+              "x": 1020,
+              "y": 100,
+              "w": 140,
+              "h": 140
+            }
+          },
+          "shape:fx-line": {
+            "type": "line",
+            "bounds": {
+              "x": 880,
+              "y": 320,
+              "w": 240,
+              "h": 90
+            }
+          },
+          "shape:fx-note": {
+            "type": "note",
+            "bounds": {
+              "x": 100,
+              "y": 520,
+              "w": 200,
+              "h": 200
+            }
+          },
+          "shape:fx-rect": {
+            "type": "geo",
+            "bounds": {
+              "x": 100,
+              "y": 100,
+              "w": 200,
+              "h": 120
+            }
+          },
+          "shape:fx-star": {
+            "type": "geo",
+            "bounds": {
+              "x": 620,
+              "y": 100,
+              "w": 140,
+              "h": 140
+            }
+          },
+          "shape:fx-text": {
+            "type": "text",
+            "bounds": {
+              "x": 380,
+              "y": 560,
+              "w": 300,
+              "h": 32
+            }
+          },
+          "shape:fx-triangle": {
+            "type": "geo",
+            "bounds": {
+              "x": 820,
+              "y": 100,
+              "w": 140,
+              "h": 120
+            }
+          }
+        },
+        "count": 14
+      },
+      "tldraw": {
+        "shapes": {
+          "shape:fx-arrow-bent": {
+            "type": "arrow",
+            "bounds": {
+              "x": 311.26,
+              "y": 216.07,
+              "w": 168.74,
+              "h": 203.93
+            }
+          },
+          "shape:fx-arrow-straight": {
+            "type": "arrow",
+            "bounds": {
+              "x": 620,
+              "y": 320,
+              "w": 200,
+              "h": 80
+            }
+          },
+          "shape:fx-draw": {
+            "type": "draw",
+            "bounds": {
+              "x": 100,
+              "y": 332.17,
+              "w": 260.05,
+              "h": 55.67
+            }
+          },
+          "shape:fx-ellipse": {
+            "type": "geo",
+            "bounds": {
+              "x": 380,
+              "y": 100,
+              "w": 160,
+              "h": 160
+            }
+          },
+          "shape:fx-frame": {
+            "type": "frame",
+            "bounds": {
+              "x": 700,
+              "y": 500,
+              "w": 400,
+              "h": 260
+            }
+          },
+          "shape:fx-frame-child-1": {
+            "type": "geo",
+            "bounds": {
+              "x": 730,
+              "y": 540,
+              "w": 120,
+              "h": 80
+            }
+          },
+          "shape:fx-frame-child-2": {
+            "type": "geo",
+            "bounds": {
+              "x": 920,
+              "y": 560,
+              "w": 120,
+              "h": 120
+            }
+          },
+          "shape:fx-hexagon": {
+            "type": "geo",
+            "bounds": {
+              "x": 1020,
+              "y": 100,
+              "w": 140,
+              "h": 140
+            }
+          },
+          "shape:fx-line": {
+            "type": "line",
+            "bounds": {
+              "x": 880,
+              "y": 320,
+              "w": 240,
+              "h": 90
+            }
+          },
+          "shape:fx-note": {
+            "type": "note",
+            "bounds": {
+              "x": 100,
+              "y": 520,
+              "w": 200,
+              "h": 200
+            }
+          },
+          "shape:fx-rect": {
+            "type": "geo",
+            "bounds": {
+              "x": 100,
+              "y": 100,
+              "w": 200,
+              "h": 120
+            }
+          },
+          "shape:fx-star": {
+            "type": "geo",
+            "bounds": {
+              "x": 620.17,
+              "y": 100,
+              "w": 139.66,
+              "h": 138.72
+            }
+          },
+          "shape:fx-text": {
+            "type": "text",
+            "bounds": {
+              "x": 380,
+              "y": 560,
+              "w": 300,
+              "h": 32
+            }
+          },
+          "shape:fx-triangle": {
+            "type": "geo",
+            "bounds": {
+              "x": 820,
+              "y": 100,
+              "w": 140,
+              "h": 120
+            }
+          }
+        },
+        "count": 14
+      },
+      "known": [
+        {
+          "path": "shapes.shape:fx-arrow-bent.bounds.h",
+          "kind": "number",
+          "mocanvas": 207.99,
+          "tldraw": 203.93,
+          "delta": 4.060000000000002,
+          "reason": "Arrow routing, as in arrow-bound-geometry: about 5 units across a 170-unit box.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "shapes.shape:fx-arrow-bent.bounds.w",
+          "kind": "number",
+          "mocanvas": 173.87,
+          "tldraw": 168.74,
+          "delta": 5.1299999999999955,
+          "reason": "Arrow routing, as in arrow-bound-geometry: about 5 units across a 170-unit box.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "shapes.shape:fx-arrow-bent.bounds.x",
+          "kind": "number",
+          "mocanvas": 306.13,
+          "tldraw": 311.26,
+          "delta": -5.1299999999999955,
+          "reason": "Arrow routing, as in arrow-bound-geometry: about 5 units across a 170-unit box.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "shapes.shape:fx-arrow-bent.bounds.y",
+          "kind": "number",
+          "mocanvas": 212.01,
+          "tldraw": 216.07,
+          "delta": -4.060000000000002,
+          "reason": "Arrow routing, as in arrow-bound-geometry: about 5 units across a 170-unit box.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "shapes.shape:fx-arrow-straight.bounds.h",
+          "kind": "number",
+          "mocanvas": 82.31,
+          "tldraw": 80,
+          "delta": 2.3100000000000023,
+          "reason": "82.3 tall against 80: the arrowhead's extent, on an arrow whose shaft is horizontal.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "shapes.shape:fx-draw.bounds.h",
+          "kind": "number",
+          "mocanvas": 58.7,
+          "tldraw": 55.67,
+          "delta": 3.030000000000001,
+          "reason": "A freehand stroke's outline is hand-drawn and deliberately not reproduced point for point — the two wobble differently by design, which is why the rendering comparison scores stroke distance rather than pixel overlap (apps/bench/results/visible-differences.md). 3 units of extent on a 56-unit stroke is inside that.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "shapes.shape:fx-draw.bounds.y",
+          "kind": "number",
+          "mocanvas": 330.65,
+          "tldraw": 332.17,
+          "delta": -1.5200000000000387,
+          "reason": "A freehand stroke's outline is hand-drawn and deliberately not reproduced point for point — the two wobble differently by design, which is why the rendering comparison scores stroke distance rather than pixel overlap (apps/bench/results/visible-differences.md). 3 units of extent on a 56-unit stroke is inside that.",
+          "status": "accepted",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "shapes.shape:fx-star.bounds.h",
+          "kind": "number",
+          "mocanvas": 140,
+          "tldraw": 138.72,
+          "delta": 1.2800000000000011,
+          "reason": "A star's bounds are exactly its box here (140x140) and slightly inside it there (139.66x138.72), because tldraw's star geometry does not quite touch the box on every side. Under a unit, but it is a shape of geometry rather than of stroke, so it is not the same kind of difference as fx-draw.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "shapes.shape:fx-star.bounds.w",
+          "kind": "number",
+          "mocanvas": 140,
+          "tldraw": 139.66,
+          "delta": 0.3400000000000034,
+          "reason": "A star's bounds are exactly its box here (140x140) and slightly inside it there (139.66x138.72), because tldraw's star geometry does not quite touch the box on every side. Under a unit, but it is a shape of geometry rather than of stroke, so it is not the same kind of difference as fx-draw.",
+          "status": "open",
+          "since": "2026-11-12"
+        },
+        {
+          "path": "shapes.shape:fx-star.bounds.x",
+          "kind": "number",
+          "mocanvas": 620,
+          "tldraw": 620.17,
+          "delta": -0.16999999999995907,
+          "reason": "A star's bounds are exactly its box here (140x140) and slightly inside it there (139.66x138.72), because tldraw's star geometry does not quite touch the box on every side. Under a unit, but it is a shape of geometry rather than of stroke, so it is not the same kind of difference as fx-draw.",
+          "status": "open",
+          "since": "2026-11-12"
+        }
+      ],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "gesture-press-interior-unfilled",
+      "title": "Pressing in the middle of an *unfilled* rectangle",
+      "about": "4.4.0 made a filled shape clickable in the middle. The question this asks is the other half: whether an unfilled one is too. `getShapeAtPoint` agrees on both sides here — it is the tool's own hit test that does not, so only a real press can see it.",
+      "mocanvas": {
+        "selected": 1
+      },
+      "tldraw": {
+        "selected": 1
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "gesture-press-interior-filled",
+      "title": "Pressing in the middle of a filled rectangle",
+      "about": null,
+      "mocanvas": {
+        "selected": 1
+      },
+      "tldraw": {
+        "selected": 1
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "gesture-drag-plain",
+      "title": "Dragging a shape with no modifier held",
+      "about": "4.13.0 found two divergences here at once — whether a plain drag snaps to other shapes, and whether grid mode steps it. Both only show up through the pointer.",
+      "mocanvas": {
+        "moved": {
+          "x": 137,
+          "y": 123
+        },
+        "other": {
+          "x": 500,
+          "y": 123
+        }
+      },
+      "tldraw": {
+        "moved": {
+          "x": 137,
+          "y": 123
+        },
+        "other": {
+          "x": 500,
+          "y": 123
+        }
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "gesture-drag-accelerator",
+      "title": "Dragging with the accelerator held",
+      "about": "The same drag with the platform accelerator held (cmd on macOS, ctrl elsewhere). 4.13.0: the accelerator asks for snapping rather than refusing it.",
+      "mocanvas": {
+        "moved": {
+          "x": 137,
+          "y": 123
+        },
+        "other": {
+          "x": 500,
+          "y": 123
+        }
+      },
+      "tldraw": {
+        "moved": {
+          "x": 137,
+          "y": 123
+        },
+        "other": {
+          "x": 500,
+          "y": 123
+        }
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "gesture-resize-corner",
+      "title": "Dragging a selection's bottom-right handle",
+      "about": "4.13.0: in grid mode the dragged edge lands on the grid and the opposite one stays put.",
+      "mocanvas": {
+        "shape": {
+          "x": 100,
+          "y": 100,
+          "rotation": 0,
+          "w": 201.2,
+          "h": 138.4
+        },
+        "bounds": {
+          "x": 100,
+          "y": 100,
+          "w": 201.2,
+          "h": 138.4
+        }
+      },
+      "tldraw": {
+        "shape": {
+          "x": 100,
+          "y": 100,
+          "rotation": 0,
+          "w": 201.2,
+          "h": 138.4
+        },
+        "bounds": {
+          "x": 100,
+          "y": 100,
+          "w": 201.2,
+          "h": 138.4
+        }
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    },
+    {
+      "id": "gesture-click-create-geo",
+      "title": "Placing a rectangle with one click",
+      "about": "4.4.2: one placed by a click was half the size it should be.",
+      "mocanvas": {
+        "created": 1,
+        "shape": {
+          "x": 300,
+          "y": 200,
+          "rotation": 0,
+          "w": 200,
+          "h": 200,
+          "geo": "rectangle"
+        },
+        "bounds": {
+          "x": 300,
+          "y": 200,
+          "w": 200,
+          "h": 200
+        }
+      },
+      "tldraw": {
+        "created": 1,
+        "shape": {
+          "x": 300,
+          "y": 200,
+          "rotation": 0,
+          "w": 200,
+          "h": 200,
+          "geo": "rectangle"
+        },
+        "bounds": {
+          "x": 300,
+          "y": 200,
+          "w": 200,
+          "h": 200
+        }
+      },
+      "known": [],
+      "new": [],
+      "unused": []
+    }
+  ]
+}

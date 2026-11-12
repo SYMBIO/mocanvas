@@ -26,7 +26,7 @@ import { TextLabel } from "../text/TextEditor"
 import { applyPlainTextToRichText, richTextToText, toRichText, type RichText } from "../text/rich-text"
 import { getTextShapeSize } from "../text/text-layout"
 import { getTextTextureKey, renderTextToCanvas, type TextTextureSpec } from "../text/TextTexture"
-import { LINE_HEIGHT } from "./text-helpers"
+import { getLineHeight, getLineHeightPx } from "./text-helpers"
 import { propsOf, readBoolean, readEnum, readNumber, readRichText, readStyle, readText } from "./prop-access"
 import { getFontFamily, getLabelFontFaces, getStrokeRgba, getTheme, getThemeColors, getTextCssColor } from "./shape-theme"
 import { rectPath } from "./indicator-paths"
@@ -135,7 +135,7 @@ export function getTextShapeTextureSpec(editor: Editor, shape: TextShape): TextT
     color: getTextCssColor(color, getThemeColors(editor)),
     align: textAlign,
     verticalAlign: "start",
-    lineHeight: LINE_HEIGHT,
+    lineHeight: getLineHeight(FONT_SIZES[size] * scale),
     width: box.w,
     height: box.h,
     ...(autoSize ? {} : { maxWidth: box.w }),
@@ -182,7 +182,7 @@ export function getTextDisplayValues(
   return {
     ...base,
     labelFontSize: base.fontSize * scale,
-    labelLineHeight: base.fontSize * scale * LINE_HEIGHT,
+    labelLineHeight: getLineHeightPx(base.fontSize * scale),
     labelFontFamily: base.fontFamily,
   }
 }

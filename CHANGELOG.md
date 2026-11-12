@@ -1,5 +1,93 @@
 # Changelog
 
+## 4.17.0
+
+### Breaking: a label's line box is `round(fontSize × 1.35)`, as it is in tldraw
+
+A label's lines sat `fontSize × 1.3` apart. tldraw rounds a ratio of 1.35, so
+at the built-in sizes its lines are 24, 32, 49 and 59 page units where ours
+were 23.4, 31.2, 46.8 and 57.2 — a label three lines deep ended 3 units short,
+and a sticky note's text sat on different lines from the same text in the
+reference.
+
+The ratio was already inconsistent inside this library: the theme's
+`DEFAULT_LINE_HEIGHT` said 1.35 and a note's label used it, while every other
+label used a separate `LINE_HEIGHT` of 1.3.
+
+`LINE_HEIGHT` is now 1.35 and is **the ratio, not the line box**. Two new
+helpers derive the box from it:
+
+```ts
+import { getLineHeightPx, getLineHeight } from "@mocanvas/mocanvas"
+
+getLineHeightPx(24) // 32  — the line box in page units
+getLineHeight(24) //  1.3333 — the same line as a CSS `line-height`
+```
+
+**If your own code multiplied `fontSize * LINE_HEIGHT`**, call
+`getLineHeightPx(fontSize)` instead; multiplying by the new constant gives 32.4
+rather than 32. The rounding has to happen before any division, or it is not
+the same line.
+
+A text shape, a geo or arrow label, the editing overlay and an exported SVG all
+measure and paint on the same rule now. Measured against tldraw 5.4 across four
+fonts and four sizes, one to three lines: every height agrees exactly, where
+all sixteen disagreed before (`pnpm --filter bench oracle
+--probes=text-shape-line-height`).
+
+**Label *widths* are not aligned, and this release decides not to align
+them.** mocanvas ships no font files and borrows local families, so the same
+string measures narrower than in the reference: mono within 0.3%, sans
+3.1–7.5%, serif 7.9–8.2%, draw 8.8–9.1%. That is one typeface against another,
+so closing it means vendoring four families into the package — and the package
+not carrying fonts is worth more than the last few per cent of width. The
+numbers and the way out (replace the theme's `fonts` stacks with your own
+families) are now in docs/COMPAT.md.
+
+### An oracle harness, so the next divergence is found here
+
+Every behavioural divergence fixed on 2026-11-12 was found by a consumer
+running mocanvas and tldraw side by side, never by this repository: our tests
+check mocanvas against what we *believed* tldraw does, and nothing could check
+the belief.
+
+`pnpm --filter bench oracle` now asks tldraw directly — 29 probes covering
+defaults, sizes, text measurement, operations, a `.tldr` fixture's geometry and
+six real pointer gestures — and fails on any difference not written down in
+`apps/bench/oracle/divergences.json`. It runs on every pull request. See
+docs/ORACLE.md.
+
+It found 64 differences on its first clean run, all recorded, none of them
+previously known. Among them: `zoomToFit()` leaves twice the margin (the
+arithmetic is identical at a stated inset — only the default differs, 256
+against 128); `duplicateShapes(ids)` offsets the copy by 20 units where tldraw
+leaves it in place; the default hit-test margin is wider; a frame, a video and
+a line created from code come out a different size; and `props.w` of an empty
+text shape is 20 against tldraw's 8 — a number 4.12.1 changed *to* 20 on the
+belief that it was tldraw's.
+
+Nothing in this release acts on those. They are written down, printed on every
+run, and each one is now a decision with a reason attached rather than a
+surprise waiting in a consumer's app.
+
+### Correction to 4.16.0
+
+The note on the retained-shape fix quoted a consumer's measurement: "a retained
+board at 21.8 ms p95 crossing a level-of-detail threshold, against 3.5 ms with
+retention off". That measurement was contaminated. Traced on 2026-11-12: the
+spike was a Storybook highlight addon in the consumer's benchmark harness,
+whose `MutationObserver` runs `document.body.querySelectorAll("*")` plus
+`getComputedStyle` on every childList mutation — so its cost grows with the DOM,
+retained shapes enlarge the DOM, and none of that code exists in production.
+
+The fix itself stands on its own: writing the camera to a shape nobody can see
+is work either way, and `content-visibility: hidden` skips a subtree's
+rendering, not the style of the element declaring it. But retention is not the
+regression that number made it look like. Measured again with the observer
+disabled, across three interleaved runs, retention *wins* on p95 at every
+gesture and size tried (zoom-to-fit at 200 cards: 8.4 → 6.0 ms) and costs
+0.2–0.4 ms on p50.
+
 ## 4.16.0
 
 ### Breaking: grid mode is off by default, as it is in tldraw

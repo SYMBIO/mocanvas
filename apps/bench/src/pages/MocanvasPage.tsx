@@ -1,4 +1,13 @@
-import { compressLegacySegments, createShapeId, loadMocanvasFile, Mocanvas, type Editor, type ShapeCreate } from "@mocanvas/mocanvas"
+import {
+  compressLegacySegments,
+  createShapeId,
+  getIndices,
+  loadMocanvasFile,
+  Mocanvas,
+  toRichText,
+  type Editor,
+  type ShapeCreate,
+} from "@mocanvas/mocanvas"
 
 import { BaseBoxShapeUtil, HTMLContainer } from "@mocanvas/editor"
 import { makeGalleryCardUtil } from "../gallery-card"
@@ -251,6 +260,16 @@ function install(editor: Editor): BenchApi {
 const galleryCardUtil = makeGalleryCardUtil({ BaseBoxShapeUtil, HTMLContainer } as never) as never
 const domCardUtils = makeDomCardUtils({ BaseBoxShapeUtil, HTMLContainer } as never) as unknown as never[]
 ;(globalThis as { __GALLERY_HAS_CUSTOM__?: boolean }).__GALLERY_HAS_CUSTOM__ = true
+
+/**
+ * What `oracle/probes.mjs` may reach for on this page.
+ *
+ * A probe is one body of code run against both libraries, so it cannot import
+ * anything: whatever it needs in this library's own spelling — a rich-text
+ * document, an index key — it asks this object for. Each page installs its own,
+ * from its own package.
+ */
+;(window as unknown as { oracleKit: Record<string, unknown> }).oracleKit = { toRichText, createShapeId, getIndices }
 
 export default function MocanvasPage() {
   return (
