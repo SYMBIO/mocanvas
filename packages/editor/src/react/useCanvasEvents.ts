@@ -63,8 +63,8 @@ function resolveTarget(editor: Editor, point: { x: number; y: number }): Pointer
     const inside = selected.find((s) => editor.getShapeGeometry(s).hitTestPoint(editor.getPointInShapeSpace(s, page), 0, true))
     return inside ? { target: "shape", shape: inside } : { target: "selection" }
   }
-  const filled = editor.getShapeAtPoint(page, { hitInside: true })
-  if (filled && editor.getSelectedShapeIds().includes(filled.id)) return { target: "shape", shape: filled }
+  // No second hit test: the one above asked the same question of the same
+  // page and found nothing, and each one is a spatial-index query.
   return { target: "canvas" }
 }
 
