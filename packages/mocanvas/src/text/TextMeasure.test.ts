@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { estimateTextSize, LINE_HEIGHT } from "../shapes/text-helpers"
+import { estimateTextSize, getLineHeight, getLineHeightPx } from "../shapes/text-helpers"
 import { getTextMeasure, TextMeasure, toDisplayText } from "./TextMeasure"
 
-const opts = { fontFamily: "sans-serif", fontSize: 24, lineHeight: LINE_HEIGHT }
+const opts = { fontFamily: "sans-serif", fontSize: 24, lineHeight: getLineHeight(24) }
 
 describe("TextMeasure (no DOM)", () => {
   it("falls back to the estimate when document is undefined", () => {
@@ -23,13 +23,13 @@ describe("TextMeasure (no DOM)", () => {
     expect(m.lineCount).toBe(est.lines)
     expect(m.lineCount).toBeGreaterThan(1)
     expect(m.w).toBeCloseTo(est.w + 16)
-    expect(m.h).toBeCloseTo(est.lines * 24 * LINE_HEIGHT + 16)
+    expect(m.h).toBeCloseTo(est.lines * getLineHeightPx(24) + 16)
   })
 
   it("empty text still occupies one line", () => {
     const m = new TextMeasure().measureText("", opts)
     expect(m.lineCount).toBe(1)
-    expect(m.h).toBeCloseTo(24 * LINE_HEIGHT)
+    expect(m.h).toBeCloseTo(getLineHeightPx(24))
     expect(m.w).toBe(0)
   })
 

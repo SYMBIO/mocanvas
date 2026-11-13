@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { createShapeId, LABEL_FONT_SIZES, type Editor, type PageId, type ShapeId, type UnknownShape } from "@mocanvas/editor"
 import type { IndexKey } from "@mocanvas/store"
 import { toRichText } from "../text/rich-text"
-import { LINE_HEIGHT } from "./text-helpers"
+import { getLineHeightPx } from "./text-helpers"
 import { GeoShapeUtil, getGeoGrowY, type GeoShape } from "./GeoShapeUtil"
 import { NoteShapeUtil, NOTE_SIZE, type NoteShape } from "./NoteShapeUtil"
 import { TEXT_SHAPE_MIN_WIDTH } from "../text/text-layout"
@@ -71,8 +71,8 @@ describe("TextShapeUtil auto-size", () => {
   it("height follows the line count", () => {
     const one = makeShape<TextShape>("text", { ...util.getDefaultProps(), text: "one" })
     const three = makeShape<TextShape>("text", { ...util.getDefaultProps(), text: "one\ntwo\nthree" })
-    expect(util.getGeometry(one).bounds.h).toBeCloseTo(24 * LINE_HEIGHT)
-    expect(util.getGeometry(three).bounds.h).toBeCloseTo(3 * 24 * LINE_HEIGHT)
+    expect(util.getGeometry(one).bounds.h).toBeCloseTo(getLineHeightPx(24))
+    expect(util.getGeometry(three).bounds.h).toBeCloseTo(3 * getLineHeightPx(24))
     // multi-line auto-size width is the widest line
     const size = util.onBeforeCreate(three)!
     expect(size.props.w).toBeCloseTo("three".length * 24 * 0.6)
@@ -83,7 +83,7 @@ describe("TextShapeUtil auto-size", () => {
     expect(util.onBeforeCreate(fixed)).toBeUndefined()
     expect(util.onBeforeUpdate(fixed, { ...fixed, props: { ...fixed.props, text: "b".repeat(40) } })).toBeUndefined()
     expect(util.getGeometry(fixed).bounds.w).toBe(100)
-    expect(util.getGeometry(fixed).bounds.h).toBeCloseTo(5 * 24 * LINE_HEIGHT)
+    expect(util.getGeometry(fixed).bounds.h).toBeCloseTo(5 * getLineHeightPx(24))
   })
 
   it("scale changes the measured width", () => {
@@ -114,7 +114,7 @@ describe("GeoShapeUtil growY", () => {
     // follows the font size, so both come from the same constant.
     const tall = { ...props, text: "x".repeat(40) }
     const growY = getGeoGrowY(tall)
-    expect(growY).toBeCloseTo(8 * LABEL_FONT_SIZES.m * LINE_HEIGHT + 32 - 40)
+    expect(growY).toBeCloseTo(8 * getLineHeightPx(LABEL_FONT_SIZES.m) + 32 - 40)
     // a taller box absorbs the label
     expect(getGeoGrowY({ ...tall, h: 1000 })).toBe(0)
   })
@@ -126,7 +126,7 @@ describe("GeoShapeUtil growY", () => {
     expect(util.getGeometry(created).bounds.h).toBeCloseTo(40 + created.props.growY)
 
     const shrunk = util.onBeforeUpdate(created, { ...created, props: { ...created.props, text: "x" } })!
-    expect(shrunk.props.growY).toBeCloseTo(LABEL_FONT_SIZES.m * LINE_HEIGHT + 32 - 40)
+    expect(shrunk.props.growY).toBeCloseTo(getLineHeightPx(LABEL_FONT_SIZES.m) + 32 - 40)
     const cleared = util.onBeforeUpdate(shrunk, { ...shrunk, props: { ...shrunk.props, text: "" } })!
     expect(cleared.props.growY).toBe(0)
 

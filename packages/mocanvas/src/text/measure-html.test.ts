@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { LINE_HEIGHT } from "../shapes/text-helpers"
+import { getLineHeight } from "../shapes/text-helpers"
 import {
   getRichTextExtensions,
   measureRichText,
@@ -11,7 +11,7 @@ import { measureLabel } from "./text-layout"
 import { getTextMeasure, TextMeasure } from "./TextMeasure"
 import { tipTapDefaultExtensions, type RichTextExtension } from "./tiptap-extensions"
 
-const opts = { fontFamily: "sans-serif", fontSize: 24, lineHeight: LINE_HEIGHT }
+const opts = { fontFamily: "sans-serif", fontSize: 24, lineHeight: getLineHeight(24) }
 
 describe("renderHtmlFromRichTextForMeasurement", () => {
   it("renders a document to the markup the measurer sizes", () => {

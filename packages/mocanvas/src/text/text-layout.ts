@@ -2,7 +2,7 @@
 
 import type { DefaultFontStyle, Editor } from "@mocanvas/editor"
 import { getFontFamily } from "../shapes/shape-theme"
-import { LINE_HEIGHT } from "../shapes/text-helpers"
+import { getLineHeight, LINE_HEIGHT } from "../shapes/text-helpers"
 import { renderHtmlFromRichTextForMeasurement } from "./measure-html"
 import { isRichText, richTextToText, type RichTextSource } from "./rich-text"
 import { getTextMeasure, type TextMeasurement } from "./TextMeasure"
@@ -62,7 +62,7 @@ export function measureLabel(source: RichTextSource, opts: LabelMeasureOptions):
     return getTextMeasure().measureHtml(html, {
       fontFamily,
       fontSize: opts.fontSize,
-      lineHeight: LINE_HEIGHT,
+      lineHeight: getLineHeight(opts.fontSize),
       ...(opts.maxWidth === undefined ? {} : { maxWidth: opts.maxWidth }),
       padding: opts.padding ?? 0,
     })
@@ -70,7 +70,7 @@ export function measureLabel(source: RichTextSource, opts: LabelMeasureOptions):
   return getTextMeasure().measureText(richTextToText(source), {
     fontFamily,
     fontSize: opts.fontSize,
-    lineHeight: LINE_HEIGHT,
+    lineHeight: getLineHeight(opts.fontSize),
     ...(opts.maxWidth === undefined ? {} : { maxWidth: opts.maxWidth }),
     padding: opts.padding ?? 0,
   })
@@ -114,6 +114,9 @@ function getOpticalCentreLift(fontFamily: string): number {
       const ascent = caps.fontBoundingBoxAscent
       const descent = caps.fontBoundingBoxDescent
       if (capHeight > 0 && xHeight > 0 && ascent > 0) {
+        // The nominal ratio rather than a rounded line box: this correction is
+        // cached per family and scales with the em, so making it depend on the
+        // font size would buy a hundredth of a unit and cost the cache.
         const lineHeight = LINE_HEIGHT * em
         const baseline = (lineHeight - (ascent + descent)) / 2 + ascent
         // Halfway between the capitals' midpoint and the x-height's midpoint.

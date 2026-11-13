@@ -1,0 +1,257 @@
+{
+  "about": "Differences from tldraw that this repository has looked at. `path` is exact, or a prefix ending in `.*`, or `*` for the whole probe. `status` is \"accepted\" (decided: mocanvas is right to differ) or \"open\" (seen, not yet decided \u2014 printed in full on every run so the list cannot quietly become the plan). Either way the run stays green; what fails it is a difference nobody has written down here, and an entry that matches nothing, which should be deleted rather than left. Regenerate the raw entries with `pnpm --filter bench oracle --update`, then write the reasons.",
+  "entries": [
+    {
+      "probe": "user-preference-defaults",
+      "path": "animationSpeed",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "mocanvas keeps the raw preferences sparse on purpose \u2014 an unset key means 'whatever the editor's default is', and `UserPreferencesManager`'s getters resolve it \u2014 so `getUserPreferences().animationSpeed` is undefined where tldraw's is 1. An app that multiplies a duration by it gets NaN. Decide: resolve in the getter, or keep the distinction and say so in COMPAT.md."
+    },
+    {
+      "probe": "user-preference-defaults",
+      "path": "isSnapMode",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "Same sparse-preferences design: undefined rather than false. Falsy either way, so behaviour matches; a `=== false` check does not. See the animationSpeed entry, which is the one that actually breaks."
+    },
+    {
+      "probe": "user-preference-defaults",
+      "path": "isWrapMode",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "Same sparse-preferences design as isSnapMode."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "draw.scaleX",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "A draw shape carries scaleX/scaleY in tldraw and not in mocanvas. Missing props, not different values: code that reads or writes them is a type error after migration."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "draw.scaleY",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "See draw.scaleX."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "highlight.scaleX",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "See draw.scaleX; the highlight shape has the same pair."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "highlight.scaleY",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "See draw.scaleX."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "frame.color",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "tldraw's frame carries a `color` prop; mocanvas's does not. A migrated app that sets a frame's colour writes a prop no validator here knows."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "frame.w",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "A frame created with no size is 160x90 here and 320x180 there \u2014 the same 16:9, at half the size. Drawn-by-hand frames are unaffected; a frame created from code is half as big."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "frame.h",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "See frame.w."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "embed.w",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "720x500 here, 300x300 there. mocanvas's is the better default for an embed and tldraw's is what a migrated layout expects; this one is a genuine choice rather than an oversight."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "embed.h",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "See embed.w."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "video.w",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "640x360 here, 100x100 there. Same shape of question as embed.w."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "video.h",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "See video.w."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "video.autoplay",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "tldraw's video defaults carry `autoplay: true`; mocanvas has no such prop."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "line.points.1.x",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "A default line runs to (100, 100) here and to (0.1, 0.1) there \u2014 tldraw's default line is effectively a point, waiting for the tool to drag its second handle out. A line created from code with no points is a 141-unit diagonal here and invisible there."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "line.points.1.y",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "See line.points.1.x."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "note.fontSizeAdjustment",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "0 here, 1 there. 4.10.1 established that this is a fraction rather than a size, and a fraction's identity is 1 \u2014 so a default of 0 is either a different meaning again or a bug. Worth settling before anything else reads it."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "note.textLastEditedBy",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "A collaboration field tldraw's note carries and mocanvas's does not."
+    },
+    {
+      "probe": "shape-default-props",
+      "path": "text.w",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "20 here, 8 there \u2014 and 4.12.1 shipped the 20 on the belief that it was tldraw's number. The oracle says otherwise. See the `text-empty-width` entries, which are the same number seen from the other end."
+    },
+    {
+      "probe": "text-empty-width",
+      "path": "shape.w",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "An empty text shape stores w=20 here and w=8 there; see shape-default-props text.w."
+    },
+    {
+      "probe": "text-empty-width",
+      "path": "bounds.w",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "And measures 20 wide here against 16 there \u2014 so the two disagree about the caret area of an empty text shape as well as about the stored prop."
+    },
+    {
+      "probe": "text-shape-props-after-create",
+      "path": "propsW",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "An auto-sized text shape writes its measured width back into `props.w` here (177.44) and leaves the default there (8), deriving the width from measurement at read time. A consumer reading `props.w` gets a usable number from one library and a placeholder from the other."
+    },
+    {
+      "probe": "text-shape-props-after-create",
+      "path": "bounds.w",
+      "status": "accepted",
+      "since": "2026-11-12",
+      "reason": "The width difference itself, which is the typeface difference; see text-shape-size-by-font, decided and written up in docs/COMPAT.md."
+    },
+    {
+      "probe": "text-shape-size-by-font",
+      "path": "*",
+      "status": "accepted",
+      "since": "2026-11-12",
+      "reason": "Label widths, because the two libraries are not setting the same type. mocanvas ships no font files and borrows local families (Helvetica, Georgia, Comic Sans MS, Menlo); tldraw ships its own. Measured 2026-11-12 on 'Hamburgefonstiv': mono within 0.3%, sans -3.1% to -7.5%, serif -7.9% to -8.2%, draw -8.8% to -9.1%. Decided 2026-11-12 to carry the difference rather than vendor four typeface families: the package not carrying fonts is worth more than the last few per cent of width, and an app that needs the exact widths replaces the theme's font stacks. Written up in docs/COMPAT.md. Line height is NOT part of this \u2014 4.17.0 aligned it exactly."
+    },
+    {
+      "probe": "duplicate-selection",
+      "path": "copyBounds.x",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "`duplicateShapes(ids)` with no offset leaves the copy 20 units down and right here, and exactly on top of the original there. mocanvas's signature defaults `offset` to {x:20,y:20}; tldraw's default is no offset at all."
+    },
+    {
+      "probe": "duplicate-selection",
+      "path": "copyBounds.y",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "See copyBounds.x."
+    },
+    {
+      "probe": "hit-test-margin",
+      "path": "none.justOutside",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "A point 4 units outside the shape's edge finds the shape here and finds nothing there, at the default margin and whatever the fill. With the margin stated the two agree exactly (margin 0 misses on both, margin 8 hits on both), so this is the default alone \u2014 mocanvas's is larger."
+    },
+    {
+      "probe": "hit-test-margin",
+      "path": "semi.justOutside",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "See none.justOutside: the same default, independent of fill."
+    },
+    {
+      "probe": "hit-test-margin",
+      "path": "solid.justOutside",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "See none.justOutside."
+    },
+    {
+      "probe": "zoom-to-fit",
+      "path": "defaultInset.*",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "`zoomToFit()` with no inset leaves twice the margin here. The arithmetic is identical \u2014 at a stated inset of 0, 64, 128 or 256 both land on the same camera to five decimals \u2014 so the whole difference is the default: mocanvas uses min(256, viewportWidth * 0.28), which is 256 in a 1200x800 viewport, against tldraw's 128. A migrated app that calls zoomToFit sees its content smaller."
+    },
+    {
+      "probe": "arrow-bound-geometry",
+      "path": "*",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "A bound arrow leaves and meets its shapes a few units from where tldraw's does (start 128.4,80.7 against 120,76.3). Shape routing, not binding: the bindings themselves are there and the arrow follows the shape when it moves. Same cause as the fx-arrow rows in tldr-fixture-bounds."
+    },
+    {
+      "probe": "tldr-fixture-bounds",
+      "path": "shapes.shape:fx-arrow-bent.*",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "Arrow routing, as in arrow-bound-geometry: about 5 units across a 170-unit box."
+    },
+    {
+      "probe": "tldr-fixture-bounds",
+      "path": "shapes.shape:fx-arrow-straight.*",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "82.3 tall against 80: the arrowhead's extent, on an arrow whose shaft is horizontal."
+    },
+    {
+      "probe": "tldr-fixture-bounds",
+      "path": "shapes.shape:fx-draw.*",
+      "status": "accepted",
+      "since": "2026-11-12",
+      "reason": "A freehand stroke's outline is hand-drawn and deliberately not reproduced point for point \u2014 the two wobble differently by design, which is why the rendering comparison scores stroke distance rather than pixel overlap (apps/bench/results/visible-differences.md). 3 units of extent on a 56-unit stroke is inside that."
+    },
+    {
+      "probe": "tldr-fixture-bounds",
+      "path": "shapes.shape:fx-star.*",
+      "status": "open",
+      "since": "2026-11-12",
+      "reason": "A star's bounds are exactly its box here (140x140) and slightly inside it there (139.66x138.72), because tldraw's star geometry does not quite touch the box on every side. Under a unit, but it is a shape of geometry rather than of stroke, so it is not the same kind of difference as fx-draw."
+    }
+  ]
+}

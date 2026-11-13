@@ -58,6 +58,7 @@ import {
   getDashId,
   getNoteShadowSvgRect,
 } from "./shape-theme"
+import { getLineHeightPx } from "./text-helpers"
 
 const editor = {
   getSortedChildIdsForParent: () => [],
@@ -564,15 +565,15 @@ describe("TextShapeUtil", () => {
     const g1 = util.getGeometry(one)
     expectWellFormedPath(g1.toPathWords())
     expect(g1.bounds.w).toBe(200)
-    expect(g1.bounds.h).toBeCloseTo(24 * 1.3)
+    expect(g1.bounds.h).toBeCloseTo(getLineHeightPx(24))
     expect(g1.isFilled).toBe(true)
 
     const wrapped = makeShape<TextShape>("text", { ...util.getDefaultProps(), w: 100, autoSize: false, text: "a".repeat(30) })
     // 100 / (24 * 0.6) = 6 chars per line → 5 lines
-    expect(util.getGeometry(wrapped).bounds.h).toBeCloseTo(5 * 24 * 1.3)
+    expect(util.getGeometry(wrapped).bounds.h).toBeCloseTo(5 * getLineHeightPx(24))
 
     const multi = makeShape<TextShape>("text", { ...util.getDefaultProps(), w: 500, text: "a\nb\n\nc", scale: 2 })
-    expect(util.getGeometry(multi).bounds.h).toBeCloseTo(4 * 48 * 1.3)
+    expect(util.getGeometry(multi).bounds.h).toBeCloseTo(4 * getLineHeightPx(48))
   })
 
   it("resizing changes width and disables auto-size", () => {
