@@ -20,6 +20,7 @@ import { Rectangle2d } from "../geometry"
 import type { BaseShape, ShapeId } from "../records/base"
 import { BaseBoxShapeUtil } from "../shapes/ShapeUtil"
 import { StateNode } from "../tools/StateNode"
+import { OverlayUtil } from "../indicators/OverlayUtil"
 import { Canvas } from "./Canvas"
 
 const fakeBackend = {
@@ -120,8 +121,18 @@ afterEach(() => {
   editor = null
 })
 
+/** Stand-ins for the canvas painters that own the selection chrome, as `Mocanvas` registers them. */
+class SelectionForeground extends OverlayUtil {
+  static override type = "selectionForeground"
+  render() {}
+}
+class ShapeHandles extends OverlayUtil {
+  static override type = "shapeHandle"
+  render() {}
+}
+
 /** Three cards side by side, all on screen. */
-function mount(): { editor: Editor; ids: ShapeId[] } {
+function mount(withPainters = false): { editor: Editor; ids: ShapeId[] } {
   host = document.createElement("div")
   document.body.appendChild(host)
   editor = new Editor({
@@ -130,6 +141,7 @@ function mount(): { editor: Editor; ids: ShapeId[] } {
     tools: [SelectTool],
     engine: loadEngineSync(readFileSync(wasmPath)),
     getContainer: () => host!,
+    ...(withPainters ? { overlayUtils: [SelectionForeground, ShapeHandles] as never } : {}),
   })
   editor.createShapes([
     { type: "card", x: 10, y: 10, meta: { name: "a" } },
@@ -196,6 +208,16 @@ describe("dragging a shape is a transform write", () => {
     expect(renders).toEqual(before)
     expect(cardElement("b")!.style.transform).toBe("matrix(1, 0, 0, 1, 245, 25)")
     expect(cardElement("a")!.style.transform).toBe("matrix(1, 0, 0, 1, 10, 10)")
+  })
+
+  it("drags a selected shape without a commit when the canvas paints the selection", () => {
+    // With the selection chrome on the canvas overlay, the SVG layer draws
+    // nothing for this shape, and used to re-render on every step to say so.
+    const { editor, ids } = mount(true)
+    step(() => editor.select(ids[1]!))
+    commits = 0
+    for (let i = 1; i <= 5; i++) step(() => editor.updateShapes([{ id: ids[1]!, type: "card", x: 210 + i * 7 }]))
+    expect(commits).toBe(0)
   })
 
   it("still re-renders the body, and resizes the wrapper, when props change", () => {

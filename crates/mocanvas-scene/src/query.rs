@@ -110,7 +110,7 @@ impl Scene {
             let sh = self.shape_at(slot);
             let ok = match mode {
                 BoxQueryMode::Contains => b.contains_box(sh.page_bounds),
-                BoxQueryMode::Bounds => b.intersects(&sh.page_bounds),
+                BoxQueryMode::Bounds => b.intersects(sh.page_bounds),
                 BoxQueryMode::Intersects => {
                     if b.contains_box(sh.page_bounds) {
                         true

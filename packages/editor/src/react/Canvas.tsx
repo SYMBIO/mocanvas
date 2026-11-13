@@ -888,8 +888,27 @@ export function getShapeIndicatorNode<T extends UnknownShape>(
 }
 
 /** Selection bounds and hover indicator. */
+/**
+ * Whether the SVG layer below draws anything for the current selection — the
+ * same decisions {@link DefaultIndicators} makes, without reading where the
+ * shapes are. When the canvas painters own the selection chrome and the util
+ * is ported, the answer is no, and it stays no while the shape is dragged.
+ */
+function svgDrawsSelection(editor: Editor): boolean {
+  const selected = editor.getSelectedShapes()
+  if (selected.length > 1) return true
+  if (selected.length === 0 || editor.getCurrentToolId() !== "select") return false
+  const shape = selected[0]!
+  const util = editor.getShapeUtil(shape)
+  if (!util.hideSelectionBoundsFg(shape) && getIndicatorSource(util) === "react") return true
+  if (!hasOverlay(editor, "shapeHandle") && (util.getHandles?.(shape)?.length ?? 0) > 0) return true
+  return !hasOverlay(editor, "selectionForeground")
+}
+
 const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor: Editor }) {
-  const bounds = editor.getSelectionPageBounds()
+  // Read first, and as a computed: a drag changes the selection's bounds on
+  // every step, and this layer re-rendered for each of them to draw nothing.
+  const drawsSelection = useMemo(() => computed("canvas.svgDrawsSelection", () => svgDrawsSelection(editor)), [editor]).get()
   // Only a hovered shape this layer would outline: one still on the deprecated
   // `indicator()` hook. Every other hover outline is stroked on the canvas, and
   // reading the hovered shape itself re-rendered this layer each time the
@@ -903,11 +922,12 @@ const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor:
       }),
     [editor],
   ).get()
-  const selected = editor.getSelectedShapes()
   const tool = editor.getCurrentToolId()
-  // Nothing to outline: return before reading the camera, so a pan over a board
-  // with nothing hovered or selected does not re-render this layer every frame.
-  if (!bounds && selected.length === 0 && !(hovered && tool === "select")) return null
+  // Nothing to outline: return before reading the camera or the selection's
+  // bounds, so neither a pan nor a drag re-renders this layer every frame.
+  if (!drawsSelection && !(hovered && tool === "select")) return null
+  const bounds = editor.getSelectionPageBounds()
+  const selected = editor.getSelectedShapes()
   const cam = editor.getCamera()
   const z = cam.z
   const toScreen = (x: number, y: number) => [(x + cam.x) * z, (y + cam.y) * z] as const
