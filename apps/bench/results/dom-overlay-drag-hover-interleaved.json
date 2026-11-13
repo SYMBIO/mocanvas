@@ -1,0 +1,3297 @@
+{
+  "meta": {
+    "label": "drag-hover-interleaved",
+    "date": "2026-11-13T08:01:14.713Z",
+    "rev": "3469edc-dirty",
+    "machine": "Apple M5 Pro, 18 cores, 64 GB",
+    "os": "Darwin 27.2.0 (arm64)",
+    "node": "v24.18.0",
+    "browser": "151.0.7922.34",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+    "gl": "hardware",
+    "viewport": {
+      "width": 1200,
+      "height": 800
+    },
+    "repeats": 5,
+    "grid": "default",
+    "interleaved": [
+      {
+        "name": "main",
+        "lib": "mocanvas",
+        "build": "main"
+      },
+      {
+        "name": "branch",
+        "lib": "mocanvas",
+        "build": "branch"
+      }
+    ]
+  },
+  "results": [
+    {
+      "config": "main",
+      "lib": "mocanvas",
+      "build": "main",
+      "n": 200,
+      "kind": "dom",
+      "gesture": "drag",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 131,
+          "mainP50": 1.095,
+          "mainP95": 4.581,
+          "mainTotal": 276.474,
+          "traceStyleMs": 6.407,
+          "traceLayoutMs": 0,
+          "wallMs": 1088.857,
+          "mainMsPerStep": 4.6079,
+          "styleMsPerStep": 0.10721666666666668,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 2.03175,
+          "taskMsPerStep": 4.593983333333333,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 126,
+          "mainP50": 2.993,
+          "mainP95": 3.79,
+          "mainTotal": 252.185,
+          "traceStyleMs": 6.084,
+          "traceLayoutMs": 0,
+          "wallMs": 1043.543,
+          "mainMsPerStep": 4.203083333333334,
+          "styleMsPerStep": 0.10161666666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.8919333333333335,
+          "taskMsPerStep": 4.191516666666666,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 129,
+          "mainP50": 1.524,
+          "mainP95": 4.024,
+          "mainTotal": 257.096,
+          "traceStyleMs": 6.164,
+          "traceLayoutMs": 0,
+          "wallMs": 1070.777,
+          "mainMsPerStep": 4.284933333333333,
+          "styleMsPerStep": 0.10305,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.9324000000000001,
+          "taskMsPerStep": 4.271600000000001,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 147,
+          "mainP50": 0.4,
+          "mainP95": 3.598,
+          "mainTotal": 239.601,
+          "traceStyleMs": 5.841,
+          "traceLayoutMs": 0,
+          "wallMs": 1219.779,
+          "mainMsPerStep": 3.99335,
+          "styleMsPerStep": 0.09763333333333334,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.7706666666666666,
+          "taskMsPerStep": 3.9795999999999996,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 146,
+          "mainP50": 0.471,
+          "mainP95": 4.096,
+          "mainTotal": 281.872,
+          "traceStyleMs": 6.608,
+          "traceLayoutMs": 0,
+          "wallMs": 1217.298,
+          "mainMsPerStep": 4.697866666666667,
+          "styleMsPerStep": 0.11041666666666666,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 2.10365,
+          "taskMsPerStep": 4.683083333333332,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 1.095,
+        "mainP95": 4.024,
+        "mainTotal": 257.096,
+        "mainMsPerStep": 4.284933333333333,
+        "styleMsPerStep": 0.10305,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 1.9324000000000001,
+        "taskMsPerStep": 4.271600000000001,
+        "commits": 63,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 131,
+        "wallMs": 1088.857
+      },
+      "spread": {
+        "mainP50": [
+          0.4,
+          2.993
+        ],
+        "mainP95": [
+          3.598,
+          4.581
+        ],
+        "mainTotal": [
+          239.601,
+          281.872
+        ],
+        "mainMsPerStep": [
+          3.99335,
+          4.697866666666667
+        ],
+        "styleMsPerStep": [
+          0.09763333333333334,
+          0.11041666666666666
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          1.7706666666666666,
+          2.10365
+        ],
+        "taskMsPerStep": [
+          3.9795999999999996,
+          4.683083333333332
+        ],
+        "commits": [
+          63,
+          63
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          126,
+          147
+        ],
+        "wallMs": [
+          1043.543,
+          1219.779
+        ]
+      }
+    },
+    {
+      "config": "branch",
+      "lib": "mocanvas",
+      "build": "branch",
+      "n": 200,
+      "kind": "dom",
+      "gesture": "drag",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 126,
+          "mainP50": 2.054,
+          "mainP95": 2.752,
+          "mainTotal": 188.088,
+          "traceStyleMs": 6.159,
+          "traceLayoutMs": 0,
+          "wallMs": 1046.206,
+          "mainMsPerStep": 3.1348,
+          "styleMsPerStep": 0.10283333333333333,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.7910333333333333,
+          "taskMsPerStep": 3.1221666666666663,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 130,
+          "mainP50": 1.072,
+          "mainP95": 2.687,
+          "mainTotal": 186.601,
+          "traceStyleMs": 6.122,
+          "traceLayoutMs": 0,
+          "wallMs": 1080.176,
+          "mainMsPerStep": 3.1100166666666667,
+          "styleMsPerStep": 0.10203333333333334,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.7824666666666665,
+          "taskMsPerStep": 3.09735,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 126,
+          "mainP50": 1.917,
+          "mainP95": 2.658,
+          "mainTotal": 184.475,
+          "traceStyleMs": 6.196,
+          "traceLayoutMs": 0,
+          "wallMs": 1045.638,
+          "mainMsPerStep": 3.0745833333333334,
+          "styleMsPerStep": 0.10341666666666666,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.7946666666666666,
+          "taskMsPerStep": 3.0627,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 126,
+          "mainP50": 2.061,
+          "mainP95": 2.774,
+          "mainTotal": 182.107,
+          "traceStyleMs": 6.149,
+          "traceLayoutMs": 0,
+          "wallMs": 1046.219,
+          "mainMsPerStep": 3.0351166666666667,
+          "styleMsPerStep": 0.10268333333333332,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.7793833333333333,
+          "taskMsPerStep": 3.0231833333333338,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 139,
+          "mainP50": 0.444,
+          "mainP95": 2.87,
+          "mainTotal": 201.876,
+          "traceStyleMs": 6.599,
+          "traceLayoutMs": 0,
+          "wallMs": 1153.85,
+          "mainMsPerStep": 3.3646000000000003,
+          "styleMsPerStep": 0.1102,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.8509333333333333,
+          "taskMsPerStep": 3.350866666666667,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 1.917,
+        "mainP95": 2.752,
+        "mainTotal": 186.601,
+        "mainMsPerStep": 3.1100166666666667,
+        "styleMsPerStep": 0.10283333333333333,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 0.7910333333333333,
+        "taskMsPerStep": 3.09735,
+        "commits": 2,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 126,
+        "wallMs": 1046.219
+      },
+      "spread": {
+        "mainP50": [
+          0.444,
+          2.061
+        ],
+        "mainP95": [
+          2.658,
+          2.87
+        ],
+        "mainTotal": [
+          182.107,
+          201.876
+        ],
+        "mainMsPerStep": [
+          3.0351166666666667,
+          3.3646000000000003
+        ],
+        "styleMsPerStep": [
+          0.10203333333333334,
+          0.1102
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          0.7793833333333333,
+          0.8509333333333333
+        ],
+        "taskMsPerStep": [
+          3.0231833333333338,
+          3.350866666666667
+        ],
+        "commits": [
+          2,
+          2
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          126,
+          139
+        ],
+        "wallMs": [
+          1045.638,
+          1153.85
+        ]
+      }
+    },
+    {
+      "config": "main",
+      "lib": "mocanvas",
+      "build": "main",
+      "n": 200,
+      "kind": "dom",
+      "gesture": "hover",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 126,
+          "mainP50": 0.305,
+          "mainP95": 3.967,
+          "mainTotal": 224.251,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1113.942,
+          "mainMsPerStep": 3.7375166666666666,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.5127333333333333,
+          "taskMsPerStep": 3.724616666666667,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 133,
+          "mainP50": 0.291,
+          "mainP95": 3.784,
+          "mainTotal": 230.011,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1250.268,
+          "mainMsPerStep": 3.8335166666666667,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.5172500000000002,
+          "taskMsPerStep": 3.8205,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 130,
+          "mainP50": 0.273,
+          "mainP95": 3.772,
+          "mainTotal": 228.219,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1137.438,
+          "mainMsPerStep": 3.8036499999999998,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.5324833333333332,
+          "taskMsPerStep": 3.787916666666667,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 134,
+          "mainP50": 0.314,
+          "mainP95": 3.8,
+          "mainTotal": 230.079,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1188.626,
+          "mainMsPerStep": 3.8346500000000003,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.5318833333333333,
+          "taskMsPerStep": 3.822166666666667,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 0.333,
+          "mainP95": 3.901,
+          "mainTotal": 229.14,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1010.169,
+          "mainMsPerStep": 3.819,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.5422,
+          "taskMsPerStep": 3.8080666666666665,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 0.305,
+        "mainP95": 3.8,
+        "mainTotal": 229.14,
+        "mainMsPerStep": 3.819,
+        "styleMsPerStep": 0,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 1.5318833333333333,
+        "taskMsPerStep": 3.8080666666666665,
+        "commits": 60,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 130,
+        "wallMs": 1137.438
+      },
+      "spread": {
+        "mainP50": [
+          0.273,
+          0.333
+        ],
+        "mainP95": [
+          3.772,
+          3.967
+        ],
+        "mainTotal": [
+          224.251,
+          230.079
+        ],
+        "mainMsPerStep": [
+          3.7375166666666666,
+          3.8346500000000003
+        ],
+        "styleMsPerStep": [
+          0,
+          0
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          1.5127333333333333,
+          1.5422
+        ],
+        "taskMsPerStep": [
+          3.724616666666667,
+          3.822166666666667
+        ],
+        "commits": [
+          60,
+          60
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          122,
+          134
+        ],
+        "wallMs": [
+          1010.169,
+          1250.268
+        ]
+      }
+    },
+    {
+      "config": "branch",
+      "lib": "mocanvas",
+      "build": "branch",
+      "n": 200,
+      "kind": "dom",
+      "gesture": "hover",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 0.317,
+          "mainP95": 2.406,
+          "mainTotal": 144.396,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1011.456,
+          "mainMsPerStep": 2.4065999999999996,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.29893333333333333,
+          "taskMsPerStep": 2.3964333333333334,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 1.908,
+          "mainP95": 2.464,
+          "mainTotal": 143.741,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1029.964,
+          "mainMsPerStep": 2.3956833333333334,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.298,
+          "taskMsPerStep": 2.385,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 123,
+          "mainP50": 0.365,
+          "mainP95": 2.367,
+          "mainTotal": 143.004,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1035.933,
+          "mainMsPerStep": 2.3834,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.3027,
+          "taskMsPerStep": 2.37365,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 1.962,
+          "mainP95": 2.602,
+          "mainTotal": 150.194,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1011.626,
+          "mainMsPerStep": 2.503233333333333,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.31296666666666667,
+          "taskMsPerStep": 2.4922166666666663,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 1.904,
+          "mainP95": 2.438,
+          "mainTotal": 146.666,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1011.522,
+          "mainMsPerStep": 2.4444333333333335,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.30660000000000004,
+          "taskMsPerStep": 2.4349333333333334,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 1.904,
+        "mainP95": 2.438,
+        "mainTotal": 144.396,
+        "mainMsPerStep": 2.4065999999999996,
+        "styleMsPerStep": 0,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 0.3027,
+        "taskMsPerStep": 2.3964333333333334,
+        "commits": 0,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 122,
+        "wallMs": 1011.626
+      },
+      "spread": {
+        "mainP50": [
+          0.317,
+          1.962
+        ],
+        "mainP95": [
+          2.367,
+          2.602
+        ],
+        "mainTotal": [
+          143.004,
+          150.194
+        ],
+        "mainMsPerStep": [
+          2.3834,
+          2.503233333333333
+        ],
+        "styleMsPerStep": [
+          0,
+          0
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          0.298,
+          0.31296666666666667
+        ],
+        "taskMsPerStep": [
+          2.37365,
+          2.4922166666666663
+        ],
+        "commits": [
+          0,
+          0
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          122,
+          123
+        ],
+        "wallMs": [
+          1011.456,
+          1035.933
+        ]
+      }
+    },
+    {
+      "config": "main",
+      "lib": "mocanvas",
+      "build": "main",
+      "n": 200,
+      "kind": "dom-live",
+      "gesture": "drag",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 196,
+          "mainP50": 0.48,
+          "mainP95": 8.991,
+          "mainTotal": 680.535,
+          "traceStyleMs": 35.714,
+          "traceLayoutMs": 0,
+          "wallMs": 1676.764,
+          "mainMsPerStep": 11.34225,
+          "styleMsPerStep": 0.5955166666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 2.4848500000000002,
+          "taskMsPerStep": 11.323433333333332,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 192,
+          "mainP50": 0.48,
+          "mainP95": 9.046,
+          "mainTotal": 674.822,
+          "traceStyleMs": 36.221,
+          "traceLayoutMs": 0,
+          "wallMs": 1625.101,
+          "mainMsPerStep": 11.247033333333333,
+          "styleMsPerStep": 0.6042833333333333,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 2.5172166666666667,
+          "taskMsPerStep": 11.229316666666668,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 191,
+          "mainP50": 0.473,
+          "mainP95": 8.986,
+          "mainTotal": 668.816,
+          "traceStyleMs": 36.066,
+          "traceLayoutMs": 0,
+          "wallMs": 1622.438,
+          "mainMsPerStep": 11.146933333333333,
+          "styleMsPerStep": 0.6016333333333334,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 2.4543666666666666,
+          "taskMsPerStep": 11.1293,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 195,
+          "mainP50": 0.489,
+          "mainP95": 9.087,
+          "mainTotal": 686.223,
+          "traceStyleMs": 37.151,
+          "traceLayoutMs": 0,
+          "wallMs": 1656.122,
+          "mainMsPerStep": 11.43705,
+          "styleMsPerStep": 0.6196,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 2.5596166666666664,
+          "taskMsPerStep": 11.420066666666667,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 197,
+          "mainP50": 0.483,
+          "mainP95": 8.758,
+          "mainTotal": 662.474,
+          "traceStyleMs": 34.063,
+          "traceLayoutMs": 0,
+          "wallMs": 1671.087,
+          "mainMsPerStep": 11.041233333333334,
+          "styleMsPerStep": 0.5686166666666668,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 2.4168666666666665,
+          "taskMsPerStep": 11.022333333333332,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 0.48,
+        "mainP95": 8.991,
+        "mainTotal": 674.822,
+        "mainMsPerStep": 11.247033333333333,
+        "styleMsPerStep": 0.6016333333333334,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 2.4848500000000002,
+        "taskMsPerStep": 11.229316666666668,
+        "commits": 63,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 195,
+        "wallMs": 1656.122
+      },
+      "spread": {
+        "mainP50": [
+          0.473,
+          0.489
+        ],
+        "mainP95": [
+          8.758,
+          9.087
+        ],
+        "mainTotal": [
+          662.474,
+          686.223
+        ],
+        "mainMsPerStep": [
+          11.041233333333334,
+          11.43705
+        ],
+        "styleMsPerStep": [
+          0.5686166666666668,
+          0.6196
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          2.4168666666666665,
+          2.5596166666666664
+        ],
+        "taskMsPerStep": [
+          11.022333333333332,
+          11.420066666666667
+        ],
+        "commits": [
+          63,
+          63
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          191,
+          197
+        ],
+        "wallMs": [
+          1622.438,
+          1676.764
+        ]
+      }
+    },
+    {
+      "config": "branch",
+      "lib": "mocanvas",
+      "build": "branch",
+      "n": 200,
+      "kind": "dom-live",
+      "gesture": "drag",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 198,
+          "mainP50": 0.444,
+          "mainP95": 7.81,
+          "mainTotal": 589.332,
+          "traceStyleMs": 34.824,
+          "traceLayoutMs": 0,
+          "wallMs": 1679.053,
+          "mainMsPerStep": 9.8222,
+          "styleMsPerStep": 0.581,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.0895833333333333,
+          "taskMsPerStep": 9.8038,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 190,
+          "mainP50": 0.441,
+          "mainP95": 7.714,
+          "mainTotal": 584.712,
+          "traceStyleMs": 34.328,
+          "traceLayoutMs": 0,
+          "wallMs": 1627.298,
+          "mainMsPerStep": 9.7452,
+          "styleMsPerStep": 0.5725,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.0521833333333335,
+          "taskMsPerStep": 9.727350000000001,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 184,
+          "mainP50": 0.452,
+          "mainP95": 7.701,
+          "mainTotal": 581.327,
+          "traceStyleMs": 34.785,
+          "traceLayoutMs": 0,
+          "wallMs": 1571.643,
+          "mainMsPerStep": 9.688783333333333,
+          "styleMsPerStep": 0.5800833333333333,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.0588166666666667,
+          "taskMsPerStep": 9.672400000000001,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 187,
+          "mainP50": 0.453,
+          "mainP95": 7.861,
+          "mainTotal": 588.615,
+          "traceStyleMs": 35.7,
+          "traceLayoutMs": 0,
+          "wallMs": 1597.758,
+          "mainMsPerStep": 9.81025,
+          "styleMsPerStep": 0.5951666666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.0653833333333333,
+          "taskMsPerStep": 9.791383333333334,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 189,
+          "mainP50": 0.435,
+          "mainP95": 7.625,
+          "mainTotal": 590.067,
+          "traceStyleMs": 35.636,
+          "traceLayoutMs": 0,
+          "wallMs": 1613.154,
+          "mainMsPerStep": 9.83445,
+          "styleMsPerStep": 0.5945666666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.0372999999999999,
+          "taskMsPerStep": 9.815750000000001,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 0.444,
+        "mainP95": 7.714,
+        "mainTotal": 588.615,
+        "mainMsPerStep": 9.81025,
+        "styleMsPerStep": 0.581,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 1.0588166666666667,
+        "taskMsPerStep": 9.791383333333334,
+        "commits": 2,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 189,
+        "wallMs": 1613.154
+      },
+      "spread": {
+        "mainP50": [
+          0.435,
+          0.453
+        ],
+        "mainP95": [
+          7.625,
+          7.861
+        ],
+        "mainTotal": [
+          581.327,
+          590.067
+        ],
+        "mainMsPerStep": [
+          9.688783333333333,
+          9.83445
+        ],
+        "styleMsPerStep": [
+          0.5725,
+          0.5951666666666667
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          1.0372999999999999,
+          1.0895833333333333
+        ],
+        "taskMsPerStep": [
+          9.672400000000001,
+          9.815750000000001
+        ],
+        "commits": [
+          2,
+          2
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          184,
+          198
+        ],
+        "wallMs": [
+          1571.643,
+          1679.053
+        ]
+      }
+    },
+    {
+      "config": "main",
+      "lib": "mocanvas",
+      "build": "main",
+      "n": 200,
+      "kind": "dom-live",
+      "gesture": "hover",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 124,
+          "mainP50": 0.291,
+          "mainP95": 7.261,
+          "mainTotal": 413.016,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1030.17,
+          "mainMsPerStep": 6.8836,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.7866333333333335,
+          "taskMsPerStep": 6.871316666666667,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 133,
+          "mainP50": 0.276,
+          "mainP95": 7.293,
+          "mainTotal": 401.403,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1103.896,
+          "mainMsPerStep": 6.69005,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.8372,
+          "taskMsPerStep": 6.678183333333334,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 133,
+          "mainP50": 0.303,
+          "mainP95": 6.439,
+          "mainTotal": 391.683,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1170.436,
+          "mainMsPerStep": 6.5280499999999995,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.6481333333333335,
+          "taskMsPerStep": 6.515750000000001,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 134,
+          "mainP50": 0.296,
+          "mainP95": 7.14,
+          "mainTotal": 406.024,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1145.923,
+          "mainMsPerStep": 6.767066666666667,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.7242166666666667,
+          "taskMsPerStep": 6.755316666666666,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 126,
+          "mainP50": 0.274,
+          "mainP95": 6.393,
+          "mainTotal": 381.927,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1045.743,
+          "mainMsPerStep": 6.36545,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.6969,
+          "taskMsPerStep": 6.35355,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 0.291,
+        "mainP95": 7.14,
+        "mainTotal": 401.403,
+        "mainMsPerStep": 6.69005,
+        "styleMsPerStep": 0,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 1.7242166666666667,
+        "taskMsPerStep": 6.678183333333334,
+        "commits": 60,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 133,
+        "wallMs": 1103.896
+      },
+      "spread": {
+        "mainP50": [
+          0.274,
+          0.303
+        ],
+        "mainP95": [
+          6.393,
+          7.293
+        ],
+        "mainTotal": [
+          381.927,
+          413.016
+        ],
+        "mainMsPerStep": [
+          6.36545,
+          6.8836
+        ],
+        "styleMsPerStep": [
+          0,
+          0
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          1.6481333333333335,
+          1.8372
+        ],
+        "taskMsPerStep": [
+          6.35355,
+          6.871316666666667
+        ],
+        "commits": [
+          60,
+          60
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          124,
+          134
+        ],
+        "wallMs": [
+          1030.17,
+          1170.436
+        ]
+      }
+    },
+    {
+      "config": "branch",
+      "lib": "mocanvas",
+      "build": "branch",
+      "n": 200,
+      "kind": "dom-live",
+      "gesture": "hover",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 3.585,
+          "mainP95": 6.023,
+          "mainTotal": 318.4,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1013.351,
+          "mainMsPerStep": 5.306666666666667,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.5638,
+          "taskMsPerStep": 5.282966666666667,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 4.167,
+          "mainP95": 4.996,
+          "mainTotal": 300.791,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1013.735,
+          "mainMsPerStep": 5.013183333333333,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.3701333333333333,
+          "taskMsPerStep": 5.003116666666666,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 123,
+          "mainP50": 0.944,
+          "mainP95": 5.092,
+          "mainTotal": 306.198,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1081.976,
+          "mainMsPerStep": 5.1033,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.33410000000000006,
+          "taskMsPerStep": 5.0930333333333335,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 0.35,
+          "mainP95": 5.317,
+          "mainTotal": 298.145,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1015.548,
+          "mainMsPerStep": 4.969083333333333,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.32333333333333336,
+          "taskMsPerStep": 4.958733333333333,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 3.964,
+          "mainP95": 4.846,
+          "mainTotal": 283.908,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1013.98,
+          "mainMsPerStep": 4.731800000000001,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.30856666666666666,
+          "taskMsPerStep": 4.723249999999999,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 3.585,
+        "mainP95": 5.092,
+        "mainTotal": 300.791,
+        "mainMsPerStep": 5.013183333333333,
+        "styleMsPerStep": 0,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 0.33410000000000006,
+        "taskMsPerStep": 5.003116666666666,
+        "commits": 0,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 122,
+        "wallMs": 1013.98
+      },
+      "spread": {
+        "mainP50": [
+          0.35,
+          4.167
+        ],
+        "mainP95": [
+          4.846,
+          6.023
+        ],
+        "mainTotal": [
+          283.908,
+          318.4
+        ],
+        "mainMsPerStep": [
+          4.731800000000001,
+          5.306666666666667
+        ],
+        "styleMsPerStep": [
+          0,
+          0
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          0.30856666666666666,
+          0.5638
+        ],
+        "taskMsPerStep": [
+          4.723249999999999,
+          5.282966666666667
+        ],
+        "commits": [
+          0,
+          0
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          122,
+          123
+        ],
+        "wallMs": [
+          1013.351,
+          1081.976
+        ]
+      }
+    },
+    {
+      "config": "main",
+      "lib": "mocanvas",
+      "build": "main",
+      "n": 1000,
+      "kind": "dom",
+      "gesture": "drag",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 175,
+          "mainP50": 0.411,
+          "mainP95": 23.138,
+          "mainTotal": 732.856,
+          "traceStyleMs": 6.404,
+          "traceLayoutMs": 0,
+          "wallMs": 1616.877,
+          "mainMsPerStep": 12.214266666666667,
+          "styleMsPerStep": 0.10690000000000001,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 9.696566666666666,
+          "taskMsPerStep": 12.198433333333334,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 178,
+          "mainP50": 0.41,
+          "mainP95": 23.108,
+          "mainTotal": 733.534,
+          "traceStyleMs": 6.203,
+          "traceLayoutMs": 0,
+          "wallMs": 1630.569,
+          "mainMsPerStep": 12.225566666666667,
+          "styleMsPerStep": 0.10361666666666668,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 9.678300000000002,
+          "taskMsPerStep": 12.210133333333333,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 195,
+          "mainP50": 0.427,
+          "mainP95": 24.462,
+          "mainTotal": 786.831,
+          "traceStyleMs": 6.64,
+          "traceLayoutMs": 0,
+          "wallMs": 1772.37,
+          "mainMsPerStep": 13.113850000000001,
+          "styleMsPerStep": 0.11121666666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 10.399849999999999,
+          "taskMsPerStep": 13.096399999999997,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 191,
+          "mainP50": 0.408,
+          "mainP95": 24.137,
+          "mainTotal": 752.967,
+          "traceStyleMs": 6.397,
+          "traceLayoutMs": 0,
+          "wallMs": 1729.875,
+          "mainMsPerStep": 12.54945,
+          "styleMsPerStep": 0.10706666666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 9.953149999999999,
+          "taskMsPerStep": 12.533933333333334,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 195,
+          "mainP50": 0.415,
+          "mainP95": 24.13,
+          "mainTotal": 772.814,
+          "traceStyleMs": 6.56,
+          "traceLayoutMs": 0,
+          "wallMs": 1755.767,
+          "mainMsPerStep": 12.880233333333333,
+          "styleMsPerStep": 0.10945,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 10.207716666666666,
+          "taskMsPerStep": 12.863949999999999,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 0.411,
+        "mainP95": 24.13,
+        "mainTotal": 752.967,
+        "mainMsPerStep": 12.54945,
+        "styleMsPerStep": 0.10706666666666667,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 9.953149999999999,
+        "taskMsPerStep": 12.533933333333334,
+        "commits": 63,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 191,
+        "wallMs": 1729.875
+      },
+      "spread": {
+        "mainP50": [
+          0.408,
+          0.427
+        ],
+        "mainP95": [
+          23.108,
+          24.462
+        ],
+        "mainTotal": [
+          732.856,
+          786.831
+        ],
+        "mainMsPerStep": [
+          12.214266666666667,
+          13.113850000000001
+        ],
+        "styleMsPerStep": [
+          0.10361666666666668,
+          0.11121666666666667
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          9.678300000000002,
+          10.399849999999999
+        ],
+        "taskMsPerStep": [
+          12.198433333333334,
+          13.096399999999997
+        ],
+        "commits": [
+          63,
+          63
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          175,
+          195
+        ],
+        "wallMs": [
+          1616.877,
+          1772.37
+        ]
+      }
+    },
+    {
+      "config": "branch",
+      "lib": "mocanvas",
+      "build": "branch",
+      "n": 1000,
+      "kind": "dom",
+      "gesture": "drag",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 126,
+          "mainP50": 2.002,
+          "mainP95": 3.074,
+          "mainTotal": 210.16,
+          "traceStyleMs": 6.527,
+          "traceLayoutMs": 0,
+          "wallMs": 1046.894,
+          "mainMsPerStep": 3.502666666666667,
+          "styleMsPerStep": 0.10921666666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.0346333333333333,
+          "taskMsPerStep": 3.4886166666666667,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 129,
+          "mainP50": 1.422,
+          "mainP95": 2.938,
+          "mainTotal": 199.338,
+          "traceStyleMs": 6.235,
+          "traceLayoutMs": 0,
+          "wallMs": 1071.554,
+          "mainMsPerStep": 3.3223,
+          "styleMsPerStep": 0.10416666666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.9897333333333334,
+          "taskMsPerStep": 3.30895,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 130,
+          "mainP50": 1.272,
+          "mainP95": 3.139,
+          "mainTotal": 212.262,
+          "traceStyleMs": 6.57,
+          "traceLayoutMs": 0,
+          "wallMs": 1080.783,
+          "mainMsPerStep": 3.5377,
+          "styleMsPerStep": 0.10971666666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.0498,
+          "taskMsPerStep": 3.5231666666666666,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 126,
+          "mainP50": 2.083,
+          "mainP95": 3.205,
+          "mainTotal": 206.796,
+          "traceStyleMs": 6.504,
+          "traceLayoutMs": 0,
+          "wallMs": 1046.434,
+          "mainMsPerStep": 3.4465999999999997,
+          "styleMsPerStep": 0.10868333333333333,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.0314166666666666,
+          "taskMsPerStep": 3.432783333333333,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 127,
+          "mainP50": 1.97,
+          "mainP95": 3.204,
+          "mainTotal": 207.259,
+          "traceStyleMs": 6.361,
+          "traceLayoutMs": 0,
+          "wallMs": 1055.796,
+          "mainMsPerStep": 3.4543166666666663,
+          "styleMsPerStep": 0.10641666666666666,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.0245,
+          "taskMsPerStep": 3.4408499999999997,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 1.97,
+        "mainP95": 3.139,
+        "mainTotal": 207.259,
+        "mainMsPerStep": 3.4543166666666663,
+        "styleMsPerStep": 0.10868333333333333,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 1.0314166666666666,
+        "taskMsPerStep": 3.4408499999999997,
+        "commits": 2,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 127,
+        "wallMs": 1055.796
+      },
+      "spread": {
+        "mainP50": [
+          1.272,
+          2.083
+        ],
+        "mainP95": [
+          2.938,
+          3.205
+        ],
+        "mainTotal": [
+          199.338,
+          212.262
+        ],
+        "mainMsPerStep": [
+          3.3223,
+          3.5377
+        ],
+        "styleMsPerStep": [
+          0.10416666666666667,
+          0.10971666666666667
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          0.9897333333333334,
+          1.0498
+        ],
+        "taskMsPerStep": [
+          3.30895,
+          3.5231666666666666
+        ],
+        "commits": [
+          2,
+          2
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          126,
+          130
+        ],
+        "wallMs": [
+          1046.434,
+          1080.783
+        ]
+      }
+    },
+    {
+      "config": "main",
+      "lib": "mocanvas",
+      "build": "main",
+      "n": 1000,
+      "kind": "dom",
+      "gesture": "hover",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 0.946,
+          "mainP95": 17.789,
+          "mainTotal": 695.294,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1220.776,
+          "mainMsPerStep": 11.588233333333333,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 9.533166666666666,
+          "taskMsPerStep": 11.577333333333332,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 1.65,
+          "mainP95": 17.603,
+          "mainTotal": 691.595,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1228.12,
+          "mainMsPerStep": 11.526583333333333,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 9.497583333333333,
+          "taskMsPerStep": 11.515766666666668,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 126,
+          "mainP50": 0.882,
+          "mainP95": 18.372,
+          "mainTotal": 698.648,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1238.358,
+          "mainMsPerStep": 11.644133333333334,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 9.668083333333332,
+          "taskMsPerStep": 11.633516666666669,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 0.809,
+          "mainP95": 16.032,
+          "mainTotal": 625.902,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1047.771,
+          "mainMsPerStep": 10.431700000000001,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 8.521466666666665,
+          "taskMsPerStep": 10.42175,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 0.925,
+          "mainP95": 14.942,
+          "mainTotal": 601.298,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1055.608,
+          "mainMsPerStep": 10.021633333333334,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 8.087683333333334,
+          "taskMsPerStep": 10.010666666666669,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 0.925,
+        "mainP95": 17.603,
+        "mainTotal": 691.595,
+        "mainMsPerStep": 11.526583333333333,
+        "styleMsPerStep": 0,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 9.497583333333333,
+        "taskMsPerStep": 11.515766666666668,
+        "commits": 60,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 122,
+        "wallMs": 1220.776
+      },
+      "spread": {
+        "mainP50": [
+          0.809,
+          1.65
+        ],
+        "mainP95": [
+          14.942,
+          18.372
+        ],
+        "mainTotal": [
+          601.298,
+          698.648
+        ],
+        "mainMsPerStep": [
+          10.021633333333334,
+          11.644133333333334
+        ],
+        "styleMsPerStep": [
+          0,
+          0
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          8.087683333333334,
+          9.668083333333332
+        ],
+        "taskMsPerStep": [
+          10.010666666666669,
+          11.633516666666669
+        ],
+        "commits": [
+          60,
+          60
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          122,
+          126
+        ],
+        "wallMs": [
+          1047.771,
+          1238.358
+        ]
+      }
+    },
+    {
+      "config": "branch",
+      "lib": "mocanvas",
+      "build": "branch",
+      "n": 1000,
+      "kind": "dom",
+      "gesture": "hover",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 0.304,
+          "mainP95": 2.263,
+          "mainTotal": 130.118,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1012.948,
+          "mainMsPerStep": 2.168633333333333,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.2924333333333333,
+          "taskMsPerStep": 2.158433333333333,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 1.623,
+          "mainP95": 2.13,
+          "mainTotal": 128.653,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1012.47,
+          "mainMsPerStep": 2.1442166666666664,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.2840666666666667,
+          "taskMsPerStep": 2.1344833333333337,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 1.587,
+          "mainP95": 2.11,
+          "mainTotal": 125.552,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1014.087,
+          "mainMsPerStep": 2.0925333333333334,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.27743333333333337,
+          "taskMsPerStep": 2.083716666666667,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 0.268,
+          "mainP95": 2.091,
+          "mainTotal": 122.399,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1014.383,
+          "mainMsPerStep": 2.0399833333333333,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.27390000000000003,
+          "taskMsPerStep": 2.0317,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 124,
+          "mainP50": 0.269,
+          "mainP95": 2.031,
+          "mainTotal": 118.289,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1076.467,
+          "mainMsPerStep": 1.9714833333333333,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.25751666666666667,
+          "taskMsPerStep": 1.9636333333333336,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 0.304,
+        "mainP95": 2.11,
+        "mainTotal": 125.552,
+        "mainMsPerStep": 2.0925333333333334,
+        "styleMsPerStep": 0,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 0.27743333333333337,
+        "taskMsPerStep": 2.083716666666667,
+        "commits": 0,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 122,
+        "wallMs": 1014.087
+      },
+      "spread": {
+        "mainP50": [
+          0.268,
+          1.623
+        ],
+        "mainP95": [
+          2.031,
+          2.263
+        ],
+        "mainTotal": [
+          118.289,
+          130.118
+        ],
+        "mainMsPerStep": [
+          1.9714833333333333,
+          2.168633333333333
+        ],
+        "styleMsPerStep": [
+          0,
+          0
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          0.25751666666666667,
+          0.2924333333333333
+        ],
+        "taskMsPerStep": [
+          1.9636333333333336,
+          2.158433333333333
+        ],
+        "commits": [
+          0,
+          0
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          122,
+          124
+        ],
+        "wallMs": [
+          1012.47,
+          1076.467
+        ]
+      }
+    },
+    {
+      "config": "main",
+      "lib": "mocanvas",
+      "build": "main",
+      "n": 1000,
+      "kind": "dom-live",
+      "gesture": "drag",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 194,
+          "mainP50": 0.451,
+          "mainP95": 51.065,
+          "mainTotal": 2744.714,
+          "traceStyleMs": 158.737,
+          "traceLayoutMs": 0,
+          "wallMs": 3662.611,
+          "mainMsPerStep": 45.74523333333333,
+          "styleMsPerStep": 2.646916666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 11.412583333333334,
+          "taskMsPerStep": 45.72615,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 2,
+          "loafBlockingMs": 143.2,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 202,
+          "mainP50": 0.464,
+          "mainP95": 51.839,
+          "mainTotal": 2778.701,
+          "traceStyleMs": 159.619,
+          "traceLayoutMs": 0,
+          "wallMs": 3723.4,
+          "mainMsPerStep": 46.311683333333335,
+          "styleMsPerStep": 2.6612333333333336,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 11.7432,
+          "taskMsPerStep": 46.29288333333333,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 3,
+          "loafBlockingMs": 145.9,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 198,
+          "mainP50": 0.46,
+          "mainP95": 52.164,
+          "mainTotal": 2961.085,
+          "traceStyleMs": 160.63,
+          "traceLayoutMs": 0,
+          "wallMs": 3805.347,
+          "mainMsPerStep": 49.351416666666665,
+          "styleMsPerStep": 2.678866666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 14.22395,
+          "taskMsPerStep": 49.33228333333333,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 3,
+          "loafBlockingMs": 152.89999999999998,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 221,
+          "mainP50": 0.432,
+          "mainP95": 53.352,
+          "mainTotal": 3273.396,
+          "traceStyleMs": 221.589,
+          "traceLayoutMs": 0,
+          "wallMs": 4161.313,
+          "mainMsPerStep": 54.5566,
+          "styleMsPerStep": 3.694733333333333,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 14.115350000000001,
+          "taskMsPerStep": 54.5373,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 4,
+          "loafBlockingMs": 240.5,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 202,
+          "mainP50": 0.407,
+          "mainP95": 48.21,
+          "mainTotal": 2626.429,
+          "traceStyleMs": 146.738,
+          "traceLayoutMs": 0,
+          "wallMs": 3455.823,
+          "mainMsPerStep": 43.77381666666667,
+          "styleMsPerStep": 2.4467,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 10.888,
+          "taskMsPerStep": 43.75736666666667,
+          "commits": 63,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 2,
+          "loafBlockingMs": 134.8,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 0.451,
+        "mainP95": 51.839,
+        "mainTotal": 2778.701,
+        "mainMsPerStep": 46.311683333333335,
+        "styleMsPerStep": 2.6612333333333336,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 11.7432,
+        "taskMsPerStep": 46.29288333333333,
+        "commits": 63,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 3,
+        "loafBlockingMs": 145.9,
+        "frames": 202,
+        "wallMs": 3723.4
+      },
+      "spread": {
+        "mainP50": [
+          0.407,
+          0.464
+        ],
+        "mainP95": [
+          48.21,
+          53.352
+        ],
+        "mainTotal": [
+          2626.429,
+          3273.396
+        ],
+        "mainMsPerStep": [
+          43.77381666666667,
+          54.5566
+        ],
+        "styleMsPerStep": [
+          2.4467,
+          3.694733333333333
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          10.888,
+          14.22395
+        ],
+        "taskMsPerStep": [
+          43.75736666666667,
+          54.5373
+        ],
+        "commits": [
+          63,
+          63
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          2,
+          4
+        ],
+        "loafBlockingMs": [
+          134.8,
+          240.5
+        ],
+        "frames": [
+          194,
+          221
+        ],
+        "wallMs": [
+          3455.823,
+          4161.313
+        ]
+      }
+    },
+    {
+      "config": "branch",
+      "lib": "mocanvas",
+      "build": "branch",
+      "n": 1000,
+      "kind": "dom-live",
+      "gesture": "drag",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 221,
+          "mainP50": 0.427,
+          "mainP95": 28.72,
+          "mainTotal": 2169.068,
+          "traceStyleMs": 159.242,
+          "traceLayoutMs": 0,
+          "wallMs": 3155.564,
+          "mainMsPerStep": 36.151133333333334,
+          "styleMsPerStep": 2.6551833333333335,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.5602500000000001,
+          "taskMsPerStep": 36.13184999999999,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 2,
+          "loafBlockingMs": 116.9,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 202,
+          "mainP50": 0.426,
+          "mainP95": 28.82,
+          "mainTotal": 2165.026,
+          "traceStyleMs": 161.064,
+          "traceLayoutMs": 0,
+          "wallMs": 2996.205,
+          "mainMsPerStep": 36.08376666666666,
+          "styleMsPerStep": 2.6858999999999997,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.5531000000000001,
+          "taskMsPerStep": 36.06585,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 2,
+          "loafBlockingMs": 117.4,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 197,
+          "mainP50": 0.427,
+          "mainP95": 28.95,
+          "mainTotal": 2188.189,
+          "traceStyleMs": 160.567,
+          "traceLayoutMs": 0,
+          "wallMs": 2983.513,
+          "mainMsPerStep": 36.46981666666667,
+          "styleMsPerStep": 2.6776166666666663,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.5765500000000001,
+          "taskMsPerStep": 36.45228333333333,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 2,
+          "loafBlockingMs": 120.4,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 198,
+          "mainP50": 0.441,
+          "mainP95": 29.154,
+          "mainTotal": 2203.633,
+          "traceStyleMs": 162.073,
+          "traceLayoutMs": 0,
+          "wallMs": 2999.456,
+          "mainMsPerStep": 36.72721666666666,
+          "styleMsPerStep": 2.7024166666666667,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.56955,
+          "taskMsPerStep": 36.708200000000005,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 2,
+          "loafBlockingMs": 120.8,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 196,
+          "mainP50": 0.448,
+          "mainP95": 29.428,
+          "mainTotal": 2118.296,
+          "traceStyleMs": 145.345,
+          "traceLayoutMs": 0,
+          "wallMs": 2903.832,
+          "mainMsPerStep": 35.30493333333333,
+          "styleMsPerStep": 2.4236,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 1.5340833333333335,
+          "taskMsPerStep": 35.28764999999999,
+          "commits": 2,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 2,
+          "loafBlockingMs": 95.5,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 0.427,
+        "mainP95": 28.95,
+        "mainTotal": 2169.068,
+        "mainMsPerStep": 36.151133333333334,
+        "styleMsPerStep": 2.6776166666666663,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 1.5602500000000001,
+        "taskMsPerStep": 36.13184999999999,
+        "commits": 2,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 2,
+        "loafBlockingMs": 117.4,
+        "frames": 198,
+        "wallMs": 2996.205
+      },
+      "spread": {
+        "mainP50": [
+          0.426,
+          0.448
+        ],
+        "mainP95": [
+          28.72,
+          29.428
+        ],
+        "mainTotal": [
+          2118.296,
+          2203.633
+        ],
+        "mainMsPerStep": [
+          35.30493333333333,
+          36.72721666666666
+        ],
+        "styleMsPerStep": [
+          2.4236,
+          2.7024166666666667
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          1.5340833333333335,
+          1.5765500000000001
+        ],
+        "taskMsPerStep": [
+          35.28764999999999,
+          36.708200000000005
+        ],
+        "commits": [
+          2,
+          2
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          2,
+          2
+        ],
+        "loafBlockingMs": [
+          95.5,
+          120.8
+        ],
+        "frames": [
+          196,
+          221
+        ],
+        "wallMs": [
+          2903.832,
+          3155.564
+        ]
+      }
+    },
+    {
+      "config": "main",
+      "lib": "mocanvas",
+      "build": "main",
+      "n": 1000,
+      "kind": "dom-live",
+      "gesture": "hover",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 131,
+          "mainP50": 0.464,
+          "mainP95": 35.183,
+          "mainTotal": 1806.76,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 2224.256,
+          "mainMsPerStep": 30.112666666666666,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 9.298766666666667,
+          "taskMsPerStep": 30.10151666666667,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 139,
+          "mainP50": 0.233,
+          "mainP95": 29.817,
+          "mainTotal": 1642.609,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 2040.296,
+          "mainMsPerStep": 27.376816666666667,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 8.213766666666666,
+          "taskMsPerStep": 27.366016666666667,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 146,
+          "mainP50": 0.198,
+          "mainP95": 30.179,
+          "mainTotal": 1595.15,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 2013.638,
+          "mainMsPerStep": 26.585833333333333,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 7.793566666666666,
+          "taskMsPerStep": 26.576283333333333,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 0.591,
+          "mainP95": 28.141,
+          "mainTotal": 1423.945,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1763.746,
+          "mainMsPerStep": 23.732416666666666,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 7.055233333333334,
+          "taskMsPerStep": 23.724533333333333,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 122,
+          "mainP50": 0.736,
+          "mainP95": 29.923,
+          "mainTotal": 1459.908,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1772.419,
+          "mainMsPerStep": 24.331799999999998,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 7.381166666666667,
+          "taskMsPerStep": 24.32365,
+          "commits": 60,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 0.464,
+        "mainP95": 29.923,
+        "mainTotal": 1595.15,
+        "mainMsPerStep": 26.585833333333333,
+        "styleMsPerStep": 0,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 7.793566666666666,
+        "taskMsPerStep": 26.576283333333333,
+        "commits": 60,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 131,
+        "wallMs": 2013.638
+      },
+      "spread": {
+        "mainP50": [
+          0.198,
+          0.736
+        ],
+        "mainP95": [
+          28.141,
+          35.183
+        ],
+        "mainTotal": [
+          1423.945,
+          1806.76
+        ],
+        "mainMsPerStep": [
+          23.732416666666666,
+          30.112666666666666
+        ],
+        "styleMsPerStep": [
+          0,
+          0
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          7.055233333333334,
+          9.298766666666667
+        ],
+        "taskMsPerStep": [
+          23.724533333333333,
+          30.10151666666667
+        ],
+        "commits": [
+          60,
+          60
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          122,
+          146
+        ],
+        "wallMs": [
+          1763.746,
+          2224.256
+        ]
+      }
+    },
+    {
+      "config": "branch",
+      "lib": "mocanvas",
+      "build": "branch",
+      "n": 1000,
+      "kind": "dom-live",
+      "gesture": "hover",
+      "runs": [
+        {
+          "steps": 60,
+          "frames": 134,
+          "mainP50": 0.249,
+          "mainP95": 22.642,
+          "mainTotal": 1318.099,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1683.689,
+          "mainMsPerStep": 21.968316666666666,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.37883333333333336,
+          "taskMsPerStep": 21.957833333333333,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 0
+        },
+        {
+          "steps": 60,
+          "frames": 131,
+          "mainP50": 0.177,
+          "mainP95": 17.461,
+          "mainTotal": 1047.34,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1564.402,
+          "mainMsPerStep": 17.455666666666666,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.2796,
+          "taskMsPerStep": 17.44885,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 1
+        },
+        {
+          "steps": 60,
+          "frames": 132,
+          "mainP50": 0.187,
+          "mainP95": 18.304,
+          "mainTotal": 1075.103,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1613.845,
+          "mainMsPerStep": 17.918383333333335,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.2847166666666667,
+          "taskMsPerStep": 17.9104,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 2
+        },
+        {
+          "steps": 60,
+          "frames": 133,
+          "mainP50": 0.173,
+          "mainP95": 17.519,
+          "mainTotal": 1063.67,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1554.836,
+          "mainMsPerStep": 17.727833333333333,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.2886,
+          "taskMsPerStep": 17.720333333333333,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 3
+        },
+        {
+          "steps": 60,
+          "frames": 133,
+          "mainP50": 0.165,
+          "mainP95": 17.243,
+          "mainTotal": 1014.775,
+          "traceStyleMs": 0,
+          "traceLayoutMs": 0,
+          "wallMs": 1397.529,
+          "mainMsPerStep": 16.912916666666668,
+          "styleMsPerStep": 0,
+          "layoutMsPerStep": 0,
+          "scriptMsPerStep": 0.2691166666666667,
+          "taskMsPerStep": 16.905183333333333,
+          "commits": 0,
+          "mounts": 0,
+          "unmounts": 0,
+          "renders": 0,
+          "loafCount": 0,
+          "loafBlockingMs": 0,
+          "order": 4
+        }
+      ],
+      "median": {
+        "mainP50": 0.177,
+        "mainP95": 17.519,
+        "mainTotal": 1063.67,
+        "mainMsPerStep": 17.727833333333333,
+        "styleMsPerStep": 0,
+        "layoutMsPerStep": 0,
+        "scriptMsPerStep": 0.2847166666666667,
+        "taskMsPerStep": 17.720333333333333,
+        "commits": 0,
+        "mounts": 0,
+        "unmounts": 0,
+        "renders": 0,
+        "loafCount": 0,
+        "loafBlockingMs": 0,
+        "frames": 133,
+        "wallMs": 1564.402
+      },
+      "spread": {
+        "mainP50": [
+          0.165,
+          0.249
+        ],
+        "mainP95": [
+          17.243,
+          22.642
+        ],
+        "mainTotal": [
+          1014.775,
+          1318.099
+        ],
+        "mainMsPerStep": [
+          16.912916666666668,
+          21.968316666666666
+        ],
+        "styleMsPerStep": [
+          0,
+          0
+        ],
+        "layoutMsPerStep": [
+          0,
+          0
+        ],
+        "scriptMsPerStep": [
+          0.2691166666666667,
+          0.37883333333333336
+        ],
+        "taskMsPerStep": [
+          16.905183333333333,
+          21.957833333333333
+        ],
+        "commits": [
+          0,
+          0
+        ],
+        "mounts": [
+          0,
+          0
+        ],
+        "unmounts": [
+          0,
+          0
+        ],
+        "renders": [
+          0,
+          0
+        ],
+        "loafCount": [
+          0,
+          0
+        ],
+        "loafBlockingMs": [
+          0,
+          0
+        ],
+        "frames": [
+          131,
+          134
+        ],
+        "wallMs": [
+          1397.529,
+          1683.689
+        ]
+      }
+    }
+  ]
+}
