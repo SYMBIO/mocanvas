@@ -1,4 +1,4 @@
-import { react as reactSignal } from "@mocanvas/state"
+import { computed, react as reactSignal, type Computed } from "@mocanvas/state"
 import { track, useValue } from "@mocanvas/state/react"
 import { DefaultGrid, DefaultShapeErrorFallback } from "./defaultEditorComponents"
 import type { TLGridProps } from "./ui-types"
@@ -614,7 +614,7 @@ const GridLayer = track(function GridLayer({ editor, Grid }: { editor: Editor; G
  * zoom frame changes one CSS property and nothing else, where rendering it made
  * React walk every overlay shape on every frame of the gesture. The layer
  * re-renders only when the set of mounted shapes, their clips, the retained set
- * or the editing shape changes.
+ * or the editing shape changes — not when a shape in it moves or changes.
  */
 const OverlayLayer = track(function OverlayLayer({ editor }: { editor: Editor }) {
   const ids = editor.getOverlayShapeIds()
@@ -633,20 +633,12 @@ const OverlayLayer = track(function OverlayLayer({ editor }: { editor: Editor })
   const cut = editor.options.overlayCameraCssVars !== "inherit"
   return (
     <div ref={ref} className="mocanvas-overlay" style={cut ? overlayLayerStyleCut : overlayLayerStyle}>
-      {ids.map((id, i) => {
-        const shape = editor.getShape(id)
-        if (!shape) return null
-        return (
-          <OverlayShape
-            key={id}
-            editor={editor}
-            shape={shape}
-            isEditing={editingId === id}
-            clip={clips[i]}
-            isRetained={retained.has(id)}
-          />
-        )
-      })}
+      {ids.map((id, i) => (
+        // The id, not the record: reading every record here re-rendered this
+        // layer — and walked every mounted shape — whenever any one of them
+        // changed, which is every step of a drag.
+        <OverlayShape key={id} editor={editor} id={id} isEditing={editingId === id} clip={clips[i]} isRetained={retained.has(id)} />
+      ))}
     </div>
   )
 })
@@ -697,36 +689,90 @@ const overlayLayerStyleCut: CSSProperties = {
  */
 const RETAINED_STYLE: CSSProperties = { contentVisibility: "hidden", visibility: "hidden" } as CSSProperties
 
+/**
+ * What an overlay shape's wrapper renders from: everything about the shape but
+ * where it is. Position, size and opacity are written to the wrapper by a
+ * reaction instead (see {@link useShapePlacement}), so a moving shape does not
+ * re-render its wrapper, its boundary, or — through them — anything else.
+ */
+function sameRendered(a: UnknownShape | undefined, b: UnknownShape | undefined): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  return a.id === b.id && a.type === b.type && a.props === b.props && a.meta === b.meta
+}
+
+/** The shape's record, as a signal that changes only when {@link sameRendered} says so. */
+function useRenderedShape(editor: Editor, id: UnknownShape["id"]): UnknownShape | undefined {
+  const signal: Computed<UnknownShape | undefined> = useMemo(
+    () => computed(`overlayShape:${id}`, () => editor.getShape(id), { isEqual: sameRendered }),
+    [editor, id],
+  )
+  return signal.get()
+}
+
+/**
+ * Writes a shape's page transform, size and opacity to its wrapper from a
+ * reaction: a drag step changes three style properties and renders nothing.
+ * Written first inside a layout effect, so the wrapper is placed before paint.
+ */
+function useShapePlacement(editor: Editor, id: string, clip: ClipRect | undefined, ref: { current: HTMLDivElement | null }, mounted: boolean) {
+  const clipped = clip !== undefined
+  const cx = clip ? clip[0] : 0
+  const cy = clip ? clip[1] : 0
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    // The clip rect is page-space and the shape may be rotated, so it is applied
+    // by an unrotated wrapper placed at the rect; the shape is offset back into it.
+    const offset = clipped ? `translate(${-cx}px, ${-cy}px) ` : ""
+    return reactSignal(`canvas.shapePlacement:${id}`, () => {
+      const shape = editor.getShape(id as UnknownShape["id"])
+      if (!shape) return
+      const m = editor.getShapePageTransform(shape)
+      const bounds = editor.getShapeGeometryBounds(shape)
+      el.style.transform = `${offset}matrix(${m.a}, ${m.b}, ${m.c}, ${m.d}, ${m.e}, ${m.f})`
+      el.style.width = `${bounds?.w ?? 0}px`
+      el.style.height = `${bounds?.h ?? 0}px`
+      el.style.opacity = String(shape.opacity)
+    })
+  }, [editor, id, clipped, cx, cy, ref, mounted])
+}
+
 const OverlayShape = track(function OverlayShape({
   editor,
-  shape,
+  id,
   isEditing,
   clip,
   isRetained,
 }: {
   editor: Editor
-  shape: UnknownShape
+  id: UnknownShape["id"]
   isEditing: boolean
   /** Page-space clip rect inherited from a clipping ancestor (a frame). */
   clip: ClipRect | undefined
   /** Off screen, mounted only so that coming back does not rebuild it: hidden. */
   isRetained: boolean
 }) {
-  const util = editor.getShapeUtil(shape)
-  const m = editor.getShapePageTransform(shape)
-  const bounds = editor.getShapeGeometryBounds(shape)
+  // The record as far as rendering cares: a new value when props, meta or type
+  // change, the same one when only x, y, rotation or opacity do.
+  const shape = useRenderedShape(editor, id)
+  const placementRef = useRef<HTMLDivElement>(null)
+  useShapePlacement(editor, id, clip, placementRef, !!shape)
   // Duck-typed like `canCull`: a util that does not implement the hook does not
   // read the camera variables, which is what every shape did before the overlay
   // stopped inheriting them.
-  const asksForCamera = (util as { usesCameraCssVars?(shape: UnknownShape): boolean }).usesCameraCssVars?.(shape) === true
+  const util = shape ? editor.getShapeUtil(shape) : undefined
+  const asksForCamera = !!shape && (util as { usesCameraCssVars?(shape: UnknownShape): boolean } | undefined)?.usesCameraCssVars?.(shape) === true
   // Off while the shape is retained: nobody can see it, and the write is not free.
   const cameraRef = useCameraCssVarsOnShape(editor, asksForCamera && !isRetained)
-  // The clip rect is page-space and the shape may be rotated, so it is applied
-  // by an unrotated wrapper placed at the rect; the shape is offset back into it.
-  const offset = clip ? `translate(${-clip[0]}px, ${-clip[1]}px) ` : ""
+  if (!shape || !util) return null
+  const setRef = (node: HTMLDivElement | null) => {
+    placementRef.current = node
+    cameraRef.current = node
+  }
   const el = (
     <div
-      ref={cameraRef}
+      ref={setRef}
       className="mocanvas-shape"
       data-shape-id={shape.id}
       data-shape-type={shape.type}
@@ -735,11 +781,7 @@ const OverlayShape = track(function OverlayShape({
         position: "absolute",
         left: 0,
         top: 0,
-        width: bounds?.w ?? 0,
-        height: bounds?.h ?? 0,
         transformOrigin: "0 0",
-        transform: `${offset}matrix(${m.a}, ${m.b}, ${m.c}, ${m.d}, ${m.e}, ${m.f})`,
-        opacity: shape.opacity,
         pointerEvents: isEditing ? "auto" : "none",
         ...(isRetained && !clip ? RETAINED_STYLE : null),
       }}
@@ -846,14 +888,46 @@ export function getShapeIndicatorNode<T extends UnknownShape>(
 }
 
 /** Selection bounds and hover indicator. */
-const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor: Editor }) {
-  const bounds = editor.getSelectionPageBounds()
-  const hovered = editor.getHoveredShape()
+/**
+ * Whether the SVG layer below draws anything for the current selection — the
+ * same decisions {@link DefaultIndicators} makes, without reading where the
+ * shapes are. When the canvas painters own the selection chrome and the util
+ * is ported, the answer is no, and it stays no while the shape is dragged.
+ */
+function svgDrawsSelection(editor: Editor): boolean {
   const selected = editor.getSelectedShapes()
+  if (selected.length > 1) return true
+  if (selected.length === 0 || editor.getCurrentToolId() !== "select") return false
+  const shape = selected[0]!
+  const util = editor.getShapeUtil(shape)
+  if (!util.hideSelectionBoundsFg(shape) && getIndicatorSource(util) === "react") return true
+  if (!hasOverlay(editor, "shapeHandle") && (util.getHandles?.(shape)?.length ?? 0) > 0) return true
+  return !hasOverlay(editor, "selectionForeground")
+}
+
+const DefaultIndicators = track(function DefaultIndicators({ editor }: { editor: Editor }) {
+  // Read first, and as a computed: a drag changes the selection's bounds on
+  // every step, and this layer re-rendered for each of them to draw nothing.
+  const drawsSelection = useMemo(() => computed("canvas.svgDrawsSelection", () => svgDrawsSelection(editor)), [editor]).get()
+  // Only a hovered shape this layer would outline: one still on the deprecated
+  // `indicator()` hook. Every other hover outline is stroked on the canvas, and
+  // reading the hovered shape itself re-rendered this layer each time the
+  // pointer crossed from one card to the next, to draw nothing.
+  const hovered = useMemo(
+    () =>
+      computed("canvas.svgHoverIndicator", () => {
+        const shape = editor.getHoveredShape()
+        if (!shape || editor.getCurrentToolId() !== "select") return undefined
+        return getIndicatorSource(editor.getShapeUtil(shape)) === "react" ? shape : undefined
+      }),
+    [editor],
+  ).get()
   const tool = editor.getCurrentToolId()
-  // Nothing to outline: return before reading the camera, so a pan over a board
-  // with nothing hovered or selected does not re-render this layer every frame.
-  if (!bounds && selected.length === 0 && !(hovered && tool === "select")) return null
+  // Nothing to outline: return before reading the camera or the selection's
+  // bounds, so neither a pan nor a drag re-renders this layer every frame.
+  if (!drawsSelection && !(hovered && tool === "select")) return null
+  const bounds = editor.getSelectionPageBounds()
+  const selected = editor.getSelectedShapes()
   const cam = editor.getCamera()
   const z = cam.z
   const toScreen = (x: number, y: number) => [(x + cam.x) * z, (y + cam.y) * z] as const
@@ -992,7 +1066,10 @@ const SnapLines = track(function SnapLines({ editor }: { editor: Editor }) {
 })
 
 const DefaultBrush = track(function DefaultBrush({ editor }: { editor: Editor }) {
-  const brush = editor.getInstanceState().brush
+  // The brush alone, not the instance record it lives in: the record also
+  // carries the cursor, and re-rendering on a cursor write is a commit per
+  // pointer move for a brush that is not there.
+  const brush = useValue("brush", () => editor.getInstanceState().brush, [editor])
   if (!brush) return null
   const cam = editor.getCamera()
   const x = (brush.x + cam.x) * cam.z

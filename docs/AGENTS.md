@@ -210,8 +210,9 @@ Both call `flushEngine()` first, so a shape created a line earlier is already in
 spatial index: **no frame has to be rendered for a hit test to be correct**, and none
 is. The default answers "the interior of a filled shape, or the outline of any
 shape", which is what a pointer would hit. `{ hitInside: true }` also counts the
-interior of a *hollow* shape; that case goes the geometry route rather than the
-engine's index, which is a page scan, so it is a deliberate opt-in. Tolerance comes
+interior of a *hollow* shape; that case takes its candidates from the engine's index
+by bounds and then tests each one's geometry, so it costs a little more than the
+default but does not scan the page. Tolerance comes
 from `editor.getHitTestMargin()`, divided by the current zoom — headless with no
 camera moved, that zoom is 1; pass `{ margin }` to fix it yourself if a run should
 not depend on the configured default. `editor.getPointInShapeSpace(shape, point)`

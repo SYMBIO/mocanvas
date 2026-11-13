@@ -35,15 +35,19 @@ pub enum BoxQueryMode {
     Intersects,
     /// Shape's page bounds lie fully within the box.
     Contains,
+    /// Shape's page bounds overlap the box (touching counts). No outline test:
+    /// the candidates for a caller that runs its own, finer test — a point
+    /// inside a hollow shape is within its bounds and nowhere near its outline.
+    Bounds,
 }
 
 impl BoxQueryMode {
     /// Decode from the WASM boundary.
     pub fn from_u32(v: u32) -> Self {
-        if v == 1 {
-            Self::Contains
-        } else {
-            Self::Intersects
+        match v {
+            1 => Self::Contains,
+            2 => Self::Bounds,
+            _ => Self::Intersects,
         }
     }
 }
@@ -106,6 +110,7 @@ impl Scene {
             let sh = self.shape_at(slot);
             let ok = match mode {
                 BoxQueryMode::Contains => b.contains_box(sh.page_bounds),
+                BoxQueryMode::Bounds => b.intersects(sh.page_bounds),
                 BoxQueryMode::Intersects => {
                     if b.contains_box(sh.page_bounds) {
                         true
@@ -254,6 +259,13 @@ mod tests {
         // box inside hollow ellipse touching no outline → not selected
         let inside_hollow = Box2d::from_xywh(95.0, 95.0, 10.0, 10.0);
         assert_eq!(sc.query_box(&inside_hollow, BoxQueryMode::Intersects, HitFilter::default()), vec![1]);
+        // bounds only: a box deep inside the hollow ellipse's bounds still finds it
+        let centre = Box2d::from_xywh(119.0, 119.0, 2.0, 2.0);
+        assert!(sc.query_box(&centre, BoxQueryMode::Intersects, HitFilter::default()).is_empty());
+        assert_eq!(sc.query_box(&centre, BoxQueryMode::Bounds, HitFilter::default()), vec![2]);
+        let far = Box2d::from_xywh(5000.0, 5000.0, 2.0, 2.0);
+        assert!(sc.query_box(&far, BoxQueryMode::Bounds, HitFilter::default()).is_empty());
+        assert_eq!(BoxQueryMode::from_u32(2), BoxQueryMode::Bounds);
     }
 
     #[test]
