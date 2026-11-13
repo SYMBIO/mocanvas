@@ -1,0 +1,82 @@
+# Ask tldraw the same questions we ask mocanvas, and fail on a new answer.
+#
+# Every behavioural divergence fixed on 2026-11-12 — nine releases of them —
+# was found by a consumer running the two libraries side by side, never by this
+# repository. Our own tests check mocanvas against what mocanvas's author
+# believed tldraw does; nothing here could check the belief. This job checks it.
+#
+# `apps/bench` is the one place the clean-room policy lets us depend on tldraw
+# and drive it through its public API (docs/CLEAN_ROOM.md). It reads no tldraw
+# source, and nothing it prints is copied into `packages/**`: a divergence is a
+# question for a human, who writes mocanvas's own answer from first principles.
+#
+# Green means every difference is written down in `apps/bench/oracle/divergences.json`.
+# Red means one is not — which is the only thing this job is for.
+name: Oracle
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A second push supersedes the first; this job takes minutes and nobody reads
+# the older of two answers to the same question.
+concurrency:
+  group: oracle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  oracle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: latest
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ hashFiles('Cargo.lock') }}
+
+      - run: pnpm install --frozen-lockfile
+
+      # `packages/wasm/pkg` is wasm-pack output and is not in the repository,
+      # so the bench cannot resolve `@mocanvas/wasm` until it exists.
+      - run: pnpm build
+
+      # Chromium only: the harness runs both libraries in one browser, so the
+      # question is what they do differently, not what a browser does.
+      - run: pnpm --filter bench exec playwright install --with-deps chromium
+
+      - name: Ask the oracle
+        run: pnpm --filter bench oracle
+
+      # The full answer for every probe, so a red run can be read without
+      # reproducing it. Kept whether the step above passed or failed.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oracle-report
+          path: apps/bench/results/oracle.json
+          retention-days: 14

@@ -4,7 +4,7 @@
  * estimate the Node-side text measurer uses), one `<tspan>` per line.
  */
 import type { DefaultHorizontalAlignStyle, DefaultVerticalAlignStyle } from "@mocanvas/editor"
-import { AVG_CHAR_WIDTH, LINE_HEIGHT } from "../shapes/text-helpers"
+import { AVG_CHAR_WIDTH, getLineHeightPx } from "../shapes/text-helpers"
 import { isRichText, richTextToBlocks, richTextToText, safeHref, type RichTextRun, type RichTextSource } from "../text/rich-text"
 import { attrs, escapeXml, svgNum } from "./svg-utils"
 
@@ -181,7 +181,7 @@ export function textToSvg(source: RichTextSource, box: SvgTextBox, opts: SvgText
   const innerH = Math.max(0, box.h - padding * 2)
   const wrapWidth = opts.wrap ? innerW : Infinity
   const lineCount = rich ? wrapRichTextLines(source, opts.fontSize, wrapWidth).length : wrapTextLines(plain, opts.fontSize, wrapWidth).length
-  const lineH = opts.fontSize * LINE_HEIGHT
+  const lineH = getLineHeightPx(opts.fontSize)
   const blockH = lineCount * lineH
 
   const anchor = anchorFor(alignOf(opts))

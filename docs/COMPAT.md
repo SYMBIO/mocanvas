@@ -268,6 +268,32 @@ local persistence, and `onUiEvent`. Those are canvas features.
   lets you check first. Two of tldraw's fill names, `fill-fill` and
   `fill-lined-fill`, have no mocanvas equivalent and are not aliased: they name
   style variants this canvas does not have. See `docs/UI.md` for the whole set.
+- **Typefaces, and therefore label widths.** mocanvas ships no font files: each
+  built-in font style names a family that is already on the machine
+  (`draw` → Comic Sans MS, `sans` → Helvetica, `serif` → Georgia,
+  `mono` → Menlo), so a board renders with nothing loaded and the package stays
+  small. tldraw ships its own four. The same string therefore measures
+  narrower here, which moves a label's box and anything laid out against it.
+
+  Measured 2026-11-12 on "Hamburgefonstiv" at all four sizes, mocanvas against
+  tldraw 5.4 (`pnpm --filter bench oracle --probes=text-shape-size-by-font`):
+
+  | font | difference |
+  | :-- | :-- |
+  | `mono` | within 0.3% |
+  | `sans` | −3.1% to −7.5% |
+  | `serif` | −7.9% to −8.2% |
+  | `draw` | −8.8% to −9.1% |
+
+  This is a decision, not a gap: closing it means vendoring four typeface
+  families into the package, and the package not carrying fonts is worth more
+  than the last few per cent of width. **Line height is not part of it** — a
+  label's line box is `round(fontSize × 1.35)` in both, exactly, since 4.17.0.
+
+  **If your layout depends on the exact width**, replace the theme's `fonts`
+  stacks with your own families and register their faces with the font manager;
+  measurement follows whatever the stack resolves to. An app that does this with
+  tldraw's own families gets tldraw's widths back.
 - **No watermark, licence key or telemetry.**
 
 ## File format

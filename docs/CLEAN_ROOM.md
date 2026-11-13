@@ -47,6 +47,10 @@ The exception is bounded:
 - No code is copied in either direction. The fixture in
   `apps/bench/public/compare.tldr` is data produced by running the other
   library, which is exactly the kind of sample document rule 2 permits.
+- The same applies to the oracle harness (`apps/bench/oracle/`, docs/ORACLE.md),
+  which asks both libraries the same question and compares the answers. Reading
+  what tldraw *returns* is permitted; reading how it arrives there is not, and a
+  divergence it reports is a question for a human rather than an answer to copy.
 - License tooling (`license-checker`, `cargo deny`) must therefore *exclude*
   `apps/bench` rather than have rule 5's allowlist relaxed for everyone.
 

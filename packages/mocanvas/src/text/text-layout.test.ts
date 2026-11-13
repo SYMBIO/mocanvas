@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { LINE_HEIGHT } from "../shapes/text-helpers"
+import { getLineHeightPx } from "../shapes/text-helpers"
 import { computeGrowY, getTextShapeSize, measureLabel, TEXT_SHAPE_MIN_WIDTH, trimTrailingWhitespace } from "./text-layout"
 
 describe("computeGrowY", () => {
@@ -33,13 +33,13 @@ describe("measureLabel / getTextShapeSize (estimate fallback)", () => {
     const m = measureLabel("x".repeat(20), { font: "draw", fontSize: 24, maxWidth: 100 + 32, padding: 16 })
     // 100px inner width / 14.4px per char = 6 chars per line → 4 lines
     expect(m.lineCount).toBe(4)
-    expect(m.h).toBeCloseTo(4 * 24 * LINE_HEIGHT + 32)
+    expect(m.h).toBeCloseTo(4 * getLineHeightPx(24) + 32)
   })
 
   it("auto-size follows the text width, with a floor for empty text", () => {
     const empty = getTextShapeSize({ text: "", font: "draw", fontSize: 24, autoSize: true, w: 100 })
     expect(empty.w).toBe(TEXT_SHAPE_MIN_WIDTH)
-    expect(empty.h).toBeCloseTo(24 * LINE_HEIGHT)
+    expect(empty.h).toBeCloseTo(getLineHeightPx(24))
 
     const short = getTextShapeSize({ text: "hi", font: "draw", fontSize: 24, autoSize: true, w: 100 })
     const long = getTextShapeSize({ text: "hello there", font: "draw", fontSize: 24, autoSize: true, w: 100 })
@@ -49,13 +49,13 @@ describe("measureLabel / getTextShapeSize (estimate fallback)", () => {
 
     const multi = getTextShapeSize({ text: "a\nb\nc", font: "draw", fontSize: 24, autoSize: true, w: 100 })
     expect(multi.lineCount).toBe(3)
-    expect(multi.h).toBeCloseTo(3 * 24 * LINE_HEIGHT)
+    expect(multi.h).toBeCloseTo(3 * getLineHeightPx(24))
   })
 
   it("fixed width wraps and keeps w", () => {
     const s = getTextShapeSize({ text: "a".repeat(30), font: "draw", fontSize: 24, autoSize: false, w: 100 })
     expect(s.w).toBe(100)
     expect(s.lineCount).toBe(5)
-    expect(s.h).toBeCloseTo(5 * 24 * LINE_HEIGHT)
+    expect(s.h).toBeCloseTo(5 * getLineHeightPx(24))
   })
 })
