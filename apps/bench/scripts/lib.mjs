@@ -28,17 +28,20 @@ const HARDWARE_ANGLE_ARGS = process.platform === "darwin" ? ["--use-gl=angle", "
 /** Always on: deterministic-ish timing plus `window.gc` for the heap metric. */
 const BASE_ARGS = ["--js-flags=--expose-gc", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows", "--hide-scrollbars", "--force-color-profile=srgb", "--font-render-hinting=none"]
 
-/** Build the bench app for production (both pages get minified, NODE_ENV=production React). */
-export async function buildApp() {
+/**
+ * Build the bench app for production (both pages get minified, NODE_ENV=production React).
+ * `minify: false` keeps component names, for a run that has to say what rendered.
+ */
+export async function buildApp({ minify = true } = {}) {
   process.env.NODE_ENV = "production"
   const { build } = await import("vite")
-  await build({ root: ROOT, mode: "production", logLevel: "warn" })
+  await build({ root: ROOT, mode: "production", logLevel: "warn", ...(minify ? {} : { build: { minify: false } }) })
 }
 
-/** Serve `dist/` with `vite preview`. Returns `{ url, close }`. */
-export async function startPreview(port = 5182) {
+/** Serve `dir` (default `dist/`) with `vite preview`. Returns `{ url, close }`. */
+export async function startPreview(port = 5182, dir = undefined) {
   const { preview } = await import("vite")
-  const server = await preview({ root: ROOT, preview: { port, strictPort: true, host: "127.0.0.1" }, logLevel: "warn" })
+  const server = await preview({ root: ROOT, preview: { port, strictPort: true, host: "127.0.0.1" }, ...(dir ? { build: { outDir: dir } } : {}), logLevel: "warn" })
   const url = server.resolvedUrls?.local?.[0] ?? `http://127.0.0.1:${port}/`
   return { url: url.replace(/\/$/, ""), close: () => server.close() }
 }

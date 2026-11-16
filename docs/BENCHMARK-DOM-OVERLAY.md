@@ -205,6 +205,59 @@ with no React work and no style recalc on either side. That is the browser
 compositing and painting a 150,000-node layer; it is a candidate for
 `content-visibility: auto` on off-screen kept shapes, not measured here.
 
-**Hit-testing on hover (H5)** — `hitInside` walking the page in JS per pointer
-move — does not show: hover is under 0.5 ms p50 at every N. The p95 tail at
-1,000 cards is the same before and after and was not investigated.
+**Hit-testing on hover (H5)** was measured wrong here: p50 is floored by the idle
+frames of a real-mouse gesture. It was the hover cost — see
+[Drag and hover](#drag-and-hover).
+
+## Drag and hover
+
+_Measured 2026-11-13, interleaved: `--builds=main=<4.16.0 build>,branch=.`,
+5 repeats per configuration (pan/zoom: 3), alternating page by page. Raw:
+`results/dom-overlay-drag-hover-interleaved.json`,
+`results/dom-overlay-panzoom-interleaved.json`, noise floor
+`results/dom-overlay-noise-floor.json`._
+
+**Noise floor.** The same build under two names, interleaved: medians differ by
+0.0–0.9 ms per step and 0.0–0.6 ms of p95. Every change below is larger than
+that, and no before/after range overlaps.
+
+**Causes, from a CPU profile of a drag step on 1,000 cards and the `--why`
+attribution:**
+
+- `getCurrentPageShapesSorted()` sorted each parent's children by filtering
+  every shape on the page — N² — and ran three times per step: the pointer hit
+  test, the drop-target search, and the overlay's kept set. ~10 ms of the
+  ~11 ms of script per step at 1,000 shapes.
+- H5: the `hitInside` hit test the canvas runs on every pointer move scanned the
+  whole page (4.0 ms per call at 1,000 against 0.003 ms for the engine query),
+  and over empty canvas ran twice.
+- Hover commits: the idle select tool wrote a new cursor object on every move,
+  and the current page id was read off the instance record, so every reader of
+  the page — the overlay layer, the indicators — re-rendered per move.
+- H4 refuted for the body (already 0 renders since #20); confirmed for the
+  layer: reading every shape record made the overlay layer re-render, and walk
+  every mounted shape, on each drag step, plus the dragged shape's wrapper.
+
+`main → branch`, median [min–max]; main ms/step is main-thread busy time per
+input:
+
+| N | kind | gesture | main ms/step | main p95 ms | commits |
+| --: | :-- | :-- | --: | --: | --: |
+| 200 | dom | drag | 4.28 [3.99–4.70] → 3.11 [3.04–3.36] | 4.02 → 2.75 | 63 → 2 |
+| 200 | dom | hover | 3.82 [3.74–3.83] → 2.41 [2.38–2.50] | 3.80 → 2.44 | 60 → 0 |
+| 200 | dom-live | drag | 11.25 [11.04–11.44] → 9.81 [9.69–9.83] | 8.99 → 7.71 | 63 → 2 |
+| 200 | dom-live | hover | 6.69 [6.37–6.88] → 5.01 [4.73–5.31] | 7.14 → 5.09 | 60 → 0 |
+| 1000 | dom | drag | 12.55 [12.21–13.11] → 3.45 [3.32–3.54] | 24.13 → 3.14 | 63 → 2 |
+| 1000 | dom | hover | 11.53 [10.02–11.64] → 2.09 [1.97–2.17] | 17.60 → 2.11 | 60 → 0 |
+| 1000 | dom-live | drag | 46.31 [43.77–54.56] → 36.15 [35.30–36.73] | 51.84 → 28.95 | 63 → 2 |
+| 1000 | dom-live | hover | 26.59 [23.73–30.11] → 17.73 [16.91–21.97] | 29.92 → 17.52 | 60 → 0 |
+
+The two drag commits left are the press and the release changing the
+selection. Pan and zoom are unchanged within the noise at both N. tldraw 5.4 in
+the noise-floor run, for reference: drag 3.84 ms/step (`dom`) and 19.48
+(`dom-live`) at 1,000; hover 2.78 and 14.88.
+
+**What is left.** A drag over 1,000 *mounted* cards still costs ~36 ms a step,
+of which ~1 ms is script: the rest is the browser restyling, laying out and
+painting a 150,000-node layer, as on a pan. That is the same paint cost listed
+above, not fixed here.

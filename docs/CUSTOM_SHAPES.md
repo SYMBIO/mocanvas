@@ -203,6 +203,10 @@ last render changes (`useValue`, `editor.get*`). Moving, rotating or fading the
 shape changes only the wrapper's transform and opacity, so a body that reads
 `shape.x`, `shape.y`, `shape.rotation` or `shape.opacity` sees the value from its
 last render. Read the position through a signal if you need it.
+The wrapper does not re-render for a move either: its transform, size and
+opacity are written to the element directly, so a drag step is no React commit.
+`updateShapes` keeps the `props` object when an update restates values the
+shape already has, so restating a prop does not re-render the body.
 A pan or zoom re-renders nothing: the camera is a transform on the overlay layer.
 
 **Off screen.** A body is mounted while its shape is on screen. When the shape

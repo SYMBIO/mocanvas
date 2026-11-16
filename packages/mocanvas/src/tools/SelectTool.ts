@@ -29,8 +29,13 @@ const RESIZE_CURSORS: Partial<Record<SelectionHandle, string>> = {
   rotate: "grab",
 }
 
-function setCursor(editor: { updateInstanceState(p: { cursor: { type: string; rotation: number } }): unknown }, type: string): void {
-  editor.updateInstanceState({ cursor: { type, rotation: 0 } })
+/**
+ * Through `Editor.setCursor`, which writes nothing when the cursor is already
+ * this one. Idle calls this on every pointer move; writing the instance record
+ * each time re-ran everything that reads it — one React commit per move.
+ */
+function setCursor(editor: { setCursor(cursor: { type: string; rotation: number }): unknown }, type: string): void {
+  editor.setCursor({ type, rotation: 0 })
 }
 
 /**

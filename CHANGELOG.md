@@ -44,6 +44,40 @@ not carrying fonts is worth more than the last few per cent of width. The
 numbers and the way out (replace the theme's `fonts` stacks with your own
 families) are now in docs/COMPAT.md.
 
+### Faster: dragging and hovering on a board of DOM-overlay shapes
+
+On 1,000 DOM cards a drag step spent ~10 ms of script in
+`getCurrentPageShapesSorted()`, reached three times a step — the pointer hit
+test, the drop-target search and the overlay's kept set — and it sorted each
+shape's children by filtering every shape on the page. Hovering paid the same
+through the hit test, and was one React commit per pointer move.
+
+- The page's draw order is kept per parent and shared, so
+  `getCurrentPageShapesSorted()`, `getSortedChildIdsForParent()` and
+  `getHighestIndexForParent()` no longer cost N² on a page of N shapes. They
+  still return arrays you may change.
+- `getShapeAtPoint(p, { hitInside: true })` — what the canvas asks on every
+  pointer move — takes its candidates from the spatial index instead of
+  scanning the page. The answers are the same.
+- The select tool no longer rewrites the cursor on every pointer move, and the
+  current page id and the page state's hovered, editing, selected and hinting
+  ids are computed, so a cursor or hover change no longer re-renders the
+  overlay layer or the indicators.
+- A shape that moves has its wrapper's transform, size and opacity written to
+  the element; neither the wrapper nor the overlay layer re-renders.
+- `updateShapes` keeps the `props` (and `meta`) object when an update restates
+  values the shape already has, so a shape body memoized on `props` does not
+  re-render for it.
+
+Numbers, interleaved against 4.16.0 in `apps/bench`: see
+[docs/BENCHMARK-DOM-OVERLAY.md](docs/BENCHMARK-DOM-OVERLAY.md#drag-and-hover).
+
+### Added: a bounds-only box query in `@mocanvas/wasm`
+
+`EngineBridge.queryBox(..., mode)` accepts `2`: every shape whose page (ink)
+bounds overlap the box, with no outline test — candidates for a caller that
+runs its own finer test.
+
 ### An oracle harness, so the next divergence is found here
 
 Every behavioural divergence fixed on 2026-11-12 was found by a consumer
@@ -69,6 +103,7 @@ belief that it was tldraw's.
 Nothing in this release acts on those. They are written down, printed on every
 run, and each one is now a decision with a reason attached rather than a
 surprise waiting in a consumer's app.
+
 
 ### Correction to 4.16.0
 

@@ -16,6 +16,8 @@
  *
  * Per gesture it records, inside a window marked with `console.timeStamp`:
  *
+ *   - main-thread busy ms per input step: all of the above summed over the
+ *     gesture and divided by its inputs — the steadiest of the three;
  *   - main-thread busy ms per frame, p50 / p95: the renderer main thread's
  *     top-level tasks from a Chromium trace, summed per `BeginMainThreadFrame`
  *     interval — not rAF deltas, which floor at the cadence;
@@ -24,22 +26,43 @@
  *   - card mounts / unmounts / renders (the card counts its own);
  *   - Long Animation Frames (> 50 ms), count and total blocking ms.
  *
- * Every (lib, N, kind, gesture, repeat) gets a fresh page, and shapes are created
- * with the camera already at the gesture's start, so nothing is mounted that the
- * gesture would not mount.
+ * Every (config, N, kind, gesture, repeat) gets a fresh page, and shapes are
+ * created with the camera already at the gesture's start, so nothing is mounted
+ * that the gesture would not mount.
+ *
+ * **Configurations are interleaved.** A configuration is a build of this app plus
+ * a library (`--builds` × `--libs`). For each (N, kind, gesture) the driver runs
+ * repeat 1 of every configuration, then repeat 2, and so on — rotating which one
+ * goes first — so a laptop that slows down halfway through a run slows every
+ * configuration down alike instead of whichever happened to run last. Run
+ * sequentially, the same build measured twice drifted by ~4 ms of p95 within one
+ * run, which is larger than most effects worth claiming. Every row reports the
+ * median and the min–max over its repeats; compare two builds only where their
+ * ranges do not overlap, and measure the noise floor by passing the same build
+ * twice under two names.
  *
  * Usage:
  *   pnpm --filter bench dom-overlay -- --label=baseline
  *   pnpm --filter bench dom-overlay -- --n=50,200 --repeats=1 --gestures=pan --label=quick
  *   pnpm --filter bench dom-overlay -- --grid=off --label=nogrid   (mocanvas starts in grid mode)
  *   node scripts/dom-overlay.mjs --compare=results/dom-overlay-baseline.json,results/dom-overlay-after.json
+ *
+ * Two builds, interleaved — snapshot one tree's build, then measure against it
+ * from another:
+ *   (on main)    node scripts/dom-overlay.mjs --save-build=/tmp/bench-main
+ *   (on branch)  node scripts/dom-overlay.mjs --builds=main=/tmp/bench-main,branch=. --repeats=5
+ *   (noise)      node scripts/dom-overlay.mjs --builds=a=.,b=. --repeats=5
+ * `.` is this tree, built now. `--why` builds unminified and adds, per row, which
+ * components rendered in the gesture's React commits.
  */
 import { chromium } from "playwright"
 import { execFileSync } from "node:child_process"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import { resolve } from "node:path"
 import { REPO_ROOT, ROOT, VIEWPORT, buildApp, launchBrowser, median, startPreview } from "./lib.mjs"
+
+const THIS_BUILD = resolve(ROOT, "dist")
 
 const RESULTS_DIR = resolve(ROOT, "results")
 const GESTURES = ["zoom", "pan", "drag", "hover"]
@@ -60,16 +83,45 @@ const TRACE_CATEGORIES = [
  * A stand-in for the React DevTools hook, installed before React loads. React's
  * production build reports every commit to it, which is a commit counter that
  * needs no profiling build.
+ *
+ * With `window.__reactWhy` set it also names what rendered in each commit, by
+ * the rule React DevTools uses: walk the committed tree, skip a subtree whose
+ * child list is the one the previous commit left (it bailed out), and count a
+ * component fiber that has no previous version (a mount) or that carries
+ * \`PerformedWork\` (its function ran). Names survive only an unminified build,
+ * which is what \`--why\` makes.
  */
 const REACT_HOOK = `(() => {
   const counts = (window.__reactCommits = { commits: 0 })
+  const COMPONENT_TAGS = new Set([0, 1, 11, 14, 15])
+  const nameOf = (f) => {
+    const t = f.tag === 14 ? f.elementType : f.type
+    return (t && (t.displayName || t.name || (t.type && (t.type.displayName || t.type.name)))) || "anonymous"
+  }
+  const attribute = (root) => {
+    const why = window.__reactWhy
+    const stack = [root.current]
+    while (stack.length) {
+      const f = stack.pop()
+      const prev = f.alternate
+      if (COMPONENT_TAGS.has(f.tag) && (!prev || (f.flags & 1) === 1)) {
+        const key = nameOf(f) + (prev ? "" : " (mount)")
+        why[key] = (why[key] || 0) + 1
+      }
+      if (prev && f.child === prev.child) continue
+      for (let c = f.child; c; c = c.sibling) stack.push(c)
+    }
+  }
   let id = 0
   window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
     supportsFiber: true,
     isDisabled: false,
     renderers: new Map(),
     inject(renderer) { id++; this.renderers.set(id, renderer); return id },
-    onCommitFiberRoot() { counts.commits++ },
+    onCommitFiberRoot(_id, root) {
+      counts.commits++
+      if (window.__reactWhy) attribute(root)
+    },
     onCommitFiberUnmount() {},
     onPostCommitFiberRoot() {},
     onScheduleFiberRoot() {},
@@ -78,9 +130,11 @@ const REACT_HOOK = `(() => {
 })()`
 
 function parseArgs(argv) {
-  const opts = { n: [50, 200, 1000], kinds: KINDS, gestures: GESTURES, libs: ["mocanvas"], repeats: 3, grid: "default", label: "run", build: true, gl: process.platform === "darwin" ? "hardware" : "auto", compare: null, retain: null }
+  const opts = { n: [50, 200, 1000], kinds: KINDS, gestures: GESTURES, libs: ["mocanvas"], repeats: 3, grid: "default", label: "run", build: true, gl: process.platform === "darwin" ? "hardware" : "auto", compare: null, retain: null, builds: null, saveBuild: null, why: false, port: 5183 }
   for (const a of argv) {
-    const [k, v] = a.replace(/^--/, "").split("=")
+    const arg = a.replace(/^--/, "")
+    const eq = arg.indexOf("=")
+    const [k, v] = eq < 0 ? [arg, undefined] : [arg.slice(0, eq), arg.slice(eq + 1)]
     if (k === "n") opts.n = v.split(",").map(Number)
     else if (k === "kinds") opts.kinds = v.split(",")
     else if (k === "gestures") opts.gestures = v.split(",")
@@ -92,6 +146,14 @@ function parseArgs(argv) {
     else if (k === "compare") opts.compare = v.split(",")
     else if (k === "grid") opts.grid = v
     else if (k === "retain") opts.retain = Number(v)
+    else if (k === "builds") opts.builds = v.split(",").map((b) => {
+      const [name, dir] = b.split("=")
+      if (!name || !dir) throw new Error(`--builds wants name=dir pairs, got "${b}"`)
+      return { name, dir: dir === "." ? THIS_BUILD : resolve(dir) }
+    })
+    else if (k === "save-build") opts.saveBuild = resolve(v)
+    else if (k === "why") opts.why = true
+    else if (k === "port") opts.port = Number(v)
   }
   return opts
 }
@@ -196,11 +258,12 @@ async function runGesture(page, gesture) {
   throw new Error(`unknown gesture ${gesture}`)
 }
 
-async function openPage(browser, url, lib, extraQuery = "") {
+async function openPage(browser, url, lib, extraQuery = "", why = false) {
   const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 })
   page.setDefaultTimeout(180_000)
   const errors = []
   page.on("pageerror", (e) => errors.push(e.message))
+  if (why) await page.addInitScript(() => (window.__reactWhy = {}))
   await page.addInitScript(REACT_HOOK)
   await page.goto(`${url}/?lib=${lib}${extraQuery}`, { waitUntil: "load" })
   await page.waitForFunction(() => Boolean(window.bench?.isReady()), null, { timeout: 120_000 })
@@ -265,6 +328,7 @@ async function measure(browser, page, gesture) {
   await page.evaluate(() => {
     window.__domBench = { renders: 0, mounts: 0, unmounts: 0 }
     window.__reactCommits.commits = 0
+    if (window.__reactWhy) window.__reactWhy = {}
     const loaf = (window.__loaf = { count: 0, blockingMs: 0 })
     try {
       window.__loafObserver?.disconnect()
@@ -292,11 +356,15 @@ async function measure(browser, page, gesture) {
   await cdp.detach()
   const trace = JSON.parse(buf.toString("utf8"))
   const analysis = analyzeTrace(trace.traceEvents ?? trace)
-  const counters = await page.evaluate(() => ({ ...window.__domBench, commits: window.__reactCommits.commits, loaf: { ...window.__loaf } }))
+  const counters = await page.evaluate(() => ({ ...window.__domBench, commits: window.__reactCommits.commits, loaf: { ...window.__loaf }, why: window.__reactWhy ? { ...window.__reactWhy } : undefined }))
   const delta = (k) => ((after[k] ?? 0) - (before[k] ?? 0)) * 1000
   return {
     steps,
     ...analysis,
+    // Busy ms per input, from the trace: what the gesture cost in total, which
+    // is steadier than a p95 over 60 frames (the third-worst frame) and is not
+    // floored by the idle frames a real-mouse gesture spends on CDP round trips.
+    mainMsPerStep: analysis ? analysis.mainTotal / steps : null,
     styleMsPerStep: delta("RecalcStyleDuration") / steps,
     layoutMsPerStep: delta("LayoutDuration") / steps,
     scriptMsPerStep: delta("ScriptDuration") / steps,
@@ -307,15 +375,35 @@ async function measure(browser, page, gesture) {
     renders: counters.renders,
     loafCount: counters.loaf.count ?? 0,
     loafBlockingMs: counters.loaf.blockingMs ?? 0,
+    ...(counters.why ? { why: counters.why } : {}),
   }
 }
 
-const FIELDS = ["mainP50", "mainP95", "mainTotal", "styleMsPerStep", "layoutMsPerStep", "scriptMsPerStep", "taskMsPerStep", "commits", "mounts", "unmounts", "renders", "loafCount", "loafBlockingMs", "frames", "wallMs"]
+const FIELDS = ["mainP50", "mainP95", "mainTotal", "mainMsPerStep", "styleMsPerStep", "layoutMsPerStep", "scriptMsPerStep", "taskMsPerStep", "commits", "mounts", "unmounts", "renders", "loafCount", "loafBlockingMs", "frames", "wallMs"]
 
 function medianOf(runs) {
   const out = {}
   for (const f of FIELDS) out[f] = median(runs.map((r) => r[f]))
   return out
+}
+
+/** Min and max of every field over the repeats: the spread a median hides. */
+function spreadOf(runs) {
+  const out = {}
+  for (const f of FIELDS) {
+    const xs = runs.map((r) => r[f]).filter((v) => typeof v === "number" && Number.isFinite(v))
+    out[f] = xs.length ? [Math.min(...xs), Math.max(...xs)] : null
+  }
+  return out
+}
+
+/** Which components rendered, summed over the repeats and divided back to one gesture. */
+function whyOf(runs) {
+  const withWhy = runs.filter((r) => r.why)
+  if (!withWhy.length) return undefined
+  const sum = {}
+  for (const r of withWhy) for (const [k, v] of Object.entries(r.why)) sum[k] = (sum[k] ?? 0) + v
+  return Object.fromEntries(Object.entries(sum).map(([k, v]) => [k, v / withWhy.length]).sort((a, b) => b[1] - a[1]))
 }
 
 function gitRev() {
@@ -330,31 +418,54 @@ function gitRev() {
 
 const fmt = (v, d = 2) => (v === null || v === undefined ? "–" : Number(v).toFixed(d))
 
-function table(results, libs) {
+/** `median [min–max]`, or the median alone for an older result file with no spread. */
+function withSpread(r, f, d = 2) {
+  const s = r.spread?.[f]
+  const m = fmt(r.median[f], d)
+  return s && r.runs.length > 1 ? `${m} [${fmt(s[0], d)}–${fmt(s[1], d)}]` : m
+}
+
+const configOf = (r) => r.config ?? r.lib
+
+function table(results) {
   const lines = []
-  lines.push("| lib | N | kind | gesture | main p50 ms | main p95 ms | style ms/step | layout ms/step | commits | mounts | unmounts | renders | LoAF |")
-  lines.push("| :-- | --: | :-- | :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: |")
+  lines.push("| config | N | kind | gesture | main ms/step | main p50 ms | main p95 ms | style ms/step | layout ms/step | commits | mounts | unmounts | renders | LoAF |")
+  lines.push("| :-- | --: | :-- | :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |")
   for (const r of results) {
-    if (!libs.includes(r.lib)) continue
     const m = r.median
-    lines.push(`| ${r.lib} | ${r.n} | ${r.kind} | ${r.gesture} | ${fmt(m.mainP50)} | ${fmt(m.mainP95)} | ${fmt(m.styleMsPerStep)} | ${fmt(m.layoutMsPerStep)} | ${fmt(m.commits, 0)} | ${fmt(m.mounts, 0)} | ${fmt(m.unmounts, 0)} | ${fmt(m.renders, 0)} | ${fmt(m.loafCount, 0)} |`)
+    lines.push(`| ${configOf(r)} | ${r.n} | ${r.kind} | ${r.gesture} | ${withSpread(r, "mainMsPerStep")} | ${withSpread(r, "mainP50")} | ${withSpread(r, "mainP95")} | ${fmt(m.styleMsPerStep)} | ${fmt(m.layoutMsPerStep)} | ${withSpread(r, "commits", 0)} | ${fmt(m.mounts, 0)} | ${fmt(m.unmounts, 0)} | ${fmt(m.renders, 0)} | ${fmt(m.loafCount, 0)} |`)
   }
   return lines.join("\n")
 }
 
+function whyTable(results) {
+  const lines = []
+  for (const r of results) {
+    if (!r.why) continue
+    const top = Object.entries(r.why).slice(0, 12).map(([k, v]) => `${k} ×${fmt(v, v % 1 ? 1 : 0)}`)
+    lines.push(`- ${configOf(r)} n=${r.n} ${r.kind} ${r.gesture}: ${top.join(", ") || "nothing"}`)
+  }
+  return lines.join("\n")
+}
+
+/**
+ * `before → after` for every row the two sides share. `a` and `b` are lists of
+ * rows: from two result files (measured at different times — trust only large
+ * differences), or two configurations of one interleaved file.
+ */
 function compareTable(a, b) {
   const key = (r) => `${r.lib}|${r.n}|${r.kind}|${r.gesture}`
-  const byKey = new Map(b.results.map((r) => [key(r), r]))
+  const byKey = new Map(b.map((r) => [key(r), r]))
   const lines = []
-  lines.push(`| N | kind | gesture | main p50 ms | main p95 ms | style ms/step | commits | mounts | unmounts | renders |`)
-  lines.push(`| --: | :-- | :-- | --: | --: | --: | --: | --: | --: | --: |`)
-  const pair = (x, y, d = 2) => `${fmt(x, d)} → ${fmt(y, d)}`
-  for (const ra of a.results) {
+  lines.push(`| N | kind | gesture | main ms/step | main p50 ms | main p95 ms | style ms/step | commits | mounts | unmounts | renders |`)
+  lines.push(`| --: | :-- | :-- | --: | --: | --: | --: | --: | --: | --: | --: |`)
+  const pair = (ra, rb, f, d = 2) => `${withSpread(ra, f, d)} → ${withSpread(rb, f, d)}`
+  for (const ra of a) {
     const rb = byKey.get(key(ra))
     if (!rb) continue
     const x = ra.median
     const y = rb.median
-    lines.push(`| ${ra.n} | ${ra.kind} | ${ra.gesture} | ${pair(x.mainP50, y.mainP50)} | ${pair(x.mainP95, y.mainP95)} | ${pair(x.styleMsPerStep, y.styleMsPerStep)} | ${pair(x.commits, y.commits, 0)} | ${pair(x.mounts, y.mounts, 0)} | ${pair(x.unmounts, y.unmounts, 0)} | ${pair(x.renders, y.renders, 0)} |`)
+    lines.push(`| ${ra.n} | ${ra.kind} | ${ra.gesture} | ${pair(ra, rb, "mainMsPerStep")} | ${pair(ra, rb, "mainP50")} | ${pair(ra, rb, "mainP95")} | ${fmt(x.styleMsPerStep)} → ${fmt(y.styleMsPerStep)} | ${pair(ra, rb, "commits", 0)} | ${fmt(x.mounts, 0)} → ${fmt(y.mounts, 0)} | ${fmt(x.unmounts, 0)} → ${fmt(y.unmounts, 0)} | ${fmt(x.renders, 0)} → ${fmt(y.renders, 0)} |`)
   }
   return lines.join("\n")
 }
@@ -362,29 +473,64 @@ function compareTable(a, b) {
 async function main() {
   const opts = parseArgs(process.argv.slice(2))
   if (opts.compare) {
-    const [a, b] = await Promise.all(opts.compare.map(async (p) => JSON.parse(await readFile(resolve(ROOT, p), "utf8"))))
+    const files = await Promise.all(opts.compare.map(async (p) => JSON.parse(await readFile(resolve(ROOT, p), "utf8"))))
+    if (files.length === 1) {
+      // One interleaved file: its first two configurations, as before → after.
+      const [f] = files
+      const names = [...new Set(f.results.map(configOf))]
+      const [x, y] = names
+      console.log(`Interleaved in one run (${f.meta.rev}, ${f.meta.date}): ${x} → ${y}\n`)
+      console.log(compareTable(f.results.filter((r) => configOf(r) === x), f.results.filter((r) => configOf(r) === y)))
+      return
+    }
+    const [a, b] = files
     console.log(`Before: ${a.meta.label} (${a.meta.rev}, ${a.meta.date})\nAfter: ${b.meta.label} (${b.meta.rev}, ${b.meta.date})\n`)
-    console.log(compareTable(a, b))
+    console.log(compareTable(a.results, b.results))
     return
   }
   const rev = gitRev()
-  if (opts.build) {
-    console.log("building bench app (production)…")
-    await buildApp()
+  const builds = opts.builds ?? [{ name: null, dir: THIS_BUILD }]
+  const needsThis = opts.saveBuild || builds.some((b) => b.dir === THIS_BUILD)
+  if (opts.build && needsThis) {
+    console.log(`building bench app (production${opts.why ? ", unminified" : ""})…`)
+    await buildApp(opts.why ? { minify: false } : undefined)
   }
-  const preview = await startPreview(5183)
-  const launched = await launchBrowser({ chromium }, preview.url, { gl: opts.gl })
+  if (opts.saveBuild) {
+    await rm(opts.saveBuild, { recursive: true, force: true })
+    await cp(THIS_BUILD, opts.saveBuild, { recursive: true })
+    console.log(`saved the build of ${rev} to ${opts.saveBuild}`)
+    return
+  }
+  // One preview server per distinct build directory, so two configurations can
+  // alternate page by page without rebuilding.
+  const previews = new Map()
+  for (const b of builds) {
+    if (!previews.has(b.dir)) previews.set(b.dir, await startPreview(opts.port + previews.size, b.dir))
+  }
+  const configs = []
+  for (const lib of opts.libs) {
+    for (const b of builds) {
+      // tldraw is the same code in every build of this app; measure it once.
+      if (lib !== "mocanvas" && configs.some((c) => c.lib === lib)) continue
+      const name = lib !== "mocanvas" ? lib : (b.name ?? lib)
+      configs.push({ name, lib, build: b.name, url: previews.get(b.dir).url })
+    }
+  }
+  const launched = await launchBrowser({ chromium }, configs[0].url, { gl: opts.gl })
   const { browser } = launched
   console.log(`chromium ${launched.version}, ${launched.gpu.renderer}`)
+  console.log(`configurations, interleaved: ${configs.map((c) => c.name).join(", ")}`)
   const results = []
   try {
-    for (const lib of opts.libs) {
-      for (const n of opts.n) {
-        for (const kind of opts.kinds) {
-          for (const gesture of opts.gestures) {
-            const runs = []
-            for (let rep = 0; rep < opts.repeats; rep++) {
-              const { page, errors } = await openPage(browser, preview.url, lib, opts.retain === null ? "" : `&retain=${opts.retain}`)
+    for (const n of opts.n) {
+      for (const kind of opts.kinds) {
+        for (const gesture of opts.gestures) {
+          const runs = new Map(configs.map((c) => [c.name, []]))
+          for (let rep = 0; rep < opts.repeats; rep++) {
+            // Rotate the order, so no configuration always runs first.
+            const order = configs.map((_, i) => configs[(i + rep) % configs.length])
+            for (const c of order) {
+              const { page, errors } = await openPage(browser, c.url, c.lib, opts.retain === null ? "" : `&retain=${opts.retain}`, opts.why)
               try {
                 // mocanvas starts in grid mode and tldraw does not; `--grid=off`
                 // measures both without one, `--grid=on` both with.
@@ -393,23 +539,27 @@ async function main() {
                 await page.evaluate(([count, k]) => window.bench.create(count, k, false), [n, kind])
                 await settle(page, 20)
                 const run = await measure(browser, page, gesture)
+                run.order = rep
                 if (errors.length) run.errors = errors.slice(0, 5)
-                runs.push(run)
+                runs.get(c.name).push(run)
               } finally {
                 await page.close()
               }
             }
-            const row = { lib, n, kind, gesture, runs, median: medianOf(runs) }
+          }
+          for (const c of configs) {
+            const rs = runs.get(c.name)
+            const why = whyOf(rs)
+            const row = { config: c.name, lib: c.lib, build: c.build, n, kind, gesture, runs: rs, median: medianOf(rs), spread: spreadOf(rs), ...(why ? { why } : {}) }
             results.push(row)
-            const m = row.median
-            console.log(`${lib} n=${n} ${kind} ${gesture}: main p50 ${fmt(m.mainP50)} p95 ${fmt(m.mainP95)} ms, style ${fmt(m.styleMsPerStep)} ms/step, commits ${m.commits}, mounts ${m.mounts}, unmounts ${m.unmounts}, renders ${m.renders}`)
+            console.log(`${c.name} n=${n} ${kind} ${gesture}: main ${withSpread(row, "mainMsPerStep")} ms/step, p50 ${withSpread(row, "mainP50")} p95 ${withSpread(row, "mainP95")} ms, commits ${withSpread(row, "commits", 0)}, mounts ${row.median.mounts}, renders ${row.median.renders}`)
           }
         }
       }
     }
   } finally {
     await browser.close()
-    await preview.close()
+    for (const p of previews.values()) await p.close()
   }
   const out = {
     meta: {
@@ -425,6 +575,7 @@ async function main() {
       viewport: VIEWPORT,
       repeats: opts.repeats,
       grid: opts.grid,
+      interleaved: configs.map((c) => ({ name: c.name, lib: c.lib, build: c.build })),
     },
     results,
   }
@@ -432,7 +583,8 @@ async function main() {
   const file = resolve(RESULTS_DIR, `dom-overlay-${opts.label}.json`)
   await writeFile(file, JSON.stringify(out, null, 2) + "\n")
   console.log(`\nwrote ${file}\n`)
-  console.log(table(results, opts.libs))
+  console.log(table(results))
+  if (opts.why) console.log(`\nWhat rendered, per gesture:\n${whyTable(results)}`)
 }
 
 main().catch((e) => {

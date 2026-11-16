@@ -600,8 +600,17 @@ export class EngineBridge {
     return this.engine.hit_test(pageX, pageY, tolerance, filter)
   }
 
-  /** Handles in draw order. `mode` 0 = intersects, 1 = contains. Returns a copy. */
-  queryBox(minX: number, minY: number, maxX: number, maxY: number, mode: 0 | 1 = 0, filter = 0): Uint32Array {
+  /**
+   * Handles in draw order. Returns a copy. `mode`:
+   *
+   * - 0: the outline meets the box, or the shape lies inside it;
+   * - 1: the shape's page bounds lie inside the box;
+   * - 2: the shape's page bounds overlap the box — candidates only, for a
+   *   caller that runs its own finer test (the interior of a hollow shape).
+   *
+   * Page bounds here are ink bounds: the outline grown by half the stroke.
+   */
+  queryBox(minX: number, minY: number, maxX: number, maxY: number, mode: 0 | 1 | 2 = 0, filter = 0): Uint32Array {
     const n = this.engine.query_box(minX, minY, maxX, maxY, mode, filter)
     return new Uint32Array(this.memory.buffer, this.engine.handles_ptr(), n).slice()
   }

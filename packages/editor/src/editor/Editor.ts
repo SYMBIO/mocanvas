@@ -1122,9 +1122,32 @@ export class Editor extends EventEmitter<EditorEvents> {
     return target !== undefined && this.handledEvents.has(target)
   }
 
+  /**
+   * The current page's id.
+   *
+   * A computed over the instance record rather than a read of it: the instance
+   * record also carries the cursor, the brush and the scribbles, which change
+   * on pointer moves, and everything keyed on the page — its state, its shapes,
+   * the selection, the overlay — read the page through here. A reader is now
+   * re-run when the page changes, not whenever the cursor does.
+   */
   getCurrentPageId(): PageId {
-    return this.getInstanceState().currentPageId
+    return this._currentPageId.get()
   }
+
+  private readonly _currentPageId: Computed<PageId> = computed("editor.currentPageId", () => this.getInstanceState().currentPageId)
+
+  /*
+   * The page-state fields readers ask for one at a time, each behind a computed
+   * so that a reader of one is not re-run by a change to another — the hovered
+   * shape changes on pointer moves, and the overlay layer reads the editing
+   * shape. The store keeps a field's value when an update leaves it alone, so
+   * an unchanged array compares equal by identity.
+   */
+  private readonly _hoveredShapeId: Computed<ShapeId | null> = computed("editor.hoveredShapeId", () => this.getCurrentPageState().hoveredShapeId)
+  private readonly _editingShapeId: Computed<ShapeId | null> = computed("editor.editingShapeId", () => this.getCurrentPageState().editingShapeId)
+  private readonly _selectedShapeIds: Computed<ShapeId[]> = computed("editor.selectedShapeIds", () => this.getCurrentPageState().selectedShapeIds)
+  private readonly _hintingShapeIds: Computed<ShapeId[]> = computed("editor.hintingShapeIds", () => this.getCurrentPageState().hintingShapeIds)
 
   getCurrentPage(): Page {
     return this.getPage(this.getCurrentPageId())!
@@ -1309,19 +1332,51 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this._currentPageShapeIds.get()
   }
 
+  /**
+   * Every shape on the current page in draw order: parents before their
+   * children, siblings by index.
+   *
+   * Hit testing, the drop-target search and the overlay's kept set all start
+   * here, several times per pointer move, so it is computed once per change to
+   * the page and shared. It used to sort each parent's children by filtering
+   * every shape on the page — N² comparisons per call, ~3 ms a call on 1,000
+   * shapes and three calls per drag step. The array is a copy: change it freely.
+   */
   getCurrentPageShapesSorted(): UnknownShape[] {
+    return this._currentPageShapesSorted.get().slice()
+  }
+
+  private readonly _currentPageShapesSorted: Computed<readonly UnknownShape[]> = computed("editor.currentPageShapesSorted", () => {
+    const byParent = this._sortedChildrenByParent.get()
     const result: UnknownShape[] = []
     const visit = (parentId: ParentId): void => {
-      for (const child of this.getSortedChildIdsForParent(parentId)) {
-        const shape = this.getShape<UnknownShape>(child)
-        if (!shape) continue
+      const children = byParent.get(parentId)
+      if (!children) return
+      for (const shape of children) {
         result.push(shape)
         visit(shape.id)
       }
     }
     visit(this.getCurrentPageId())
     return result
-  }
+  })
+
+  /**
+   * Every parent's children, sorted by index, from one pass over the shapes.
+   * Within a parent the input order is store order, as the per-parent filter
+   * it replaces saw it, so ties between equal indexes break the same way.
+   */
+  private readonly _sortedChildrenByParent: Computed<ReadonlyMap<ParentId, readonly UnknownShape[]>> = computed("editor.sortedChildrenByParent", () => {
+    const groups = new Map<ParentId, UnknownShape[]>()
+    for (const shape of this._allShapes.get()) {
+      const group = groups.get(shape.parentId)
+      if (group) group.push(shape)
+      else groups.set(shape.parentId, [shape])
+    }
+    const sorted = new Map<ParentId, readonly UnknownShape[]>()
+    for (const [parentId, group] of groups) sorted.set(parentId, group.length > 1 ? sortByIndex(group) : group)
+    return sorted
+  })
 
   getPageShapeIds(pageId: PageId): ShapeId[] {
     return this._allShapes
@@ -1442,8 +1497,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   getSortedChildIdsForParent(parentId: ParentId): ShapeId[] {
-    const children = this._allShapes.get().filter((s) => s.parentId === parentId)
-    return sortByIndex(children).map((s) => s.id)
+    return (this._sortedChildrenByParent.get().get(parentId) ?? []).map((s) => s.id)
   }
 
   /**
@@ -1462,9 +1516,9 @@ export class Editor extends EventEmitter<EditorEvents> {
    * before this still sorts exactly as it did.
    */
   getHighestIndexForParent(parentId: ParentId): IndexKey {
-    const children = this._allShapes.get().filter((s) => s.parentId === parentId)
-    if (children.length === 0) return getIndexAbove(ZERO_INDEX_KEY)
-    return getIndexAbove(sortByIndex(children).at(-1)!.index)
+    const children = this._sortedChildrenByParent.get().get(parentId)
+    if (!children?.length) return getIndexAbove(ZERO_INDEX_KEY)
+    return getIndexAbove(children.at(-1)!.index)
   }
 
   getShapeGeometry<G extends Geometry2d = Geometry2d>(shape: UnknownShape | ShapeId): G {
@@ -1623,16 +1677,22 @@ export class Editor extends EventEmitter<EditorEvents> {
     // caller explicitly asked for is unreachable.
     //
     // For that one case the candidates are the shapes whose bounds contain the
-    // point. It is a scan of the page rather than a tree query, which is why it
-    // is not the default — but it is a superset of the outline set (an outline
-    // within `margin` of the point sits inside bounds that contain it), so the
-    // two never need merging, and `hitInside` is a deliberate, rare path.
+    // point — a superset of the outline set (an outline within `margin` of the
+    // point sits inside bounds that contain it), so the two never need merging.
+    // They come from the engine's spatial index, bounds only, in draw order:
+    // the canvas asks this on every pointer move, and the scan of the whole
+    // page it replaces cost 4 ms a move on 1,000 shapes. The index holds ink
+    // bounds, which contain the geometry bounds tested below, and locked or
+    // hidden shapes are let through because this path never filtered them.
     let candidates: UnknownShape[]
     if (opts.hitInside) {
-      // Sorted: `getCurrentPageShapes` is store order, not draw order, and the
-      // result of this method is documented topmost-first.
-      candidates = this.getCurrentPageShapesSorted().filter((s) => this.getShapePageBounds(s)?.containsPoint(point, margin))
-      candidates.reverse()
+      const handles = this.engine.queryBox(point.x - margin, point.y - margin, point.x + margin, point.y + margin, 2, HIT_ALL_BITS)
+      candidates = []
+      for (let i = handles.length - 1; i >= 0; i--) {
+        const id = this.handles.id(handles[i]!)
+        const shape = id ? this.getShape<UnknownShape>(id as ShapeId) : undefined
+        if (shape && this.getShapePageBounds(shape)?.containsPoint(point, margin)) candidates.push(shape)
+      }
     } else {
       const handles = this.engine.queryBox(point.x - margin, point.y - margin, point.x + margin, point.y + margin, 0, this.hitFilterBits(opts))
       candidates = []
@@ -1766,8 +1826,11 @@ export class Editor extends EventEmitter<EditorEvents> {
         let next: T = {
           ...prev,
           ...partial,
-          props: partial.props ? { ...prev.props, ...partial.props } : prev.props,
-          meta: partial.meta ? { ...prev.meta, ...partial.meta } : prev.meta,
+          // The object itself is kept when the update changes none of its
+          // values: a shape body is memoized on `props` identity, and a move
+          // that restated a prop re-rendered it for nothing.
+          props: mergeChanged(prev.props, partial.props),
+          meta: mergeChanged(prev.meta, partial.meta),
         } as T
         const adjusted = util.onBeforeUpdate?.(prev, next) as T | undefined
         if (adjusted) next = adjusted
@@ -2502,7 +2565,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   // ---- selection ---------------------------------------------------------
 
   getSelectedShapeIds(): ShapeId[] {
-    return this.getCurrentPageState().selectedShapeIds
+    return this._selectedShapeIds.get()
   }
 
   getSelectedShapes(): Shape[] {
@@ -2565,7 +2628,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   getHoveredShapeId(): ShapeId | null {
-    return this.getCurrentPageState().hoveredShapeId
+    return this._hoveredShapeId.get()
   }
 
   getHoveredShape(): UnknownShape | undefined {
@@ -2580,7 +2643,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   getEditingShapeId(): ShapeId | null {
-    return this.getCurrentPageState().editingShapeId
+    return this._editingShapeId.get()
   }
 
   getEditingShape(): UnknownShape | undefined {
@@ -2632,7 +2695,7 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   /** The shapes currently marked as drop targets. */
   getHintingShapeIds(): ShapeId[] {
-    return this.getCurrentPageState().hintingShapeIds
+    return this._hintingShapeIds.get()
   }
 
   /** The shape records behind `getHintingShapeIds()`, skipping any that are gone. */
@@ -4991,6 +5054,21 @@ export class Editor extends EventEmitter<EditorEvents> {
 }
 
 const EMPTY_ID_SET: ReadonlySet<ShapeId> = new Set()
+
+/**
+ * `prev` with `partial`'s fields written over it — or `prev` itself, the same
+ * object, when there is no partial or none of its fields changes a value.
+ */
+function mergeChanged<T extends object>(prev: T, partial: Partial<T> | undefined): T {
+  if (!partial) return prev
+  for (const key in partial) {
+    if (!Object.is(partial[key], prev[key]) || !(key in prev)) return { ...prev, ...partial }
+  }
+  return prev
+}
+
+/** Engine hit-filter bits that let locked (1) and hidden (2) shapes through. */
+const HIT_ALL_BITS = 1 | 2
 
 function sameIdSet(a: ReadonlySet<ShapeId>, b: ReadonlySet<ShapeId>): boolean {
   if (a === b) return true
